@@ -57,7 +57,7 @@ class BajaDeEquipoResultadoDto {
   final BajaDeEquipoResultadoDtoModoDeTerminal? modoDeTerminal;
   final bool canalDeAudioHabilitado;
 
-  /// Flujo de video; `null` = 102
+  /// Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay)
   final String? canalDeVideo;
   final String? zonaId;
   final CapacidadesDeEquipoDto? capacidades;

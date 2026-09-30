@@ -2526,7 +2526,7 @@ export interface components {
             /** @enum {string|null} */
             modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
             canalDeAudioHabilitado: boolean;
-            /** @description Flujo de video; `null` = 102 */
+            /** @description Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay) */
             canalDeVideo: string | null;
             /** Format: uuid */
             zonaId: string | null;
@@ -3215,7 +3215,7 @@ export interface components {
             /** @enum {string|null} */
             modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
             canalDeAudioHabilitado: boolean;
-            /** @description Flujo de video; `null` = 102 */
+            /** @description Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay) */
             canalDeVideo: string | null;
             /** Format: uuid */
             zonaId: string | null;
@@ -3259,7 +3259,7 @@ export interface components {
             /** @enum {string|null} */
             modoDeTerminal: "reporta_y_espera" | "decide_el_equipo" | null;
             canalDeAudioHabilitado: boolean;
-            /** @description Flujo de video; `null` = 102 */
+            /** @description Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay) */
             canalDeVideo: string | null;
             /** Format: uuid */
             zonaId: string | null;

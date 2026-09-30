@@ -434,9 +434,11 @@ export class GuardiaController {
    * HU-28 · CU-03 flujo alterno 1 — el residente no contesta al intercom, y el
    * operador le avisa por otra vía.
    *
-   * Hoy el aviso se encola en el notificador; FCM llega con la ETAPA 11, que es
-   * la dueña del registro de tokens del dispositivo. Lo que **sí** existe ya es
-   * la constancia: que se intentó avisar, a qué vivienda y cuándo.
+   * Lo que existe es la constancia: que se intentó avisar, a qué vivienda,
+   * desde qué equipo, quién y cuándo. O6 (15-N) · el envío a la app del
+   * residente NO está cableado (el notificador push sigue siendo el
+   * provisional), y la respuesta lo dice en vez de prometerlo:
+   * PENDIENTE DE DEFINICIÓN (DT-15N-02).
    */
   // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
   @SoloGuardiaRemota()
@@ -470,7 +472,9 @@ export class GuardiaController {
     await this.escalar.ejecutar(alerta.valor, ctx.usuarioId);
     return {
       aceptado: true,
-      detalle: 'El aviso queda registrado; el envío por FCM llega en la ETAPA 11',
+      detalle:
+        'Aviso registrado en Alertas. Todavía no le llega a la app del residente: ' +
+        'avísele por teléfono o por el citófono',
     };
   }
 

@@ -18,13 +18,16 @@ export interface CanalDeclarado {
   readonly codec: string | null;
 }
 
-/** El subflujo (`x02`) si existe; si no, el primero; sin lista, vacío (= 102). */
+/**
+ * El subflujo (`x02`) si existe; si no, el primero; sin lista, vacío. Vacío NO
+ * es el 102 (V2, 15-N): la API usa el que el equipo declare al sondearlo.
+ */
 export const canalPorOmision = (canales: readonly CanalDeclarado[] | undefined): string =>
   canales?.find((c) => c.id.endsWith('02'))?.id ?? canales?.[0]?.id ?? '';
 
 const AYUDA =
-  'Canal × 100 + flujo: 102 es el subflujo de la primera cámara (el que mejor ve el ' +
-  'navegador); 101 el principal. Vacío = 102.';
+  'Canal × 100 + flujo: x02 es el subflujo (el que mejor ve el navegador), x01 el ' +
+  'principal. Vacío: el que el equipo declare; use «Probar conexión» para verlos.';
 
 export const CampoCanalDeVideo = ({
   valor,
@@ -43,7 +46,7 @@ export const CampoCanalDeVideo = ({
       <Campo
         etiqueta="Canal de video (opcional)"
         inputMode="numeric"
-        placeholder="102"
+        placeholder="101, 102…"
         value={valor}
         onChange={(e) => alCambiar(e.target.value)}
         ayuda={AYUDA}

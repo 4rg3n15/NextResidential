@@ -50,7 +50,8 @@ import { AYUDA_GUARDIA_REMOTA, MENSAJE_GUARDIA_REMOTA } from '@/lib/guardia-remo
  * LOS CUATRO FLUJOS ALTERNOS DE CU-03, Y DÓNDE ESTÁ CADA UNO
  *
  *  1. **El residente no responde** → «Avisar al residente» deja constancia del
- *     intento y del texto. El envío por FCM llega en la ETAPA 11.
+ *     intento y del texto. El envío a la app del residente no está cableado
+ *     (O6, 15-N): la consola lo dice en vez de prometerlo.
  *  2. **El residente niega** → es una negación con motivo, el mismo diálogo:
  *     el operador escribe que la vivienda no confirma.
  *  3. **El operador está ocupado en otra copropiedad** → el canal de audio es
@@ -482,7 +483,8 @@ export const PantallaDeGuardiaVirtual = ({
 
                   {avisar.isSuccess ? (
                     <p aria-live="polite" className="text-secundario text-exito-texto">
-                      Aviso registrado. El envío por FCM llega con la ETAPA 11.
+                      Aviso registrado en Alertas. Todavía no le llega a la app del residente:
+                      avísele por teléfono o por el citófono.
                     </p>
                   ) : null}
                   {emergencia.isSuccess ? (

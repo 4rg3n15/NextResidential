@@ -115,7 +115,8 @@ export class AltaDeEquipoDto {
 
   /**
    * C2/D2 (15-L) · el flujo de video: canal×100+flujo de la guía del
-   * fabricante (101 el principal del canal 1, 102 su subflujo). Sin él, 102.
+   * fabricante (101 el principal del canal 1, 102 su subflujo). Sin él, el que
+   * el equipo DECLARA (V2, 15-N): nunca un 102 supuesto.
    */
   @ApiPropertyOptional({ type: String, pattern: '^[1-9][0-9]{2,3}$', example: '102' })
   @IsOptional()
@@ -249,7 +250,11 @@ export class EquipoDto {
   @ApiProperty({ type: String, nullable: true, enum: ['reporta_y_espera', 'decide_el_equipo'] })
   modoDeTerminal!: string | null;
   @ApiProperty({ type: Boolean }) canalDeAudioHabilitado!: boolean;
-  @ApiProperty({ type: String, nullable: true, description: 'Flujo de video; `null` = 102' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Flujo de video; `null` = el que el equipo declara (subflujo x02 si lo hay)',
+  })
   canalDeVideo!: string | null;
   @ApiProperty({ type: String, nullable: true, format: 'uuid' }) zonaId!: string | null;
   @ApiProperty({ type: CapacidadesDeEquipoDto, nullable: true })

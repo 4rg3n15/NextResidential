@@ -102,6 +102,10 @@ describe('O3 · el aviso al residente', () => {
     fireEvent.click(boton);
     await waitFor(() => expect(avisos).toHaveLength(1));
     expect(avisos[0]).toMatchObject({ viviendaId: VIVIENDA, dispositivoId: PORTERO });
+    // O6 (15-N) · la ETAPA 11 ya cerró y el aviso NO le llega al residente: la
+    // consola no puede prometer un envío que no ocurre.
+    await screen.findByText(/no le llega a la app del residente/);
+    expect(screen.queryByText(/ETAPA 11/)).toBeNull();
   });
 
   it('sin vivienda no se puede avisar: nunca manda la copropiedad como vivienda', async () => {

@@ -226,7 +226,12 @@ describe('O3 · el aviso al residente, atribuido al operador y al equipo', () =>
       .post(`/copropiedades/${COP_B}/guardia/avisar-residente`)
       .set('Authorization', `Bearer ${token}`)
       .send({ viviendaId: VIVIENDA, dispositivoId: VIDEOPORTERO, texto: 'Tiene una visita' })
-      .expect(202);
+      .expect(202)
+      .expect((r) => {
+        // O6 (15-N) · la respuesta no promete un envío que no ocurre.
+        expect(r.body.detalle).not.toMatch(/ETAPA 11/);
+        expect(r.body.detalle).toMatch(/no le llega a la app del residente/);
+      });
 
     const admin = await como('administrador', COP_B);
     const delEquipo = await request(app.getHttpServer())
