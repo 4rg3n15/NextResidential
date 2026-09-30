@@ -271,7 +271,13 @@ export class HikvisionProvider
       const resultado = await barrera.accionar(dispositivoId, true);
       // H-1 · `aceptada` NO afirma que el vehículo pasara. El puerto tampoco lo
       // afirma: dice que la orden se aceptó.
-      return { aceptado: resultado.estado === 'aceptada', latenciaMs: resultado.latenciaMs };
+      // O1 (15-N) · y un rechazo del equipo viaja con su motivo: no es «no
+      // respondió» (DT-15M-06). La orden enviada no cambia.
+      return {
+        aceptado: resultado.estado === 'aceptada',
+        latenciaMs: resultado.latenciaMs,
+        ...(resultado.estado === 'rechazada' ? { rechazo: resultado.motivo } : {}),
+      };
     }
     // A5 · ocupado o nonce vencido se reintentan con dispersión; nada más.
     return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
