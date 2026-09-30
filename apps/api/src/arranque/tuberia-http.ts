@@ -2,12 +2,12 @@ import type { INestApplication } from '@nestjs/common';
 import express from 'express';
 import { BITACORA, GENERADOR_DE_ID } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId } from '@ncr/domain-core';
-import { guardarCuerpoCrudo } from '../autorizaciones/presentacion/guardia-firma';
 import {
+  guardarCuerpoCrudo,
   LIMITE_DE_FOTOGRAFIA,
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
-} from '../autorizaciones/presentacion/limites';
-import { RUTAS_CON_FOTO_DE_VISITA } from '../visitas/presentacion/limites';
+} from '../autorizaciones';
+import { RUTAS_CON_FOTO_DE_VISITA } from '../visitas';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../comun/sobre-de-equipo';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../comun/ruta-de-video';

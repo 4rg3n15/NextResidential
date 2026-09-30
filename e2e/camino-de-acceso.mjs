@@ -633,7 +633,18 @@ const principal = async () => {
     const pRed = await ctxRed.newPage();
     const erroresRed = [];
     pRed.on('console', (m) => {
-      if (m.type() === 'error') erroresRed.push(m.text());
+      if (m.type() !== 'error') return;
+      // «Failed to load resource» lleva la URL del recurso en su ubicación.
+      const donde = m.location().url;
+      erroresRed.push(
+        donde ? `${m.text()} · ${new URL(donde).pathname}${new URL(donde).search}` : m.text(),
+      );
+    });
+    // «Failed to load resource: 404» no dice CUÁL: sin la URL, un rojo por IP
+    // no se puede diagnosticar. Se anota qué petición falló y con qué estado.
+    const fallidasRed = [];
+    ctxRed.on('response', (r) => {
+      if (r.status() >= 400) fallidasRed.push(`${String(r.status())} ${new URL(r.url()).pathname}`);
     });
 
     await pRed.goto(`${baseRed}/acceso`, { waitUntil: 'networkidle' });
@@ -763,6 +774,7 @@ const principal = async () => {
 
     afirmar(erroresRed.length === 0, `sin errores de consola por IP (${erroresRed.length})`);
     if (erroresRed.length > 0) erroresRed.slice(0, 5).forEach((e) => console.log(`     · ${e}`));
+    if (erroresRed.length > 0) fallidasRed.slice(0, 5).forEach((f) => console.log(`     · ${f}`));
     await ctxRed.close();
   }
 
