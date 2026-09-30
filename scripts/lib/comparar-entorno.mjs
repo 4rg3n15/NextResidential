@@ -26,7 +26,26 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const raiz = resolve(import.meta.dirname, '..', '..');
+/**
+ * `--raiz <carpeta>` sólo lo usan las pruebas (un repositorio de mentira en una
+ * carpeta temporal); sin él, el repositorio de este guion.
+ */
+const indiceDeRaiz = process.argv.indexOf('--raiz');
+const raiz =
+  indiceDeRaiz >= 0 && process.argv[indiceDeRaiz + 1] !== undefined
+    ? resolve(process.argv[indiceDeRaiz + 1])
+    : resolve(import.meta.dirname, '..', '..');
+
+/**
+ * O5 (15-N) · un nombre que huele a SECRETO. Si el `.example` ya no lo
+ * declara, nadie lo lee y sigue en disco: no es una errata, es una llave
+ * olvidada (hoy, `SUPABASE_SECRET_KEY` en `apps/edge/.env`). Lo público por
+ * definición —la llave publicable, `NEXT_PUBLIC_*`— no cuenta.
+ */
+const SECRETO =
+  /(SECRET|SECRETO|CLAVE|PASSWORD|CONTRASENA|TOKEN|LLAVE|PRIVAD|CREDENCIAL|_KEY$|_KEY_|^DATABASE.*URL$)/;
+const PUBLICO = /(PUBLISHABLE|PUBLICA|^NEXT_PUBLIC_)/;
+const esSecreto = (nombre) => SECRETO.test(nombre) && !PUBLICO.test(nombre);
 
 /** Nombre de variable al principio de línea, con o sin comentario delante. */
 const NOMBRE = /^\s*(#\s*)?([A-Z][A-Z0-9_]*)\s*=/;
@@ -86,9 +105,9 @@ for (const app of aplicaciones) {
   const definidas = leerDefinidas(real);
   const faltan = [...obligatorias].filter((n) => !definidas.has(n));
   const vacias = [...obligatorias].filter((n) => definidas.get(n) === '' && !admitenVacio.has(n));
-  const desconocidas = [...definidas.keys()].filter(
-    (n) => !obligatorias.has(n) && !opcionales.has(n),
-  );
+  const sobrantes = [...definidas.keys()].filter((n) => !obligatorias.has(n) && !opcionales.has(n));
+  const secretosObsoletos = sobrantes.filter(esSecreto);
+  const desconocidas = sobrantes.filter((n) => !esSecreto(n));
 
   // El valor que se tragó el nombre de otra variable (D-61). Se busca solo
   // entre los nombres declarados en el propio `.example`: cualquier `algo=`
@@ -104,7 +123,12 @@ for (const app of aplicaciones) {
   const sinSaltoFinal = contenido.length > 0 && !contenido.endsWith('\n');
 
   const hayAlgo =
-    faltan.length || vacias.length || desconocidas.length || pegadas.length || sinSaltoFinal;
+    faltan.length ||
+    vacias.length ||
+    desconocidas.length ||
+    secretosObsoletos.length ||
+    pegadas.length ||
+    sinSaltoFinal;
   console.log(`\napps/${app}/.env  ${hayAlgo ? '' : '· al día'}`);
 
   for (const [nombre, otra] of pegadas) {
@@ -123,6 +147,13 @@ for (const app of aplicaciones) {
   if (vacias.length) {
     problemas += vacias.length;
     console.log(`  ✗ declaradas pero vacías: ${vacias.join(', ')}`);
+  }
+  for (const nombre of secretosObsoletos) {
+    avisos++;
+    console.log(`  ‼ SECRETO OBSOLETO: bórrelo. ${nombre} no lo declara el .example: nadie lo`);
+    console.log(
+      '    lee y la llave sigue en disco. Quite la línea (y rótela si pudo salir de aquí)',
+    );
   }
   if (desconocidas.length) {
     avisos += desconocidas.length;
