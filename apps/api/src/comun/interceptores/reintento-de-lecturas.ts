@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import type { Observable } from 'rxjs';
 import { retry, tap, throwError, timer } from 'rxjs';
 import type { Bitacora } from '@ncr/domain-core';
-import { esErrorDeConexion } from '../../persistencia/con-cliente';
+import { esCorteDeConexionAbierta } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -19,6 +19,12 @@ import { esErrorDeConexion } from '../../persistencia/con-cliente';
  * UNA sola vez, y sólo si la respuesta no empezó (un flujo SSE que ya emitió
  * no se reabre por debajo): si la base sigue caída, el segundo fallo es el que
  * se responde.
+ *
+ * Y sólo si se cortó una conexión que YA estaba abierta. Si la base no se
+ * alcanza o el pooler está lleno, repetir 100 ms después sólo duplica la carga
+ * sobre lo que ya está saturado —en sitio, el pooler—. Lo destapó la primera
+ * corrida del verificador de la 15-O: con la base inalcanzable cada `GET`
+ * tardaba 100 ms más y una prueba de límites pasó de 0,4 s a 4,2 s.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const ESPERA_ANTES_DEL_REINTENTO_MS = 100;
@@ -38,7 +44,7 @@ export class InterceptorDeReintentoDeLecturas implements NestInterceptor {
       retry({
         count: 1,
         delay: (error: unknown) => {
-          if (emitio || !esErrorDeConexion(error)) return throwError(() => error);
+          if (emitio || !esCorteDeConexionAbierta(error)) return throwError(() => error);
           this.bitacora.registrar('aviso', 'lectura reintentada tras un corte de la base', {
             metodo: peticion.method,
             ruta: peticion.path,

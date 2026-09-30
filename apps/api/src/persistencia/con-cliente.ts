@@ -62,6 +62,37 @@ export const esErrorDeConexion = (error: unknown): boolean => {
 };
 
 /**
+ * 15-O · no se pudo ABRIR una conexión: la base no se alcanza, el pooler está
+ * lleno o no contestó a tiempo. Repetir enseguida no ayuda —y con el pooler
+ * lleno, empeora—. Es lo contrario de un corte de una conexión ya abierta.
+ */
+const CODIGOS_AL_ABRIR = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  '53300',
+]);
+const MENSAJES_AL_ABRIR =
+  /timeout exceeded when trying to connect|EMAXCONN|max clients reached|too many (clients|connections)|remaining connection slots|getaddrinfo/i;
+
+/**
+ * 15-O · la base cortó una conexión que YA estaba abierta (el pooler la
+ * cerró por inactividad, la administración la terminó, se cayó el socket). El
+ * pool la descartó: otra petición abrirá otra, así que repetir una lectura una
+ * vez tiene sentido. No abrirla, no (`CODIGOS_AL_ABRIR`).
+ */
+export const esCorteDeConexionAbierta = (error: unknown): boolean => {
+  const causa = error instanceof BaseDeDatosNoDisponible ? error.causa : error;
+  if (!esErrorDeConexion(causa)) return false;
+  const codigo =
+    causa !== null && typeof causa === 'object' ? (causa as { code?: unknown }).code : undefined;
+  if (typeof codigo === 'string' && CODIGOS_AL_ABRIR.has(codigo)) return false;
+  return !MENSAJES_AL_ABRIR.test(causa instanceof Error ? causa.message : '');
+};
+
+/**
  * La base no está disponible AHORA. No es un fallo del programa: el filtro
  * global la responde con 503 y `Retry-After`, y el pool ya descartó la
  * conexión rota.

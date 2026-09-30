@@ -73,6 +73,26 @@ describe('15-O · una lectura cortada se reintenta una vez', () => {
     expect(m.llamadas()).toBe(1);
   });
 
+  it.each([
+    [
+      'la base no se alcanza',
+      () => Object.assign(new Error('getaddrinfo ENOTFOUND base'), { code: 'ENOTFOUND' }),
+    ],
+    [
+      'el pooler está lleno',
+      () => new Error('EMAXCONNSESSION max clients reached in session mode'),
+    ],
+    ['no hubo conexión a tiempo', () => new Error('timeout exceeded when trying to connect')],
+  ])('%s: NO se repite (sólo duplicaría la carga)', async (_n, error) => {
+    const { interceptor, registrar } = montar();
+    const m = manejador(1, error);
+    await expect(
+      firstValueFrom(interceptor.intercept(contexto('GET'), m.handler)),
+    ).rejects.toThrow();
+    expect(m.llamadas()).toBe(1);
+    expect(registrar).not.toHaveBeenCalled();
+  });
+
   it('un flujo que ya emitió no se reabre por debajo', async () => {
     const { interceptor } = montar();
     let suscripciones = 0;

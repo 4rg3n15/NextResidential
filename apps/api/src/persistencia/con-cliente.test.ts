@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg';
 import {
   BaseDeDatosNoDisponible,
   conCliente,
+  esCorteDeConexionAbierta,
   esErrorDeConexion,
   motivoSinSecretos,
   saludDe,
@@ -52,6 +53,35 @@ describe('15-O · esErrorDeConexion', () => {
     ['un texto', 'Connection terminated'],
   ])('no confunde %s con un corte', (_n, error) => {
     expect(esErrorDeConexion(error)).toBe(false);
+  });
+});
+
+describe('15-O · esCorteDeConexionAbierta: qué merece repetir una lectura', () => {
+  it.each([
+    ['el socket que se cerró', new Error('Connection terminated unexpectedly'), true],
+    ['la sesión terminada por la administración', { code: '57P01' }, true],
+    ['ECONNRESET', { code: 'ECONNRESET' }, true],
+    [
+      'envuelto en BaseDeDatosNoDisponible',
+      new BaseDeDatosNoDisponible(new Error('Connection terminated')),
+      true,
+    ],
+    ['la base que no se alcanza', { code: 'ECONNREFUSED' }, false],
+    [
+      'el host que no resuelve',
+      Object.assign(new Error('getaddrinfo ENOTFOUND base'), { code: 'ENOTFOUND' }),
+      false,
+    ],
+    ['el pooler lleno', new Error('EMAXCONNSESSION max clients reached in session mode'), false],
+    ['demasiadas conexiones', { code: '53300' }, false],
+    [
+      'el tope de espera del pool',
+      new BaseDeDatosNoDisponible(new Error('timeout exceeded when trying to connect')),
+      false,
+    ],
+    ['un error de negocio', { code: '23505' }, false],
+  ])('%s → %s', (_n, error, esperado) => {
+    expect(esCorteDeConexionAbierta(error)).toBe(esperado);
   });
 });
 
