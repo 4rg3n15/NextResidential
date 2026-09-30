@@ -14,6 +14,8 @@ import { ALMACEN_EVIDENCIA, BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain
 import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { ALERTAS_DE_EQUIPO, AbrirAlertaDeEquipo } from './aplicacion/deduplicacion-de-alertas';
+import { AlertasDelCicloDelEquipo } from './aplicacion/alertas-del-ciclo-del-equipo';
+import { ARCHIVO_DE_ALERTAS_DEL_EQUIPO } from '../equipos';
 import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import type { Configuracion } from '../configuracion/esquema';
 import { Pool } from 'pg';
@@ -475,6 +477,7 @@ export class EventosModule {
             RELOJ,
             GENERADOR_DE_ID,
             BITACORA,
+            AlertasDelCicloDelEquipo,
           ],
           useFactory: (
             dispositivos: RepositorioDispositivos,
@@ -483,8 +486,17 @@ export class EventosModule {
             reloj: Reloj,
             ids: GeneradorDeId,
             bitacora: Bitacora,
-          ) => new VigilarLatidos(dispositivos, alertas, escalador, reloj, ids, bitacora),
+            ciclo: AlertasDelCicloDelEquipo,
+          ) => new VigilarLatidos(dispositivos, alertas, escalador, reloj, ids, bitacora, ciclo),
         },
+        {
+          // A1 (15-N) · la caída se resuelve sola al volver la señal; la baja archiva.
+          provide: AlertasDelCicloDelEquipo,
+          inject: [REPOSITORIO_ALERTAS, RELOJ, BITACORA],
+          useFactory: (alertas: RepositorioAlertas, reloj: Reloj, bitacora: Bitacora) =>
+            new AlertasDelCicloDelEquipo(alertas, reloj, bitacora),
+        },
+        { provide: ARCHIVO_DE_ALERTAS_DEL_EQUIPO, useExisting: AlertasDelCicloDelEquipo },
       ],
       exports: [
         REPOSITORIO_EVENTOS,
@@ -502,6 +514,8 @@ export class EventosModule {
         REPOSITORIO_ALERTAS,
         REPOSITORIO_DISPOSITIVOS,
         ALERTAS_DE_EQUIPO,
+        AlertasDelCicloDelEquipo,
+        ARCHIVO_DE_ALERTAS_DEL_EQUIPO,
         CANAL_TIEMPO_REAL,
         CanalEnProceso,
         RegistrarAcceso,

@@ -83,7 +83,9 @@ export class RepositorioAlertasEnMemoria implements RepositorioAlertas {
         !this.archivadas.has(`${copropiedadId}|${a.id}`) &&
         ((filtro?.dispositivoId ?? null) === null || a.dispositivoId === filtro?.dispositivoId) &&
         ((filtro?.severidad ?? null) === null || a.severidad === filtro?.severidad) &&
-        ((filtro?.tipo ?? null) === null || a.tipo === filtro?.tipo),
+        ((filtro?.tipo ?? null) === null || a.tipo === filtro?.tipo) &&
+        a.generadaEn.getTime() >= (filtro?.desde ?? new Date(0)).getTime() &&
+        a.generadaEn.getTime() < (filtro?.hasta ?? new Date(8.64e15)).getTime(),
     );
   }
 

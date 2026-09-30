@@ -22,6 +22,8 @@ import { LECTOR_DE_SENALES, hallazgoDeEventos } from '../aplicacion/senal-de-eve
 import { entradasDeEstado, estadoDelEquipo } from '../aplicacion/estado-del-equipo';
 import { ModuleRef } from '@nestjs/core';
 import { RETIRO_DE_PLANTILLAS_DE_EQUIPO } from '../aplicacion/retiro-de-plantillas';
+import { ARCHIVO_DE_ALERTAS_DEL_EQUIPO } from '../aplicacion/archivo-de-alertas-del-equipo';
+import type { ArchivoDeAlertasDelEquipo } from '../aplicacion/archivo-de-alertas-del-equipo';
 import type {
   ResultadoDeRetiroDePlantillas,
   RetiroDePlantillasDeEquipo,
@@ -616,6 +618,20 @@ export class EquiposController {
         : { retiradas: 0, pendientes: 0 };
     const equipo = await this.repo.desactivar(ctx, copropiedadId, equipoId, dto.motivo);
     if (equipo === null) throw new NotFoundException('No se encontró el equipo');
+    // A1 (15-N) · sus alertas abiertas no las va a cerrar nadie: se archivan.
+    const archivadas = await this.archivarAlertas(
+      copropiedadId,
+      equipoId,
+      dto.motivo,
+      ctx.usuarioId,
+    );
+    if (archivadas > 0) {
+      await this.repo.auditarCorreccion(
+        ctx,
+        copropiedadId,
+        `${equipo.nombre} · baja: ${String(archivadas)} alerta(s) abierta(s) archivada(s)`,
+      );
+    }
     if (retiro.retiradas + retiro.pendientes > 0) {
       await this.repo.auditarCorreccion(
         ctx,
@@ -630,6 +646,24 @@ export class EquiposController {
       plantillasRetiradas: retiro.retiradas,
       plantillasPendientes: retiro.pendientes,
     };
+  }
+
+  /** Por `ModuleRef`, como el retiro: eventos importa (vía biometría) equipos. */
+  private async archivarAlertas(
+    copropiedadId: string,
+    equipoId: string,
+    motivo: string,
+    actorId: string,
+  ): Promise<number> {
+    let archivo: ArchivoDeAlertasDelEquipo | null = null;
+    try {
+      archivo = this.modulos.get<ArchivoDeAlertasDelEquipo>(ARCHIVO_DE_ALERTAS_DEL_EQUIPO, {
+        strict: false,
+      });
+    } catch {
+      return 0;
+    }
+    return archivo.archivarPorBaja(copropiedadId, equipoId, motivo, actorId);
   }
 
   /** Por `ModuleRef`: biometría importa equipos, así que equipos no la importa. */

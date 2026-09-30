@@ -79,6 +79,9 @@ export interface FiltroDeAlertas {
   readonly dispositivoId?: string | null;
   readonly severidad?: Severidad | null;
   readonly tipo?: TipoDeAlerta | null;
+  /** A2 (15-N) · por fecha de generación: `[desde, hasta)`. */
+  readonly desde?: Date | null;
+  readonly hasta?: Date | null;
 }
 
 export interface RepositorioAlertas {

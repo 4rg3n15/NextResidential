@@ -9,6 +9,8 @@ import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-prov
 import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
 import { LECTOR_DE_SENALES } from '../src/equipos/aplicacion/senal-de-eventos';
 import { capacidadesDescubiertas, equiposSimulados } from '@ncr/providers';
+import { ALERTAS_DE_EQUIPO } from '../src/eventos';
+import type { AlertasDeEquipo } from '../src/eventos';
 
 /**
  * A · APROVISIONAMIENTO DE EQUIPOS DESDE LA CONSOLA
@@ -183,6 +185,77 @@ describe('A.2 · el secreto es de ESCRITURA: entra y no vuelve', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ motivo: 'se retiró para mantenimiento' });
     expect(repo.auditoria.map((x) => x.recurso)).toEqual(['equipos/alta', 'equipos/baja']);
+  });
+});
+
+describe('A1 (15-N) · la baja archiva las alertas abiertas del equipo', () => {
+  it('una alerta abierta del equipo sale de la lista y del contador al darlo de baja', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    const creado = await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(ALTA);
+    const id = creado.body.id as string;
+    await a.get<AlertasDeEquipo>(ALERTAS_DE_EQUIPO).ejecutar(
+      {
+        copropiedadId: COP_B,
+        dispositivoId: id,
+        tipo: 'dispositivo_caido',
+        severidad: 'alta',
+        clave: 'caido',
+        notas: 'sin latido',
+        persistente: true,
+      },
+      'prueba',
+    );
+    const lista = () =>
+      request(a.getHttpServer())
+        .get(`/copropiedades/${COP_B}/alertas`)
+        .query({ dispositivoId: id })
+        .set('Authorization', `Bearer ${token}`);
+    expect((await lista()).body).toHaveLength(1);
+    await request(a.getHttpServer())
+      .post(`/copropiedades/${COP_B}/equipos/${id}/baja`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'equipo reemplazado' })
+      .expect(201);
+    expect((await lista()).body).toEqual([]);
+    const tablero = await request(a.getHttpServer())
+      .get(`/copropiedades/${COP_B}/tablero/indicadores`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(tablero.status).toBe(200);
+    expect(tablero.body.alertas.pendientes).toBe(0);
+  });
+});
+
+describe('A2 (15-N) · la lista de alertas se filtra por fecha', () => {
+  it('desde incluido, hasta excluido; una fecha que no es fecha es 400', async () => {
+    const { app: a, firmante } = await conEquipos({ probar: async () => ALCANZADO });
+    const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
+    await a.get<AlertasDeEquipo>(ALERTAS_DE_EQUIPO).ejecutar(
+      {
+        copropiedadId: COP_B,
+        dispositivoId: '20000000-0000-4000-8000-000000000001',
+        tipo: 'acceso_dudoso',
+        severidad: 'media',
+        clave: 'fecha',
+        notas: 'para filtrar',
+        persistente: false,
+      },
+      'prueba',
+    );
+    const pedir = (query: Record<string, string>) =>
+      request(a.getHttpServer())
+        .get(`/copropiedades/${COP_B}/alertas`)
+        .query(query)
+        .set('Authorization', `Bearer ${token}`);
+    const ayer = new Date(Date.now() - 86_400_000).toISOString();
+    const manana = new Date(Date.now() + 86_400_000).toISOString();
+    expect((await pedir({ desde: ayer, hasta: manana })).body).toHaveLength(1);
+    expect((await pedir({ desde: manana })).body).toEqual([]);
+    expect((await pedir({ hasta: ayer })).body).toEqual([]);
+    expect((await pedir({ desde: 'ayer' })).status).toBe(400);
   });
 });
 

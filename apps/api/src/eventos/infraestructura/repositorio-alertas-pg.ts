@@ -188,6 +188,15 @@ export class RepositorioAlertasPg implements RepositorioAlertas {
         parametros.push(tipoPedido);
         condiciones.push(`tipo = $${String(parametros.length)}::tipo_alerta`);
       }
+      // A2 (15-N) · por fecha de generación, `[desde, hasta)`.
+      if ((filtro?.desde ?? null) !== null) {
+        parametros.push(filtro?.desde);
+        condiciones.push(`generada_en >= $${String(parametros.length)}`);
+      }
+      if ((filtro?.hasta ?? null) !== null) {
+        parametros.push(filtro?.hasta);
+        condiciones.push(`generada_en < $${String(parametros.length)}`);
+      }
       const { rows } = await c.query<FilaAlerta>(
         `SELECT ${CAMPOS} FROM public.alertas
           WHERE ${condiciones.join(' AND ')}

@@ -9,6 +9,10 @@ export { EventosModule } from './eventos.module';
 export { RegistrarAcceso } from './aplicacion/registrar-acceso';
 /** E5 (15-M) · alertas por EQUIPO, deduplicadas: las abre el ingestor por este puerto. */
 export { ALERTAS_DE_EQUIPO } from './aplicacion/deduplicacion-de-alertas';
+export {
+  AlertasDelCicloDelEquipo,
+  NOTA_DE_RESOLUCION_AUTOMATICA,
+} from './aplicacion/alertas-del-ciclo-del-equipo';
 export type { AlertasDeEquipo, AlertaDeEquipoNueva } from './aplicacion/deduplicacion-de-alertas';
 export {
   CANAL_TIEMPO_REAL,

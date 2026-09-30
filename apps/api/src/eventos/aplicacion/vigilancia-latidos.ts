@@ -3,6 +3,7 @@ import type { Bitacora, GeneradorDeId, Reloj, UmbralDeLatido } from '@ncr/domain
 import type { RepositorioAlertas, RepositorioDispositivos } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
 import { VENTANA_DE_DUPLICADOS_MS } from './deduplicacion-de-alertas';
+import type { AlertasDelCicloDelEquipo } from './alertas-del-ciclo-del-equipo';
 
 export interface ParteDeVigilancia {
   readonly revisados: number;
@@ -33,6 +34,8 @@ export class VigilarLatidos {
     private readonly reloj: Reloj,
     private readonly ids: GeneradorDeId,
     private readonly bitacora: Bitacora,
+    /** A1 (15-N) · la red de seguridad: lo que late y tenía caída abierta, se resuelve. */
+    private readonly ciclo?: Pick<AlertasDelCicloDelEquipo, 'resolverCaida'>,
   ) {}
 
   async ejecutar(
@@ -54,6 +57,10 @@ export class VigilarLatidos {
 
     for (const latido of latidos) {
       const estado = estadoPorLatido(latido.ultimoLatido, ahora, umbral);
+      if (estado !== 'caido' && estado !== 'degradado' && yaAlertados.has(latido.dispositivoId)) {
+        await this.ciclo?.resolverCaida(copropiedadId, latido.dispositivoId, 'latido', actorId);
+        continue;
+      }
       if (estado === 'degradado') {
         degradados.push(latido.dispositivoId);
         continue;

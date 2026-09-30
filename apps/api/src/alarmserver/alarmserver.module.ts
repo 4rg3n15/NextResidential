@@ -9,7 +9,8 @@ import { BiometriaModule, IDENTIDAD_BIOMETRICA } from '../biometria';
 import type { IdentidadBiometricaDesdeRepositorios } from '../biometria';
 import { ACCIONADOR_DE_PUERTA } from '../guardia';
 import type { AccionadorDePuerta } from '../guardia';
-import { RegistrarAcceso } from '../eventos';
+import { AlertasDelCicloDelEquipo, RegistrarAcceso } from '../eventos';
+import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import { AlarmServerController } from './presentacion/alarm-server.controller';
 import { GuardiaDeAlarmServer, EQUIPOS_DE_ALARM_SERVER } from './presentacion/guardia-alarm-server';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
@@ -140,6 +141,7 @@ export class AlarmServerModule {
             RELOJ,
             BITACORA,
             CONFIGURACION,
+            AlertasDelCicloDelEquipo,
           ],
           useFactory: (
             equipos: EquiposParaEscucha,
@@ -149,9 +151,13 @@ export class AlarmServerModule {
             reloj: Reloj,
             bitacora: Bitacora,
             c: Configuracion,
+            ciclo: AlertasDelCicloDelEquipo,
           ) =>
             new LatidosDeEquipos(equipos, proveedor, escuchas, latidos, reloj, bitacora, {
               intervaloMs: c.EQUIPOS_LATIDO_S * 1000,
+              // A1 (15-N) · el equipo volvió: su alerta de caída se resuelve sola.
+              alVolver: (copropiedadId, dispositivoId, senal) =>
+                ciclo.resolverCaida(copropiedadId, dispositivoId, senal, ACTOR_INGESTA),
             }),
         },
         {

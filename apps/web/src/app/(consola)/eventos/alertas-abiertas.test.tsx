@@ -107,3 +107,46 @@ describe('E5 / C7 (15-M) · la cola de alertas: filtros y archivo con motivo', (
     expect(await screen.findByText(/archivada\(s\) con motivo; ninguna se borra/)).toBeTruthy();
   });
 });
+
+describe('A2 (15-N) · seleccionar todas las visibles, archivar en lote y filtrar por fecha', () => {
+  it('«Seleccionar todas las visibles» marca las dos y el lote las archiva con UN motivo', async () => {
+    montar();
+    const boton = await screen.findByRole('button', { name: 'Seleccionar todas las visibles (2)' });
+    fireEvent.click(boton);
+    fireEvent.change(screen.getByPlaceholderText(/Obligatorio/), {
+      target: { value: 'ruido de la cámara del 28/09' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Archivar 2 marcada(s)' }));
+    await waitFor(() => expect(pedidas.some((p) => p.method === 'POST')).toBe(true));
+    const post = pedidas.find((p) => p.method === 'POST');
+    expect(new URL(post?.url ?? '').pathname).toMatch(/\/alertas\/archivar$/);
+    expect(await post?.json()).toEqual({
+      ids: ['a1', 'a2'],
+      motivo: 'ruido de la cámara del 28/09',
+    });
+  });
+
+  it('las fechas viajan como [inicio del día desde, inicio del día siguiente a hasta)', async () => {
+    montar();
+    await screen.findByRole('button', { name: /Seleccionar todas las visibles/ });
+    fireEvent.change(screen.getByLabelText('Alertas generadas desde el día'), {
+      target: { value: '2026-09-28' },
+    });
+    fireEvent.change(screen.getByLabelText('Alertas generadas hasta el día (incluido)'), {
+      target: { value: '2026-09-29' },
+    });
+    await waitFor(() =>
+      expect(
+        pedidas.some((p) => {
+          const q = new URL(p.url).searchParams;
+          return q.has('desde') && q.has('hasta');
+        }),
+      ).toBe(true),
+    );
+    const q = new URL(
+      pedidas.filter((p) => new URL(p.url).searchParams.has('hasta')).at(-1)?.url ?? '',
+    ).searchParams;
+    expect(q.get('desde')).toBe(new Date(2026, 8, 28).toISOString());
+    expect(q.get('hasta')).toBe(new Date(2026, 8, 30).toISOString());
+  });
+});

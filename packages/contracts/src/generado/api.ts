@@ -5042,6 +5042,8 @@ export interface operations {
                 dispositivoId?: string;
                 severidad?: "informativa" | "media" | "alta" | "critica";
                 tipo?: "lista_negra" | "sabotaje" | "dispositivo_caido" | "acceso_dudoso" | "panico" | "apertura_fallida";
+                desde?: string;
+                hasta?: string;
             };
             header?: never;
             path: {

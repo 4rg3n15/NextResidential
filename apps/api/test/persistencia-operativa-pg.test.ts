@@ -6,6 +6,10 @@ import type { Bitacora, HechoDeAcceso } from '@ncr/domain-core';
 import { ACTOR_INGESTA } from '../src/comun/actores-de-servicio';
 import { RepositorioEventosPgDeServicio } from '../src/eventos/infraestructura/repositorio-eventos-pg-de-servicio';
 import { RepositorioAlertasPg } from '../src/eventos/infraestructura/repositorio-alertas-pg';
+import {
+  AlertasDelCicloDelEquipo,
+  NOTA_DE_RESOLUCION_AUTOMATICA,
+} from '../src/eventos/aplicacion/alertas-del-ciclo-del-equipo';
 import { BitacoraDeOrdenesPg } from '../src/guardia/infraestructura/bitacora-de-ordenes-pg';
 import { RegistroDeAuditoriaPg } from '../src/comun/auditoria/auditoria-pg';
 import type { OrdenEjecutada } from '../src/guardia/aplicacion/apertura-manual';
@@ -195,6 +199,40 @@ describe('alertas · persisten, incluidas las que nacen en la consola', () => {
     const otra = new RepositorioAlertasPg(lee as Pool, bitacora);
     expect((await otra.porId(COP, alerta.valor.id))?.estado).toBe('resuelta');
     expect((await otra.abiertasDe(COP)).some((x) => x.id === alerta.valor.id)).toBe(false);
+  });
+});
+
+describe('A1 · A2 (15-N) · la caída se resuelve sola y la lista filtra por fecha, contra la base', () => {
+  it('AlertasDelCicloDelEquipo resuelve la caída de ESE equipo y el filtro de fechas la acota', async () => {
+    if (omitida()) return;
+    const generada = new Date(Date.now() - 3_600_000);
+    const alerta = Alerta.abrir({
+      id: randomUUID(),
+      copropiedadId: COP,
+      tipo: 'dispositivo_caido',
+      severidad: 'alta',
+      generadaEn: generada,
+      dispositivoId,
+      notas: `caída ${CORRIDA}`,
+    });
+    if (!esExito(alerta)) throw new Error(alerta.error.detalle);
+    const repo = new RepositorioAlertasPg(escribe as Pool, bitacora);
+    await repo.guardar(alerta.valor, ACTOR_INGESTA);
+
+    const antes = new Date(generada.getTime() - 1000);
+    const despues = new Date(generada.getTime() + 1000);
+    const enVentana = await repo.abiertasDe(COP, { dispositivoId, desde: antes, hasta: despues });
+    expect(enVentana.map((a) => a.id)).toContain(alerta.valor.id);
+    const fuera = await repo.abiertasDe(COP, { dispositivoId, desde: despues });
+    expect(fuera.map((a) => a.id)).not.toContain(alerta.valor.id);
+
+    const ciclo = new AlertasDelCicloDelEquipo(repo, { ahora: () => new Date() }, bitacora);
+    expect(await ciclo.resolverCaida(COP, dispositivoId, 'sondeo', ACTOR_INGESTA)).toBeGreaterThan(
+      0,
+    );
+    const leida = await new RepositorioAlertasPg(lee as Pool, bitacora).porId(COP, alerta.valor.id);
+    expect(leida?.estado).toBe('resuelta');
+    expect(leida?.notas).toContain(NOTA_DE_RESOLUCION_AUTOMATICA);
   });
 });
 

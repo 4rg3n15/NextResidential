@@ -71,6 +71,8 @@ export class AlertasController {
         dispositivoId: filtro.dispositivoId ?? null,
         severidad: filtro.severidad ?? null,
         tipo: filtro.tipo ?? null,
+        desde: filtro.desde === undefined ? null : new Date(filtro.desde),
+        hasta: filtro.hasta === undefined ? null : new Date(filtro.hasta),
       })
     ).map(exponer);
   }

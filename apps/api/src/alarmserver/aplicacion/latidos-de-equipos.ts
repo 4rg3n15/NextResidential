@@ -68,7 +68,18 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, BeforeApplicati
     private readonly latidos: RegistroDeLatidos,
     private readonly reloj: Reloj,
     private readonly bitacora: Bitacora,
-    private readonly opciones: { readonly intervaloMs?: number } = {},
+    private readonly opciones: {
+      readonly intervaloMs?: number;
+      /**
+       * A1 (15-N) · el equipo dio señal: sus alertas de caída se resuelven
+       * solas. Nunca lanza (lo cumple `AlertasDelCicloDelEquipo`).
+       */
+      readonly alVolver?: (
+        copropiedadId: string,
+        dispositivoId: string,
+        senal: 'evento' | 'sondeo',
+      ) => Promise<unknown>;
+    } = {},
   ) {}
 
   onApplicationBootstrap(): void {
@@ -115,6 +126,7 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, BeforeApplicati
       if (senal !== null && ahora.getTime() - senal.getTime() <= FRESCURA_DE_SENAL_MS) {
         await this.latidos.registrarLatido(copropiedadId, dispositivoId, senal);
         await this.anotar(copropiedadId, dispositivoId, 'saludable', null, false);
+        await this.opciones.alVolver?.(copropiedadId, dispositivoId, 'evento');
         return 'porSenal';
       }
       /**
@@ -128,6 +140,7 @@ export class LatidosDeEquipos implements OnApplicationBootstrap, BeforeApplicati
       if (estado === 'en_linea') {
         await this.latidos.registrarLatido(copropiedadId, dispositivoId, this.reloj.ahora());
         await this.anotar(copropiedadId, dispositivoId, 'saludable', 'alcanzado', false);
+        await this.opciones.alVolver?.(copropiedadId, dispositivoId, 'sondeo');
         return 'porSondeo';
       }
       if (estado === 'degradado') {
