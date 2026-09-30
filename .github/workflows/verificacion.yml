@@ -30,6 +30,15 @@ on:
   pull_request:
     branches: [develop, main]
 
+# O4 (15-N) · una corrida por rama. El push y el pull_request del MISMO commit
+# corrían dos veces, y una corrida vieja sobrevivía a un push nuevo gastando
+# minutos en un resultado que ya nadie mira. El grupo es la rama de cabeza (en
+# un PR, `head_ref`; en un push, `ref_name`), así que push y PR de la misma
+# rama caen en el mismo grupo y la corrida nueva cancela la vieja.
+concurrency:
+  group: verificacion-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   controles:
     strategy:
