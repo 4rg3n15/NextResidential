@@ -2,7 +2,20 @@ import type { INestApplication } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import type { Configuracion } from './configuracion/esquema';
-import { SaneamientoMiddleware } from './comun/saneamiento';
+import { SaneamientoMiddleware, conservarCuerpoCrudo } from './comun/saneamiento';
+import { RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
+import { RUTA_DE_WHEP_DE_VIDEO } from './comun/ruta-de-video';
+
+/**
+ * V1 (15-N) · las rutas cuyo cuerpo es un FORMATO (SDP, bytes de audio) y no
+ * texto de usuario: el saneamiento no lo toca (`saneamiento.ts`). El servidor
+ * de alarma no está aquí porque su acumulador ya deja `body = {}` y guarda el
+ * sobre aparte (`sobre-de-equipo.ts`).
+ */
+export const RUTAS_DE_CUERPO_CRUDO: readonly string[] = [
+  RUTA_DE_WHEP_DE_VIDEO,
+  RUTA_DE_AUDIO_DE_INTERCOM,
+];
 
 /**
  * Endurecimiento HTTP (§2.7). Vive en un único archivo para que una auditoría
@@ -110,6 +123,8 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const aplicarSaneamiento = (app: INestApplication): void => {
+  // V1 (15-N) · la marca va ANTES del saneamiento y sólo bajo su ruta.
+  for (const ruta of RUTAS_DE_CUERPO_CRUDO) app.use(ruta, conservarCuerpoCrudo);
   const saneamiento = new SaneamientoMiddleware();
   app.use(
     (

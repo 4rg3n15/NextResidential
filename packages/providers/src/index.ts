@@ -143,4 +143,6 @@ export {
   binarioGo2rtc,
 } from './simulacion/go2rtc-de-pruebas';
 export type { Go2rtcDePruebas } from './simulacion/go2rtc-de-pruebas';
+// V1 (15-N) · la oferta del navegador, con su CRLF final, para la prueba extremo a extremo.
+export { OFERTA_SDP_DE_NAVEGADOR } from './simulacion/oferta-de-navegador';
 export type { PersonaSimulada } from './simulacion/personas-simuladas';

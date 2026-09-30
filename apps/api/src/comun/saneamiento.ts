@@ -141,6 +141,38 @@ export const sanear = (valor: unknown, profundidad = 0): unknown => {
 };
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * V1 (15-N) · UN CUERPO QUE NO ES TEXTO DE USUARIO NO SE SANEA
+ *
+ * Hasta la 15-N el saneamiento recorría TODO `req.body`, y dos rutas no traen
+ * texto de usuario sino un formato con su propia gramática y su propia
+ * validación:
+ *
+ *  · la oferta SDP del video en vivo (`application/sdp`, una cadena). El
+ *    `.trim()` de `sanearTexto` le quitaba el CRLF final; go2rtc la rechazaba
+ *    con «EOF» (`webrtc.go:272`, `SetOffer`) y la consola no vio video en
+ *    ningún equipo. Medido con el binario oficial en el Bloque 0.
+ *  · el trozo de audio del operador (`application/octet-stream`, un Buffer).
+ *    `sanear` lo recorría como objeto y lo convertía en `{0: …, 1: …}`: el
+ *    controlador ya no veía un Buffer y respondía 400 a TODO trozo.
+ *
+ * Esas rutas se MARCAN (`conservarCuerpoCrudo`) y el cuerpo marcado pasa sin
+ * tocar; su validación es la de su formato —tipo, tamaño y forma— en su
+ * controlador. La consulta (`req.query`) se sanea igual en todas.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const CUERPOS_CRUDOS = new WeakSet<Request>();
+
+/** Marca la petición: su cuerpo es un formato, no texto de usuario. */
+export const conservarCuerpoCrudo = (req: Request, _res: Response, next: NextFunction): void => {
+  CUERPOS_CRUDOS.add(req);
+  next();
+};
+
+/** Bytes (un Buffer o cualquier vista binaria) no son texto: jamás se recorren. */
+const esBinario = (valor: unknown): boolean => ArrayBuffer.isView(valor);
+
+/**
  * Middleware, no pipe, y el motivo importa: un pipe solo ve lo que un DTO
  * declara, y estas tres garantías tienen que valer también en las rutas sin
  * DTO. Corre antes que `ValidationPipe`, así que lo que llega a validarse ya
@@ -148,7 +180,12 @@ export const sanear = (valor: unknown, profundidad = 0): unknown => {
  */
 export class SaneamientoMiddleware implements NestMiddleware {
   use(req: Request, _res: Response, next: NextFunction): void {
-    if (req.body !== undefined && req.body !== null) {
+    if (
+      req.body !== undefined &&
+      req.body !== null &&
+      !CUERPOS_CRUDOS.has(req) &&
+      !esBinario(req.body)
+    ) {
       req.body = sanear(req.body) as Request['body'];
     }
     if (req.query !== undefined) {

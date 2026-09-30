@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { sanear, sanearTexto } from './saneamiento';
+import { SaneamientoMiddleware, conservarCuerpoCrudo, sanear, sanearTexto } from './saneamiento';
 
 /**
  * H-13-05 y H-13-06 · el saneador, contra la función y sin dominio de por medio.
@@ -93,5 +93,37 @@ describe('sanear', () => {
   it('deja intactos los valores que no son texto', () => {
     const r = sanear({ n: 42, b: true, z: null, f: 1.5 }) as Record<string, unknown>;
     expect(r).toEqual({ n: 42, b: true, z: null, f: 1.5 });
+  });
+});
+
+describe('V1 (15-N) · un cuerpo de formato no se sanea como texto', () => {
+  const pasar = (req: Record<string, unknown>, marcar: boolean): Record<string, unknown> => {
+    const peticion = req as unknown as Parameters<SaneamientoMiddleware['use']>[0];
+    const nada = (() => undefined) as unknown as Parameters<SaneamientoMiddleware['use']>[2];
+    if (marcar) conservarCuerpoCrudo(peticion, {} as never, nada);
+    new SaneamientoMiddleware().use(peticion, {} as never, nada);
+    return req;
+  };
+
+  it('la oferta SDP de una ruta marcada conserva su CRLF final', () => {
+    const req = pasar({ body: 'v=0\r\ns=-\r\n', query: {} }, true);
+    expect(req.body).toBe('v=0\r\ns=-\r\n');
+  });
+
+  it('la misma cadena SIN marca se recorta: es lo que rompía el video', () => {
+    const req = pasar({ body: 'v=0\r\ns=-\r\n', query: {} }, false);
+    expect(req.body).toBe('v=0\r\ns=-');
+  });
+
+  it('un Buffer nunca se recorre como objeto: el audio llega como bytes', () => {
+    const bytes = Buffer.from([0xff, 0x00, 0x10]);
+    const req = pasar({ body: bytes, query: {} }, false);
+    expect(Buffer.isBuffer(req.body)).toBe(true);
+    expect([...(req.body as Buffer)]).toEqual([0xff, 0x00, 0x10]);
+  });
+
+  it('la consulta de una ruta marcada SÍ se sanea', () => {
+    const req = pasar({ body: 'v=0\r\n', query: { a: ' x\u0000 ' } }, true);
+    expect((req.query as Record<string, string>).a).toBe('x');
   });
 });
