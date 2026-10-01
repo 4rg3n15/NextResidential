@@ -34,6 +34,7 @@ import type { CapacidadesDeEquipo } from './capacidades';
 import type { EscuchaActiva, TransporteDeEscucha } from './escucha';
 import type { DiagnosticoDeVideo, OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
+import type { NodoDeSalidas } from './salidas';
 
 /**
  * LO QUE TODO ADAPTADOR CUMPLE: los cuatro puertos del dominio, más UNA
@@ -125,6 +126,20 @@ export type ProveedorDeEquipos = AccessPointProvider &
       /** C7 (15-L) · la conexión la tiene otra plataforma: la frase con el remedio. */
       readonly rechazo: string | null;
     } | null;
+    /**
+     * 15-P · P3 · las salidas que el equipo declara, como árbol equipo →
+     * módulo → salida (`nucleo/salidas.ts`). Opcional: sólo quien sabe leerlas.
+     */
+    salidasDe?(dispositivoId: string): Promise<NodoDeSalidas>;
+    /**
+     * 15-P · P3 · abre UNA salida (orden `open`): la consola elige la puerta.
+     * Dejarla libre o bloqueada no existe aquí (PENDIENTE DE DEFINICIÓN).
+     */
+    abrirSalida?(
+      dispositivoId: string,
+      numeroDePuerta: number,
+      actorId: string,
+    ): Promise<ResultadoAccionamiento>;
     /** C6 (15-M) · la sesión de audio POR EQUIPO. Ver `IntercomPorEquipo`. */
     enviarAudioA?(dispositivoId: string, fragmento: Uint8Array): Promise<void>;
     recibirAudioDe?(dispositivoId: string): AsyncIterable<Uint8Array>;

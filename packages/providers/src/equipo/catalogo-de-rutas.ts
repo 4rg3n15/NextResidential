@@ -633,6 +633,41 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
   },
 
   // ── VIDEOPORTERO · DS-KD9633-WBE6 ────────────────────────────────────────
+  // 15-P · P3 · lo que el videoportero declara de sus salidas: el árbol
+  // equipo → módulo → salida (`videoportero/arbol-de-salidas.ts`).
+  {
+    proposito: 'leer las capacidades de control de acceso del videoportero',
+    metodo: 'GET',
+    ruta: '/ISAPI/AccessControl/capabilities',
+    procedencia: 'documentada',
+    familia: 'videoportero',
+    fuente:
+      'Manual ISAPI IP Series / Ultra Series (familia del videoportero): isSupportOpenDoorParams, ' +
+      'isSupportDoorSecurityModulePairParams / SwitchParams, isSupportModuleStatus, ' +
+      'isSupportSubModules, isSupportElevatorControlCfg',
+    confirmarEnSitio:
+      'qué declara el videoportero del conjunto: cerraduras, unidad segura, submódulos',
+  },
+  {
+    proposito: 'leer el estado de las unidades de puerta segura',
+    metodo: 'GET',
+    ruta: '/ISAPI/AccessControl/DoorSecurityModule/moduleStatus',
+    procedencia: 'documentada',
+    familia: 'videoportero',
+    fuente: 'Manual ISAPI IP Series / Ultra Series · estado de la unidad de puerta segura (RS-485)',
+    confirmarEnSitio: 'si hay unidad segura instalada y si contesta en línea y sin manipular',
+  },
+  {
+    proposito: 'leer los submódulos del videoportero',
+    metodo: 'GET',
+    ruta: '/ISAPI/VideoIntercom/SubModules?format=json',
+    procedencia: 'documentada',
+    familia: 'videoportero',
+    fuente:
+      'Manual ISAPI IP Series / Ultra Series · SubModules/capabilities documenta la FORMA de la ' +
+      'lista; la ruta de la lista se deduce de ella ([SUPUESTO] S-178)',
+    confirmarEnSitio: 'que la lista conteste en esta ruta y con esta forma',
+  },
   {
     proposito: 'abrir la puerta del videoportero',
     metodo: 'PUT',

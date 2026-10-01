@@ -38,6 +38,8 @@
  */
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
+// 15-P · P3 · el árbol de salidas de un equipo (equipo → módulo → salida).
+export * from './nucleo/salidas';
 // R2 (15-N) · el motivo del dominio con que el equipo negó, por su código.
 export { motivoDelEquipo } from './hikvision/catalogo-de-eventos';
 export type { MotivoDelEquipo } from './hikvision/catalogo-de-eventos';

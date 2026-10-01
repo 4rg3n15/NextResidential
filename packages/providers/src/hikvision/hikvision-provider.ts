@@ -24,6 +24,9 @@ import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { IntercomIsapiPersistente } from '../videoportero/intercom-isapi-persistente';
+import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
+import { leerSalidasDelEquipo } from '../videoportero/salidas-del-equipo';
+import type { NodoDeSalidas } from '../nucleo/salidas';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
 import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
@@ -134,6 +137,8 @@ export interface OpcionesDeHikvision {
    */
   readonly audioDelEquipo?: 'fetch' | 'persistente';
 }
+
+const VACIOS = { capacidades: null, ordenRemota: null, unidadesSeguras: null, submodulos: null };
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
   camara_lpr: 'camara',
@@ -288,6 +293,39 @@ export class HikvisionProvider
       };
     }
     // A5 · ocupado o nonce vencido se reintentan con dispersión; nada más.
+    return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
+  }
+
+  // ── 15-P · P3 · salidas del videoportero ─────────────────────────────────
+
+  /** El árbol equipo → módulo → salida que el videoportero DECLARA. */
+  async salidasDe(dispositivoId: string): Promise<NodoDeSalidas> {
+    const equipo = await this.resolver(dispositivoId);
+    const ficha = equipo.numeroDePuerta ?? null;
+    if (equipo.tipo === 'intercom') {
+      return leerSalidasDelEquipo(this.conexionDe(equipo), equipo.modelo ?? 'Videoportero', ficha);
+    }
+    // Otros equipos no se recorren: su salida es la que declara su ficha.
+    return construirArbolDeSalidas(equipo.modelo ?? 'Equipo', VACIOS, ficha);
+  }
+
+  /** Abre UNA salida del videoportero (`open`; nunca libre ni bloqueada). */
+  async abrirSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    actorId: string,
+  ): Promise<ResultadoAccionamiento> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo !== 'intercom') return this.abrir(dispositivoId, actorId);
+    try {
+      await this.exigirQueNoDecidaSolo(equipo);
+      await this.exigirCapacidad(dispositivoId, 'aperturaRemota');
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable)
+        return { aceptado: false, latenciaMs: error.latenciaMs };
+      throw error;
+    }
+    const puerta = new Videoportero({ ...this.conexionDe(equipo), numeroDePuerta });
     return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
   }
 
