@@ -172,8 +172,10 @@ quiere.
 La API es un monolito modular **sin estado de sesión en memoria**: escalar
 horizontalmente es correcto. Dos avisos:
 
-- **`PG_POOL_MAX` se multiplica por instancia.** Tres instancias con `20` son
-  sesenta conexiones contra el tope del proyecto Supabase. Divida.
+- **`PG_POOL_MAX` se multiplica por instancia.** Tres instancias con `10` son
+  treinta conexiones contra el tope del proyecto Supabase. Divida: cada
+  instancia comprueba al arrancar que su `PG_POOL_MAX` + `PGBOSS_POOL_MAX` cabe
+  en `SUPABASE_POOLER_MAX_CLIENTES`, pero no sabe cuántas hermanas tiene (15-O).
 - **El canal de tiempo real es por proceso (D-29).** Un operador conectado a la
   instancia B no ve lo que publica la A. Con más de una instancia hace falta el
   peldaño siguiente de la escalera de contingencia (`LISTEN/NOTIFY`), que está

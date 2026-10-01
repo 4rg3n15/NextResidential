@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
+import { problemaDelPresupuesto } from './presupuesto-de-conexiones';
 
 /**
  * Configuración tipada y validada (§2.7.1).
@@ -92,8 +93,18 @@ export const esquemaConfiguracion = z.object({
    * decidido. Es configurable porque el límite que importa es el del proyecto
    * Supabase, y ese cambia con el plan; el Edge de la ETAPA 12 añadirá tráfico
    * sobre este mismo número.
+   *
+   * 15-O · por omisión 10, no 20: con pg-boss cabe en los quince clientes del
+   * pooler en modo sesión del plan gratuito (`presupuesto-de-conexiones.ts`).
    */
-  PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(20),
+  PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+
+  /**
+   * 15-O · cuántos clientes admite el pooler de Supabase («Pool Size» del
+   * panel). 15 es el del plan gratuito [SUPUESTO S-170]. La API NO arranca si
+   * `PG_POOL_MAX` + `PGBOSS_POOL_MAX` lo exceden.
+   */
+  SUPABASE_POOLER_MAX_CLIENTES: z.coerce.number().int().min(2).max(10_000).default(15),
 
   /** Lista blanca explícita (§2.7.2). Nunca `*`, nunca `origin: true`. */
   CORS_ALLOWED_ORIGINS: noVacio('CORS_ALLOWED_ORIGINS'),
@@ -508,6 +519,20 @@ export const esquemaConfiguracion = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  /**
+   * 15-O · el pool PROPIO de pg-boss. Suma en el presupuesto del pooler con
+   * `PG_POOL_MAX`: son tres barridos por hora y una cola a pedido, dos bastan.
+   */
+  PGBOSS_POOL_MAX: z.coerce.number().int().min(1).max(20).default(2),
+
+  /**
+   * 15-O · el volcado histórico que un equipo envía al suscribirse: lotes de
+   * este tamaño (un `INSERT` por lote; 14 parámetros por fila, así que 1 000
+   * como mucho) y como mucho estos eventos por segundo. Lo VIVO no pasa por
+   * aquí y no espera.
+   */
+  EVENTOS_HISTORICOS_LOTE: z.coerce.number().int().min(1).max(1000).default(500),
+  EVENTOS_HISTORICOS_POR_SEGUNDO: z.coerce.number().int().min(10).max(10_000).default(500),
 
   THROTTLE_TTL_SEGUNDOS: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMITE: z.coerce.number().int().positive().default(120),
@@ -662,6 +687,10 @@ export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion =
     }
   }
   if (malFormados.length > 0) throw new ErrorDeConfiguracion(malFormados);
+
+  // 15-O · el pool de la API y el de pg-boss caben en el pooler de Supabase.
+  const presupuesto = problemaDelPresupuesto(resto);
+  if (presupuesto !== null) throw new ErrorDeConfiguracion([presupuesto]);
 
   return { ...resto, origenesPermitidos };
 };

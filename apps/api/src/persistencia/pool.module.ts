@@ -7,6 +7,22 @@ import type { Bitacora } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { PrecalentamientoDelPool } from './precalentamiento';
+import { vigilarPool } from './con-cliente';
+
+/**
+ * 15-O · el nombre con el que el pool se presenta a PostgreSQL. Sirve para verlo
+ * en `pg_stat_activity` (qué conexiones son de la API) y para que la prueba de
+ * cortes corte SÓLO las suyas.
+ */
+export const NOMBRE_DE_APLICACION_DEL_POOL = 'ncr-api';
+
+/**
+ * 15-O · cuánto espera una petición por una conexión libre antes de rendirse.
+ * Sin tope (lo de antes), con el pool agotado la petición esperaba para
+ * siempre; con él, falla y el filtro la responde 503 «base de datos no
+ * disponible», que es lo que está pasando.
+ */
+export const ESPERA_MAXIMA_POR_CONEXION_MS = 10_000;
 
 /**
  * **Un solo `Pool` por proceso** — D-66.
@@ -27,13 +43,14 @@ import { PrecalentamientoDelPool } from './precalentamiento';
  * «too many connections» en un módulo que apenas tenía carga.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * LO QUE NO SE UNIFICA, Y POR QUÉ
+ * LA SONDA DE `/ready`, UNIFICADA DESDE LA 15-O
  *
- * La **sonda de arranque** conserva su propia conexión a propósito. Es la que
- * responde `/ready`, y tiene que poder contestar precisamente cuando el pool
- * principal está agotado: si compartiera pool, la sonda esperaría en la misma
- * cola que la saturó y `/ready` se quedaría colgado en vez de decir 503. Una
- * comprobación de salud que depende del recurso que vigila no vigila nada.
+ * Tenía su propia conexión para no esperar en la cola del pool agotado. El
+ * precio apareció en sitio (30/09/2026): decía «la base contesta» con el pool
+ * de la API roto, y gastaba un cliente de los quince del pooler gratuito. Ahora
+ * mira ESTE pool y no se queda en su cola: con todas las conexiones ocupadas y
+ * peticiones esperando responde `agotado` sin pedir otra, y en otro caso pide
+ * una con tope de dos segundos (`arranque/sonda-postgres.ts`).
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * CIERRE ORDENADO
@@ -68,18 +85,33 @@ export class PoolModule {
       providers: [
         {
           provide: Pool,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) =>
-            new Pool({
-              connectionString: c.DATABASE_POOLER_URL,
-              /**
-               * Un tope único y configurable. El valor por defecto es el que
-               * tenía el módulo más exigente (`padron`, 20), no la suma de los
-               * tres: la suma nunca fue una decisión, era el resultado de que
-               * nadie mirara el total.
-               */
-              max: c.PG_POOL_MAX,
-            }),
+          inject: [CONFIGURACION, BITACORA],
+          useFactory: (c: Configuracion, bitacora: Bitacora) =>
+            /**
+             * 15-O · `pool.on('error')`: un cliente OCIOSO cuya conexión corta
+             * el servidor (o el pooler de Supabase) emite `'error'`, el pool lo
+             * re-emite, y sin oyente Node termina el proceso. Se registra y se
+             * sigue: el pool ya descartó ese cliente.
+             */
+            vigilarPool(
+              new Pool({
+                connectionString: c.DATABASE_POOLER_URL,
+                /**
+                 * Un tope único y configurable. Desde la 15-O cabe, con pg-boss
+                 * y la sonda, en el presupuesto del pooler
+                 * (`SUPABASE_POOLER_MAX_CLIENTES`): lo valida el esquema.
+                 */
+                max: c.PG_POOL_MAX,
+                application_name: NOMBRE_DE_APLICACION_DEL_POOL,
+                connectionTimeoutMillis: ESPERA_MAXIMA_POR_CONEXION_MS,
+              }),
+              (motivo) => {
+                bitacora.registrar('aviso', 'PostgreSQL cortó una conexión ociosa del pool', {
+                  motivo,
+                  remedio: 'el pool la descartó y abrirá otra en la siguiente consulta',
+                });
+              },
+            ),
         },
         CierreDelPool,
         // F2 (corrección de la 15-L) · conexiones abiertas antes del primer rostro.

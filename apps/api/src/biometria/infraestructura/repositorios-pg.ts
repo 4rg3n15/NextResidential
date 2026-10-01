@@ -14,6 +14,7 @@ import type {
   RepositorioPlantillas,
 } from '../aplicacion/puertos';
 import type { AlmacenDeBytes, ReferenciaDeCifrado } from './boveda-cifrada';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -73,17 +74,16 @@ const conServicio = async <T>(
   copropiedadId: string,
   fn: (c: PoolClient) => Promise<T>,
 ): Promise<T> => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-      JSON.stringify(claimsDeServicio(copropiedadId)),
-    ]);
-    return await fn(cliente);
-  } catch (error) {
-    return traducir(error);
-  } finally {
-    cliente.release();
-  }
+  return conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        JSON.stringify(claimsDeServicio(copropiedadId)),
+      ]);
+      return await fn(cliente);
+    } catch (error) {
+      return traducir(error);
+    }
+  });
 };
 
 // ── Consentimientos ──────────────────────────────────────────────────────────

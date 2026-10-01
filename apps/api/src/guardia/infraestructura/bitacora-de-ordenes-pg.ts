@@ -7,6 +7,7 @@ import type {
   OrdenEjecutada,
 } from '../aplicacion/apertura-manual';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * LA BITÁCORA DE ÓRDENES MANUALES EN POSTGRESQL · ETAPA 15-E (D-139)
@@ -56,15 +57,12 @@ export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
     copropiedadId: string,
     fn: (c: PoolClient) => Promise<T>,
   ): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(claimsDeServicio(copropiedadId)),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   async registrar(orden: OrdenEjecutada): Promise<void> {

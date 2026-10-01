@@ -9,6 +9,8 @@ export type { CasosDeUsoDeMantenimiento } from './planificacion.module';
 export { PLANIFICADOR, CATALOGO_DE_COPROPIEDADES } from './aplicacion/puertos';
 export type {
   CatalogoDeCopropiedades,
+  EstadoDelPlanificador,
+  FaseDelPlanificador,
   Planificador,
   TrabajoProgramado,
 } from './aplicacion/puertos';

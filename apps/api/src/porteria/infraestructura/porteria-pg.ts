@@ -12,6 +12,7 @@ import type {
   TurnoRegistrado,
 } from '../aplicacion/puertos';
 import { conServicio } from './con-servicio';
+import { conCliente } from '../../persistencia/con-cliente';
 
 interface FilaPerfil {
   usuario_id: string;
@@ -263,14 +264,14 @@ const comoPlataforma = async <T>(
   actorId: string,
   fn: (c: PoolClient) => Promise<T>,
 ): Promise<T> => {
-  const c = await pool.connect();
-  try {
-    await c.query("SELECT set_config('request.jwt.claims', $1, false)", [
-      JSON.stringify({ rol: 'superadministrador', usuario_id: actorId, copropiedad_id: null }),
-    ]);
-    return await fn(c);
-  } finally {
-    await c.query("SELECT set_config('request.jwt.claims', '', false)").catch(() => undefined);
-    c.release();
-  }
+  return conCliente(pool, async (c) => {
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        JSON.stringify({ rol: 'superadministrador', usuario_id: actorId, copropiedad_id: null }),
+      ]);
+      return await fn(c);
+    } finally {
+      await c.query("SELECT set_config('request.jwt.claims', '', false)").catch(() => undefined);
+    }
+  });
 };

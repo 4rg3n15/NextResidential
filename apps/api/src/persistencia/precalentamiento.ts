@@ -5,6 +5,7 @@ import { BITACORA, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
+import { conCliente } from './con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -42,12 +43,9 @@ export class PrecalentamientoDelPool implements OnApplicationBootstrap {
     const comienzo = this.reloj.ahora().getTime();
     const resultados = await Promise.allSettled(
       Array.from({ length: cuantas }, async () => {
-        const cliente = await this.pool.connect();
-        try {
+        return conCliente(this.pool, async (cliente) => {
           await cliente.query('SELECT 1');
-        } finally {
-          cliente.release();
-        }
+        });
       }),
     );
     const fallidas = resultados.filter((r) => r.status === 'rejected');

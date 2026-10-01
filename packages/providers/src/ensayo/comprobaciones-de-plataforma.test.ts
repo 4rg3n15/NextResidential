@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PROVEEDORES_REALES,
   juzgarConexionDePgBoss,
+  juzgarPresupuestoDeConexiones,
   juzgarProveedorDeEquipos,
   lineasDeComprobaciones,
 } from './comprobaciones-de-plataforma';
@@ -91,5 +92,38 @@ describe('las líneas y el veredicto', () => {
     expect(lineas.join('\n')).not.toContain('sa-east-1');
     expect(lineas.some((l) => /OK — pg-boss conecta a/.test(l))).toBe(true);
     expect(recuentoDe([], comprobaciones)).toEqual({ ok: 1, fallo: 1, omitido: 0, no_aplica: 0 });
+  });
+});
+
+describe('15-O · el presupuesto de conexiones, con la MISMA regla que la API', () => {
+  it('los valores por omisión caben con el ensayo: 10 + 2 + 2 de 15', () => {
+    const r = juzgarPresupuestoDeConexiones({});
+    expect(r.estado).toBe('ok');
+    expect(r.detalle[0]).toBe(
+      'API 10 + pg-boss 2 = 12 de 15 clientes del pooler; el ensayo abre 2 más mientras corre',
+    );
+  });
+
+  it('lo de sitio el 30/09 (20 + 2 contra 15): FALLO, la API no arranca', () => {
+    const r = juzgarPresupuestoDeConexiones({ PG_POOL_MAX: '20' });
+    expect(r.estado).toBe('fallo');
+    expect(r.causa).toMatch(/La API pide 22 conexiones y el pooler admite 15: no arranca/);
+    expect(r.accion).toMatch(/Pool Size/);
+  });
+
+  it('cabe la API pero no con el ensayo: FALLO, y lo dice', () => {
+    const r = juzgarPresupuestoDeConexiones({
+      PG_POOL_MAX: '12',
+      SUPABASE_POOLER_MAX_CLIENTES: '15',
+    });
+    expect(r.estado).toBe('fallo');
+    expect(r.causa).toMatch(/^Cabe la API \(14 de 15\), pero no con el ensayo/);
+  });
+
+  it('sin planificador, pg-boss no suma; un valor que no es número es FALLO', () => {
+    expect(
+      juzgarPresupuestoDeConexiones({ PG_POOL_MAX: '13', PLANIFICADOR_HABILITADO: 'false' }).estado,
+    ).toBe('ok');
+    expect(juzgarPresupuestoDeConexiones({ PG_POOL_MAX: 'veinte' }).estado).toBe('fallo');
   });
 });

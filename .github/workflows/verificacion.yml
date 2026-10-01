@@ -132,6 +132,9 @@ jobs:
       - name: O2 · el hardware se elige por capacidades, nunca por marca (ETAPA 15-D)
         run: node scripts/lib/frontera-extensibilidad.mjs
 
+      - name: 15-O · ninguna conexión a PostgreSQL sin oyente de 'error'
+        run: node scripts/lib/frontera-conexiones.mjs
+
       # Añadidos el 2026-09-09 tras la revisión que pidió el usuario. Estos
       # cuatro controles EXISTÍAN y se probaban en «Pruebas negativas» —donde se
       # comprueba que detectan su violación—, pero no se ejecutaban nunca contra

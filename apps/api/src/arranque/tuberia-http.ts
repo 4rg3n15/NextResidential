@@ -14,6 +14,7 @@ import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../comun/
 import { aplicarContextoDePeticion } from '../comun/contexto/contexto-de-peticion';
 import { FiltroGlobalDeExcepciones } from '../comun/filtros/filtro-global';
 import { InterceptorDeCorrelacion } from '../comun/interceptores/correlacion';
+import { InterceptorDeReintentoDeLecturas } from '../comun/interceptores/reintento-de-lecturas';
 import { InterceptorDeLatencias, REPORTE_DE_ERRORES } from '../observabilidad';
 import type { ReporteDeErrores } from '../observabilidad';
 import type { Configuracion } from '../configuracion/esquema';
@@ -81,5 +82,11 @@ export const montarTuberiaHttp = (app: INestApplication, config: Configuracion):
   );
   // Correlación primero, latencias después: el cronómetro se lee en el log de
   // la misma petición que lo produjo.
-  app.useGlobalInterceptors(app.get(InterceptorDeCorrelacion), app.get(InterceptorDeLatencias));
+  // 15-O · el reintento de lecturas va DENTRO de los dos: una lectura
+  // reintentada es UNA petición, con una correlación y una latencia.
+  app.useGlobalInterceptors(
+    app.get(InterceptorDeCorrelacion),
+    app.get(InterceptorDeLatencias),
+    new InterceptorDeReintentoDeLecturas(app.get<Bitacora>(BITACORA)),
+  );
 };

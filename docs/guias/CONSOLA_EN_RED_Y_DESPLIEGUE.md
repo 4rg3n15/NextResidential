@@ -188,7 +188,7 @@ por el otro lado.
 | `CORS_ALLOWED_ORIGINS` (API)         | `http://127.0.0.1:3100` | `https://consola.sudominio.co`                                  |
 | `RECUPERACION_URL_REDIRECCION` (API) | sin declarar            | `https://consola.sudominio.co/acceso/nueva-contrasena`          |
 | `EVIDENCIA_BUCKET` (API)             | `evidencias`            | Igual                                                           |
-| `PG_POOL_MAX` (API)                  | 20 por defecto          | Según el plan de Supabase y lo que añada el Edge                |
+| `PG_POOL_MAX` (API)                  | 10 por defecto          | Con `PGBOSS_POOL_MAX`, dentro de `SUPABASE_POOLER_MAX_CLIENTES` |
 
 ---
 

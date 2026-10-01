@@ -9,6 +9,7 @@ import type {
   IdentidadDeCuenta,
   RepositorioDeCuentas,
 } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * `usuarios` y `roles_usuario` para el módulo de cuentas (ADR-023).
@@ -205,17 +206,17 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
     claims: Record<string, unknown>,
     fn: (c: PoolClient) => Promise<T>,
   ): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(claims),
-      ]);
-      return await fn(cliente);
-    } finally {
-      await cliente
-        .query("SELECT set_config('request.jwt.claims', '', false)")
-        .catch(() => undefined);
-      cliente.release();
-    }
+    return conCliente(this.pool, async (cliente) => {
+      try {
+        await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+          JSON.stringify(claims),
+        ]);
+        return await fn(cliente);
+      } finally {
+        await cliente
+          .query("SELECT set_config('request.jwt.claims', '', false)")
+          .catch(() => undefined);
+      }
+    });
   }
 }

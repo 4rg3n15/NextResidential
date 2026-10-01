@@ -9,7 +9,11 @@ import type { Configuracion } from './configuracion/esquema';
 const configuracionParaContrato: Configuracion = {
   NODE_ENV: 'development',
   PORT: 3000,
-  PG_POOL_MAX: 20,
+  PG_POOL_MAX: 10,
+  SUPABASE_POOLER_MAX_CLIENTES: 15,
+  PGBOSS_POOL_MAX: 2,
+  EVENTOS_HISTORICOS_LOTE: 500,
+  EVENTOS_HISTORICOS_POR_SEGUNDO: 500,
   API_PROXIES_DE_CONFIANZA: 'loopback',
   MODO_PRUEBAS_FACTOR_DE_LIMITE: 10,
   SUPABASE_URL: 'https://generacion-de-contrato.invalid',

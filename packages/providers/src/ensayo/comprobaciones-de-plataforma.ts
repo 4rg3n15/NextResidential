@@ -35,6 +35,10 @@ export interface EntornoDeLaPlataforma {
   readonly PROVEEDOR_DE_EQUIPOS?: string | undefined;
   readonly DATABASE_URL?: string | undefined;
   readonly PGBOSS_DATABASE_URL?: string | undefined;
+  readonly PG_POOL_MAX?: string | undefined;
+  readonly PGBOSS_POOL_MAX?: string | undefined;
+  readonly PLANIFICADOR_HABILITADO?: string | undefined;
+  readonly SUPABASE_POOLER_MAX_CLIENTES?: string | undefined;
 }
 
 const valor = (v: string | undefined): string | undefined =>
@@ -161,6 +165,79 @@ export const juzgarConexionDePgBoss = (
     return { titulo, estado: 'fallo', causa: `${variable} no es una URL`, accion, detalle };
   }
   return { titulo, estado: 'ok', causa: `pg-boss conecta a ${destino}`, accion: null, detalle };
+};
+
+/** Las conexiones que abre el propio ensayo mientras corre (su pool, `max: 2`). */
+export const CONEXIONES_DEL_ENSAYO = 2;
+
+/**
+ * 15-O · el presupuesto de conexiones, con LA MISMA regla y los mismos valores
+ * por omisión que el esquema de la API (`configuracion/presupuesto-de-
+ * conexiones.ts`; una prueba de la API comprueba que coinciden): `PG_POOL_MAX`
+ * + `PGBOSS_POOL_MAX` (si el planificador está habilitado) ≤
+ * `SUPABASE_POOLER_MAX_CLIENTES`. Si no cabe, la API ni arranca; y si cabe
+ * justo, el ensayo —que abre dos más— puede ser el que lo llene.
+ */
+export const juzgarPresupuestoDeConexiones = (
+  entorno: EntornoDeLaPlataforma,
+): ComprobacionDePlataforma => {
+  const titulo = 'Presupuesto de conexiones (pooler)';
+  const numero = (v: string | undefined, porOmision: number): number | null => {
+    const crudo = valor(v);
+    if (crudo === undefined) return porOmision;
+    return /^\d+$/.test(crudo) ? Number(crudo) : null;
+  };
+  const api = numero(entorno.PG_POOL_MAX, 10);
+  const pgbossPropio = numero(entorno.PGBOSS_POOL_MAX, 2);
+  const limite = numero(entorno.SUPABASE_POOLER_MAX_CLIENTES, 15);
+  const accion =
+    'En apps/api/.env baje PG_POOL_MAX, o ponga en SUPABASE_POOLER_MAX_CLIENTES el «Pool Size» ' +
+    'real del panel (Database → Settings → Connection pooling), y reinicie la API';
+  if (api === null || pgbossPropio === null || limite === null) {
+    return {
+      titulo,
+      estado: 'fallo',
+      causa:
+        'PG_POOL_MAX, PGBOSS_POOL_MAX o SUPABASE_POOLER_MAX_CLIENTES no es un número: la API no arranca',
+      accion,
+      detalle: [],
+    };
+  }
+  const pgboss = valor(entorno.PLANIFICADOR_HABILITADO) === 'false' ? 0 : pgbossPropio;
+  const total = api + pgboss;
+  const detalle = [
+    `API ${String(api)} + pg-boss ${String(pgboss)} = ${String(total)} de ` +
+      `${String(limite)} clientes del pooler; el ensayo abre ${String(CONEXIONES_DEL_ENSAYO)} más mientras corre`,
+  ];
+  if (total > limite) {
+    return {
+      titulo,
+      estado: 'fallo',
+      causa:
+        `La API pide ${String(total)} conexiones y el pooler admite ${String(limite)}: no ` +
+        'arranca (15-O); con más, Supabase rechaza y corta conexiones',
+      accion,
+      detalle,
+    };
+  }
+  if (total + CONEXIONES_DEL_ENSAYO > limite) {
+    return {
+      titulo,
+      estado: 'fallo',
+      causa:
+        `Cabe la API (${String(total)} de ${String(limite)}), pero no con el ensayo: sus ` +
+        `${String(CONEXIONES_DEL_ENSAYO)} conexiones pueden llenar el pooler en plena prueba`,
+      accion,
+      detalle,
+    };
+  }
+  return {
+    titulo,
+    estado: 'ok',
+    causa: `Caben la API, pg-boss y el ensayo (${String(total + CONEXIONES_DEL_ENSAYO)} de ${String(limite)})`,
+    accion: null,
+    detalle,
+  };
 };
 
 const MARCA: Readonly<Record<EstadoDePaso, string>> = {

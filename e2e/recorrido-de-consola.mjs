@@ -618,6 +618,8 @@ const principal = async () => {
 
   paso('2 · doble de GoTrue con el gancho de claims REAL de la base');
   const lectura = new Pool({ connectionString: urlDe(BASE), max: 2 });
+  // 15-O · como todo pool del repositorio: un corte se anota, no tumba.
+  lectura.on('error', () => undefined);
   const doble = await arrarcarDoble(lectura);
   ok(`escuchando en ${doble.url}`);
 

@@ -195,7 +195,7 @@ export const TableroOperativo = ({
           {recientes.isPending ? (
             <EstadoCargando etiqueta="Cargando eventos" />
           ) : recientes.error instanceof ErrorDeApi ? (
-            estadoSegunCodigo(recientes.error.estado, recientes.error.message, () => {
+            estadoSegunCodigo(recientes.error, recientes.error.message, () => {
               void recientes.refetch();
             })
           ) : eventos.length === 0 ? (
@@ -221,7 +221,7 @@ export const TableroOperativo = ({
             {accesos.isPending ? (
               <EstadoCargando etiqueta="Cargando histograma" />
             ) : accesos.error instanceof ErrorDeApi ? (
-              estadoSegunCodigo(accesos.error.estado, accesos.error.message, () => {
+              estadoSegunCodigo(accesos.error, accesos.error.message, () => {
                 void accesos.refetch();
               })
             ) : accesos.data === undefined ? null : (
@@ -252,7 +252,7 @@ export const TableroOperativo = ({
             {dispositivos.isPending ? (
               <EstadoCargando etiqueta="Cargando dispositivos" />
             ) : dispositivos.error instanceof ErrorDeApi ? (
-              estadoSegunCodigo(dispositivos.error.estado, dispositivos.error.message, () => {
+              estadoSegunCodigo(dispositivos.error, dispositivos.error.message, () => {
                 void dispositivos.refetch();
               })
             ) : (dispositivos.data?.dispositivos.length ?? 0) === 0 ? (

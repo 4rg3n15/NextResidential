@@ -3,6 +3,7 @@ import { Alerta, esExito } from '@ncr/domain-core';
 import type { Bitacora, EstadoDeAlerta, Severidad, TipoDeAlerta } from '@ncr/domain-core';
 import type { FiltroDeAlertas, RepositorioAlertas, UltimaAlerta } from '../aplicacion/puertos';
 import { claimsDeServicio } from '../../comun/claims-de-servicio';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -87,15 +88,12 @@ export class RepositorioAlertasPg implements RepositorioAlertas {
     copropiedadId: string,
     fn: (c: PoolClient) => Promise<T>,
   ): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(claimsDeServicio(copropiedadId)),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   async guardar(alerta: Alerta, actorId: string): Promise<void> {

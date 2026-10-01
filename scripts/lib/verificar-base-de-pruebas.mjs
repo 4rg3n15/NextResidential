@@ -67,6 +67,16 @@ const describir = (cadena) => {
 const REMEDIO = './supabase/verificar.sh --con-semillas --modo-supabase';
 
 const cliente = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
+/**
+ * 15-O · el primer fallo, venga de una consulta o de un corte de la conexión.
+ * Sin oyente de `'error'`, un corte a mitad de la comprobación era una
+ * excepción sin capturar en vez de un «no» con su causa.
+ */
+let fallo = null;
+const anotar = (e) => {
+  if (fallo === null) fallo = e;
+};
+cliente.on('error', anotar);
 try {
   await cliente.connect();
   const { rows } = await cliente.query('select version() as v, current_user as u');
@@ -107,8 +117,9 @@ try {
       `· esquema presente · ${sem[0].n} copropiedad(es) sembrada(s)`,
   );
 } catch (e) {
+  anotar(e);
   console.error(`FALLO no se pudo usar la base de pruebas en ${describir(url)}`);
-  console.error(`  ${e.code ?? ''} ${e.message}`.trim());
+  console.error(`  ${fallo.code ?? ''} ${fallo.message}`.trim());
   console.error(
     '\n  Sin ella, los pasos 12, 12b y 13 fallan con mensajes que no nombran la causa.\n' +
       '  Arranque la base o corrija DATABASE_URL_PRUEBAS antes de pedir --con-base.',

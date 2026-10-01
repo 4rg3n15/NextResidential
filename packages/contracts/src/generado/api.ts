@@ -3730,6 +3730,24 @@ export interface components {
             dependencias: {
                 [key: string]: string;
             };
+            /**
+             * @description 15-O · por qué una dependencia no está `ok`, en palabras y sin el texto del error (la ruta es pública).
+             * @example {
+             *       "postgres": "el pooler no admite más clientes (límite de conexiones alcanzado)"
+             *     }
+             */
+            motivos?: {
+                [key: string]: string;
+            };
+            /**
+             * @description 15-O · lo que conviene saber y NO saca la API del balanceador: el planificador (pg-boss) parado o reintentando, un corte reciente de la base ya repuesto.
+             * @example {
+             *       "planificador": "reintentando: la base no respondió a tiempo; intento 2"
+             *     }
+             */
+            avisos?: {
+                [key: string]: string;
+            };
         };
         LoteDeReconciliacionDto: {
             eventos: components["schemas"]["EventoReconciliadoDto"][];

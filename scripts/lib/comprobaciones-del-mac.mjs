@@ -86,5 +86,10 @@ export const comprobacionesDelMac = async ({ pool, decir, raiz }) => {
 export const comprobacionesDeLaPlataforma = async ({ P, entorno, pool }) => {
   const equiposReales =
     pool === null ? null : await equiposRealesRegistrados(pool).catch(() => null);
-  return [P.juzgarProveedorDeEquipos(entorno, equiposReales), P.juzgarConexionDePgBoss(entorno)];
+  return [
+    P.juzgarProveedorDeEquipos(entorno, equiposReales),
+    P.juzgarConexionDePgBoss(entorno),
+    // 15-O · la API y pg-boss caben en el pooler de Supabase, con el ensayo.
+    P.juzgarPresupuestoDeConexiones(entorno),
+  ];
 };

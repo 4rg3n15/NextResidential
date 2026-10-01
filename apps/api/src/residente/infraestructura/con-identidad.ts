@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -25,21 +26,20 @@ const enTransaccion = async <T>(
   claims: Record<string, unknown>,
   fn: (c: PoolClient) => Promise<T>,
 ): Promise<T> => {
-  const cliente = await pool.connect();
-  try {
-    await cliente.query('BEGIN');
-    await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify(claims),
-    ]);
-    const r = await fn(cliente);
-    await cliente.query('COMMIT');
-    return r;
-  } catch (error) {
-    await cliente.query('ROLLBACK');
-    throw error;
-  } finally {
-    cliente.release();
-  }
+  return conCliente(pool, async (cliente) => {
+    try {
+      await cliente.query('BEGIN');
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify(claims),
+      ]);
+      const r = await fn(cliente);
+      await cliente.query('COMMIT');
+      return r;
+    } catch (error) {
+      await cliente.query('ROLLBACK');
+      throw error;
+    }
+  });
 };
 
 export const comoServicio = <T>(

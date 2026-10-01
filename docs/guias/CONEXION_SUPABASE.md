@@ -103,6 +103,36 @@ migraciones: en modo transacción no hay sesión estable, y sentencias como
 `CREATE TABLE ... PARTITION OF` o `SET LOCAL ROLE` se comportan de forma
 distinta. **Migra por la directa; opera por el pooler.**
 
+### Presupuesto de conexiones (15-O) · cuántas caben en el pooler
+
+En sitio, el 30/09/2026, la API pedía hasta 20 conexiones (`PG_POOL_MAX`) más
+las de pg-boss y la de la sonda de `/ready`, contra un pooler en **modo sesión**
+que en el plan gratuito admite 15 clientes. Con el volcado histórico de un
+equipo llenando el pool, el pooler empezó a rechazar y a cortar conexiones.
+
+La regla, que **la API comprueba al arrancar** (y no arranca si no se cumple):
+
+| Quién                  | Variable                       | Por omisión | Suma                              |
+| ---------------------- | ------------------------------ | ----------- | --------------------------------- |
+| Pool de la API         | `PG_POOL_MAX`                  | 10          | siempre                           |
+| pg-boss (planificador) | `PGBOSS_POOL_MAX`              | 2           | si `PLANIFICADOR_HABILITADO=true` |
+| Sonda de `/ready`      | —                              | 0           | usa el pool de la API             |
+| **Límite del pooler**  | `SUPABASE_POOLER_MAX_CLIENTES` | 15          | ≥ la suma de arriba               |
+
+1. En el panel: **Database → Settings → Connection pooling → «Pool Size»**.
+   Ese número va en `SUPABASE_POOLER_MAX_CLIENTES` (15 es el del plan gratuito,
+   `[SUPUESTO S-170]`: ponga el de su proyecto).
+2. Deje margen para lo que se conecta además de la API: `pnpm sitio:ensayo`
+   abre 2 conexiones mientras corre y lo comprueba en su paso de plataforma.
+3. Con **varias instancias** de API, cada una suma su `PG_POOL_MAX`: divida.
+4. Si el pool de la API va por el pooler de **transacción** (`:6543`), la regla
+   es conservadora —ese modo admite más clientes—; se prefiere a descubrir el
+   límite en sitio.
+
+`/ready` dice `postgres: agotado` cuando todas las conexiones del pool están
+ocupadas y hay peticiones esperando, y avisa del último corte de la base
+durante cinco minutos aunque ya se haya repuesto.
+
 ---
 
 ## 2. Qué llave usa cada superficie, y por qué

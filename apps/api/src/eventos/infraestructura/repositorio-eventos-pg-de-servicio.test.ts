@@ -17,6 +17,9 @@ const poolFalso = () => {
       return { rows: [], rowCount: 0 };
     },
     release: () => undefined,
+    // Un cliente de `pg` es un EventEmitter: `conCliente` le pone y quita el oyente de 'error'.
+    on: () => undefined,
+    off: () => undefined,
   };
   return { sentencias, pool: { connect: async () => cliente } as unknown as Pool };
 };

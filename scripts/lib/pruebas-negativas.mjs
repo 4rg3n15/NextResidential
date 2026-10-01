@@ -3320,6 +3320,104 @@ try {
       : mal('sin argumentos da 0: un control que no mira nada y aprueba');
   }
 
+  console.log(
+    "\n▸ 40 · un pool o un cliente de PostgreSQL sin oyente de 'error', o un préstamo a mano, se detecta (15-O)",
+  );
+  {
+    /**
+     * En sitio (30/09/2026) el pooler de Supabase cortó conexiones y la API
+     * murió: «Unhandled 'error' event». Ni el `Pool` ni los `pool.connect()`
+     * escuchaban. El control lee el código; aquí se le da un árbol de sondas
+     * con cada forma de volver a romperlo, y las formas correctas.
+     */
+    if (exigeControl('scripts/lib/frontera-conexiones.mjs')) {
+      const arbol = join(banco, 'sonda-conexiones');
+      const persistencia = join(arbol, 'persistencia');
+      mkdirSync(persistencia, { recursive: true });
+      const control = () =>
+        correr('node', ['scripts/lib/frontera-conexiones.mjs', arbol], { cwd: raiz });
+      const sonda = join(arbol, 'repositorio-pg.ts');
+      // El ayudante SÍ presta: no cuenta como préstamo a mano.
+      writeFileSync(
+        join(persistencia, 'con-cliente.ts'),
+        'export const conCliente = async (pool, fn) => { const c = await pool.connect(); return fn(c); };\n',
+      );
+
+      writeFileSync(
+        sonda,
+        '// pool.connect() en un comentario no es un préstamo\n' +
+          'export const leer = async (pool) => {\n  const cliente = await pool.connect();\n  cliente.release();\n};\n',
+      );
+      const a = control();
+      a.codigo !== 0 &&
+      /repositorio-pg\.ts:3 `pool\.connect\(\)` presta un cliente a mano/.test(a.salida)
+        ? ok('un `pool.connect()` fuera de conCliente se detecta, con su línea')
+        : mal(`el préstamo a mano NO se detecta (codigo ${a.codigo})`);
+      /con-cliente\.ts|:1 /.test(a.salida)
+        ? mal('marca al propio ayudante, o a un comentario, como préstamo')
+        : ok('y no marca al ayudante ni a un comentario que lo nombra');
+
+      writeFileSync(
+        sonda,
+        "import { Pool } from 'pg';\nexport const pool = new Pool({ max: 2 });\n",
+      );
+      const b = control();
+      b.codigo !== 0 && /`pool = new Pool\(` sin `pool\.on\('error'/.test(b.salida)
+        ? ok("un `new Pool(` sin `.on('error')` se detecta")
+        : mal(`el pool sin oyente NO se detecta (codigo ${b.codigo})`);
+
+      writeFileSync(
+        sonda,
+        "import PgBoss from 'pg-boss';\nexport const arrancar = async () => {\n" +
+          '  this.boss = new PgBoss({ max: 2 });\n  await this.boss.start();\n};\n',
+      );
+      const c = control();
+      c.codigo !== 0 && /`boss = new PgBoss\(`/.test(c.salida)
+        ? ok("y un `new PgBoss(` sin `.on('error')`, también")
+        : mal(`pg-boss sin oyente NO se detecta (codigo ${c.codigo})`);
+
+      writeFileSync(
+        sonda,
+        "import { Pool } from 'pg';\nexport const crear = () => usar(new Pool({}));\n",
+      );
+      const d = control();
+      d.codigo !== 0 && /sin variable ni `vigilarPool\(`/.test(d.salida)
+        ? ok('un pool construido sin variable ni `vigilarPool(` no se da por bueno')
+        : mal(`un pool anónimo pasa sin comprobar su oyente (codigo ${d.codigo})`);
+
+      writeFileSync(
+        sonda,
+        "import { Client, Pool } from 'pg';\n" +
+          'export const p = vigilarPool(new Pool({}), () => undefined);\n' +
+          "const q = new Pool({});\nq.on('error', () => undefined);\n" +
+          'export const probar = async () => {\n  const cliente = new Client({});\n' +
+          "  cliente.on('error', () => undefined);\n  await cliente.connect();\n};\n",
+      );
+      mkdirSync(join(arbol, 'node_modules'), { recursive: true });
+      writeFileSync(join(arbol, 'node_modules', 'ajeno.js'), 'await pool.connect();\n');
+      // Una raíz que no existe se salta; lo de `node_modules` no es del proyecto.
+      const e = correr(
+        'node',
+        ['scripts/lib/frontera-conexiones.mjs', arbol, join(banco, 'no-existe')],
+        { cwd: raiz },
+      );
+      e.codigo === 0 && /OK 3 pools\/clientes/.test(e.salida)
+        ? ok("con `vigilarPool(`, `.on('error')` y un Client que se conecta a sí mismo, lo admite")
+        : mal(
+            `el control rechaza las formas correctas (codigo ${e.codigo}): ${e.salida.slice(0, 300)}`,
+          );
+      rmSync(arbol, { recursive: true, force: true });
+
+      // Sin argumentos mira el repositorio, que debe estar limpio.
+      const repo = correr('node', ['scripts/lib/frontera-conexiones.mjs'], { cwd: raiz });
+      repo.codigo === 0 && /OK [1-9]\d* pools/.test(repo.salida)
+        ? ok('sin argumentos mira el repositorio, y el repositorio pasa')
+        : mal(
+            `el repositorio no pasa su propio control (codigo ${repo.codigo}): ${repo.salida.slice(0, 300)}`,
+          );
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.

@@ -10,7 +10,13 @@ const montar = (opciones: { persistencia?: string; max?: number; falla?: boolean
   const pool = {
     connect: vi.fn(async () => {
       if (opciones.falla === true) throw new Error('sin base');
-      return { query: async (q: string) => void consultas.push(q), release: liberadas };
+      // Un cliente de `pg` es un EventEmitter: `conCliente` le pone y quita el oyente de 'error'.
+      return {
+        query: async (q: string) => void consultas.push(q),
+        release: liberadas,
+        on: vi.fn(),
+        off: vi.fn(),
+      };
     }),
   } as unknown as Pool;
   const lineas: { nivel: string; datos: Record<string, unknown> }[] = [];

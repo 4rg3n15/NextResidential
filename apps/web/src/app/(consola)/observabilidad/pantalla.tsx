@@ -94,7 +94,7 @@ export const PantallaDeLatencias = (): JSX.Element => {
   if (consulta.isPending) return <EstadoCargando etiqueta="Midiendo las latencias…" />;
   if (consulta.isError) {
     return estadoSegunCodigo(
-      consulta.error instanceof ErrorDeApi ? consulta.error.estado : 0,
+      consulta.error instanceof ErrorDeApi ? consulta.error : 0,
       'No se pudieron leer las latencias.',
     );
   }

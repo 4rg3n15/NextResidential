@@ -162,6 +162,7 @@ const principal = async () => {
   if (!simulado && (process.env.DATABASE_URL ?? '') !== '' && !bandera('sin-plataforma')) {
     const { Pool } = createRequire(join(RAIZ, 'apps/api/package.json'))('pg');
     pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
+    pool.on('error', (e) => decir(`   ⚠ la base cortó una conexión (15-O): ${e.message}`));
   }
   // C6 · PRIMERO el registro de la consola (N equipos); el .env sólo de respaldo.
   const elegidos = await elegirEquipos({ sim, pool, entorno: process.env, decir, salir });
@@ -204,6 +205,7 @@ const principal = async () => {
       : [
           P.juzgarProveedorDeEquipos(sim.entorno, sim.equiposReales),
           P.juzgarConexionDePgBoss(sim.entorno),
+          P.juzgarPresupuestoDeConexiones(sim.entorno),
         ];
   decir(`── Comprobaciones de la plataforma${sim === null ? '' : ' (API simulada)'}`);
   for (const l of P.lineasDeComprobaciones(comprobaciones, SECRETOS)) decir(l);

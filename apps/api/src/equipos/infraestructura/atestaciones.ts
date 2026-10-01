@@ -5,6 +5,7 @@ import type {
   AtestacionNueva,
   RepositorioDeAtestaciones,
 } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 interface FilaDeAtestacion {
   readonly id: string;
@@ -40,26 +41,25 @@ export class RepositorioDeAtestacionesPg implements RepositorioDeAtestaciones {
     ctx: ContextoTenant,
     fn: (consultar: Pool['query']) => Promise<T>,
   ): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
-      await cliente.query('BEGIN');
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({
-          rol: ctx.rol,
-          usuario_id: ctx.usuarioId,
-          copropiedad_id: ctx.copropiedadId,
-          copropiedades: ctx.copropiedadesAtendidas,
-        }),
-      ]);
-      const resultado = await fn(cliente.query.bind(cliente) as Pool['query']);
-      await cliente.query('COMMIT');
-      return resultado;
-    } catch (error) {
-      await cliente.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      cliente.release();
-    }
+    return conCliente(this.pool, async (cliente) => {
+      try {
+        await cliente.query('BEGIN');
+        await cliente.query("SELECT set_config('request.jwt.claims', $1, true)", [
+          JSON.stringify({
+            rol: ctx.rol,
+            usuario_id: ctx.usuarioId,
+            copropiedad_id: ctx.copropiedadId,
+            copropiedades: ctx.copropiedadesAtendidas,
+          }),
+        ]);
+        const resultado = await fn(cliente.query.bind(cliente) as Pool['query']);
+        await cliente.query('COMMIT');
+        return resultado;
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      }
+    });
   }
 
   async registrar(

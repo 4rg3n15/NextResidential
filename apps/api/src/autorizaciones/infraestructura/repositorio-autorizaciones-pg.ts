@@ -11,6 +11,7 @@ import type {
   RepositorioAutorizaciones,
   RepositorioDeConsultaDeAutorizaciones,
 } from '../aplicacion/puertos';
+import { conCliente } from '../../persistencia/con-cliente';
 
 /**
  * Adaptador PostgreSQL del agregado `Autorización` — ETAPA 09-B.
@@ -61,15 +62,12 @@ export class RepositorioAutorizacionesPg
   ) {}
 
   private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
-    const cliente = await this.pool.connect();
-    try {
+    return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
         JSON.stringify(this.claims),
       ]);
       return await fn(cliente);
-    } finally {
-      cliente.release();
-    }
+    });
   }
 
   /** Devuelve el `visitante_id` de esa persona, creándolo si aún no existe. */

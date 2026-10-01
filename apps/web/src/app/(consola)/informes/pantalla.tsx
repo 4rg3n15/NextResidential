@@ -171,7 +171,7 @@ export const PantallaDeInformes = ({
 
       {pedido && consulta.isError
         ? estadoSegunCodigo(
-            consulta.error instanceof ErrorDeApi ? consulta.error.estado : 0,
+            consulta.error instanceof ErrorDeApi ? consulta.error : 0,
             consulta.error instanceof Error ? consulta.error.message : 'Error inesperado',
             () => void consulta.refetch(),
           )

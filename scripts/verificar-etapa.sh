@@ -863,6 +863,16 @@ else
   mal "hay clases que Nest construye e inyecta por tipo: con tsx reciben undefined (H-SITIO-06)"
   echo "$salida_iny" | head -10 | sed 's/^/     /'
 fi
+# 15-O · en sitio un corte del pooler de Supabase tumbó la API entera: ni el
+# pool ni los clientes prestados escuchaban 'error', y Node termina el proceso
+# ante un 'error' sin oyente. Defensa estática; la que corta de verdad, en el
+# paso 5 (`corte-de-postgres.e2e.test.ts`).
+if salida_con=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-conexiones.mjs 2>&1); then
+  ok "${salida_con#OK }"
+else
+  mal "hay conexiones a PostgreSQL que un corte de la base convierte en caída del proceso (15-O)"
+  echo "$salida_con" | head -10 | sed 's/^/     /'
+fi
 # KPI-11 · la sustitución de MockProvider por HikvisionProvider en la ETAPA 15
 # solo es posible si nadie fuera de `packages/providers` conoce el protocolo.
 if salida_kpi11=$(con_limite "$LIMITE_CORTO" node scripts/lib/frontera-hardware.mjs 2>&1); then

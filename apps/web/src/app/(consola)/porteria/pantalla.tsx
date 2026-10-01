@@ -134,9 +134,13 @@ export const PantallaDePorteria = ({
   if (cola.isPending) return <EstadoCargando etiqueta="Cargando la portería" />;
   if (cola.isError) {
     const estado = cola.error instanceof ErrorDeApi ? cola.error.estado : 0;
-    return estadoSegunCodigo(estado, 'No se pudo cargar la portería.', () => {
-      void cola.refetch();
-    });
+    return estadoSegunCodigo(
+      cola.error instanceof ErrorDeApi ? cola.error : estado,
+      'No se pudo cargar la portería.',
+      () => {
+        void cola.refetch();
+      },
+    );
   }
 
   const lista = cola.data?.cola ?? [];

@@ -169,13 +169,25 @@ export class EventosModule {
         },
         {
           provide: REGISTRO_DE_EVENTOS_DE_EQUIPO,
-          inject: [REPOSITORIO_EVENTOS_DE_EQUIPO, CANAL_TIEMPO_REAL, BITACORA, RELOJ],
+          inject: [
+            REPOSITORIO_EVENTOS_DE_EQUIPO,
+            CANAL_TIEMPO_REAL,
+            BITACORA,
+            RELOJ,
+            CONFIGURACION,
+          ],
           useFactory: (
             repositorio: RepositorioEventosDeEquipo,
             canal: CanalTiempoReal,
             bitacora: Bitacora,
             reloj: Reloj,
-          ) => new RegistroDeEventosDeEquipo(repositorio, canal, bitacora, reloj),
+            config: Configuracion,
+          ) =>
+            // 15-O · el volcado histórico, en lotes grandes y con tope por segundo.
+            new RegistroDeEventosDeEquipo(repositorio, canal, bitacora, reloj, {
+              lote: config.EVENTOS_HISTORICOS_LOTE,
+              porSegundo: config.EVENTOS_HISTORICOS_POR_SEGUNDO,
+            }),
         },
         {
           /**

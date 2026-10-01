@@ -27,7 +27,7 @@ export const estadoDeConsulta = (
   if (consulta.isError) {
     const e = consulta.error;
     return estadoSegunCodigo(
-      e instanceof ErrorDeApi ? e.estado : 0,
+      e instanceof ErrorDeApi ? e : 0,
       e instanceof ErrorDeApi ? e.message : 'No se pudo cargar',
       () => void consulta.refetch(),
     );
