@@ -3,7 +3,7 @@ import { cache } from 'react';
 import type { EstadoDeSesionDePorteria } from '@ncr/contracts';
 import { configuracion } from '../configuracion';
 import { reenvioDeIpActual } from './ip-del-navegador';
-import { tokenVigente } from './token';
+import { tokenDeLectura } from './token';
 
 /**
  * Lo que la consola necesita saber del token ANTES de pintar nada (15-H).
@@ -19,7 +19,7 @@ export interface ClaimsVisibles {
 }
 
 export const claimsVisibles = cache(async (): Promise<ClaimsVisibles | null> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return null;
   try {
     const carga = token.accessToken.split('.')[1] ?? '';
@@ -42,7 +42,7 @@ export const claimsVisibles = cache(async (): Promise<ClaimsVisibles | null> => 
  * API admite en patrullaje y fuera de turno, precisamente para esto.
  */
 export const estadoDePorteria = cache(async (): Promise<EstadoDeSesionDePorteria | null> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return null;
   const { apiUrl } = configuracion();
   try {

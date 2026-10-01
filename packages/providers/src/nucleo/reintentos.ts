@@ -38,7 +38,7 @@ export interface MedioDeEspera {
   readonly azar: () => number;
 }
 
-const MEDIO_REAL: MedioDeEspera = {
+export const MEDIO_DE_ESPERA_REAL: MedioDeEspera = {
   esperar: (ms) => new Promise((listo) => setTimeout(listo, ms)),
   azar: Math.random,
 };
@@ -50,7 +50,7 @@ export const esReintentable = (error: unknown): boolean =>
 export const conReintentos = async <T>(
   orden: () => Promise<T>,
   politica: PoliticaDeReintentos = POLITICA_DE_ORDENES,
-  medio: MedioDeEspera = MEDIO_REAL,
+  medio: MedioDeEspera = MEDIO_DE_ESPERA_REAL,
 ): Promise<T> => {
   let espera = politica.esperaInicialMs;
   for (let intento = 1; ; intento += 1) {

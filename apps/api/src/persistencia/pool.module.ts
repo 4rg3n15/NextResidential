@@ -104,6 +104,12 @@ export class PoolModule {
                 max: c.PG_POOL_MAX,
                 application_name: NOMBRE_DE_APLICACION_DEL_POOL,
                 connectionTimeoutMillis: ESPERA_MAXIMA_POR_CONEXION_MS,
+                /**
+                 * 15-P · 0.6 · TCP keepalive: una conexión ociosa que un router
+                 * o el pooler cortan en silencio se descubre por el sistema
+                 * operativo, no en la siguiente consulta de un operador.
+                 */
+                keepAlive: true,
               }),
               (motivo) => {
                 bitacora.registrar('aviso', 'PostgreSQL cortó una conexión ociosa del pool', {

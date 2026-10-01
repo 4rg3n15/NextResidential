@@ -64,6 +64,19 @@ export class CapacidadNoSoportada extends ErrorDeEquipo {
  * en el canal de la ficha, según su propia respuesta RTSP). Se niega ANTES de
  * negociar: un reproductor negro con «primer cuadro pendiente» no explica nada.
  */
+/**
+ * 15-P (0.5) · NO BASTA CON DECIR «CÁMBIELO A H.264»: CÓMO.
+ *
+ * La ruta del menú es la de la web de estos equipos (Configuración › Video/Audio
+ * › Video) [SUPUESTO S-175: varía en algún firmware; la guía de sitio lo
+ * confirma]. El flujo se dice por su canal: `x01` principal, `x02` subflujo.
+ */
+export const comoPasarAH264 = (canal: string): string =>
+  `Para verlo: en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» ` +
+  `elija el ${canal.endsWith('01') ? 'principal' : 'subflujo'} (canal ${canal}); en ` +
+  '«Codificación de video» ponga H.264 y pulse Guardar; o elija otro canal en su ficha que ya ' +
+  'entregue H.264.';
+
 export class VideoNoReproducible extends ErrorDeEquipo {
   constructor(
     dispositivoId: string,
@@ -73,8 +86,8 @@ export class VideoNoReproducible extends ErrorDeEquipo {
     // Sin el identificador: esta frase la lee el operador en la consola de video.
     super(
       dispositivoId,
-      `Este equipo entrega ${codec} en el canal ${canal} y el navegador no lo reproduce: ` +
-        'cámbielo a H.264 en el equipo o elija otro canal en su ficha',
+      `Este equipo entrega ${codec} en el canal ${canal} y el navegador no lo reproduce. ` +
+        comoPasarAH264(canal),
     );
   }
 }

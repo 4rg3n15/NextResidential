@@ -115,9 +115,17 @@ export class SondaPorProveedor implements SondaDeEquipo {
      */
     const capacidades =
       diagnostico.contacto.clase === 'alcanzado' ? diagnostico.capacidadesDelEquipo : null;
-    // V2 (15-N) · el canal propuesto entre los declarados viaja para guardarse.
+    /**
+     * V2 (15-N) · el canal propuesto entre los declarados viaja para guardarse.
+     * 15-P (0.5) · el 101 por omisión, sólo si el equipo lo describió: un
+     * canal que el equipo niega no se escribe en la ficha.
+     */
+    const v = diagnostico.video;
     const propuesto =
-      diagnostico.video?.origenDelCanal === 'propuesto' ? diagnostico.video.canal : undefined;
+      v?.origenDelCanal === 'propuesto' ||
+      (v?.origenDelCanal === 'por_omision' && v.clase === 'respondio')
+        ? v.canal
+        : undefined;
     const base = {
       modelo: diagnostico.modelo,
       firmware: diagnostico.firmware,

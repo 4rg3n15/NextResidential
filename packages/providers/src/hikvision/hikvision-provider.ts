@@ -42,8 +42,9 @@ import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
 import { CapacidadNoSoportada, CredencialRechazada, VideoNoReproducible } from '../nucleo/errores';
-import { POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
+import { MEDIO_DE_ESPERA_REAL, POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
 import type { MedioDeEspera } from '../nucleo/reintentos';
+import { publicarConEspera } from '../nucleo/publicacion-con-espera';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
@@ -520,11 +521,33 @@ export class HikvisionProvider
   ): Promise<void> {
     try {
       for await (const evento of escucha.escuchar(cancelar)) {
-        await this.fuente.publicar({ evento, foto: null, recorte: null, transporte });
+        // 15-P · 0.2 · si la plataforma tropieza, espera con dispersión y SIGUE:
+        // un fallo momentáneo de la base no deja al equipo mudo para siempre.
+        const desenlace = await publicarConEspera(
+          () => this.fuente.publicar({ evento, foto: null, recorte: null, transporte }),
+          cancelar,
+          this.opciones.medioDeReintento ?? MEDIO_DE_ESPERA_REAL,
+          (intento, error) => {
+            this.opciones.traza?.registrar('aviso', 'escucha: la publicación falló, se reintenta', {
+              dispositivoId: escucha.dispositivoId,
+              intento,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          },
+        );
+        if (desenlace === 'perdido') {
+          this.opciones.traza?.registrar(
+            'error',
+            'escucha: evento perdido tras reintentar; se sigue',
+            {
+              dispositivoId: escucha.dispositivoId,
+            },
+          );
+        }
       }
     } catch (error) {
       // La escucha reintenta sola; si salió del bucle es porque se canceló o
-      // porque publicar falló. Lo segundo se DICE (H-SITIO-14).
+      // porque la propia escucha falló. Lo segundo se DICE (H-SITIO-14).
       if (!cancelar.aborted) {
         this.opciones.traza?.registrar('error', 'escucha: el bombeo hacia la fuente se detuvo', {
           dispositivoId: escucha.dispositivoId,

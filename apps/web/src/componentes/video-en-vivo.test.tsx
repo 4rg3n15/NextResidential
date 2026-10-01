@@ -164,3 +164,26 @@ describe('VideoEnVivo (A5)', () => {
     expect(screen.getByText('Se cortó el video')).toBeTruthy();
   });
 });
+
+describe('15-P · 0.4 · cambiar de equipo aborta la negociación en vuelo', () => {
+  it('la señal de la primera se aborta al pasar a otro equipo, y la segunda sigue viva', () => {
+    const senales: AbortSignal[] = [];
+    const negociar = vi.fn(
+      (_url: string, opciones: OpcionesDeNegociacion) =>
+        new Promise<ConexionEnVivo>(() => {
+          if (opciones.senal !== undefined) senales.push(opciones.senal);
+        }),
+    );
+    const vista = render(
+      <VideoEnVivo copropiedadId={COP} dispositivoId={DISP} negociar={negociar} />,
+    );
+    vista.rerender(
+      <VideoEnVivo copropiedadId={COP} dispositivoId="otro-equipo" negociar={negociar} />,
+    );
+    expect(negociar).toHaveBeenCalledTimes(2);
+    expect(senales[0]?.aborted).toBe(true);
+    expect(senales[1]?.aborted).toBe(false);
+    vista.unmount();
+    expect(senales[1]?.aborted).toBe(true);
+  });
+});

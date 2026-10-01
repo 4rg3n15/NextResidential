@@ -1,6 +1,7 @@
 import 'server-only';
 import { borrarSesion, guardarSesion, leerSesion } from './cookies';
 import { FalloDeAcceso, refrescarSesion } from './supabase-auth';
+import { MARGEN_SEGUNDOS } from './margen';
 
 /**
  * Token de acceso vigente, **renovado por anticipación y no por reacción**.
@@ -15,7 +16,7 @@ import { FalloDeAcceso, refrescarSesion } from './supabase-auth';
  * pueden ir desalineados, y una petición puede tardar. Renovar de más cuesta
  * una llamada; renovar de menos cuesta una sesión caída.
  */
-export const MARGEN_SEGUNDOS = 60;
+export { MARGEN_SEGUNDOS } from './margen';
 
 export interface TokenVigente {
   readonly accessToken: string;
@@ -43,7 +44,26 @@ export const tokenVigente = async (ahora = Date.now()): Promise<TokenVigente | n
   } catch (e) {
     // Un refresco rechazado significa sesión revocada o caducada de verdad. Se
     // borra la cookie: dejarla haría que la consola reintentara en bucle.
-    if (e instanceof FalloDeAcceso) await borrarSesion();
+    // 15-P · el borrado tampoco puede lanzar: sin token, null y a /acceso.
+    if (e instanceof FalloDeAcceso) await borrarSesion().catch(() => undefined);
     return null;
   }
+};
+
+/**
+ * 15-P · 0.3 · EL TOKEN PARA UN COMPONENTE DE SERVIDOR: SÓLO LEE.
+ *
+ * Next prohíbe escribir cookies al pintar, así que aquí no se renueva: la
+ * renovación de una navegación ya la hizo el middleware
+ * (`renovar-en-middleware.ts`) y dejó el token nuevo en la petición. Un token
+ * aún válido dentro del margen se usa (si el middleware no pudo renovar por la
+ * red, sigue sirviendo); uno vencido o ausente es `null`, y la página manda a
+ * /acceso sin lanzar.
+ */
+export const tokenDeLectura = async (ahora = Date.now()): Promise<TokenVigente | null> => {
+  const sesion = await leerSesion();
+  if (sesion === null || sesion.accessToken === '') return null;
+  return sesion.expiraEn > Math.floor(ahora / 1000)
+    ? { accessToken: sesion.accessToken, expiraEn: sesion.expiraEn }
+    : null;
 };

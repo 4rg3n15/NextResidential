@@ -128,6 +128,11 @@ describe.skipIf(URL_BASE === undefined)('15-O · pg-boss ante un corte (PostgreS
     });
     await planificador.arrancar();
     expect(planificador.estado().fase).toBe('en-marcha');
+    // 15-P · 0.6 · el pool propio de pg-boss también pide TCP keepalive.
+    const motor = (planificador as unknown as { boss: { getDb: () => { pool: Pool } } }).boss;
+    expect(
+      (motor.getDb().pool as Pool & { options: { keepAlive?: boolean } }).options.keepAlive,
+    ).toBe(true);
 
     const { rowCount } = await (admin as Pool).query(
       `SELECT pg_terminate_backend(pid) FROM pg_stat_activity

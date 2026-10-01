@@ -85,3 +85,11 @@ describe('instalarCierreOrdenado', () => {
     await vi.waitFor(() => expect(salir).toHaveBeenCalledWith(0));
   });
 });
+
+describe('15-P · 0.1 · el cierre pedido por un fallo sale con su código', () => {
+  it('cierra en orden y sale con 1, no con 0', async () => {
+    const { alRecibir, salir } = montar(async () => undefined);
+    await alRecibir('uncaughtException', 1);
+    expect(salir).toHaveBeenCalledWith(1);
+  });
+});

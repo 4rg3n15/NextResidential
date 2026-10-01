@@ -134,6 +134,13 @@ describe('15-O · la API ante una conexión cortada por PostgreSQL', () => {
     await admin?.end();
   });
 
+  it('15-P · 0.6 · el pool de la API pide TCP keepalive', () => {
+    if (app === undefined) return;
+    expect((app.get(Pool) as Pool & { options: { keepAlive?: boolean } }).options.keepAlive).toBe(
+      true,
+    );
+  });
+
   it('conexiones OCIOSAS cortadas: el proceso sigue y la siguiente petición responde', async () => {
     if (app === undefined) return;
     await listar().expect(200);

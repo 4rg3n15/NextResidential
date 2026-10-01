@@ -78,12 +78,31 @@ describe('SondaPorProveedor · video', () => {
     expect(r.canalDeVideo).toBeUndefined();
   });
 
-  it('V2 · sin canal en la ficha y sin lista del equipo: no se pregunta a ciegas', async () => {
+  /**
+   * 15-P (0.5) · esta prueba fijaba «sin ficha y sin lista no se pregunta»:
+   * es el 409 «sin video» que el encargo manda cambiar por «proponer 101».
+   * Se pregunta el 101, se dice que fue por omisión y, como el equipo lo
+   * describe, se propone guardarlo.
+   */
+  it('V2 · sin canal en la ficha y sin lista del equipo: el 101 por omisión', async () => {
     const r = await sonda(rtsp.puerto).probar(datos(null));
-    expect(r.canalDeVideo).toBeUndefined();
-    expect(r.ficha?.hallazgos.find((h) => h.campo.startsWith('video en vivo'))?.detalle).toMatch(
-      /sin canal/i,
-    );
+    expect(r.canalDeVideo).toBe('101');
+    const detalle = r.ficha?.hallazgos.find((h) => h.campo.startsWith('video en vivo'))?.detalle;
+    expect(detalle).toMatch(/canal 101 por omisión: el equipo no lista sus canales; lo describió/);
+    expect(detalle).toMatch(/Codificación de video» ponga H\.264/);
+  });
+
+  it('15-P · el 101 por omisión que el equipo NO tiene no se guarda en la ficha', async () => {
+    const sinPrincipal = await servidorRtspSimulado({ ...CREDENCIAL, canales: { '102': 'H264' } });
+    try {
+      const r = await sonda(sinPrincipal.puerto).probar(datos(null));
+      expect(r.canalDeVideo).toBeUndefined();
+      expect(r.ficha?.hallazgos.find((h) => h.campo.startsWith('video en vivo'))?.detalle).toMatch(
+        /canal 101 por omisión: el equipo no lista sus canales$/,
+      );
+    } finally {
+      await sinPrincipal.cerrar();
+    }
   });
 
   it('sin puerto RTSP configurado, no se pregunta el video', async () => {

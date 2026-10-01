@@ -17,9 +17,9 @@ import { configuracion } from '../configuracion';
  * que es lo que importa.
  */
 
-export const COOKIE_ACCESO = 'ncr_acceso';
-export const COOKIE_REFRESCO = 'ncr_refresco';
-export const COOKIE_EXPIRA = 'ncr_expira';
+import { COOKIE_ACCESO, COOKIE_EXPIRA, COOKIE_REFRESCO } from './nombres-de-cookies';
+
+export { COOKIE_ACCESO, COOKIE_EXPIRA, COOKIE_REFRESCO };
 /** Marca legible por el servidor para saber si hay un segundo factor pendiente. */
 export const COOKIE_FACTOR_PENDIENTE = 'ncr_factor';
 /**

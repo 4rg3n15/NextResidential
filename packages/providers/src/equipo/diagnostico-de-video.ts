@@ -1,5 +1,6 @@
 import type { DiagnosticoDeVideo } from '../nucleo/video';
 import type { ResultadoRtsp } from './rtsp-describe';
+import { comoPasarAH264 } from '../nucleo/errores';
 
 /**
  * V5 (15-N) · de la respuesta RTSP del equipo a una causa y una frase.
@@ -36,8 +37,7 @@ export const diagnosticoDeVideoDesde = (canal: string, r: ResultadoRtsp): Diagno
           codec: r.codec,
           frase:
             `el equipo entrega ${r.codec ?? 'un códec ilegible'} en el canal ${canal} y el ` +
-            'navegador sólo reproduce H.264: cámbielo en el equipo (codificación del subflujo) o ' +
-            'elija otro canal en su ficha',
+            `navegador sólo reproduce H.264. ${comoPasarAH264(canal)}`,
         };
   }
   if (r.clase === 'credencial') {

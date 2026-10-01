@@ -35,12 +35,17 @@ export const instalarCierreOrdenado = (
     readonly salir?: (codigo: number) => void;
     readonly proceso?: Pick<NodeJS.Process, 'on'>;
   } = {},
-): ((senal: string) => Promise<void>) => {
+): ((senal: string, codigoAlTerminar?: number) => Promise<void>) => {
   const salir = opciones.salir ?? ((codigo: number) => process.exit(codigo));
   const plazoMs = opciones.plazoMs ?? PLAZO_DE_CIERRE_MS;
   let cerrando = false;
 
-  const alRecibir = async (senal: string): Promise<void> => {
+  /**
+   * `codigoAlTerminar` · 0 por una señal; 1 cuando el cierre lo pide un fallo
+   * del proceso (15-P, `vigilancia-del-proceso.ts`): cerró bien, pero no salió
+   * bien.
+   */
+  const alRecibir = async (senal: string, codigoAlTerminar = 0): Promise<void> => {
     if (cerrando) {
       bitacora.registrar('aviso', 'segunda señal: se sale sin esperar', { senal });
       salir(130);
@@ -59,7 +64,7 @@ export const instalarCierreOrdenado = (
       await app.close();
       bitacora.registrar('info', 'API cerrada: escuchas, latidos y pools terminados', { senal });
       clearTimeout(vigilante);
-      salir(0);
+      salir(codigoAlTerminar);
     } catch (error) {
       clearTimeout(vigilante);
       bitacora.registrar('error', 'fallo al cerrar la API', {

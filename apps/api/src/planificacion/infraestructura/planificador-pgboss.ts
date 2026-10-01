@@ -154,7 +154,12 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
   private async intentar(): Promise<void> {
     this.intentos += 1;
     this.situacion = { fase: 'arrancando' };
-    const boss = new PgBoss({
+    /**
+     * 15-P · 0.6 · `keepAlive` no está en los tipos de pg-boss, pero pg-boss
+     * pasa su configuración tal cual a `pg.Pool` (`attorney.getConfig` copia el
+     * objeto y `Db` lo entrega al pool): se declara aquí con su tipo.
+     */
+    const configuracion: PgBoss.ConstructorOptions & { readonly keepAlive: boolean } = {
       connectionString: this.opciones.cadenaDeConexion,
       schema: this.opciones.esquema,
       // El planificador no necesita concurrencia: son tres barridos por hora.
@@ -162,7 +167,9 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
       // comparte el tope del proyecto Supabase (D-66, 15-O).
       max: this.opciones.maximoDeConexiones ?? 2,
       application_name: NOMBRE_DE_APLICACION_DE_PGBOSS,
-    });
+      keepAlive: true,
+    };
+    const boss = new PgBoss(configuracion);
     /**
      * 15-O · el `'error'` de pg-boss reúne el de su pool (una conexión ociosa
      * que la base cortó), el de sus bucles de mantenimiento y el de los

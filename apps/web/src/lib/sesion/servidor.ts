@@ -4,7 +4,7 @@ import type { AlcanceDeCopropiedades, Sesion } from '@ncr/contracts';
 import { configuracion } from '../configuracion';
 import { reenvioDeIpActual } from './ip-del-navegador';
 import { registrar } from '../registro';
-import { tokenVigente } from './token';
+import { tokenDeLectura } from './token';
 
 /**
  * SOLO PARA DIAGNÓSTICO: los NOMBRES de los claims del token, jamás sus
@@ -36,7 +36,7 @@ const nombresDeClaims = (accessToken: string): string => {
  * y la página la piden ambos y solo sale una al servidor.
  */
 export const sesionActual = cache(async (): Promise<Sesion | null> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return null;
 
   const { apiUrl } = configuracion();
@@ -90,7 +90,7 @@ export const sesionActual = cache(async (): Promise<Sesion | null> => {
  * es nulo y quien lo resuelve es `app.es_superadmin()` en la base.
  */
 export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropiedades | null> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return null;
 
   const { apiUrl } = configuracion();
@@ -133,7 +133,7 @@ export const alcanceDeCopropiedades = cache(async (): Promise<AlcanceDeCopropied
  */
 export const avisoDeEquiposSimulados = cache(
   async (copropiedadId: string): Promise<string | null> => {
-    const token = await tokenVigente();
+    const token = await tokenDeLectura();
     if (token === null) return null;
     const { apiUrl } = configuracion();
     try {
@@ -158,7 +158,7 @@ export const avisoDeEquiposSimulados = cache(
 );
 
 export const modoPruebasActivo = cache(async (): Promise<boolean> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return false;
   const { apiUrl } = configuracion();
   try {

@@ -4,6 +4,7 @@ import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { hallazgoDeRostros } from './hallazgo-de-rostros';
+import { comoPasarAH264 } from '../nucleo/errores';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -288,7 +289,10 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
       ? v.sustituido === null || v.sustituido === undefined
         ? ` · canal ${v.canal} propuesto entre los que el equipo declara; se guarda en la ficha`
         : ` · la ficha tenía el ${v.sustituido}, que el equipo NO declara: se usó y se guarda el ${v.canal}`
-      : '';
+      : v.origenDelCanal === 'por_omision'
+        ? // 15-P (0.5) · sólo se guarda si el equipo describió el canal.
+          ` · canal ${v.canal} por omisión: el equipo no lista sus canales${v.clase === 'respondio' ? '; lo describió y se guarda en la ficha' : ''}`
+        : '';
   if (v.clase === 'respondio' && v.codec === 'H.264') {
     return {
       ...base,
@@ -305,8 +309,7 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
       detalle:
         (v.codec === 'H.265'
           ? `El equipo entrega H.265 en el canal ${v.canal} y el navegador no lo reproduce: la ` +
-            'consola lo dirá en vez de mostrar negro. Cámbielo a H.264 en el equipo (codificación ' +
-            'del flujo) o elija otro canal en la ficha, y vuelva a probar'
+            `consola lo dirá en vez de mostrar negro. ${comoPasarAH264(v.canal)} Luego vuelva a probar`
           : `El equipo describe el canal ${v.canal} sin un video H.264 legible: elija otro canal o ` +
             'cambie la codificación en el equipo') + delCanal,
     };
