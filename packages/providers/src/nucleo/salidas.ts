@@ -42,6 +42,46 @@ export class ArbolDeSalidasDemasiadoHondo extends Error {
   }
 }
 
+/** Un nodo con su sitio en el árbol: lo que una lista plana necesita para dibujarlo. */
+export interface NodoEnElArbol {
+  readonly nodo: NodoDeSalidas;
+  /** 1 = equipo, 2 = módulo, 3 = salida. */
+  readonly nivel: number;
+  /** `equipo/propio/puerta-1`: las claves desde la raíz. */
+  readonly ruta: string;
+  /** La ruta del padre; `null` en la raíz. */
+  readonly padre: string | null;
+  /** El nombre del nodo padre (`''` en la raíz). */
+  readonly nombreDelPadre: string;
+}
+
+/**
+ * EL ÚNICO RECORRIDO del árbol (R3), en preorden. Dos casos base: una salida
+ * es hoja —sus `hijos`, si alguien se los puso, no se recorren— y pasar de
+ * `PROFUNDIDAD_MAXIMA_DE_SALIDAS` es un error, no un recorte.
+ */
+export const recorrerSalidas = (
+  nodo: NodoDeSalidas,
+  nivel = 1,
+  camino: readonly NodoDeSalidas[] = [],
+): readonly NodoEnElArbol[] => {
+  const claves = [...camino, nodo].map((n) => n.clave);
+  const ruta = claves.join('/');
+  if (nivel > PROFUNDIDAD_MAXIMA_DE_SALIDAS) throw new ArbolDeSalidasDemasiadoHondo(ruta);
+  const aqui: NodoEnElArbol = {
+    nodo,
+    nivel,
+    ruta,
+    padre: camino.length === 0 ? null : claves.slice(0, -1).join('/'),
+    nombreDelPadre: camino.at(-1)?.nombre ?? '',
+  };
+  if (nodo.tipo === 'salida') return [aqui];
+  return [
+    aqui,
+    ...nodo.hijos.flatMap((hijo) => recorrerSalidas(hijo, nivel + 1, [...camino, nodo])),
+  ];
+};
+
 export interface SalidaAplanada {
   /** `equipo/propio/puerta-1`: dónde está la salida en el árbol. */
   readonly ruta: string;
@@ -51,28 +91,10 @@ export interface SalidaAplanada {
   readonly modulo: string;
 }
 
-/**
- * Las salidas que se pueden ABRIR, en orden. Recursiva sobre el árbol, con dos
- * casos base: una salida (hoja) y la profundidad máxima superada (error).
- */
-export const aplanarSalidas = (
-  nodo: NodoDeSalidas,
-  profundidad = 1,
-  camino: readonly NodoDeSalidas[] = [],
-): readonly SalidaAplanada[] => {
-  const ruta = [...camino, nodo].map((n) => n.clave).join('/');
-  if (profundidad > PROFUNDIDAD_MAXIMA_DE_SALIDAS) throw new ArbolDeSalidasDemasiadoHondo(ruta);
-  if (nodo.tipo === 'salida') {
-    return nodo.numeroDePuerta === null
-      ? []
-      : [
-          {
-            ruta,
-            nombre: nodo.nombre,
-            numeroDePuerta: nodo.numeroDePuerta,
-            modulo: camino.at(-1)?.nombre ?? '',
-          },
-        ];
-  }
-  return nodo.hijos.flatMap((hijo) => aplanarSalidas(hijo, profundidad + 1, [...camino, nodo]));
-};
+/** Las salidas que se pueden ABRIR, en orden: las hojas con número de puerta. */
+export const aplanarSalidas = (raiz: NodoDeSalidas): readonly SalidaAplanada[] =>
+  recorrerSalidas(raiz).flatMap(({ nodo, ruta, nombreDelPadre }) =>
+    nodo.tipo === 'salida' && nodo.numeroDePuerta !== null
+      ? [{ ruta, nombre: nodo.nombre, numeroDePuerta: nodo.numeroDePuerta, modulo: nombreDelPadre }]
+      : [],
+  );

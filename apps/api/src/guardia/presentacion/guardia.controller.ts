@@ -10,7 +10,12 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -125,6 +130,8 @@ export class GuardiaController {
     // error del cliente, no una falta de permiso, y confundirlos haría que la
     // consola mostrara «sin permiso» a quien sólo olvidó escribir por qué abre.
     if (r.error.codigo === 'OPERACION_NO_PERMITIDA') throw new ForbiddenException(r.error.detalle);
+    // 15-P · un punto de acceso que no es del equipo: 404, como el equipo ajeno.
+    if (r.error.codigo === 'ENTIDAD_NO_ENCONTRADA') throw new NotFoundException(r.error.detalle);
     throw new BadRequestException(r.error.detalle);
   }
 
@@ -159,6 +166,7 @@ export class GuardiaController {
         accion: dto.accion,
         motivo: dto.motivo,
         eventoId: dto.eventoId ?? null,
+        puntoId: dto.puntoId ?? null,
       }),
     );
     return {
@@ -166,6 +174,7 @@ export class GuardiaController {
       momento: orden.momento.toISOString(),
       resultado: orden.resultado ?? null,
       detalle: orden.detalle ?? null,
+      punto: orden.punto ?? null,
     };
   }
 
@@ -245,6 +254,7 @@ export class GuardiaController {
         // con un equipo mudo, y es justo lo que el portero necesita mirar.
         resultado: o.resultado ?? null,
         detalle: o.detalle ?? null,
+        punto: o.punto ?? null,
       })),
     };
   }

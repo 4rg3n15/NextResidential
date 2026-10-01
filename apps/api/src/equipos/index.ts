@@ -67,3 +67,9 @@ export type {
   ResultadoDeRetiroDePlantillas,
   RetiroDePlantillasDeEquipo,
 } from './aplicacion/retiro-de-plantillas';
+/**
+ * 15-P · P3 · los puntos de acceso del equipo (`puntos_de_acceso`), para que la
+ * guardia resuelva la puerta del punto elegido sin consultar la tabla.
+ */
+export { PuntosDeOperacion } from './aplicacion/puntos-de-operacion';
+export type { PuntoDeAcceso } from './aplicacion/puntos-de-acceso';

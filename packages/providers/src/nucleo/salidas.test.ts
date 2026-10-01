@@ -3,6 +3,7 @@ import {
   ArbolDeSalidasDemasiadoHondo,
   PROFUNDIDAD_MAXIMA_DE_SALIDAS,
   aplanarSalidas,
+  recorrerSalidas,
 } from './salidas';
 import type { NodoDeSalidas } from './salidas';
 
@@ -61,5 +62,16 @@ describe('aplanarSalidas · equipo → módulo → salida', () => {
     const ciclico: NodoDeSalidas = { ...nodo('equipo', 'equipo'), hijos };
     hijos.push(ciclico);
     expect(() => aplanarSalidas(ciclico)).toThrow(ArbolDeSalidasDemasiadoHondo);
+  });
+
+  it('recorrerSalidas: preorden con nivel, ruta y padre; una salida es hoja', () => {
+    const arbol = nodo('equipo', 'equipo', [
+      nodo('propio', 'modulo', [nodo('puerta-1', 'salida', [nodo('colgado', 'salida', [], 9)], 1)]),
+    ]);
+    expect(recorrerSalidas(arbol).map((n) => [n.ruta, n.nivel, n.padre])).toEqual([
+      ['equipo', 1, null],
+      ['equipo/propio', 2, 'equipo'],
+      ['equipo/propio/puerta-1', 3, 'equipo/propio'],
+    ]);
   });
 });

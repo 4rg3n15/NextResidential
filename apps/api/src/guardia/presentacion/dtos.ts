@@ -48,6 +48,23 @@ export class OrdenManualDto {
   @IsOptional()
   @IsUUID()
   eventoId?: string;
+
+  @ApiProperty({
+    required: false,
+    format: 'uuid',
+    description:
+      '15-P · el punto de acceso del equipo que se abre. Sin él, la puerta de la ficha. ' +
+      'Un punto de otro equipo, de otra copropiedad o dado de baja: 404 y la orden no sale.',
+  })
+  @IsOptional()
+  @IsUUID()
+  puntoId?: string;
+}
+
+export class PuntoDeLaOrdenDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() nombre!: string;
+  @ApiProperty({ type: Number }) numeroDePuerta!: number;
 }
 
 export class OrdenEjecutadaDto {
@@ -81,6 +98,13 @@ export class OrdenEjecutadaDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Lo que contestó el equipo.' })
   detalle!: string | null;
+
+  @ApiProperty({
+    type: PuntoDeLaOrdenDto,
+    nullable: true,
+    description: '15-P · el punto elegido; nulo = la puerta de la ficha del equipo.',
+  })
+  punto!: PuntoDeLaOrdenDto | null;
 }
 
 export class HistorialDeOrdenesDto {

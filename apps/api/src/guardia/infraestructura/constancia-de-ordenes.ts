@@ -37,10 +37,13 @@ export class ConstanciaDeOrdenesEnLineaDeTiempo implements ConstanciaDeOrdenes {
         orden.resultado === undefined || orden.resultado === null
           ? 'sin respuesta del equipo'
           : (DESENLACE[orden.resultado] ?? orden.resultado);
+      // 15-P · P3 · con punto elegido, cuál: «Cerradura 2» dice más que el equipo.
+      const donde =
+        orden.punto === undefined || orden.punto === null ? '' : ` (${orden.punto.nombre})`;
       const titulo = abrir
-        ? `Apertura ordenada por ${quien}: ${desenlace}` +
+        ? `Apertura ordenada por ${quien}${donde}: ${desenlace}` +
           (orden.detalle === undefined || orden.detalle === null ? '' : ` — ${orden.detalle}`)
-        : `Acceso negado a mano por ${quien}`;
+        : `Acceso negado a mano por ${quien}${donde}`;
       await this.registro.vivo({
         copropiedadId: orden.copropiedadId,
         dispositivoId: orden.dispositivoId,
@@ -61,6 +64,9 @@ export class ConstanciaDeOrdenesEnLineaDeTiempo implements ConstanciaDeOrdenes {
           motivo: orden.motivo,
           resultado: orden.resultado ?? null,
           detalle: orden.detalle ?? null,
+          ...(orden.punto === undefined || orden.punto === null
+            ? {}
+            : { puntoDeAccesoId: orden.punto.id, numeroDePuerta: orden.punto.numeroDePuerta }),
         },
         creadoPor: orden.operadorId,
       });

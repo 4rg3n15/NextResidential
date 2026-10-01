@@ -20,7 +20,9 @@ import {
   PreferenciasDeAtencionPg,
 } from './infraestructura/preferencias-de-atencion-pg';
 import { ConstanciaDeOrdenesEnLineaDeTiempo } from './infraestructura/constancia-de-ordenes';
-import { EquiposModule } from '../equipos';
+import { EquiposModule, PuntosDeOperacion } from '../equipos';
+import { PUNTOS_DEL_EQUIPO } from './aplicacion/puntos-del-equipo';
+import type { PuntosDelEquipo } from './aplicacion/puntos-del-equipo';
 import type { DynamicModule } from '@nestjs/common';
 import { BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -274,6 +276,23 @@ export class GuardiaModule {
           ) => new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj),
         },
         {
+          /**
+           * 15-P · P3 · la puerta del punto elegido, resuelta por el módulo de
+           * equipos (dueño de `puntos_de_acceso`) con la identidad de quien
+           * ordena: la RLS y el alcance deciden qué puntos existen para él.
+           */
+          provide: PUNTOS_DEL_EQUIPO,
+          inject: [PuntosDeOperacion],
+          useFactory: (operacion: PuntosDeOperacion): PuntosDelEquipo => ({
+            resolver: async (ctx, copropiedadId, dispositivoId, puntoId) => {
+              const p = await operacion.resolver(ctx, copropiedadId, dispositivoId, puntoId);
+              return p === null
+                ? null
+                : { id: p.id, nombre: p.nombre, numeroDePuerta: p.numeroDePuerta };
+            },
+          }),
+        },
+        {
           provide: AccionarPuertaAMano,
           inject: [
             ACCIONADOR_DE_PUERTA,
@@ -282,6 +301,7 @@ export class GuardiaModule {
             GENERADOR_DE_ID,
             REGISTRO_DE_EVENTOS_DE_EQUIPO,
             BITACORA,
+            PUNTOS_DEL_EQUIPO,
           ],
           useFactory: (
             accionador: AccionadorDePuerta,
@@ -290,6 +310,7 @@ export class GuardiaModule {
             ids: GeneradorDeId,
             eventosDeEquipo: RegistroDeEventosDeEquipo,
             bitacora: Bitacora,
+            puntos: PuntosDelEquipo,
           ) =>
             new AccionarPuertaAMano(
               accionador,
@@ -298,6 +319,7 @@ export class GuardiaModule {
               ids,
               // A1 (15-L) · la orden, con su desenlace, en la línea de tiempo.
               new ConstanciaDeOrdenesEnLineaDeTiempo(eventosDeEquipo, bitacora),
+              puntos,
             ),
         },
       ],
