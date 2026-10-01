@@ -752,6 +752,20 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       }
       return respuestaDe(200, OK);
     }
+    /**
+     * 15-P · P3 · las salidas, SÓLO si el guion las declara. Sin `salidas` el
+     * simulado no conoce esas rutas, como antes de la 15-P (404): la misma
+     * `AccessControl/capabilities` es la que la lectura de la biblioteca de
+     * rostros pregunta, y contestarla con 200 cambiaba su veredicto (R1).
+     */
+    if (
+      guion.salidas === undefined &&
+      /capacidades de control de acceso del videoportero|unidades de puerta segura|submódulos del videoportero/.test(
+        catalogada.proposito,
+      )
+    ) {
+      return respuestaDe(404, 'not found');
+    }
     if (catalogada.proposito === 'leer las capacidades de control de acceso del videoportero') {
       return respuestaDe(200, capacidadesDeSalidas(guion));
     }
