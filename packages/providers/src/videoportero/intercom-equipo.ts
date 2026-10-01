@@ -17,6 +17,8 @@ import { ClienteDeEquipo } from '../equipo/cliente';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
 import { opcionesDeEscritura, rutaPara } from '../equipo/catalogo-de-rutas';
 import { resumenIsapi } from '../equipo/errores-del-fabricante';
+import { CanalDeAudioOcupado } from '../nucleo/errores';
+import { CODIGO_CANAL_OCUPADO, esCanalOcupado } from './errores-de-audio';
 
 /**
  * AUDIO BIDIRECCIONAL CONTRA EL EQUIPO · ADR-01.
@@ -227,6 +229,10 @@ export class IntercomDeEquipo implements IntercomProvider {
       // con un canal que cree tener. Un turno retenido sobre un canal muerto
       // bloquea al siguiente hasta que caduque.
       this.canales.set(dispositivoId, soltarCanal(solicitud.estado, operadorId, ahora).estado);
+      // 15-P · 0x40002068: otro cliente tiene el canal. «Canal ocupado», no un fallo.
+      if (esCanalOcupado(respuesta.cuerpo)) {
+        throw new CanalDeAudioOcupado(dispositivoId, CODIGO_CANAL_OCUPADO);
+      }
       throw new Error(
         `El equipo no abrió el canal de audio (HTTP ${String(respuesta.estado)}` +
           `${resumen.subStatusCode === null ? '' : ` · ${resumen.subStatusCode}`})`,

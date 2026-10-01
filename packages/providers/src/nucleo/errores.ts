@@ -114,6 +114,21 @@ export class EquipoOcupado extends ErrorDeEquipo {
   }
 }
 
+/**
+ * 15-P · el canal de audio del equipo lo tiene OTRO cliente (otra plataforma,
+ * la web del equipo, una sesión que no se cerró). No se le quita: el operador
+ * lee «canal ocupado» y vuelve a pedir la palabra cuando termine.
+ */
+export class CanalDeAudioOcupado extends EquipoOcupado {
+  constructor(dispositivoId: string, codigo: string) {
+    super(
+      dispositivoId,
+      `canal ocupado: otro cliente tiene abierta una conversación de audio (${codigo}). ` +
+        'Espere a que termine y vuelva a pedir la palabra',
+    );
+  }
+}
+
 /** Avería propia del equipo. Reintentar no lo arregla. */
 export class EquipoAveriado extends ErrorDeEquipo {
   readonly reintentable = false;

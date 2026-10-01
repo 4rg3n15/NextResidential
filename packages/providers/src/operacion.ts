@@ -92,3 +92,8 @@ export { clasificarConexionDeEventosRechazada } from './equipo/conexion-de-event
 export type { ConexionDeEventosRechazada } from './equipo/conexion-de-eventos-rechazada';
 export { montarEnsayoSimulado } from './simulacion/ensayo-simulado';
 export type { EnsayoSimulado } from './simulacion/ensayo-simulado';
+// 15-P · P1 · el banco de medida del audio de la guardia compara los dos
+// transportes con el videoportero simulado en red, y el procedimiento de sitio
+// los repite contra el equipo.
+export { IntercomDeEquipo } from './videoportero/intercom-equipo';
+export { IntercomIsapiPersistente } from './videoportero/intercom-isapi-persistente';

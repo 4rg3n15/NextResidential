@@ -52,7 +52,29 @@ export interface GuionRtsp {
   readonly estadoSinCanal?: string;
   /** V3 (15-N) · respuesta fija por canal, ya autenticado (p. ej. `403 Forbidden`). */
   readonly estadosPorCanal?: Readonly<Record<string, string>>;
+  /**
+   * 15-P · P1 · tramas PCMU para la pista de audio (`trackID=2`), entregadas
+   * como RTP entrelazado tras `PLAY`. Sin ella no se envía ningún paquete,
+   * como hasta ahora. Es la «vuelta» del audio cuando el puente es go2rtc.
+   */
+  readonly audio?: { suscribir(oyente: (trama: Uint8Array) => void): () => void };
 }
+
+/** RTP de PCMU (PT 0) en un marco entrelazado de RTSP sobre TCP (`$`, canal, largo). */
+const marcoRtp = (canal: number, secuencia: number, marca: number, carga: Uint8Array): Buffer => {
+  const rtp = Buffer.alloc(12 + carga.length);
+  rtp[0] = 0x80;
+  rtp[1] = 0;
+  rtp.writeUInt16BE(secuencia & 0xffff, 2);
+  rtp.writeUInt32BE(marca >>> 0, 4);
+  rtp.writeUInt32BE(0x4e435231, 8);
+  rtp.set(carga, 12);
+  const marco = Buffer.alloc(4);
+  marco[0] = 0x24;
+  marco[1] = canal;
+  marco.writeUInt16BE(rtp.length, 2);
+  return Buffer.concat([marco, rtp]);
+};
 
 export interface ServidorRtspSimulado {
   readonly puerto: number;
@@ -73,6 +95,7 @@ export const servidorRtspSimulado = async (guion: GuionRtsp): Promise<ServidorRt
   const nonce = randomBytes(8).toString('hex');
   const sockets = new Set<Socket>();
   let rechazaHasta = 0;
+  const canalDeAudio = new WeakMap<Socket, number>();
 
   const atender = (socket: Socket, p: PeticionRtsp): void => {
     const responder = (estado: string, extra: readonly string[] = [], cuerpo = ''): void => {
@@ -120,6 +143,9 @@ export const servidorRtspSimulado = async (guion: GuionRtsp): Promise<ServidorRt
       return;
     }
     if (p.metodo === 'SETUP') {
+      // 15-P · el canal entrelazado de la pista de audio, para el RTP de `PLAY`.
+      const entrelazado = /interleaved=(\d+)/i.exec(p.cabeceras.get('transport') ?? '')?.[1];
+      if (/trackID=2/i.test(p.uri)) canalDeAudio.set(socket, Number(entrelazado ?? '0'));
       responder('200 OK', [
         `Transport: ${transporteDeRespuesta(p.cabeceras.get('transport'))}`,
         `Session: ${SESION};timeout=60`,
@@ -128,6 +154,16 @@ export const servidorRtspSimulado = async (guion: GuionRtsp): Promise<ServidorRt
     }
     if (p.metodo === 'PLAY') {
       responder('200 OK', [`Session: ${SESION}`, 'Range: npt=0.000-']);
+      const canal = canalDeAudio.get(socket);
+      if (guion.audio !== undefined && canal !== undefined) {
+        let secuencia = 0;
+        const soltar = guion.audio.suscribir((trama) => {
+          secuencia += 1;
+          if (!socket.destroyed)
+            socket.write(marcoRtp(canal, secuencia, secuencia * trama.length, trama));
+        });
+        socket.once('close', soltar);
+      }
       return;
     }
     if (p.metodo === 'GET_PARAMETER' || p.metodo === 'TEARDOWN') {

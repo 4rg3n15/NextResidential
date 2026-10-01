@@ -23,6 +23,7 @@ import type { AjustesDePersona } from '../terminal/persona-en-el-equipo';
 import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
+import { IntercomIsapiPersistente } from '../videoportero/intercom-isapi-persistente';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
 import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
@@ -126,6 +127,12 @@ export interface OpcionesDeHikvision {
    * desviado, no se da de alta a nadie con vigencia en él.
    */
   readonly desvioDeRelojMaximoS?: number;
+  /**
+   * 15-P · cómo viajan los bytes del audio con el videoportero:
+   * `persistente` (manual de la familia: `audioData` crudo, sin `chunked`) o
+   * `fetch` (el de siempre). Lo decide `GUARDIA_AUDIO_TRANSPORTE` en la API.
+   */
+  readonly audioDelEquipo?: 'fetch' | 'persistente';
 }
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
@@ -154,7 +161,7 @@ export class HikvisionProvider
   private readonly capacidades = new Map<string, CapacidadesDeEquipo>();
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
-  private readonly intercomos = new Map<string, IntercomDeEquipo>();
+  private readonly intercomos = new Map<string, IntercomProvider>();
   /** A4 · escuchas abiertas, una por equipo. */
   private readonly escuchas = new Map<string, EscuchaActiva>();
   /**
@@ -658,7 +665,7 @@ export class HikvisionProvider
 
   // ── Interno ──────────────────────────────────────────────────────────────
 
-  private sesionDe(dispositivoId: string): IntercomDeEquipo {
+  private sesionDe(dispositivoId: string): IntercomProvider {
     const intercom = this.sesiones.has(dispositivoId)
       ? this.intercomos.get(dispositivoId)
       : undefined;
@@ -956,7 +963,7 @@ export class HikvisionProvider
     return await this.nuevaTerminal(equipo);
   }
 
-  private async intercomDe(dispositivoId: string): Promise<IntercomDeEquipo> {
+  private async intercomDe(dispositivoId: string): Promise<IntercomProvider> {
     const guardado = this.intercomos.get(dispositivoId);
     if (guardado !== undefined) return guardado;
 
@@ -964,7 +971,9 @@ export class HikvisionProvider
     // El canal se LEE de lo que el equipo declara (D4): sin capacidad de audio
     // no hay sesión, y sin canal descubierto tampoco.
     const capacidades = await this.exigirCapacidad(dispositivoId, 'audioBidireccional');
-    const creado = new IntercomDeEquipo({
+    const Adaptador =
+      this.opciones.audioDelEquipo === 'persistente' ? IntercomIsapiPersistente : IntercomDeEquipo;
+    const creado = new Adaptador({
       ...this.conexionDe(equipo),
       reloj: this.opciones.reloj,
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
