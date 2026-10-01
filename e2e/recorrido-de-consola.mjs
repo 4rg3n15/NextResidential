@@ -64,11 +64,18 @@ const raizApi = process.env.NCR_RAIZ_API ?? raiz;
 const raizWeb = process.env.NCR_RAIZ_WEB ?? raiz;
 const requerirDe = (paquete) => createRequire(resolve(raiz, paquete, 'package.json'));
 const { Pool } = requerirDe('apps/api')('pg');
-const { equipoSimulado, aperturasFisicasPor, escriturasSinCuerpoPor, plantillasPor } =
-  requerirDe('apps/api')('@ncr/providers');
+const {
+  equipoSimulado,
+  aperturasFisicasPor,
+  escriturasSinCuerpoPor,
+  plantillasPor,
+  puertasAbiertasPor,
+} = requerirDe('apps/api')('@ncr/providers');
 /** Rótulos del simulado: el oráculo de lo que el EQUIPO hizo (anexo 15-K). */
 const CAMARA_SIMULADA = 'camara-del-recorrido';
 const TERMINAL_SIMULADA = 'terminal-del-recorrido';
+/** 15-P · un videoportero que declara DOS cerraduras, como la familia del manual. */
+const VIDEOPORTERO_SIMULADO = 'videoportero-del-recorrido';
 
 const MIRA = '10000000-0000-4000-8000-000000000001';
 const BASE_PLANTILLA = 'ncr_recorrido_plantilla';
@@ -614,7 +621,20 @@ const principal = async () => {
     modelo: 'TERMINAL-SIMULADA',
     firmware: 'V3.2.0',
   });
-  ok(`cámara en :${String(puertoCamara)} (decide sola) y terminal en :${String(puertoTerminal)}`);
+  const claveVideoportero = randomBytes(9).toString('base64url');
+  const puertoVideoportero = await equipoPorHttp({
+    familia: 'videoportero',
+    usuario: 'servicio',
+    clave: claveVideoportero,
+    destino: VIDEOPORTERO_SIMULADO,
+    modelo: 'VIDEOPORTERO-SIMULADO',
+    firmware: 'V2.3.9',
+    salidas: { puertas: 2, cerraduras: true },
+  });
+  ok(
+    `cámara en :${String(puertoCamara)} (decide sola), terminal en :${String(puertoTerminal)} ` +
+      `y videoportero de dos cerraduras en :${String(puertoVideoportero)}`,
+  );
 
   paso('2 · doble de GoTrue con el gancho de claims REAL de la base');
   const lectura = new Pool({ connectionString: urlDe(BASE), max: 2 });
@@ -648,6 +668,8 @@ const principal = async () => {
       claveCamara,
       puertoTerminal,
       claveTerminal,
+      puertoVideoportero,
+      claveVideoportero,
     });
     const portero = await recorridoDelPortero(navegador, base);
     await visitaConFoto(admin, portero, base);
@@ -911,6 +933,8 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
     'H-SITIO-13 · la orden llega a la terminal y su PUERTA se mueve: lo dice el equipo, no la consola',
   );
 
+  await puertasDelVideoportero(pagina, base, puertoApi, equipos, sufijo);
+
   paso('10 · Porteros: el superadministrador asigna un turno que cubre ahora');
   await bloque('turno', async () => {
     await pagina.goto(`${base}/porteros`, { waitUntil: 'networkidle' });
@@ -931,6 +955,95 @@ const recorridoDelSuperadministrador = async (navegador, base, puertoApi, equipo
   });
 
   return { contexto, pagina, malas, sufijo, terminal };
+};
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 15-P · EL PANEL DE GUARDIA DEL MOCKUP, CON LAS PUERTAS DEL VIDEOPORTERO
+ *
+ * El micrófono sólo se permite en la guardia (Permissions-Policy por ruta).
+ * El videoportero declara dos cerraduras: la administración las descubre y
+ * nombra en su ficha; un evento suyo pasa a «Atención» y la guardia, sin salir
+ * del bloque abrir/denegar del mockup, elige la puerta y la abre con motivo.
+ * El veredicto sale del EQUIPO simulado: qué puerta se movió.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const puertasDelVideoportero = async (pagina, base, puertoApi, equipos, sufijo) => {
+  paso('9b · Guardia: micrófono sólo aquí, y las puertas del videoportero por punto');
+  const nombre = `Videoportero del recorrido ${sufijo}`;
+  let videoporteroId = null;
+  await bloque('Permissions-Policy: micrófono sólo en la guardia', async () => {
+    const guardia = await pagina.goto(`${base}/guardia`, { waitUntil: 'networkidle' });
+    const enGuardia = guardia?.headers()['permissions-policy'] ?? '';
+    afirmar(
+      /microphone=\(self\)/.test(enGuardia),
+      `la guardia permite el micrófono (${enGuardia})`,
+    );
+    const porteria = await pagina.goto(`${base}/porteria`, { waitUntil: 'networkidle' });
+    const enPorteria = porteria?.headers()['permissions-policy'] ?? '';
+    afirmar(/microphone=\(\)/.test(enPorteria), `la portería NO lo permite (${enPorteria})`);
+  });
+  await bloque('alta del videoportero y sus salidas', async () => {
+    await pagina.goto(`${base}/dispositivos`, { waitUntil: 'networkidle' });
+    const alta = await altaDeEquipo(pagina, {
+      nombre,
+      tipo: 'intercom',
+      puerto: equipos.puertoVideoportero,
+      usuario: 'servicio',
+      clave: equipos.claveVideoportero,
+    });
+    afirmar(alta.estado === 201, `el alta del videoportero se guarda (${String(alta.estado)})`);
+    videoporteroId = alta.cuerpo.id ?? null;
+    await pagina.reload({ waitUntil: 'networkidle' });
+    await filaDe(pagina, nombre).getByRole('button', { name: 'Probar conexión' }).click();
+    const dialogo = pagina.getByRole('dialog', { name: new RegExp(`Ficha de ${nombre}`) });
+    const propias = dialogo.getByRole('list', { name: 'Salidas de Salidas del equipo' });
+    await propias.waitFor({ timeout: 30_000 });
+    afirmar(
+      /Cerradura 1[\s\S]*Cerradura 2/.test(await propias.innerText()),
+      'la ficha enseña las dos cerraduras que el equipo DECLARA',
+    );
+    await dialogo.getByRole('button', { name: 'Descubrir salidas' }).click();
+    const campo = dialogo.getByRole('textbox', { name: 'Nombre de la puerta 2' });
+    await campo.waitFor({ timeout: 30_000 });
+    await campo.fill('Portón vehicular');
+    const guardado = pagina.waitForResponse(
+      (r) => r.request().method() === 'PATCH' && /\/salidas\//.test(new URL(r.url()).pathname),
+      { timeout: 30_000 },
+    );
+    await dialogo.getByRole('button', { name: 'Guardar nombre' }).nth(1).click();
+    afirmar((await guardado).status() === 200, 'el nombre de la puerta 2 se guarda');
+    await pagina.keyboard.press('Escape');
+  });
+  const antes = [...(puertasAbiertasPor.get(VIDEOPORTERO_SIMULADO) ?? [])];
+  await bloque('la guardia elige la puerta y la abre con motivo', async () => {
+    if (videoporteroId === null) throw new Error('no hay videoportero dado de alta');
+    await pagina.goto(`${base}/guardia`, { waitUntil: 'networkidle' });
+    const estado = await ingestar(puertoApi, { dispositivoId: videoporteroId, metodo: 'facial' });
+    afirmar(estado === 202, `la API recibe el evento del videoportero (${String(estado)})`);
+    const grupo = pagina.getByRole('group', { name: 'Punto de acceso' });
+    await grupo.waitFor({ timeout: 30_000 });
+    const abrir = pagina.getByRole('button', { name: 'Abrir con motivo' }).first();
+    afirmar(await abrir.isDisabled(), 'con dos cerraduras, «Abrir» espera a que se elija una');
+    afirmar(
+      (await pagina.getByRole('button', { name: /Hablar|Colgar|Salir de la cola/ }).count()) > 0 &&
+        (await pagina.getByRole('button', { name: /Negar con motivo/ }).count()) > 0,
+      'el panel conserva el mockup: audio, abrir/denegar, junto al selector',
+    );
+    await grupo.getByRole('radio', { name: /Portón vehicular/ }).check();
+    await pagina.getByRole('button', { name: 'Abrir Portón vehicular con motivo' }).click();
+    await pagina.locator('textarea#motivo').fill('Recorrido: visitante en el portón vehicular');
+    await pagina.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await pagina
+      .getByText(/Última orden:/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+  });
+  const despues = puertasAbiertasPor.get(VIDEOPORTERO_SIMULADO) ?? [];
+  afirmar(
+    despues.length === antes.length + 1 && despues.at(-1) === 2,
+    `KPI-32 · la orden abre la PUERTA 2 del videoportero y sólo ésa (el equipo dice: ${JSON.stringify(despues)})`,
+  );
 };
 
 const recorridoDelPortero = async (navegador, base) => {

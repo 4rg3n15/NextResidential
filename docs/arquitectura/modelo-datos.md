@@ -896,13 +896,19 @@ Es la tabla que hace **verificable** CA-10: «su plantilla ya no existe en **nin
 
 #### `puntos_de_acceso` — tenant ✔ · auditoría ✔ · baja lógica ✔
 
-| Columna          | Tipo                                            | Restricción               |
-| ---------------- | ----------------------------------------------- | ------------------------- |
-| `zona_id`        | `uuid NOT NULL REFERENCES zonas(id)`            |                           |
-| `dispositivo_id` | `uuid NOT NULL REFERENCES dispositivos(id)`     | El equipo que **acciona** |
-| `nombre`         | `text NOT NULL`                                 |                           |
-| `tipo`           | `tipo_punto NOT NULL`                           |                           |
-| `sentido`        | `sentido_paso NOT NULL DEFAULT 'bidireccional'` |                           |
+| Columna                        | Tipo                                                      | Restricción                                                                                     |
+| ------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `zona_id`                      | `uuid NULL REFERENCES zonas(id)` (opcional desde la 0048) | Una salida descubierta no trae zona: asignarla sería inventarla (C-49)                          |
+| `dispositivo_id`               | `uuid NOT NULL REFERENCES dispositivos(id)`               | El equipo que **acciona**                                                                       |
+| `nombre`                       | `text NOT NULL` (1–120)                                   | Editable por la administración; es lo que lee la guardia                                        |
+| `tipo`                         | `tipo_punto NOT NULL`                                     |                                                                                                 |
+| `sentido`                      | `sentido_paso NOT NULL DEFAULT 'bidireccional'`           |                                                                                                 |
+| `numero_de_puerta`             | `integer NULL` (1–16) · **0048**                          | La puerta con que el equipo abre este punto (orden `open`)                                      |
+| `modulo` · `ruta_en_el_equipo` | `text NULL` · **0048**                                    | Dónde está la salida en el árbol equipo → módulo → salida (R3)                                  |
+| `origen`                       | `text NOT NULL DEFAULT 'manual'` · **0048**               | `descubierto` (lo declaró el equipo) o `manual`; lo descubierto exige puerta y `descubierto_en` |
+| `descubierto_en`               | `timestamptz NULL` · **0048**                             | Última lectura que lo confirmó                                                                  |
+
+**15-P · migración 0048.** Una puerta **activa** por equipo y copropiedad (índice único parcial `puntos_salida_activa_uk`, ADR-04); sin borrado físico desde que las órdenes lo referencian (disparador `tg_prohibir_delete` y `REVOKE DELETE`, RN-19); el superadministrador también escribe aquí, como en `dispositivos`. `ordenes_manuales` gana `punto_de_acceso_id` y `numero_de_puerta`, los dos o ninguno, con clave ajena **compuesta** `(copropiedad_id, punto_de_acceso_id)`: una orden de una copropiedad no puede atarse a un punto de otra (KPI-35). Prueba: `supabase/policies/tests/99e_salidas_del_videoportero.sql`.
 
 #### `edge_gateways` — tenant ✔ · auditoría ✔ · baja lógica ✔ · **ver D-16**
 

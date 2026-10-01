@@ -51,7 +51,7 @@ export class CanalDeEquipoNoHabilitado extends Error {
   constructor(readonly dispositivoId: string) {
     super(
       `El canal de audio del equipo ${dispositivoId} está deshabilitado. Es un ajuste DEL ` +
-        'EQUIPO y lo activa un operador: docs/guias/VALIDACION_HIKVISION_EN_SITIO.md §8.3',
+        'EQUIPO y lo activa un operador: docs/guias/VALIDACION_HIKVISION_EN_SITIO.md §8.4',
     );
     this.name = 'CanalDeEquipoNoHabilitado';
   }

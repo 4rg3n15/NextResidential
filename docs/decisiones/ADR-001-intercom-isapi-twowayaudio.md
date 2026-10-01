@@ -1,6 +1,6 @@
 # ADR-001 · Intercom sobre ISAPI TwoWayAudio
 
-- **Estado:** Aceptada — decisión del cliente, cerrada
+- **Estado:** Aceptada — decisión del cliente, cerrada · **Enmienda 1 (15-P, 2026-10-01): el puente de audio**, al final
 - **Fecha:** 2026-09-06 (formalización en la ETAPA 00)
 - **Origen:** `CLAUDE.md` §4, ADR-01
 - **Afecta a:** ETAPAS 10 y 15 · OE-07 · HU-26 · CA-19 · KPI-33
@@ -78,3 +78,67 @@ El diagrama no contradice la decisión: la contiene como primera opción.
 Si el modelo concreto **no soporta** TwoWayAudio, o su latencia **excede** el umbral de 2 s, la salida es **un adaptador nuevo detrás del mismo puerto**, sin tocar dominio, aplicación ni interfaz.
 
 Que esa salida sea posible sin modificar nada aguas arriba **es precisamente el propósito del puerto**, y su verificación es la prueba de que el encapsulamiento es real y no nominal.
+
+---
+
+## Enmienda 1 · ETAPA 15-P (2026-10-01) — el puente de audio: WebSocket ordenado
+
+**No es una reapertura.** El intercom sigue siendo **ISAPI TwoWayAudio** detrás de `IntercomProvider`. Lo que cambia es el **puente** entre el navegador y la API, que el diseño original dejaba abierto («vía WebSocket/WebRTC»), y el adaptador que habla con el equipo.
+
+### Por qué hizo falta: el transporte anterior no funcionaba contra un equipo que siga el manual
+
+Medido en la 15-P contra un videoportero simulado que implementa el flujo del manual de familia (capabilities → channels → `open` → `audioData` persistente de bajada y de subida → `close`, Digest, G.711 µ-law en tramas de 160 B / 20 ms, y el `0x40002068` de canal ocupado):
+
+- **[Cierto]** La subida iba en trozos de **1600 B (200 ms)** por `fetch` POST —unas 5 peticiones por segundo, no 50 como suponía el encargo— y la API la reenviaba con `fetch` y un cuerpo en flujo, que `undici` serializa como `Transfer-Encoding: chunked`. El manual pide octetos crudos sin longitud declarada. Contra el simulado **no llegó al equipo ninguna de las 12 marcas de ida ni ninguna de las 3 «al pulsar»** (15 pérdidas; la vuelta sí funcionaba) y las tres sesiones se cerraron solas antes de colgar.
+- **[Cierto]** `next.config.mjs` declaraba `Permissions-Policy: microphone=()` en **todas** las rutas: en producción `getUserMedia` fallaba y la guardia nunca pudo hablar con `pnpm start`.
+- **[Cierto]** El audio no renovaba el turno: una conversación larga caducaba a los 90 s aunque el operador estuviera hablando.
+
+### Medición (banco `e2e/medir-audio-guardia.mjs`, Chromium real, mismo reloj en los dos extremos)
+
+3 sesiones × 4 marcas por opción. Ida = del micrófono del navegador al equipo; vuelta = del equipo al altavoz del navegador.
+
+| Opción                | Establecer escucha (mediana / máx.) | Establecer subida | Ida (mediana / p95) | Vuelta (mediana / p95) | Marcas perdidas              | Canal tomado tras colgar |
+| --------------------- | ----------------------------------- | ----------------- | ------------------- | ---------------------- | ---------------------------- | ------------------------ |
+| **B · WebSocket**     | 33 / 97 ms                          | 10 / 72 ms        | **37 / 52 ms**      | **70 / 72 ms**         | 0                            | 0 de 3                   |
+| A · go2rtc `isapi://` | 305 / 313 ms                        | 141 / 148 ms      | 16 / 19 ms          | 151 / 181 ms           | 0                            | **3 de 3**               |
+| Transporte anterior   | 32 / 57 ms                          | 299 / 330 ms      | — (no llega)        | 71 / 93 ms             | 15 (12 de ida + 3 al pulsar) | 0 de 3                   |
+
+Las dos opciones nuevas cumplen el objetivo de < 2 s (KPI-33, CA-19) con más de un orden de magnitud de margen **contra el simulado**. La cifra que vale es la de sitio (procedimiento en `VALIDACION_HIKVISION_EN_SITIO.md` §8.4.1).
+
+### Decisión
+
+**B: WebSocket binario y ordenado navegador ↔ API ↔ `audioData` persistente.**
+
+- El navegador pide un **billete** de un solo uso (15 s, atado a operador, copropiedad, equipo e IP) con las guardas de siempre, y abre `wss` al **mismo origen** de la consola; el servidor de la consola reenvía la actualización a la API. `connect-src 'self'` lo cubre: **la CSP no se relaja**.
+- Subida: tramas de 160 B sólo entre «pulsar» y «soltar»; la API descarta lo demás. Bajada: el flujo del equipo, desde que se abre, sin pulsar nada.
+- El adaptador `IntercomIsapiPersistente` (en `packages/providers`) abre y cierra el canal y reparte el turno por `IntercomDeEquipo` —la máquina del dominio, sin cambios— y sostiene `GET`/`PUT audioData` persistentes sobre un socket crudo con su **propia** sesión Digest. El `0x40002068` se traduce a «canal ocupado».
+- La API corta por su cuenta: tramo de más de 60 s ([SUPUESTO] S-177), turno caducado, tramas fuera de tamaño o de ritmo. Cada conversación deja constancia (operador, equipo, copropiedad, inicio, fin, tramos); **nunca el audio** (migración 0047).
+- `Permissions-Policy: microphone=(self)` **sólo** en `/guardia`; el resto de la consola sigue con `microphone=()`.
+- **Por omisión `GUARDIA_AUDIO_TRANSPORTE=websocket`**, porque la medición lo justifica. **Volver atrás es cambiar la variable a `http`**: el transporte anterior sigue construido y probado.
+
+### Por qué no A (queda como contingencia documentada)
+
+A es más rápida en la ida, pero sus fallos son de **control**, no de latencia, y no se arreglan desde fuera de go2rtc (v1.9.14):
+
+- **[Cierto]** Abre el canal con `close` previo: **le quita el canal a quien lo tenga**, así que el `0x40002068` nunca se ve y la exclusividad del dominio queda decorativa.
+- **[Cierto]** Al colgar, el productor sigue vivo: el canal quedó tomado en el equipo en **3 de 3** sesiones, y una segunda sesión con el mismo puente no obtuvo respuesta en 10 s.
+- **[Cierto]** El canal de retorno es `sendonly` y no distingue «pulsar»: la API no puede cortar un tramo ni una caducidad sin tumbar también el video.
+
+Si un modelo concreto exigiera el camino de go2rtc, entra como **adaptador nuevo** detrás del mismo puerto —el puerto no cambia— y con esas tres limitaciones escritas en su informe.
+
+### Video bidireccional (operador visible en el videoportero) — fuera de alcance, sin andamiaje
+
+Cabría detrás del mismo diseño así, y sólo así:
+
+1. **Capacidad leída**, nunca supuesta: una capacidad nueva (p. ej. `videoDeRetorno`) que el adaptador lea del equipo. [SUPUESTO] El manual de familia no documenta una ruta de subida de video para esta serie; sin esa ruta declarada, la capacidad es «no».
+2. **Puerto:** un método más del adaptador de intercom, o un puerto hermano, con la misma intención sin protocolo (`enviarVideo(trama)`), **atado al mismo turno** del dominio: quien no tiene la palabra no sale en pantalla.
+3. **Transporte:** el mismo WebSocket con un segundo tipo de trama binaria, y `Permissions-Policy: camera=(self)` sólo en `/guardia`.
+
+No hay código, configuración ni pruebas para esto en la 15-P.
+
+### Verificación de la enmienda
+
+- `apps/api/test/audio-guardia-ws.e2e.test.ts`: ida y vuelta por la API contra el simulado en red, segundo operador en cola, billete de un uso y de su IP, aislamiento entre copropiedades (KPI-35), `0x40002068`.
+- `apps/web/src/lib/audio/canal-por-websocket.test.ts` y `componentes/controles-de-audio-ws.test.tsx`: pulsar, soltar, soltar antes de que abra el micrófono, caducidad, cambio de equipo, cierre de pestaña.
+- `apps/web/src/politica-de-permisos.test.ts`: micrófono sólo en `/guardia`.
+- `e2e/medir-audio-guardia.mjs`: la medición de esta tabla, repetible en sitio.
