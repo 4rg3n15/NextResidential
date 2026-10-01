@@ -11,6 +11,7 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/aceptado_dto.dart';
 import '../models/aviso_al_residente_dto.dart';
+import '../models/billete_de_audio_dto.dart';
 import '../models/bloqueo_vigente_dto.dart';
 import '../models/bloqueos_vigentes_dto.dart';
 import '../models/cola_de_atencion_dto.dart';
@@ -97,6 +98,13 @@ abstract class GuardiaApi {
     @Path('id') required String id,
     @Path('dispositivoId') required String dispositivoId,
     @Body() required File body,
+  });
+
+  /// Billete de un solo uso para abrir el WebSocket de audio (ADR-01, 15-P)
+  @POST('/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete')
+  Future<BilleteDeAudioDto> audioControllerBillete({
+    @Path('id') required String id,
+    @Path('dispositivoId') required String dispositivoId,
   });
 
   /// Abre o niega a mano, con motivo obligatorio (RN-08)

@@ -25,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { Alerta, BITACORA, GENERADOR_DE_ID, RELOJ, esFallo } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
+import { Throttle } from '@nestjs/throttler';
 import { SoloGuardiaRemota } from '../../plataforma';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { ALCANCE_DE_EQUIPOS } from '../../equipos';
@@ -402,6 +403,9 @@ export class GuardiaController {
   @SoloGuardiaRemota()
   @Post('intercom/:dispositivoId/audio')
   @HttpCode(204)
+  // 15-P · límite PROPIO: un trozo cada 200 ms son 300 por minuto, y el global
+  // (120/min por IP) cortaba la ida con 429 a los ~24 s de hablar.
+  @Throttle({ default: { limit: 1200, ttl: 60_000 } })
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Un trozo de audio del operador hacia el equipo' })
   @ApiConsumes('application/octet-stream')

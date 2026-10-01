@@ -176,6 +176,9 @@ export class ProveedoresModule {
               puertoRtsp: configuracion.VIDEO_PUERTO_RTSP,
               // R2 (15-N) · el reloj del equipo, antes de dar de alta con vigencia.
               desvioDeRelojMaximoS: configuracion.EQUIPOS_DESVIO_DE_RELOJ_S,
+              // 15-P · los bytes del audio con el equipo, según el transporte de la guardia.
+              audioDelEquipo:
+                configuracion.GUARDIA_AUDIO_TRANSPORTE === 'websocket' ? 'persistente' : 'fetch',
               ...(registro === undefined ? {} : { registro }),
               ...(opciones.semilla === undefined ? {} : { semilla: opciones.semilla }),
             });

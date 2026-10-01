@@ -230,6 +230,27 @@ export class EstadoDeCanalDto {
       'La consola decodifica lo que el equipo dice.',
   })
   formatoDeAudio!: string | null;
+
+  @ApiProperty({
+    enum: ['websocket', 'http'],
+    description:
+      '15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). ' +
+      '«websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); ' +
+      '«http»: un GET de bajada y un POST por trozo.',
+  })
+  via!: string;
+}
+
+/** 15-P · el billete del WebSocket de audio: de un solo uso y de vida corta. */
+export class BilleteDeAudioDto {
+  @ApiProperty({ description: 'Se presenta UNA vez en `ruta?billete=…`; no es el token de sesión' })
+  billete!: string;
+
+  @ApiProperty({ description: 'Segundos que vale para abrir el WebSocket' })
+  caducaEnSegundos!: number;
+
+  @ApiProperty({ description: 'Ruta del WebSocket en la API (la consola la expone en su origen)' })
+  ruta!: string;
 }
 
 export class AvisoAlResidenteDto {

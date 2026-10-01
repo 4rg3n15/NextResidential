@@ -29,6 +29,12 @@ export interface EstadoDeCanal {
    * lo que el equipo dice, no lo que alguien supuso.
    */
   readonly formatoDeAudio: string | null;
+  /**
+   * 15-P · por dónde viaja el audio entre la consola y la API
+   * (`GUARDIA_AUDIO_TRANSPORTE`): `websocket` (un canal ordenado; ADR-01,
+   * enmienda 15-P) o `http` (un GET de bajada y un POST por trozo).
+   */
+  readonly via: 'websocket' | 'http';
 }
 
 /** A4 · se pidió audio a quien no tiene la palabra, o a un turno sin transporte. */
@@ -77,6 +83,12 @@ export interface CanalDeIntercom {
     operadorId: string,
     fragmento: Uint8Array,
   ): Promise<void>;
+  /**
+   * 15-P · el titular sigue ahí: renueva la actividad del turno (la máquina
+   * del dominio, `renovarActividad`). Sin esto, el turno caducaba a los 90 s
+   * de concedido aunque se estuviera hablando. `false` si no es el titular.
+   */
+  renovar(copropiedadId: string, dispositivoId: string, operadorId: string): Promise<boolean>;
 }
 
 export const CANAL_DE_INTERCOM = Symbol.for('ncr.puerto.CanalDeIntercom');

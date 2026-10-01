@@ -18,6 +18,7 @@ EstadoDeCanalDto _$EstadoDeCanalDtoFromJson(Map<String, dynamic> json) =>
       ),
       detalleTransporte: json['detalleTransporte'] as String?,
       formatoDeAudio: json['formatoDeAudio'] as String?,
+      via: EstadoDeCanalDtoVia.fromJson(json['via'] as String),
     );
 
 Map<String, dynamic> _$EstadoDeCanalDtoToJson(EstadoDeCanalDto instance) =>
@@ -30,4 +31,5 @@ Map<String, dynamic> _$EstadoDeCanalDtoToJson(EstadoDeCanalDto instance) =>
       'transporte': instance.transporte,
       'detalleTransporte': instance.detalleTransporte,
       'formatoDeAudio': instance.formatoDeAudio,
+      'via': instance.via,
     };

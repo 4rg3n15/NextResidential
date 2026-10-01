@@ -58,6 +58,11 @@ import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
 import { Pool } from 'pg';
 import { CanalIntercomConTransporte } from './infraestructura/canal-intercom-con-transporte';
 import { anunciarAccionador } from './infraestructura/aviso-de-arranque-del-accionador';
+import { REGISTRO_DE_CONVERSACIONES } from './aplicacion/conversacion-de-audio';
+import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/conversaciones-pg';
+import { AudioController } from './presentacion/audio/audio.controller';
+import { BilletesDeAudio } from './presentacion/audio/billetes-de-audio';
+import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -84,7 +89,7 @@ export class GuardiaModule {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [GuardiaController, VideoController, AtencionController],
+      controllers: [GuardiaController, VideoController, AtencionController, AudioController],
       providers: [
         /**
          * G1 · G2 (15-N) · la cola de atención (P-22) y las preferencias de la
@@ -208,10 +213,35 @@ export class GuardiaModule {
            * conoce sigue repartiendo turnos sin audio, y lo dice.
            */
           provide: CANAL_DE_INTERCOM,
-          inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA],
-          useFactory: (reloj: Reloj, proveedor: ProveedorDeEquipos, bitacora: Bitacora) =>
-            new CanalIntercomConTransporte(new CanalIntercomEnProceso(reloj), proveedor, bitacora),
+          inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA, CONFIGURACION],
+          useFactory: (
+            reloj: Reloj,
+            proveedor: ProveedorDeEquipos,
+            bitacora: Bitacora,
+            configuracion: Configuracion,
+          ) =>
+            new CanalIntercomConTransporte(
+              new CanalIntercomEnProceso(reloj),
+              proveedor,
+              bitacora,
+              configuracion.GUARDIA_AUDIO_TRANSPORTE,
+            ),
         },
+        /**
+         * 15-P · P2 · el audio por WebSocket (ADR-01, enmienda 15-P): billetes
+         * de un solo uso, la puerta de la actualización y la constancia de cada
+         * conversación (en la base con el histórico; si no, en el proceso).
+         */
+        { provide: BilletesDeAudio, useFactory: () => new BilletesDeAudio() },
+        {
+          provide: REGISTRO_DE_CONVERSACIONES,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (configuracion: Configuracion, pool: Pool) =>
+            configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new ConversacionesPg(pool)
+              : new ConversacionesEnMemoria(),
+        },
+        PuertaDeAudioPorWebSocket,
         {
           /**
            * A5 · el puente de video existe sólo si `GO2RTC_URL` está: sin él

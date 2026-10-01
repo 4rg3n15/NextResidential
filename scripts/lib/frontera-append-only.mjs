@@ -45,6 +45,8 @@ const APPEND_ONLY = [
   'atestaciones_de_equipo',
   // ETAPA 15-L (Bloque B) · todo lo que un equipo emite y lo que la plataforma hace con él.
   'eventos_de_equipo',
+  // ETAPA 15-P · el rastro de cada conversación de audio de la guardia.
+  'conversaciones_de_guardia',
 ];
 
 /**

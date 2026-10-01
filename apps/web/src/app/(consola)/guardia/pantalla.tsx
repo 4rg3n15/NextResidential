@@ -1,10 +1,11 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mic, MicOff, PhoneCall, Siren } from 'lucide-react';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
+import { ControlesDeAudioWs } from '@/componentes/controles-de-audio-ws';
 import { EquiposEnVivo } from './equipos-en-vivo';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion } from '@/lib/api/consultas';
@@ -143,6 +144,20 @@ export const PantallaDeGuardiaVirtual = ({
         }),
       ),
   });
+
+  /**
+   * 15-P · el billete del WebSocket de audio, del equipo en foco. Estable
+   * mientras no cambie el equipo: el componente reabre el audio si cambia.
+   */
+  const dispositivoEnFoco = foco?.dispositivoId;
+  const pedirBillete = useCallback(async (): Promise<string> => {
+    const r = desenvolver(
+      await cliente.POST('/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete', {
+        params: { path: { id: copropiedadId, dispositivoId: dispositivoEnFoco ?? '' } },
+      }),
+    );
+    return r.billete;
+  }, [copropiedadId, dispositivoEnFoco]);
 
   const invalidar = (): void => {
     void clienteDeConsulta.invalidateQueries({ queryKey: ['guardia', copropiedadId] });
@@ -428,11 +443,21 @@ export const PantallaDeGuardiaVirtual = ({
 
                   {/* ── A4 · el audio en sí, sólo con la palabra y con transporte ── */}
                   {tienePalabra && canal.data?.transporte === 'equipo' ? (
-                    <ControlesDeAudio
-                      copropiedadId={copropiedadId}
-                      dispositivoId={foco.dispositivoId}
-                      formatoAnunciado={canal.data.formatoDeAudio}
-                    />
+                    canal.data.via === 'websocket' ? (
+                      // 15-P · el canal ordenado (ADR-01, enmienda 15-P). La
+                      // clave por equipo cuelga el anterior al cambiar de foco.
+                      <ControlesDeAudioWs
+                        key={foco.dispositivoId}
+                        formatoAnunciado={canal.data.formatoDeAudio}
+                        pedirBillete={pedirBillete}
+                      />
+                    ) : (
+                      <ControlesDeAudio
+                        copropiedadId={copropiedadId}
+                        dispositivoId={foco.dispositivoId}
+                        formatoAnunciado={canal.data.formatoDeAudio}
+                      />
+                    )
                   ) : tienePalabra ? (
                     <p className="text-distintivo text-aviso-texto" role="status">
                       Tienes la palabra y no hay audio:{' '}

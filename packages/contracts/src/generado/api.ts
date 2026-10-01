@@ -928,6 +928,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Billete de un solo uso para abrir el WebSocket de audio (ADR-01, 15-P) */
+        post: operations["AudioController_billete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/guardia/ordenes": {
         parameters: {
             query?: never;
@@ -2566,6 +2583,14 @@ export interface components {
         BajaDto: {
             desactivado: boolean;
         };
+        BilleteDeAudioDto: {
+            /** @description Se presenta UNA vez en `ruta?billete=…`; no es el token de sesión */
+            billete: string;
+            /** @description Segundos que vale para abrir el WebSocket */
+            caducaEnSegundos: number;
+            /** @description Ruta del WebSocket en la API (la consola la expone en su origen) */
+            ruta: string;
+        };
         BitacoraDePorteriaDto: {
             hechos: components["schemas"]["HechoDeBitacoraDto"][];
         };
@@ -3332,6 +3357,11 @@ export interface components {
             detalleTransporte: string | null;
             /** @description A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice. */
             formatoDeAudio: string | null;
+            /**
+             * @description 15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). «websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); «http»: un GET de bajada y un POST por trozo.
+             * @enum {string}
+             */
+            via: "websocket" | "http";
         };
         EstadoDeDispositivosDto: {
             dispositivos: components["schemas"]["DispositivoDelTableroDto"][];
@@ -6485,6 +6515,46 @@ export interface operations {
         responses: {
             /** @description Copropiedad fuera del alcance */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    AudioController_billete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dispositivoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilleteDeAudioDto"];
+                };
+            };
+            /** @description Copropiedad o equipo fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Sin la palabra o transporte HTTP */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

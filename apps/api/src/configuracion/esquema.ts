@@ -347,6 +347,15 @@ export const esquemaConfiguracion = z.object({
    * Después sale de la cola y queda en Eventos. 5 minutos por omisión (P-22).
    */
   GUARDIA_VIGENCIA_EN_COLA_S: z.coerce.number().int().min(30).max(3600).default(300),
+  /**
+   * 15-P · por dónde viaja el audio de la guardia (ADR-01, enmienda 15-P).
+   *  · `websocket` (por omisión desde la medida de la 15-P): un canal ordenado
+   *    consola ↔ API con billete de un solo uso, y con el equipo `audioData`
+   *    persistente en bytes crudos, como pide el manual de la familia.
+   *  · `http`: el de antes —un GET de bajada y un POST por trozo; con el
+   *    equipo, `fetch` en flujo—. Volver atrás es cambiar esta variable.
+   */
+  GUARDIA_AUDIO_TRANSPORTE: z.enum(['websocket', 'http']).default('websocket'),
   /** E5 (15-M) · desvío del reloj del equipo, en segundos, a partir del cual se avisa. */
   EQUIPOS_DESVIO_DE_RELOJ_S: z.coerce.number().int().min(1).max(3600).default(30),
   EQUIPOS_FOTO_LADO_MAXIMO: z.coerce.number().int().min(160).max(4096).default(1024),

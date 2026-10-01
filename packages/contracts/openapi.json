@@ -3303,6 +3303,70 @@
         ]
       }
     },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete": {
+      "post": {
+        "operationId": "AudioController_billete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BilleteDeAudioDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad o equipo fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sin la palabra o transporte HTTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Billete de un solo uso para abrir el WebSocket de audio (ADR-01, 15-P)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/guardia/ordenes": {
       "post": {
         "operationId": "GuardiaController_ordenar",
@@ -8779,6 +8843,28 @@
           "desactivado"
         ]
       },
+      "BilleteDeAudioDto": {
+        "type": "object",
+        "properties": {
+          "billete": {
+            "type": "string",
+            "description": "Se presenta UNA vez en `ruta?billete=…`; no es el token de sesión"
+          },
+          "caducaEnSegundos": {
+            "type": "number",
+            "description": "Segundos que vale para abrir el WebSocket"
+          },
+          "ruta": {
+            "type": "string",
+            "description": "Ruta del WebSocket en la API (la consola la expone en su origen)"
+          }
+        },
+        "required": [
+          "billete",
+          "caducaEnSegundos",
+          "ruta"
+        ]
+      },
       "BitacoraDePorteriaDto": {
         "type": "object",
         "properties": {
@@ -11024,6 +11110,14 @@
             "type": "string",
             "nullable": true,
             "description": "A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice."
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "websocket",
+              "http"
+            ],
+            "description": "15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). «websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); «http»: un GET de bajada y un POST por trozo."
           }
         },
         "required": [
@@ -11034,7 +11128,8 @@
           "timeoutSegundos",
           "transporte",
           "detalleTransporte",
-          "formatoDeAudio"
+          "formatoDeAudio",
+          "via"
         ]
       },
       "EstadoDeDispositivosDto": {

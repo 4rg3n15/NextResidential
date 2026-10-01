@@ -130,6 +130,7 @@ export const configuracionDePrueba: Configuracion = {
   // `configuracion-de-prueba.test.ts`).
   ALERTAS_VENTANA_DEDUP_S: 600,
   GUARDIA_VIGENCIA_EN_COLA_S: 300,
+  GUARDIA_AUDIO_TRANSPORTE: 'websocket',
   EQUIPOS_DESVIO_DE_RELOJ_S: 30,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría

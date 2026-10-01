@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'estado_de_canal_dto_estado.dart';
 import 'estado_de_canal_dto_transporte.dart';
+import 'estado_de_canal_dto_via.dart';
 
 part 'estado_de_canal_dto.g.dart';
 
@@ -20,6 +21,7 @@ class EstadoDeCanalDto {
     required this.transporte,
     required this.detalleTransporte,
     required this.formatoDeAudio,
+    required this.via,
   });
   
   factory EstadoDeCanalDto.fromJson(Map<String, Object?> json) => _$EstadoDeCanalDtoFromJson(json);
@@ -46,6 +48,9 @@ class EstadoDeCanalDto {
 
   /// A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice.
   final String? formatoDeAudio;
+
+  /// 15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). «websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); «http»: un GET de bajada y un POST por trozo.
+  final EstadoDeCanalDtoVia via;
 
   Map<String, Object?> toJson() => _$EstadoDeCanalDtoToJson(this);
 }
