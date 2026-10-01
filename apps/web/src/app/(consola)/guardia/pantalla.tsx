@@ -7,6 +7,13 @@ import { Mic, MicOff, PhoneCall, Siren } from 'lucide-react';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
 import { ControlesDeAudioWs } from '@/componentes/controles-de-audio-ws';
 import { EquiposEnVivo } from './equipos-en-vivo';
+import {
+  SelectorDePunto,
+  faltaElegirPunto,
+  puntoDeLaOrden,
+  usePuntosDelEquipo,
+} from './selector-de-punto';
+import type { PuntoElegido } from './selector-de-punto';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion } from '@/lib/api/consultas';
 import { useAtencion } from '@/lib/atencion/use-atencion';
@@ -133,6 +140,21 @@ export const PantallaDeGuardiaVirtual = ({
           } · esperando ${String(actual.esperaSegundos)} s`,
         };
 
+  /**
+   * 15-P · P3 · el punto elegido, atado al equipo en que se eligió: cambiar de
+   * equipo en atención lo olvida sin efecto aparte (no se abre la cerradura 2
+   * de otro videoportero porque se eligió aquí).
+   */
+  const [eleccion, setEleccion] = useState<{
+    readonly dispositivoId: string;
+    readonly punto: PuntoElegido | null;
+  } | null>(null);
+  const puntos = usePuntosDelEquipo(copropiedadId, foco?.dispositivoId);
+  const elegido =
+    eleccion?.dispositivoId === foco?.dispositivoId ? (eleccion?.punto ?? null) : null;
+  const punto = puntoDeLaOrden(puntos.data, elegido);
+  const hayQueElegir = faltaElegirPunto(puntos.data, elegido);
+
   const canal = useQuery({
     queryKey: ['guardia', copropiedadId, 'canal', foco?.dispositivoId],
     enabled: foco !== undefined,
@@ -208,6 +230,8 @@ export const PantallaDeGuardiaVirtual = ({
             // en vez de viajar como `undefined`. El DTO lo declara opcional, no
             // «opcional o nulo», y la diferencia la comprueba el compilador.
             ...(foco?.eventoId === undefined ? {} : { eventoId: foco.eventoId }),
+            // 15-P · P3 · la puerta elegida; sin punto, la de la ficha del equipo.
+            ...(punto === null ? {} : { puntoId: punto.id }),
           },
         }),
       ),
@@ -465,15 +489,26 @@ export const PantallaDeGuardiaVirtual = ({
                     </p>
                   ) : null}
 
+                  {/* ── 15-P · P3 · qué puerta del equipo (la apertura NO va por el audio) ── */}
+                  <SelectorDePunto
+                    puntos={puntos}
+                    elegido={punto}
+                    alElegir={(p) => setEleccion({ dispositivoId: foco.dispositivoId, punto: p })}
+                  />
+
                   <div className="flex flex-wrap gap-2">
                     <Boton
                       variante="exito"
+                      disabled={hayQueElegir}
+                      {...(hayQueElegir
+                        ? { title: 'Elija primero qué puerta abrir: el equipo tiene varias' }
+                        : {})}
                       onClick={() => {
                         setError(undefined);
                         setPidiendo('abrir');
                       }}
                     >
-                      Abrir con motivo
+                      {punto === null ? 'Abrir con motivo' : `Abrir ${punto.nombre} con motivo`}
                     </Boton>
                     <Boton
                       variante="peligro"
@@ -561,7 +596,9 @@ export const PantallaDeGuardiaVirtual = ({
             pidiendo === 'emergencia'
               ? 'Declarar emergencia'
               : pidiendo === 'abrir'
-                ? 'Abrir la puerta'
+                ? punto === null
+                  ? 'Abrir la puerta'
+                  : `Abrir · ${punto.nombre}`
                 : 'Negar el acceso'
           }
           descripcion={

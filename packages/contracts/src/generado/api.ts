@@ -671,6 +671,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/equipos/{equipoId}/puntos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los puntos de acceso que se pueden abrir en este equipo */
+        get: operations["SalidasController_puntos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
         parameters: {
             query?: never;
@@ -686,6 +703,57 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/salidas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Las salidas que el videoportero declara y las persistidas */
+        get: operations["SalidasController_consultar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/salidas/descubrir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lee las salidas del videoportero y las persiste como puntos de acceso */
+        post: operations["SalidasController_descubrir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/equipos/{equipoId}/salidas/{puntoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Cambia el nombre de un punto de acceso */
+        patch: operations["SalidasController_renombrar"];
         trace?: never;
     };
     "/copropiedades/{id}/equipos/{equipoId}/verificacion-remota": {
@@ -3962,6 +4030,20 @@ export interface components {
             /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
         };
+        NodoDeSalidasDto: {
+            /** @description `equipo/propio/puerta-1` */
+            ruta: string;
+            padre: string | null;
+            /** @description 1 equipo · 2 módulo · 3 salida */
+            nivel: number;
+            /** @enum {string} */
+            tipo: "equipo" | "modulo" | "salida";
+            nombre: string;
+            numeroDePuerta: number | null;
+            /** @enum {string|null} */
+            estado: "en_linea" | "fuera_de_linea" | "manipulada" | "averiada" | null;
+            nota: string | null;
+        };
         NombreDeEquipoDto: {
             /** Format: uuid */
             id: string;
@@ -3969,6 +4051,9 @@ export interface components {
             /** @enum {string} */
             tipo: "camara_lpr" | "terminal_facial" | "intercom" | "rele" | "controlador_io";
             activo: boolean;
+        };
+        NombreDePuntoDto: {
+            nombre: string;
         };
         NotasDeAlertaDto: {
             notas: string;
@@ -4024,6 +4109,8 @@ export interface components {
             resultado: "aceptada" | "rechazada" | "inalcanzable" | null;
             /** @description Lo que contestó el equipo. */
             detalle: string | null;
+            /** @description 15-P · el punto elegido; nulo = la puerta de la ficha del equipo. */
+            punto: components["schemas"]["PuntoDeLaOrdenDto"] | null;
         };
         OrdenManualDto: {
             /** Format: uuid */
@@ -4040,6 +4127,11 @@ export interface components {
              * @description Evento que se está atendiendo
              */
             eventoId?: string;
+            /**
+             * Format: uuid
+             * @description 15-P · el punto de acceso del equipo que se abre. Sin él, la puerta de la ficha. Un punto de otro equipo, de otra copropiedad o dado de baja: 404 y la orden no sale.
+             */
+            puntoId?: string;
         };
         PaginaDeEventosDto: {
             filas: components["schemas"]["EventoRegistradoDto"][];
@@ -4211,10 +4303,33 @@ export interface components {
             lista_negra: components["schemas"]["PreferenciaDeDisparadorDto"];
             dudoso: components["schemas"]["PreferenciaDeDisparadorDto"];
         };
+        PuntoDeAccesoDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            nombre: string;
+            numeroDePuerta: number;
+            modulo: string | null;
+            rutaEnElEquipo: string | null;
+            /** @enum {string} */
+            origen: "descubierto" | "manual";
+            /** Format: date-time */
+            descubiertoEn: string | null;
+        };
         PuntoDeFrecuenciaDto: {
             /** @description Lunes de la semana ISO, YYYY-MM-DD */
             semana: string;
             total: number;
+        };
+        PuntoDeLaOrdenDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            numeroDePuerta: number;
+        };
+        PuntosDeAccesoDto: {
+            puntos: components["schemas"]["PuntoDeAccesoDto"][];
         };
         ReceptorDeLaFichaDto: {
             host: string | null;
@@ -4434,6 +4549,12 @@ export interface components {
         };
         RevocarAutorizacionDto: {
             motivo: string;
+        };
+        SalidasDelEquipoDto: {
+            /** @description Vacío si no se pudo leer el equipo */
+            arbol: components["schemas"]["NodoDeSalidasDto"][];
+            motivoSinArbol: string | null;
+            puntos: components["schemas"]["PuntoDeAccesoDto"][];
         };
         SaludDto: {
             /** @example vivo */
@@ -5951,6 +6072,44 @@ export interface operations {
             };
         };
     };
+    SalidasController_puntos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuntosDeAccesoDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     EquiposController_reactivar: {
         parameters: {
             query?: never;
@@ -5969,6 +6128,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EquipoDto"];
+                };
+            };
+        };
+    };
+    SalidasController_consultar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalidasDelEquipoDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    SalidasController_descubrir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalidasDelEquipoDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    SalidasController_renombrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                equipoId: string;
+                puntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NombreDePuntoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuntoDeAccesoDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

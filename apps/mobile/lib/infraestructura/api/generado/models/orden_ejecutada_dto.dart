@@ -6,6 +6,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'orden_ejecutada_dto_accion.dart';
 import 'orden_ejecutada_dto_resultado.dart';
+import 'punto_de_la_orden_dto.dart';
 
 part 'orden_ejecutada_dto.g.dart';
 
@@ -22,6 +23,7 @@ class OrdenEjecutadaDto {
     required this.eventoId,
     required this.resultado,
     required this.detalle,
+    required this.punto,
   });
   
   factory OrdenEjecutadaDto.fromJson(Map<String, Object?> json) => _$OrdenEjecutadaDtoFromJson(json);
@@ -40,6 +42,9 @@ class OrdenEjecutadaDto {
 
   /// Lo que contestó el equipo.
   final String? detalle;
+
+  /// 15-P · el punto elegido; nulo = la puerta de la ficha del equipo.
+  final PuntoDeLaOrdenDto? punto;
 
   Map<String, Object?> toJson() => _$OrdenEjecutadaDtoToJson(this);
 }

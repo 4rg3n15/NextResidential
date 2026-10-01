@@ -12,6 +12,7 @@ import { FichaDeEquipo } from './ficha-del-equipo';
 import { Boton } from '@/componentes/ui/boton';
 import { VideoEnVivo } from '@/componentes/video-en-vivo';
 import { AccionesDeSitio } from './acciones-de-sitio';
+import { SalidasDelVideoportero } from './salidas-del-equipo';
 
 /** D3 (15-L) · los equipos que entregan video por RTSP. */
 const CON_VIDEO = new Set<Equipo['tipo']>(['camara_lpr', 'terminal_facial', 'intercom']);
@@ -192,6 +193,11 @@ export const FichaDialogo = ({
             Ver video en vivo
           </Boton>
         )
+      ) : null}
+
+      {/* 15-P · P3 · las salidas que declara el videoportero, y su nombre para la guardia. */}
+      {equipo !== null && equipo.tipo === 'intercom' && equipo.estado === 'activo' ? (
+        <SalidasDelVideoportero copropiedadId={copropiedadId} equipoId={equipo.id} />
       ) : null}
 
       {sondeo?.ficha === undefined ? null : (

@@ -20,6 +20,9 @@ OrdenEjecutadaDto _$OrdenEjecutadaDtoFromJson(Map<String, dynamic> json) =>
           ? null
           : OrdenEjecutadaDtoResultado.fromJson(json['resultado'] as String),
       detalle: json['detalle'] as String?,
+      punto: json['punto'] == null
+          ? null
+          : PuntoDeLaOrdenDto.fromJson(json['punto'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$OrdenEjecutadaDtoToJson(OrdenEjecutadaDto instance) =>
@@ -34,4 +37,5 @@ Map<String, dynamic> _$OrdenEjecutadaDtoToJson(OrdenEjecutadaDto instance) =>
       'eventoId': instance.eventoId,
       'resultado': instance.resultado,
       'detalle': instance.detalle,
+      'punto': instance.punto,
     };
