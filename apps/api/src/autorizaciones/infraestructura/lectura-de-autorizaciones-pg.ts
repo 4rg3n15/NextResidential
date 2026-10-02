@@ -170,10 +170,24 @@ export const leerAutorizaciones = async (
   return salida;
 };
 
-/** 15-Q · las autorizaciones que la instantánea del Edge lleva: activas y no vencidas en `ahora`. */
+/**
+ * [SUPUESTO] S-183 · lo que lee la nube para una placa incluye la autorización
+ * ya VENCIDA (el motor la niega por VIGENCIA_EXPIRADA, no por PLACA_DESCONOCIDA).
+ * Para que el Edge dé el mismo motivo, la instantánea lleva también las
+ * vencidas en los últimos 30 días; más atrás, ambos niegan con motivo distinto.
+ */
+export const VENCIDAS_QUE_VIAJAN_MS = 30 * 24 * 3600 * 1000;
+
+/** 15-Q · las autorizaciones que lleva la instantánea del Edge (ver S-183). */
 export const autorizacionesVigentesEn = (
   c: PoolClient,
   copropiedadId: string,
   ahora: Date,
 ): Promise<Autorizacion[]> =>
-  leerAutorizaciones(c, copropiedadId, FILTRO_VIGENTES_EN, [ahora], ahora);
+  leerAutorizaciones(
+    c,
+    copropiedadId,
+    FILTRO_VIGENTES_EN,
+    [new Date(ahora.getTime() - VENCIDAS_QUE_VIAJAN_MS)],
+    ahora,
+  );
