@@ -224,22 +224,25 @@ flowchart TB
 
 ### El Edge sin WAN
 
-Mire la última flecha, la tachada: al reconectar, el Edge **no vuelve a decidir**. Envía lo que ya decidió, con la versión de reglas que usó.
+El Edge es **contingencia** (ADR-034, P-27 = B): la nube sigue hablando con los equipos y el Edge los escucha en paralelo. Por cada acceso pregunta si la nube puede decidir; sólo si no puede, decide con su caché, **acciona** la barrera o contesta a la terminal, y guarda el acceso. Mire la última flecha, la tachada: al reconectar, el Edge **no vuelve a decidir**. Envía lo que ya decidió, con la versión de reglas que usó.
 
 ```mermaid
 flowchart LR
-  WAN{"¿Hay WAN?"}
-  WAN -- "sí" --> NUBE["Decide la API en la nube"]
-  WAN -- "no" --> CACHE[("Caché de reglas versionada")]
+  EQ["Equipos · cámara, terminal, videoportero"] --> NUBE["API · decide y acciona"]
+  EQ --> EDGE["Edge · escucha en paralelo"]
+  EDGE --> P{"¿La nube puede decidir?"}
+  P -- "sí" --> NADA["El Edge no hace nada"]
+  P -- "no" --> CACHE[("Caché de reglas versionada · hash verificado")]
   CACHE --> LOCAL["Decisión local que sella la VersiónDeReglas"]
-  LOCAL --> BAND[("Bandeja de salida · clave de idempotencia")]
+  LOCAL --> ACC["Acciona · barrera o veredicto a la terminal"]
+  ACC --> BAND[("Bandeja de salida · clave de idempotencia")]
   BAND --> REC["Reconciliación ordenada al reconectar"]
   REC --> EVT[("eventos · append-only, exactamente una vez")]
   NUBE --> EVT
   REC -. "NO vuelve a decidir" .-x LOCAL
 ```
 
-Si la regla no está en la caché, la política de contingencia es configurable y su valor por defecto es **denegar** (§2.1.4 del contrato).
+Si la regla no está en la caché, **niega**; la política de contingencia es configurable, pero «escalar al portero» sin WAN también niega mientras no se defina qué significa sin nube (P-28, §2.1.4 del contrato).
 
 ---
 
@@ -499,9 +502,10 @@ verificación en el mismo empujón que la añade. Bajarlo es libre.
 
 ### El Edge Gateway · el diferenciador, y cómo se comprueba que lo es
 
-**Qué es.** Un equipo pequeño en la portería que decide accesos **cuando no hay
-internet**, con las reglas que la nube le dio la última vez, y que al reconectar
-envía todo lo que pasó durante el corte exactamente una vez.
+**Qué es.** Un equipo pequeño en la portería que **decide y abre cuando la nube
+no puede** —sin internet, o con la API sin base—, con las reglas que la nube le
+dio la última vez, y que al reconectar envía todo lo que pasó durante el corte
+exactamente una vez. Con WAN no actúa: es contingencia (ADR-034).
 
 **Qué lo hace OE-06 y no «una copia pequeña del sistema».** Una sola cosa:
 `apps/edge` **no tiene una línea de lógica de acceso**. Ni un `if` sobre
@@ -515,8 +519,14 @@ instantánea pasando por serializar, como en producción— y exige resultado
 idéntico, **motivo incluido**. Una condición «solo para el Edge» en cualquier
 punto pondría esa prueba en rojo el mismo día.
 
+Y desde la 15-Q, también **con datos reales**:
+`apps/api/test/edge-misma-decision-pg.e2e.test.ts` compara lo que decide la nube
+con su cargador contra PostgreSQL y lo que decide el Edge con la instantánea que
+la API le sirve, placa por placa y rostro por rostro.
+
 ```bash
-pnpm --filter @ncr/edge test    # 101 pruebas, incluidas las dos de la DoD
+pnpm --filter @ncr/edge test    # el Edge entero, contra los equipos simulados de providers
+pnpm sitio:edge                 # en sitio: el mismo código, contra la nube y los equipos de verdad
 ```
 
 **La DoD, ejecutada y no leída.** «30 minutos sin WAN con 20 accesos resueltos
@@ -527,7 +537,13 @@ reales durarían media hora y un día, y nadie las ejecutaría, así que la DoD 
 «verificaría» leyéndola.
 
 Lo simulado es el tiempo y la red. La decisión es el motor real, la bandeja es
-SQLite de verdad, y la deduplicación usa la clave que construye el dominio.
+SQLite de verdad, y la deduplicación usa la clave que construye el dominio. La
+versión de la 15-Q (`apps/api/test/edge-en-sitio-pg.e2e.test.ts`) pone delante
+la API real con PostgreSQL, la credencial que ella emite, el Edge compuesto como
+en producción y la cámara simulada de `providers` abriendo su barrera; pierde a
+propósito la primera respuesta de la reconciliación y exige que la base siga con
+20, no con 40. Para repetirlo cortando el WAN de verdad:
+[`DESPLIEGUE_EDGE.md` §9](docs/guias/DESPLIEGUE_EDGE.md).
 
 **Tres decisiones que explican el resto del código:**
 
@@ -682,7 +698,7 @@ La seguridad es condición de cada etapa desde la 01, no una etapa al final. La 
 
 ### El riesgo número uno: la llave secreta omite RLS
 
-El Edge Gateway, los workers y la ingesta de eventos usan la llave secreta por diseño, y esa llave **salta Row Level Security por completo**. Por eso el aislamiento se implementa **dos veces**: en RLS y en la capa de aplicación.
+Los workers y la ingesta de eventos usan la llave secreta por diseño, y esa llave **salta Row Level Security por completo**. Por eso el aislamiento se implementa **dos veces**: en RLS y en la capa de aplicación. El Edge, desde la 15-Q, ya no lleva ninguna llave de Supabase: habla con la API con una credencial propia, y la API comprueba en la aplicación que sólo pida lo de su copropiedad (un intento cruzado es 404 y queda en `auditoria_seguridad`).
 
 La suite de la ETAPA 03 recorre todos los endpoints por los cuatro caminos —JWT propio, JWT de otra copropiedad, identidad de servicio y operador multiproyecto— y **rompe la construcción ante cualquier fuga**. La lista de endpoints se enumera del enrutador, no de una lista escrita a mano: un endpoint nuevo entra en el recorrido el día que se escribe.
 
