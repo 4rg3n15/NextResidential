@@ -82,7 +82,7 @@ export class MigrarCredencialesAlEdge {
         ...equipo,
         ...(secreto === null ? {} : { secretoAlarmServer: secreto }),
       });
-      if (!r.autenticado) {
+      if (r.autenticado !== true) {
         return {
           dispositivoId,
           trasladada: false,

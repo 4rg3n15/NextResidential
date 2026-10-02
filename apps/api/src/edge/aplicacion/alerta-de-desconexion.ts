@@ -69,16 +69,24 @@ export class AlertaDeDesconexion {
     });
   }
 
-  /** Devuelve cuántas alertas pidió abrir (0 si el Edge ya volvió). */
+  /**
+   * Devuelve cuántas alertas ABRIÓ (0 si el Edge ya volvió). Equipo por equipo:
+   * que falle la de uno no deja sin aviso a los demás.
+   */
   async siSigue(copropiedadId: string, edgeId: string): Promise<number> {
     const estado = this.tuneles.estadoDe(copropiedadId);
     if (estado.conectado) return 0;
+    let equipos: readonly { readonly dispositivoId: string }[];
     try {
-      const equipos = (await this.equipos.activos()).filter(
-        (e) => e.copropiedadId === copropiedadId,
-      );
-      const desde = estado.desde?.toISOString() ?? 'hace un momento';
-      for (const { dispositivoId } of equipos) {
+      equipos = (await this.equipos.activos()).filter((e) => e.copropiedadId === copropiedadId);
+    } catch (error) {
+      this.fallo(edgeId, null, error);
+      return 0;
+    }
+    const desde = estado.desde?.toISOString() ?? 'hace un momento';
+    let abiertas = 0;
+    for (const { dispositivoId } of equipos) {
+      try {
         await this.alertas.ejecutar(
           {
             copropiedadId,
@@ -93,14 +101,19 @@ export class AlertaDeDesconexion {
           },
           this.actorId,
         );
+        abiertas += 1;
+      } catch (error) {
+        this.fallo(edgeId, dispositivoId, error);
       }
-      return equipos.length;
-    } catch (error) {
-      this.bitacora.registrar('error', 'no se pudo alertar la desconexión del Edge', {
-        edgeId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return 0;
     }
+    return abiertas;
+  }
+
+  private fallo(edgeId: string, dispositivoId: string | null, error: unknown): void {
+    this.bitacora.registrar('error', 'no se pudo alertar la desconexión del Edge', {
+      edgeId,
+      ...(dispositivoId === null ? {} : { dispositivoId }),
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }

@@ -1,5 +1,5 @@
 import type { Bitacora } from '@ncr/domain-core';
-import { EdgeDesconectado } from '@ncr/providers';
+import { EdgeDesconectado, ProtocoloInvalido } from '@ncr/providers';
 import type { EquipoRegistrado } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
 import type { CredencialesEnElEdge, EntregaAlEdge } from '../../comun/credenciales-en-el-edge';
@@ -38,6 +38,24 @@ export interface MarcaDeCredencial {
 
 export type Huella = (copropiedadId: string, dispositivoId: string, clave: string) => string;
 
+const ESTADOS: readonly unknown[] = ['en_linea', 'fuera_de_linea', 'degradado'];
+
+/**
+ * Lo que contesta el Edge, con FORMA ESTRICTA: de ese `autenticado` depende que
+ * la nube borre su copia (D3). Un `"false"`, un `1` o una respuesta vacía no son
+ * «sí»: son un Edge que no habla el protocolo, y no se marca ni se borra nada.
+ */
+export const leerEntrega = (r: unknown): EntregaAlEdge => {
+  const { autenticado, estado } = (typeof r === 'object' && r !== null ? r : {}) as Record<
+    string,
+    unknown
+  >;
+  if (typeof autenticado !== 'boolean' || !ESTADOS.includes(estado)) {
+    throw new ProtocoloInvalido('el Edge contestó la entrega sin la forma del protocolo');
+  }
+  return { autenticado, estado: estado as EntregaAlEdge['estado'] };
+};
+
 /** El pedido al Edge, compartido con la migración (D3). */
 export const pedirGuardar = async (
   tuneles: TunelesDeEdge,
@@ -46,11 +64,7 @@ export const pedirGuardar = async (
 ): Promise<EntregaAlEdge> => {
   const sesion = tuneles.sesionDe(copropiedadId);
   if (sesion === null) throw new EdgeDesconectado();
-  return (await sesion.pedir(
-    'credencial.guardar',
-    { equipo },
-    { plazoMs: 15_000 },
-  )) as EntregaAlEdge;
+  return leerEntrega(await sesion.pedir('credencial.guardar', { equipo }, { plazoMs: 15_000 }));
 };
 
 export class CredencialesDelPuente implements CredencialesEnElEdge {
