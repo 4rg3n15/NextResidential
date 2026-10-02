@@ -1,7 +1,7 @@
 # ETAPA 15-P · Guardia virtual: audio bidireccional y puertas del videoportero
 
 **Rama:** `etapa-15p-guardia-intercom-y-puertas` · **Base:** `develop` (`580ccc3`, merge del PR #37) ·
-**PR:** _(se anota al abrirlo)_, sin fusionar · **Fecha:** 2026-10-01
+**PR:** [#38](https://github.com/4rg3n15/NextResidential/pull/38), sin fusionar · **Fecha:** 2026-10-01
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Todo lo de aquí está medido y probado contra **equipos simulados** que siguen
@@ -77,6 +77,23 @@ que el videoportero declara, elegida por punto, con motivo y auditada.
 - **0.5 cambió una aserción.** `sonda-video.test.ts` (V2) fijaba el 409 que 0.5
   manda retirar. Las suites de sitio que R1 protege —cámara del 28/09, CRLF del
   SDP, cortes de la 15-O— no se tocaron.
+- **El verificador salió FALLIDO tres veces antes de la corrida buena, y las
+  tres eran ciertas.** (1) **Regresión de R1 mía:** el videoportero simulado
+  contestaba `AccessControl/capabilities` sin salidas declaradas, la misma ruta
+  que pregunta la lectura de la biblioteca de rostros, y dos regresiones de
+  sitio (H-SITIO-09, F4) pasaron de «no» a «sí». Corregido en el simulado sin
+  tocar aserciones (`6c01ffb`). En la misma corrida, el barrido de formularios
+  pidió clasificar la sección «Salidas». (2) **Un falso fallo que también habría
+  salido en sitio:** el guion de puesta en marcha contaba como «desmentidas» las
+  rutas de la unidad de puerta segura y de los submódulos, que sólo existen si
+  el módulo está instalado; ahora son `soloSiLaDeclara` y se informan como «no
+  declarada» (`f66447b`). (3) **Una carrera de la 15-N:** la prueba con go2rtc
+  real miraba el `PLAY` en el instante de la respuesta, y go2rtc lo manda en una
+  gorrutina después (`add_consumer.go:111` → `producer.go:157`); se espera al
+  `PLAY` antes de la MISMA aserción (`869029f`, 16 líneas añadidas, ninguna
+  cambiada). La lección, dicha: los dos primeros se habrían visto antes de
+  subir si hubiera corrido las suites completas del proveedor y del guion, no
+  sólo las de los ficheros tocados.
 - **El recorrido de la consola no habla.** El paso 9b recorre el panel de
   guardia con el videoportero de dos cerraduras (política de micrófono por
   ruta, descubrir, nombrar, elegir y abrir por punto, con el equipo simulado
@@ -238,7 +255,57 @@ tope). Tres que ya existían cruzaron el tope en esta ronda (DT-15P-02).
 
 ## 6 · Pruebas
 
-_(se completa con la ejecución del verificador)_
+### Qué se probó y cómo
+
+| Qué                                                                                                                                                                                                                                                                    | Dónde                                                                                                                                                                                                                    | Cómo se ejecuta                                  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Árbol de salidas: recorrido con caso base y tope 3 (error, no recorte), ciclo, lectores de documentos, cerraduras, unidad segura, submódulos, ascensor, libre/bloqueada                                                                                                | `packages/providers/src/nucleo/salidas.test.ts` · `videoportero/arbol-de-salidas.test.ts`                                                                                                                                | `pnpm --filter @ncr/providers test`              |
+| Proveedor contra el simulado: árbol leído, cada puerta abre la suya (oráculo `puertasAbiertasPor`), sin operador no sale, sin apertura remota no abre, R1 sin salidas declaradas                                                                                       | `hikvision/salidas-del-videoportero-15p.test.ts`                                                                                                                                                                         | ídem                                             |
+| Audio: marcas µ-law, adaptador persistente (subida cruda, 401, `0x40002068`), transporte anterior `chunked`                                                                                                                                                            | `simulacion/marcas-de-audio.test.ts` · `videoportero/intercom-isapi-persistente.test.ts`                                                                                                                                 | ídem                                             |
+| Conversación: sin turno no empieza, escucha sin pulsar, pulsar/soltar en orden, tramo de 60 s, caducidad, renovación, límites, doble cierre                                                                                                                            | `apps/api/src/guardia/aplicacion/conversacion-de-audio.test.ts`                                                                                                                                                          | `pnpm --filter @ncr/api test`                    |
+| Salidas en la API: roles, segundo camino de aislamiento, no videoportero, conservar nombre y dar de baja, sin lectura, R3, renombrar; orden por punto (antes de rastro y relé), punto ajeno, R1 sin punto; accionador que no sabe elegir puerta                        | `equipos/aplicacion/salidas-del-equipo.test.ts` · `lector-de-salidas-por-proveedor.test.ts` · `guardia/aplicacion/apertura-por-punto.test.ts` · `guardia/infraestructura/accionador-salidas.test.ts`                     | ídem                                             |
+| Contra PostgreSQL **como `authenticated`** (la RLS forzada decide): descubrir, nombre que sobrevive, baja lógica; **diez «Descubrir» simultáneos sin duplicar**; el portero lee y no escribe; ROBLE ni ve ni renombra; orden ↔ punto con clave ajena compuesta        | `apps/api/test/salidas-del-videoportero-pg.test.ts` · `conversaciones-de-guardia-pg.test.ts` · políticas `99d` y `99e`                                                                                                   | `--con-base`                                     |
+| De punta a punta por la API: audio de ida y vuelta, billete de un uso y de su IP, segundo operador en cola, KPI-35, `0x40002068`; salidas: árbol, descubrir, nombrar, abrir CADA salida con motivo, sin motivo no abre, punto ajeno 404, KPI-35, R1 sin punto          | `apps/api/test/audio-guardia-ws.e2e.test.ts` · `salidas-del-videoportero.e2e.test.ts`                                                                                                                                    | `pnpm --filter @ncr/api test`                    |
+| Consola: canal WebSocket (pulsar, soltar, **soltar antes de que abra el micrófono**, autorrepetición, cortes del servidor, colgar), botón de pulsar para hablar, Permissions-Policy por ruta, selector de punto sobre la pantalla de guardia entera, sección «Salidas» | `apps/web/src/lib/audio/canal-por-websocket.test.ts` · `componentes/controles-de-audio-ws.test.tsx` · `politica-de-permisos.test.ts` · `guardia/selector-de-punto.test.tsx` · `dispositivos/salidas-del-equipo.test.tsx` | `pnpm --filter @ncr/web test`                    |
+| Recorrido de la consola, **paso 9b**: micrófono sólo en la guardia; videoportero de dos cerraduras dado de alta, descubierto y nombrado en su ficha; en la guardia, «Abrir» espera a que se elija; el equipo simulado dice que se movió la puerta 2 y sólo ésa         | `e2e/recorrido-de-consola.mjs`                                                                                                                                                                                           | `node e2e/recorrido-de-consola.mjs` (o paso 13b) |
+| Banco de audio A / B / anterior con Chromium y el mismo reloj                                                                                                                                                                                                          | `e2e/medir-audio-guardia.mjs`                                                                                                                                                                                            | `node e2e/medir-audio-guardia.mjs`               |
+
+### Resultado
+
+**Cifras medidas, contra el simulado:**
+
+| Medida                                            | Valor                                                                                                                                    |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Audio por el banco (Chromium ↔ equipo), B        | ida 37 ms (p95 52) · vuelta 70 ms (p95 72) · establecer escucha 33 ms · al pulsar 30 ms · `close` tras colgar 7 ms · 0 canales huérfanos |
+| Audio por la API (sin navegador), B               | ida 2 ms · vuelta 1 ms                                                                                                                   |
+| Apertura por punto, de la petición a la respuesta | 17 ms y 8 ms (KPI-32 · < 3 s)                                                                                                            |
+| KPI-25 (paso 11)                                  | 200 de 200 alertas · p50 6 ms · p95 23 ms · p99 30 ms                                                                                    |
+
+Paso 5 de la corrida correcta: `@ncr/config` 144 · `@ncr/edge` 101 ·
+`@ncr/domain-core` 438 · `@ncr/providers` 1145 · `@ncr/web` 737 · `@ncr/api`
+1913 + 5 saltadas declaradas (las ejecuta el paso 12b) de 1918. **4483
+pruebas**, las mismas por los dos caminos (paso 7b) y tres veces seguidas sin
+caché (paso 14). 411 de 411 ficheros de prueba recogidos.
+
+### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
+
+Sobre `869029f`, desde cero (sin `dist/`, `.turbo/` ni `coverage/`, instalación con `--frozen-lockfile`):
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado no ejercido es el mismo de rondas anteriores («0 de ellos
+en linux», con motivo y etapa de revisión vigentes). Las tres corridas
+anteriores salieron **FALLIDAS** y sus causas están en «Distinto del encargo».
+
+### Cobertura por capa
+
+| Capa                                          | Líneas  | Ramas   | Funciones | Umbral |
+| --------------------------------------------- | ------- | ------- | --------- | ------ |
+| Dominio (`packages/domain-core/src`)          | 96,20 % | 96,91 % | 96,04 %   | 90 %   |
+| Aplicación (`**/aplicacion/**`, 122 archivos) | 96,74 % | 90,22 % | 97,56 %   | 90 %   |
+| Global (795 archivos)                         | 86,64 % | 86,68 % | 85,53 %   | 70 %   |
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -268,6 +335,9 @@ _(se completa con la ejecución del verificador)_
   descubren: abren la puerta de su ficha (R1). Ampliarlo es un caso de uso nuevo.
 - **DT-15P-04.** El nombre del punto que muestra el historial es el de HOY (se
   lee por la clave ajena). La puerta que se mandó sí queda fija en la orden.
+- **DT-15P-05.** `soloSiLaDeclara` lo usa sólo el guion de sitio. `pnpm
+sitio:ensayo` y la ficha no lo leen todavía: si un día sondearan esas rutas
+  a ciegas, tendrían que respetarlo.
 - **Supuestos nuevos:** S-174 a S-180. **Contradicciones:** C-47 a C-49.
   **Pendientes:** P-25 (puerta libre o bloqueada) y P-26 (ascensor). Todo en
   `docs/auditoria/contradicciones-y-supuestos.md`.
@@ -285,7 +355,20 @@ entorno:diff` muestra la variable.
 
 ## 10 · Rama y commits
 
-_(se completa al cierre)_
+Rama `etapa-15p-guardia-intercom-y-puertas`, desde `develop` (`580ccc3`). PR
+[#38](https://github.com/4rg3n15/NextResidential/pull/38) hacia `develop`, sin fusionar.
+
+- `49053a9` fix(etapa-15p/remanentes): bloque 0 — proceso vigilado, escucha que no enmudece, sesión renovada en middleware, WHEP abortable, canal 101 y keepalive
+- `a9b170e` feat(etapa-15p/audio): medir antes de construir — videoportero simulado en red, adaptador persistente y banco A/B/actual
+- `e2889bd` feat(etapa-15p/guardia): audio por WebSocket con turno, pulsar para hablar, caducidad y constancia
+- `17553de` feat(etapa-15p/puertas): árbol de salidas del videoportero leído de lo que declara
+- `a469def` feat(etapa-15p/puertas): puntos de acceso descubiertos y apertura por punto en la guardia
+- `fc579d6` feat(etapa-15p/consola): punto de acceso en la guardia y salidas en la ficha del videoportero
+- `f680714` docs(etapa-15p): ADR-01 enmendado, procedimiento de sitio y recorrido del panel de guardia
+- `6c01ffb` fix(etapa-15p/simulado): las rutas de salidas sólo existen si el guion las declara (R1)
+- `f66447b` fix(etapa-15p/sitio): la unidad de puerta segura y los submódulos son opcionales en el guion de sitio
+- `869029f` test(etapa-15p/video): esperar el PLAY asíncrono de go2rtc antes de la misma aserción
+- el commit de cierre documental (este informe y ESTADO)
 
 ---
 
