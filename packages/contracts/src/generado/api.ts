@@ -500,6 +500,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/edge-gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Da de alta un Edge Gateway y entrega su credencial (una vez) */
+        post: operations["GatewaysController_registrar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/edge-gateways/{edgeId}/credencial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rota la credencial del Edge: la anterior deja de valer ya */
+        post: operations["GatewaysController_rotar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/edge/reconciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * La bandeja del Edge tras un corte de WAN, con lo que hizo con cada equipo
+         * @description NO vuelve a decidir (RN-16, CA-21). Cada evento debe ser de la copropiedad del Edge; uno solo de otra rechaza el lote entero (RN-15). Duplicados: 202 (RN-17, CA-22).
+         */
+        post: operations["EdgeController_reconciliar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/equipos": {
         parameters: {
             query?: never;
@@ -1758,6 +1812,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/reglas/instantanea": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * La instantánea de reglas de SU copropiedad, si hay una más nueva que `desde`
+         * @description Sólo para el Edge acreditado (firma con su credencial). Sin plantillas biométricas: sólo identificadores. RN-15, RN-16, CA-21, KPI-31.
+         */
+        get: operations["EdgeController_instantanea"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/residentes/cuentas": {
         parameters: {
             query?: never;
@@ -2410,6 +2484,16 @@ export interface components {
             /** Format: date-time */
             hasta: string;
         };
+        AccionamientoDelEdgeDto: {
+            /** @enum {string} */
+            tipo: "apertura" | "veredicto";
+            /** @enum {string} */
+            estado: "aceptada" | "rechazada" | "inalcanzable";
+            latenciaMs: number;
+            motivo?: string;
+            /** @description Cuándo se accionó, en el reloj del Edge */
+            ocurridoEn: string;
+        };
         AceptadoDto: {
             /** @example true */
             aceptado: boolean;
@@ -2417,6 +2501,12 @@ export interface components {
         };
         AcompananteAgregadoDto: {
             agregado: boolean;
+        };
+        AcompananteEnLaInstantaneaDto: {
+            /** Format: uuid */
+            personaId: string;
+            /** @description Siempre vacío: el motor no lee nombres (minimización) */
+            nombre: string;
         };
         AgregarAcompananteDto: {
             /**
@@ -2460,6 +2550,10 @@ export interface components {
             contrasenaInicial: string;
             nombre: string;
             telefono?: string | null;
+        };
+        AltaDeEdgeDto: {
+            /** @description Cómo lo verá el operador */
+            nombre: string;
         };
         AltaDeEquipoDto: {
             nombre: string;
@@ -2583,6 +2677,24 @@ export interface components {
             motivoRevocacion: string | null;
             observaciones: string | null;
             tieneFotografia: boolean;
+        };
+        AutorizacionEnLaInstantaneaDto: {
+            /** @description UUID, o `residente:<vehículo>` para el derecho del residente */
+            id: string;
+            /** Format: uuid */
+            viviendaId: string;
+            personaId: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            hasta: string;
+            /** @enum {string} */
+            estado: "vigente" | "revocada";
+            zonasPermitidas: string[];
+            acompanantes: components["schemas"]["AcompananteEnLaInstantaneaDto"][];
+            maximoAcompanantes: number;
+            patron: components["schemas"]["PatronEnLaInstantaneaDto"] | null;
+            placa: string | null;
         };
         AutorizarZonaDto: {
             autorizacionId: string;
@@ -3037,6 +3149,17 @@ export interface components {
             /** @example dumbbell */
             icono?: string | null;
             normas?: string[];
+        };
+        CredencialDelEdgeDto: {
+            /** Format: uuid */
+            edgeId: string;
+            /** Format: uuid */
+            copropiedadId: string;
+            nombre: string;
+            /** @description Lo único que queda en la base (RN-21) */
+            credencialRef: string;
+            /** @description La credencial del Edge, para su `EDGE_INGESTA_SECRETO`. Se muestra UNA vez: la API no la guarda */
+            secreto: string;
         };
         CuentaDadaDeBajaDto: {
             dadaDeBaja: boolean;
@@ -3494,6 +3617,25 @@ export interface components {
             /** Format: date-time */
             ultimaSenal: string | null;
         };
+        EventoDelEdgeDto: {
+            copropiedadId: string;
+            dispositivoId: string;
+            /** @enum {string} */
+            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+            personaId?: string;
+            placaLeida?: string;
+            zonaId?: string;
+            /** @description Confianza de la lectura, 0..1 */
+            confianzaCentesimas: number;
+            /** @description Identificador del evento en el equipo (RN-17) */
+            referenciaExterna: string;
+            /** @description Instante REAL del acceso, no el de la reconciliación (CA-22) */
+            ocurridoEn: string;
+            decision: components["schemas"]["DecisionDelEdgeDto"];
+            /** @description KPI-31 · decidido con una caché que pudo haber envejecido */
+            cachePotencialmenteObsoleto?: boolean;
+            accionamiento?: components["schemas"]["AccionamientoDelEdgeDto"];
+        };
         EventoIngestaDto: {
             copropiedadId: string;
             dispositivoId: string;
@@ -3668,6 +3810,12 @@ export interface components {
             /** @description Continúa la franja del día anterior tras la medianoche */
             continuaDelDiaAnterior?: boolean;
         };
+        FranjaEnLaInstantaneaDto: {
+            dia: number;
+            minutoInicio: number;
+            minutoFin: number;
+            continuaDelDiaAnterior: boolean;
+        };
         GeneracionAplicadaDto: {
             creadas: number;
             /** @description Ya existían y se dejaron como estaban. */
@@ -3789,6 +3937,40 @@ export interface components {
             /** Format: uuid */
             copropiedadId: string;
         };
+        InstantaneaDeReglasDto: {
+            /** Format: uuid */
+            copropiedadId: string;
+            /** @description VersiónDeReglas publicada (0010): la que sella cada decisión */
+            version: number;
+            /** @description SHA-256 del contenido: el Edge puede verificar su caché */
+            hash: string;
+            /**
+             * Format: date-time
+             * @description Desde aquí se mide KPI-31
+             */
+            generadaEn: string;
+            autorizaciones: components["schemas"]["AutorizacionEnLaInstantaneaDto"][];
+            personasEnListaNegra: string[];
+            placasEnListaNegra: string[];
+            viviendasActivas: string[];
+            vehiculos: components["schemas"]["VehiculoEnLaInstantaneaDto"][];
+            zonas: components["schemas"]["ZonaEnLaInstantaneaDto"][];
+            personasConConsentimiento: string[];
+            plantillas: components["schemas"]["PlantillaEnLaInstantaneaDto"][];
+            umbralDeConfianza: number;
+        };
+        InstantaneaSinCambiosDto: {
+            /** Format: uuid */
+            copropiedadId: string;
+            version: number;
+            /** @enum {number} */
+            sinCambios: true;
+            /**
+             * Format: date-time
+             * @description La nube da fe de la versión AHORA
+             */
+            generadaEn: string;
+        };
         LatenciasDto: {
             /** @description Arranque del proceso que sirve esta respuesta */
             desde: string;
@@ -3849,6 +4031,9 @@ export interface components {
         };
         LoteDeReconciliacionDto: {
             eventos: components["schemas"]["EventoReconciliadoDto"][];
+        };
+        LoteDelEdgeDto: {
+            eventos: components["schemas"]["EventoDelEdgeDto"][];
         };
         LoteReconciliadoDto: {
             aceptado: boolean;
@@ -4180,6 +4365,12 @@ export interface components {
             /** @description Informativo: se valida y se descarta. La franja es hora local de la copropiedad y se evalúa con SU zona horaria, no con la del teléfono. */
             desplazamientoUtcMinutos: number;
         };
+        PatronEnLaInstantaneaDto: {
+            dias: number[];
+            minutoInicio: number;
+            minutoFin: number;
+            desplazamientoUtcMinutos: number;
+        };
         PendientesDto: {
             /** @description Identificadores de equipos con una orden sin ejecutar: se muestran «sincronizando». */
             dispositivos: string[];
@@ -4243,6 +4434,14 @@ export interface components {
             porPiso?: number;
             reiniciarNumeracion?: boolean;
             excepciones?: components["schemas"]["ExcepcionDeAgrupacionDto"][];
+        };
+        PlantillaEnLaInstantaneaDto: {
+            /** @description Identificador de la plantilla en la terminal; NUNCA el vector */
+            plantillaId: string;
+            /** Format: uuid */
+            personaId: string;
+            /** Format: date-time */
+            reconocibleHasta: string | null;
         };
         PlazaDeOcupanteDto: {
             /** Format: uuid */
@@ -4704,6 +4903,14 @@ export interface components {
             propietarioId: string | null;
             propietarioNombre: string | null;
         };
+        VehiculoEnLaInstantaneaDto: {
+            placa: string;
+            /** Format: uuid */
+            vehiculoId: string;
+            personaId: string;
+            /** Format: uuid */
+            viviendaId: string;
+        };
         VehiculoPropioDto: {
             placa: string;
             color: string;
@@ -4888,6 +5095,17 @@ export interface components {
             desplazamientoUtcMinutos: number;
             /** @description Reservas del día. Vacío mientras no exista el módulo de reservas (P-15): la pantalla muestra el estado vacío, que es información honesta, y no un número inventado. */
             reservasDelDia: components["schemas"]["ReservaDelDiaDto"][];
+        };
+        ZonaEnLaInstantaneaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {number} */
+            restringida: true;
+            abierta: boolean;
+            aforoMaximo: number;
+            ocupacionActual: number;
+            desplazamientoUtcMinutos: number;
+            franjas: components["schemas"]["FranjaEnLaInstantaneaDto"][];
         };
     };
     responses: never;
@@ -5798,6 +6016,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeOperacionDto"];
+                };
+            };
+        };
+    };
+    GatewaysController_registrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AltaDeEdgeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredencialDelEdgeDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GatewaysController_rotar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                edgeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredencialDelEdgeDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EdgeController_reconciliar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteDelEdgeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteReconciliadoDto"];
                 };
             };
         };
@@ -8257,6 +8563,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    EdgeController_instantanea: {
+        parameters: {
+            query?: {
+                /** @description La versión que el Edge ya tiene. 0 (o ausente): no tiene ninguna. */
+                desde?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstantaneaDeReglasDto"] | components["schemas"]["InstantaneaSinCambiosDto"];
                 };
             };
         };

@@ -2,34 +2,26 @@
  * El único fichero del Edge que sabe que existe HTTP.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * LA FIRMA ES LA MISMA QUE LA DEL ALARM SERVER, A PROPÓSITO
+ * 15-Q · EL EDGE FIRMA CON SU IDENTIDAD, NO CON EL SECRETO DE LA PLATAFORMA
  *
- * `HMAC-SHA256` sobre `<marca>.<cuerpo crudo>`, con la marca dentro del mensaje
- * firmado. No se inventa un segundo esquema para el Edge: un sistema con dos
- * formas de acreditar al emisor tiene dos superficies que revisar y dos que
- * pueden divergir. El contrato está fijado en la API
- * (`presentacion/firma-ingesta.ts`) y aquí solo se cumple.
+ * Hasta la 15-Q firmaba con el secreto de ingesta de la API: un gateway robado
+ * firmaba por cualquier copropiedad. Ahora `EDGE_INGESTA_SECRETO` es la
+ * credencial DE ESTE gateway (la emite la API al darlo de alta, derivada con su
+ * copropiedad dentro) y cada petición lleva `x-ncr-edge` con su identificador.
+ * Se firma `<marca>.<MÉTODO> <ruta>\n<cuerpo crudo>`: el método y la ruta van
+ * dentro, así que la firma de una descarga no vale para otra ruta.
  *
- * **Sobre el cuerpo CRUDO**, no sobre el objeto reserializado: dos
- * serializaciones del mismo objeto difieren en el orden de las claves y la
- * firma dejaría de cuadrar. Por eso se serializa UNA vez y se firma y se envía
- * exactamente esa cadena.
- *
- * ═════════════════════════════════════════════════════════════════════════════
- * EL RELOJ DEL EQUIPO IMPORTA, Y POR ESO ESTÁ EN LA GUÍA
- *
- * La firma lleva ventana de frescura simétrica: un reloj adelantado es tan
- * rechazable como uno atrasado. Un gateway que pasa 24 h sin conexión también
- * pasa 24 h sin NTP, y su deriva puede sacarlo de la ventana justo cuando
- * intenta reconciliar. `docs/guias/DESPLIEGUE_EDGE.md` §5 lo trata como lo que
- * es: un requisito de despliegue, no un detalle.
+ * El cuerpo se firma CRUDO y se envía exactamente esa cadena: reserializarlo
+ * cambiaría los bytes sin cambiar el contenido. Y la marca tiene ventana
+ * simétrica: el reloj del equipo importa (DESPLIEGUE_EDGE.md §5).
  */
 import { createHmac } from 'node:crypto';
-import type { InstantaneaDeReglas } from '../../aplicacion/instantanea-de-reglas';
+import type { InstantaneaDeReglas, ReglasVigentes } from '../../aplicacion/instantanea-de-reglas';
 import type { ClienteDeNube, EnvioPendiente, ResultadoDeEnvio } from '../../aplicacion/puertos';
 
 export const CABECERA_FIRMA = 'x-ncr-firma';
 export const CABECERA_MARCA = 'x-ncr-marca-temporal';
+export const CABECERA_EDGE = 'x-ncr-edge';
 
 /** El mismo mensaje canónico de la API. Cambiarlo invalida todas las firmas. */
 export const mensajeCanonico = (marca: string, cuerpoCrudo: string): string =>
@@ -38,10 +30,16 @@ export const mensajeCanonico = (marca: string, cuerpoCrudo: string): string =>
 export const firmar = (secreto: string, marca: string, cuerpoCrudo: string): string =>
   createHmac('sha256', secreto).update(mensajeCanonico(marca, cuerpoCrudo)).digest('hex');
 
+/** 15-Q · lo que se firma: método, ruta con su consulta, y el cuerpo crudo. */
+export const solicitudCanonica = (metodo: string, ruta: string, cuerpo: string): string =>
+  `${metodo.toUpperCase()} ${ruta}\n${cuerpo}`;
+
 export interface OpcionesDelCliente {
   readonly urlBase: string;
   readonly secreto: string;
   readonly copropiedadId: string;
+  /** `edge_gateways.id`: la identidad con que la API lo acredita (15-Q). */
+  readonly gatewayId: string;
   readonly tiempoLimiteMs?: number;
   /** Se inyecta para probar sin red y para no depender del reloj (§2.4). */
   readonly ahora?: () => Date;
@@ -67,7 +65,8 @@ export class ClienteHttpDeNube implements ClienteDeNube {
     // CUAL. Parsearlo y volverlo a serializar aquí cambiaría los bytes que se
     // firman sin cambiar el contenido, y la firma dejaría de cuadrar.
     const cuerpo = `{"eventos":[${lote.map((e) => e.cuerpo).join(',')}]}`;
-    const respuesta = await this.enviar('/ingesta/reconciliacion', cuerpo);
+    const ruta = `/copropiedades/${this.opciones.copropiedadId}/edge/reconciliacion`;
+    const respuesta = await this.enviar(ruta, cuerpo);
 
     const datos = respuesta as RespuestaDeLote;
     const porClave = new Map(
@@ -94,34 +93,44 @@ export class ClienteHttpDeNube implements ClienteDeNube {
   async descargarReglas(
     copropiedadId: string,
     versionActual: number,
-  ): Promise<InstantaneaDeReglas | null> {
+  ): Promise<InstantaneaDeReglas | ReglasVigentes | null> {
     const ruta = `/copropiedades/${copropiedadId}/reglas/instantanea?desde=${versionActual}`;
-    const respuesta = await this.enviar(ruta, '', 'GET');
-    if (respuesta === null) return null;
-    const instantanea = respuesta as InstantaneaDeReglas;
-    // Una respuesta sin versión o de otra copropiedad NO se guarda: sería
-    // decidir accesos de este conjunto con las reglas de otro (RN-15).
-    if (typeof instantanea.version !== 'number' || instantanea.copropiedadId !== copropiedadId) {
-      return null;
+    const respuesta = (await this.enviar(ruta, '', 'GET')) as
+      | (Partial<InstantaneaDeReglas> & {
+          readonly sinCambios?: boolean;
+        })
+      | null;
+    // Sin versión o de otra copropiedad NO se guarda: sería decidir accesos de
+    // este conjunto con las reglas de otro (RN-15).
+    if (respuesta === null || typeof respuesta.version !== 'number') return null;
+    if (respuesta.copropiedadId !== copropiedadId) return null;
+    if (respuesta.sinCambios === true) {
+      return {
+        sinCambios: true,
+        version: respuesta.version,
+        generadaEn: String(respuesta.generadaEn),
+      };
     }
-    return instantanea;
+    return respuesta as InstantaneaDeReglas;
   }
 
   private async enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'GET' = 'POST') {
     const marca = String(Math.floor((this.opciones.ahora?.() ?? new Date()).getTime() / 1000));
     const transporte = this.opciones.transporte ?? fetch;
     const control = new AbortController();
-    const temporizador = setTimeout(
-      () => control.abort(),
-      this.opciones.tiempoLimiteMs ?? 10_000,
-    );
+    const temporizador = setTimeout(() => control.abort(), this.opciones.tiempoLimiteMs ?? 10_000);
     try {
       const respuesta = await transporte(`${this.opciones.urlBase}${ruta}`, {
         method: metodo,
         headers: {
           'content-type': 'application/json',
+          [CABECERA_EDGE]: this.opciones.gatewayId,
           [CABECERA_MARCA]: marca,
-          [CABECERA_FIRMA]: firmar(this.opciones.secreto, marca, cuerpo),
+          [CABECERA_FIRMA]: firmar(
+            this.opciones.secreto,
+            marca,
+            solicitudCanonica(metodo, ruta, cuerpo),
+          ),
         },
         ...(metodo === 'POST' ? { body: cuerpo } : {}),
         signal: control.signal,
@@ -140,32 +149,5 @@ export class ClienteHttpDeNube implements ClienteDeNube {
   }
 }
 
-/**
- * La sonda del enlace: una llamada barata que solo pregunta si hay nube.
- *
- * `/health` y no la ruta de reconciliación: sondear con el trabajo real haría
- * que cada comprobación de enlace enviara eventos, y que un fallo del lote se
- * confundiera con un fallo de red. Son dos preguntas distintas.
- */
-export class SondaHttp {
-  constructor(
-    private readonly urlBase: string,
-    private readonly transporte: typeof fetch = fetch,
-    private readonly tiempoLimiteMs = 3_000,
-  ) {}
-
-  async hayEnlace(): Promise<boolean> {
-    const control = new AbortController();
-    const temporizador = setTimeout(() => control.abort(), this.tiempoLimiteMs);
-    try {
-      const r = await this.transporte(`${this.urlBase}/health`, { signal: control.signal });
-      return r.ok;
-    } catch {
-      // Cualquier fallo es «no hay enlace». No se distingue el motivo porque la
-      // respuesta del Edge es la misma: seguir solo.
-      return false;
-    } finally {
-      clearTimeout(temporizador);
-    }
-  }
-}
+// La sonda del enlace vive en su fichero desde la 15-Q; se reexporta aquí.
+export { SondaHttp } from './sonda-http';

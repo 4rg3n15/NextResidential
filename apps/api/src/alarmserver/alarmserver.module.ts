@@ -49,6 +49,7 @@ import type {
   ResolutorDeViviendaDeLlamada,
 } from './aplicacion/puertos';
 import { AvisadorPorCanal } from './infraestructura/avisador-por-canal';
+import { INTERPRETE_DE_HECHOS } from './infraestructura/interprete-de-hechos';
 import { EscuchasDeEquipos } from './aplicacion/escuchas-de-equipos';
 import { LatidosDeEquipos } from './aplicacion/latidos-de-equipos';
 
@@ -213,12 +214,10 @@ export class AlarmServerModule {
                * por `ModuleRef` con `strict: false`, que busca la instancia
                * ÚNICA que `app.module.ts` registró. Ver la nota de arriba.
                *
-               * C6 (15-M) · NO se decora: es la ruta verificada de la cámara
-               * (regla dura del encargo). Con N cámaras en el registro, el
-               * accionador ya abre el relé de la que publicó por el proveedor,
-               * con su host y su clave; `BARRERA_*` sigue siendo la
-               * compatibilidad declarada de UNA barrera, no un respaldo para
-               * cualquier cámara (abriría la barrera equivocada).
+               * C6 (15-M) · NO se decora: es la ruta verificada de la cámara.
+               * Con N cámaras, el accionador abre el relé de la que publicó, con
+               * su host y su clave; `BARRERA_*` es la compatibilidad de UNA
+               * barrera, no un respaldo para cualquiera (abriría la equivocada).
                */
               referencia.get<AccionadorDePuerta>(ACCIONADOR_DE_PUERTA, { strict: false }),
               evidencia,
@@ -235,6 +234,7 @@ export class AlarmServerModule {
               // A4 · la llamada del videoportero: vivienda por el padrón, aviso por SSE.
               viviendas,
               avisador,
+              INTERPRETE_DE_HECHOS, // 15-Q · la referencia del hecho, la misma del Edge
               // H-15I-07 · la foto queda en `evidencias` y el evento la referencia.
               registroDeEvidencia,
               // 15-L · la línea de tiempo (Bloque B) y «¿decide sola?» (A4).

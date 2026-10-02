@@ -11,6 +11,7 @@ import 'clients/alertas_api.dart';
 import 'clients/autorizaciones_api.dart';
 import 'clients/biometria_api.dart';
 import 'clients/dispositivos_api.dart';
+import 'clients/edge_api.dart';
 import 'clients/equipos_api.dart';
 import 'clients/eventos_api.dart';
 import 'clients/guardia_api.dart';
@@ -50,6 +51,7 @@ class RestClient {
   AutorizacionesApi? _autorizaciones;
   BiometriaApi? _biometria;
   DispositivosApi? _dispositivos;
+  EdgeApi? _edge;
   EquiposApi? _equipos;
   EventosApi? _eventos;
   GuardiaApi? _guardia;
@@ -80,6 +82,8 @@ class RestClient {
   BiometriaApi get biometria => _biometria ??= BiometriaApi(_dio, baseUrl: _baseUrl);
 
   DispositivosApi get dispositivos => _dispositivos ??= DispositivosApi(_dio, baseUrl: _baseUrl);
+
+  EdgeApi get edge => _edge ??= EdgeApi(_dio, baseUrl: _baseUrl);
 
   EquiposApi get equipos => _equipos ??= EquiposApi(_dio, baseUrl: _baseUrl);
 

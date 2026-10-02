@@ -6,6 +6,7 @@ import type {
   ResultadoDeIngesta,
   VeredictoRemoto,
 } from '@ncr/providers';
+import type { InterpreteDeHechos } from './interprete-de-hechos';
 import type { AlertasDeEquipo, RegistrarAcceso } from '../../eventos';
 import { alertaDeAtencionDeEquipo } from './alerta-de-atencion';
 import { registroSinBase } from '../../eventos';
@@ -32,20 +33,6 @@ export interface RespondedorDeVerificacionRemota {
     veredicto: VeredictoRemoto,
   ): Promise<{ readonly aceptado: boolean; readonly latenciaMs: number }>;
 }
-
-/**
- * ═════════════════════════════════════════════════════════════════════════════
- * [SUPUESTO] S-40 · LA CONFIANZA DE UN ROSTRO QUE LA TERMINAL YA RECONOCIÓ
- *
- * El evento de control de acceso no trae una confianza comparable a la de la
- * placa: la terminal ya comparó contra su biblioteca con su propio umbral y
- * sólo publica cuando reconoció. Se entrega 1 al motor —«identificación
- * cierta»— y se deja escrito: si el firmware publica una similitud, se lee de
- * ahí (`confianza` del evento) y este valor deja de usarse. No es decidir por
- * el equipo: la autorización, la vigencia, la lista negra y el consentimiento
- * siguen siendo del motor.
- */
-export const CONFIANZA_DE_ROSTRO_RECONOCIDO = 1;
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -128,6 +115,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     /** A4 · la llamada del videoportero: quién resuelve la vivienda y quién avisa. */
     private readonly viviendas: ResolutorDeViviendaDeLlamada,
     private readonly avisador: AvisadorDeLlamadas,
+    /** 15-Q · la referencia del hecho, la misma del Edge (`./interprete-de-hechos`). */
+    private readonly hechos: InterpreteDeHechos,
     /** H-15I-07 · la fila de `evidencias` que el evento referencia (con base). */
     private readonly registroDeEvidencia: RegistroDeEvidencia = registroSinBase,
     private readonly complementos: ComplementosDelIngestor = {},
@@ -233,8 +222,7 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     // la latencia se mide con la hora de recepción, nunca con la del equipo.
     void this.avisarSiElRelojSeDesvio(evento, copropiedadId);
 
-    const referencia =
-      evento.referenciaDelEquipo ?? `${evento.placa ?? ''}-${String(+evento.ocurridoEn)}`;
+    const referencia = this.hechos.referenciaDePlaca(evento);
     const evidenciaId = await this.guardarEvidencia(
       publicacion.foto ?? publicacion.recorte,
       evento.dispositivoId,
@@ -463,10 +451,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         copropiedadId,
         dispositivoId: evento.dispositivoId,
         metodo: 'facial',
-        referenciaExterna:
-          evento.referenciaDelEquipo ??
-          `${plantillaId ?? 'desconocida'}-${String(evento.serieDelEquipo ?? +evento.ocurridoEn)}`,
-        confianza: evento.confianza ?? CONFIANZA_DE_ROSTRO_RECONOCIDO,
+        referenciaExterna: this.hechos.referenciaDeRostro(evento),
+        confianza: evento.confianza ?? this.hechos.confianzaDeRostroReconocido,
         personaId: titularId,
         evidenciaId,
         ocurridoEn: evento.ocurridoEn,

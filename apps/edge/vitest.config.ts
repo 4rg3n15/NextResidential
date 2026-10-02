@@ -21,10 +21,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // §2.8.0 · al FUENTE, nunca al `dist/`. Y aquí importa el doble: lo que
-      // esta etapa tiene que demostrar es que el Edge ejecuta EL MISMO dominio
-      // que la nube, no una copia compilada que puede haber envejecido.
+      // §2.8.0 · al FUENTE, nunca al `dist/`: el Edge ejecuta EL MISMO dominio y
+      // habla con los equipos con EL MISMO paquete que la nube (15-Q).
       '@ncr/domain-core': resolve(__dirname, '../../packages/domain-core/src/index.ts'),
+      '@ncr/providers': resolve(__dirname, '../../packages/providers/src/index.ts'),
     },
   },
 });

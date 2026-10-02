@@ -36,8 +36,8 @@ export const esquemaDelEdge = z.object({
   NEXT_CONTROL_API_URL: z.string().url('NEXT_CONTROL_API_URL debe ser una URL absoluta'),
 
   /**
-   * El secreto HMAC con el que se firma cada envío a `/ingesta`. Es **por
-   * equipo**: comprometer un gateway no obliga a rotar los demás.
+   * La credencial que emite la API (15-Q) y firma descarga y reconciliación.
+   * Es **por equipo**: comprometer un gateway no obliga a rotar los demás.
    */
   EDGE_INGESTA_SECRETO: z.string().min(32, 'EDGE_INGESTA_SECRETO: mínimo 32 caracteres'),
 
