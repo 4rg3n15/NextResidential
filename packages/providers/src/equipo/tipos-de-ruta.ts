@@ -89,4 +89,11 @@ export interface RutaDeEquipo {
    * supresión de plantilla, y el canal de audio. No se sondean a ciegas.
    */
   readonly dejaRastro?: boolean;
+  /**
+   * 15-P · la ruta existe SÓLO si el equipo declara esta capacidad (un módulo
+   * que se instala aparte: la unidad de puerta segura, los submódulos). Que
+   * no conteste no desmiente el catálogo: dice que el módulo no está. El
+   * guion de sitio la informa como «no declarada», no como fallo.
+   */
+  readonly soloSiLaDeclara?: string;
 }

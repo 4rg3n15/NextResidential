@@ -753,19 +753,23 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       return respuestaDe(200, OK);
     }
     /**
-     * 15-P · P3 · las salidas, SÓLO si el guion las declara. Sin `salidas` el
+     * 15-P · P3 · las salidas, SÓLO si el guion las declara —y la unidad
+     * segura y los submódulos, sólo si declara ESOS módulos—. Sin ellas el
      * simulado no conoce esas rutas, como antes de la 15-P (404): la misma
      * `AccessControl/capabilities` es la que la lectura de la biblioteca de
      * rostros pregunta, y contestarla con 200 cambiaba su veredicto (R1).
      */
-    if (
-      guion.salidas === undefined &&
-      /capacidades de control de acceso del videoportero|unidades de puerta segura|submódulos del videoportero/.test(
-        catalogada.proposito,
-      )
-    ) {
-      return respuestaDe(404, 'not found');
-    }
+    const salidas = guion.salidas;
+    const sinEsaRuta =
+      (catalogada.proposito === 'leer las capacidades de control de acceso del videoportero' &&
+        // La lectura de la biblioteca de rostros pregunta la MISMA ruta en
+        // JSON: ésa no es la de las salidas, y su respuesta no cambia.
+        (salidas === undefined || url.searchParams.get('format') === 'json')) ||
+      (catalogada.proposito === 'leer el estado de las unidades de puerta segura' &&
+        salidas?.unidadesSeguras === undefined) ||
+      (catalogada.proposito === 'leer los submódulos del videoportero' &&
+        salidas?.submodulos === undefined);
+    if (sinEsaRuta) return respuestaDe(404, 'not found');
     if (catalogada.proposito === 'leer las capacidades de control de acceso del videoportero') {
       return respuestaDe(200, capacidadesDeSalidas(guion));
     }

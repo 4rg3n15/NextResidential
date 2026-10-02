@@ -656,6 +656,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
     familia: 'videoportero',
     fuente: 'Manual ISAPI IP Series / Ultra Series · estado de la unidad de puerta segura (RS-485)',
     confirmarEnSitio: 'si hay unidad segura instalada y si contesta en línea y sin manipular',
+    soloSiLaDeclara: 'unidad de puerta segura (isSupportModuleStatus)',
   },
   {
     proposito: 'leer los submódulos del videoportero',
@@ -667,6 +668,7 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
       'Manual ISAPI IP Series / Ultra Series · SubModules/capabilities documenta la FORMA de la ' +
       'lista; la ruta de la lista se deduce de ella ([SUPUESTO] S-178)',
     confirmarEnSitio: 'que la lista conteste en esta ruta y con esta forma',
+    soloSiLaDeclara: 'submódulos (isSupportSubModules)',
   },
   {
     proposito: 'abrir la puerta del videoportero',

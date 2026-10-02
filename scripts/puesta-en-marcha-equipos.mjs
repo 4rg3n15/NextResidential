@@ -306,6 +306,9 @@ const peticionSimulada = () =>
       aperturaRemota: true,
       senalizaLlamadas: true,
       admiteSuscripcion: true,
+      // 15-P · declara sus cerraduras y NINGÚN módulo opcional: el ensayo
+      // ejercita también el «no declarada» de la unidad segura y los submódulos.
+      salidas: { puertas: 1, cerraduras: true },
       canalesDeAudio: [{ id: 1, habilitado: true, codec: 'G.711ulaw' }],
       canalesDeVideo: [
         { id: '101', codec: 'H.264' },
@@ -621,7 +624,20 @@ for (const entrada of FAMILIAS) {
       continue;
     }
 
-    const { veredicto, detalle, ms, cuerpo } = await sondear(cliente, ruta);
+    const sondeo = await sondear(cliente, ruta);
+    /**
+     * 15-P · una ruta de un módulo OPCIONAL que no contesta no desmiente el
+     * catálogo: dice que el módulo no está instalado. Se informa y no cuenta
+     * como problema (la consola trabaja igual: lee esos documentos si existen).
+     */
+    const noDeclarada = sondeo.veredicto === 'desmentida' && ruta.soloSiLaDeclara !== undefined;
+    if (noDeclarada) {
+      anotar(
+        `   ${ICONO.omitida} ${ruta.proposito} — no declarada: el equipo no tiene ${ruta.soloSiLaDeclara} (${sondeo.detalle})`,
+      );
+      continue;
+    }
+    const { veredicto, detalle, ms, cuerpo } = sondeo;
     const tiempo = ms === null ? '' : ` · ${Math.round(ms)} ms`;
     const etiqueta =
       ruta.procedencia === 'verificada'
