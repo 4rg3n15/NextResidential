@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { SesionDeTunel, enlacesEnMemoria } from '@ncr/providers';
-import type { EquiposDelConjunto } from './alerta-de-desconexion';
-import { InventarioDelEdge } from './inventario-del-edge';
+import type { EquiposDelConjunto } from '../aplicacion/alerta-de-desconexion';
+import { InventarioDelEdge } from '../aplicacion/inventario-del-edge';
 
 /**
  * 15-Q2 · D2 · al abrirse el túnel, el Edge recibe qué equipos SIGUEN de alta

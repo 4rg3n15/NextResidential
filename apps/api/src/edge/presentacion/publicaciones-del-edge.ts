@@ -3,7 +3,7 @@ import { EquipoNoRegistrado, ProtocoloInvalido } from '@ncr/providers';
 import type { PublicacionDeEquipo, ResultadoDePublicacion, SesionDeTunel } from '@ncr/providers';
 import type { RegistroDeAuditoria } from '../../comun/auditoria/registro';
 import type { RutasDeEquipos } from '../../proveedores';
-import type { GatewayRegistrado } from './puertos';
+import type { GatewayRegistrado } from '../aplicacion/puertos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════

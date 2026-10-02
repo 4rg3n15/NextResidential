@@ -1,5 +1,4 @@
 import type { Bitacora, Reloj } from '@ncr/domain-core';
-import { RUTA_DEL_TUNEL } from '@ncr/providers';
 import type { Hola, SesionDeTunel } from '@ncr/providers';
 import type { TunelesDeEdge, TunelVivo } from '../../proveedores';
 import type { AcreditarEdge } from './acreditar-edge';
@@ -62,6 +61,8 @@ export class AbrirTunel {
     private readonly reloj: Reloj,
     private readonly bitacora: Bitacora,
     private readonly ventanaSegundos: number,
+    /** La ruta canónica que firma el `hola` (`RUTA_DEL_TUNEL`), puesta por quien compone (O2). */
+    private readonly ruta: string,
   ) {}
 
   async abrir(hola: Hola, crearSesion: () => SesionDeTunel): Promise<AperturaDeTunel> {
@@ -70,7 +71,7 @@ export class AbrirTunel {
       marca: hola.marca,
       firma: hola.firma,
       metodo: 'GET',
-      ruta: RUTA_DEL_TUNEL,
+      ruta: this.ruta,
       cuerpo: hola.nonce,
       copropiedadSolicitada: hola.copropiedadId,
     });

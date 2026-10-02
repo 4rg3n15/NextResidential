@@ -1,9 +1,8 @@
 import type { Bitacora } from '@ncr/domain-core';
 import type { EquipoRegistrado } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
-import type { RutasDeEquipos, TunelesDeEdge } from '../../proveedores';
-import { pedirGuardar } from './credenciales-del-puente';
-import type { Huella, LecturaParaElEdge } from './credenciales-del-puente';
+import type { RutasDeEquipos } from '../../proveedores';
+import type { EntregarAlEdge, Huella, LecturaParaElEdge } from './puertos-del-puente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -42,7 +41,7 @@ export interface ResultadoDeTraslado {
 export class MigrarCredencialesAlEdge {
   constructor(
     private readonly rutas: RutasDeEquipos,
-    private readonly tuneles: TunelesDeEdge,
+    private readonly entregar: EntregarAlEdge,
     private readonly lectura: LecturaParaElEdge,
     private readonly nube: CredencialesEnLaNube,
     private readonly huella: Huella,
@@ -78,7 +77,7 @@ export class MigrarCredencialesAlEdge {
     }
     const secreto = await this.lectura.secretoDeCamara(ctx, copropiedadId, dispositivoId);
     try {
-      const r = await pedirGuardar(this.tuneles, copropiedadId, {
+      const r = await this.entregar(copropiedadId, {
         ...equipo,
         ...(secreto === null ? {} : { secretoAlarmServer: secreto }),
       });

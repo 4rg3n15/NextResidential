@@ -9,7 +9,7 @@ import type {
   Huella,
   LecturaParaElEdge,
   MarcaDeCredencial,
-} from '../aplicacion/credenciales-del-puente';
+} from '../aplicacion/puertos-del-puente';
 import type { CredencialesEnLaNube } from '../aplicacion/migrar-credenciales';
 
 /**

@@ -13,7 +13,7 @@ import { TUNELES_DE_EDGE } from '../../proveedores';
 import type { TunelesDeEdge } from '../../proveedores';
 import { AbrirTunel } from '../aplicacion/abrir-tunel';
 import { InventarioDelEdge } from '../aplicacion/inventario-del-edge';
-import { PublicacionesDelEdge } from '../aplicacion/publicaciones-del-edge';
+import { PublicacionesDelEdge } from './publicaciones-del-edge';
 import { enlaceWs } from './enlace-ws';
 
 /**

@@ -5,9 +5,10 @@ import type { EquipoRegistrado } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
 import { TunelesDeEdge } from '../../proveedores';
 import type { RutasDeEquipos } from '../../proveedores';
-import type { LecturaParaElEdge } from './credenciales-del-puente';
-import { MigrarCredencialesAlEdge } from './migrar-credenciales';
-import type { CredencialesEnLaNube } from './migrar-credenciales';
+import type { LecturaParaElEdge } from '../aplicacion/puertos-del-puente';
+import { pedirGuardar } from './credenciales-del-puente';
+import { MigrarCredencialesAlEdge } from '../aplicacion/migrar-credenciales';
+import type { CredencialesEnLaNube } from '../aplicacion/migrar-credenciales';
 
 /**
  * 15-Q2 · D3 · la credencial que estaba en la nube se entrega al Edge y SÓLO
@@ -105,7 +106,7 @@ const montar = (
   const migrar = (t: TunelesDeEdge = tuneles) =>
     new MigrarCredencialesAlEdge(
       rutas,
-      t,
+      (cop, equipo) => pedirGuardar(t, cop, equipo),
       lectura,
       nube,
       (cop, id, clave) => {

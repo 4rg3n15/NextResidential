@@ -3,8 +3,12 @@ import type { Bitacora } from '@ncr/domain-core';
 import { SesionDeTunel, enlacesEnMemoria } from '@ncr/providers';
 import { TunelesDeEdge } from '../../proveedores';
 import type { TunelVivo } from '../../proveedores';
-import { AlertaDeDesconexion, CLAVE_EDGE_DESCONECTADO } from './alerta-de-desconexion';
-import type { AlertaParaEquipo, EquiposDelConjunto, Temporizador } from './alerta-de-desconexion';
+import { AlertaDeDesconexion, CLAVE_EDGE_DESCONECTADO } from '../aplicacion/alerta-de-desconexion';
+import type {
+  AlertaParaEquipo,
+  EquiposDelConjunto,
+  Temporizador,
+} from '../aplicacion/alerta-de-desconexion';
 
 /**
  * 15-Q2 · A3 · lo que `publicaciones-y-alertas.test.ts` no recorre: el Edge que

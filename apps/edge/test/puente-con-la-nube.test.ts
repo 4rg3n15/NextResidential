@@ -11,7 +11,7 @@ import type {
   PublicacionDeEquipo,
   ResultadoDeIngesta,
 } from '@ncr/providers';
-import { PuenteConLaNube } from './puente-con-la-nube';
+import { PuenteConLaNube } from '../src/aplicacion/puente-con-la-nube';
 
 /**
  * 15-Q2 · B2 · con túnel decide la nube; sin respuesta a tiempo, el Edge. Y

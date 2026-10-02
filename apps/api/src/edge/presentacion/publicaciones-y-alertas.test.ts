@@ -10,9 +10,9 @@ import type { PublicacionDeEquipo } from '@ncr/providers';
 import { AuditoriaEnMemoria } from '../../comun/auditoria/auditoria-en-memoria';
 import { TunelesDeEdge } from '../../proveedores';
 import type { RutasDeEquipos } from '../../proveedores';
-import { AlertaDeDesconexion, CLAVE_EDGE_DESCONECTADO } from './alerta-de-desconexion';
+import { AlertaDeDesconexion, CLAVE_EDGE_DESCONECTADO } from '../aplicacion/alerta-de-desconexion';
 import { PublicacionesDelEdge } from './publicaciones-del-edge';
-import type { GatewayRegistrado } from './puertos';
+import type { GatewayRegistrado } from '../aplicacion/puertos';
 
 /**
  * 15-Q2 · B1/B2 y A3 · lo que el Edge publica entra por la MISMA fuente, dentro

@@ -11,7 +11,7 @@ import type { ContextoTenant } from '../../autenticacion';
 import { TunelesDeEdge } from '../../proveedores';
 import type { RutasDeEquipos } from '../../proveedores';
 import { CredencialesDelPuente, pedirGuardar } from './credenciales-del-puente';
-import type { EquipoSinClave, Huella, LecturaParaElEdge } from './credenciales-del-puente';
+import type { EquipoSinClave, Huella, LecturaParaElEdge } from '../aplicacion/puertos-del-puente';
 
 /**
  * 15-Q2 · D1-D3 · la credencial de cada equipo viaja al Edge por el túnel y la

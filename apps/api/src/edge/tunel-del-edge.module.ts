@@ -4,6 +4,7 @@ import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { BITACORA, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
+import { RUTA_DEL_TUNEL } from '@ncr/providers';
 import type { FuenteDePlacas } from '@ncr/providers';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
@@ -33,8 +34,8 @@ import type { AuditoriaDelTunel } from './aplicacion/abrir-tunel';
 import { AcreditarEdge } from './aplicacion/acreditar-edge';
 import { AlertaDeDesconexion } from './aplicacion/alerta-de-desconexion';
 import type { AlertaParaEquipo, EquiposDelConjunto } from './aplicacion/alerta-de-desconexion';
-import { PublicacionesDelEdge } from './aplicacion/publicaciones-del-edge';
-import { CredencialesDelPuente } from './aplicacion/credenciales-del-puente';
+import { PublicacionesDelEdge } from './presentacion/publicaciones-del-edge';
+import { CredencialesDelPuente, pedirGuardar } from './infraestructura/credenciales-del-puente';
 import { InventarioDelEdge } from './aplicacion/inventario-del-edge';
 import { MigrarCredencialesAlEdge } from './aplicacion/migrar-credenciales';
 import {
@@ -118,6 +119,7 @@ export class TunelDelEdgeModule {
               reloj,
               bitacora,
               c.INGESTA_VENTANA_SEGUNDOS,
+              RUTA_DEL_TUNEL,
             ),
         },
         {
@@ -204,7 +206,7 @@ export class TunelDelEdgeModule {
             const registro = new RegistroDeEquiposPg(pool, c.EQUIPOS_LLAVE);
             return new MigrarCredencialesAlEdge(
               rutas,
-              tuneles,
+              (cop, equipo) => pedirGuardar(tuneles, cop, equipo),
               new LecturaParaElEdgePg(registro, new SecretosDeAlarmServerPg(pool, c.EQUIPOS_LLAVE)),
               new CredencialesEnLaNubePg(pool, registro),
               huellaConLlave(c.EQUIPOS_LLAVE),

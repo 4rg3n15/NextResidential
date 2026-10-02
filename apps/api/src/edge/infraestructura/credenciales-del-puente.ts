@@ -1,9 +1,13 @@
 import type { Bitacora } from '@ncr/domain-core';
 import { EdgeDesconectado, ProtocoloInvalido } from '@ncr/providers';
-import type { EquipoRegistrado } from '@ncr/providers';
 import type { ContextoTenant } from '../../autenticacion';
 import type { CredencialesEnElEdge, EntregaAlEdge } from '../../comun/credenciales-en-el-edge';
 import type { RutasDeEquipos, TunelesDeEdge } from '../../proveedores';
+import type {
+  Huella,
+  LecturaParaElEdge,
+  MarcaDeCredencial,
+} from '../aplicacion/puertos-del-puente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -20,23 +24,6 @@ import type { RutasDeEquipos, TunelesDeEdge } from '../../proveedores';
  * su Alarm Server: con puente, la cámara publica al Edge.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-export type EquipoSinClave = Omit<EquipoRegistrado, 'clave' | 'usuario'> & {
-  readonly usuario: string | null;
-};
-
-export interface LecturaParaElEdge {
-  /** El equipo como lo tiene la base, sin credencial. `null` si no existe o está de baja. */
-  sinClave(dispositivoId: string): Promise<EquipoSinClave | null>;
-  /** El secreto del Alarm Server de una cámara, descifrado. `null` si no tiene. */
-  secretoDeCamara(ctx: ContextoTenant, copropiedadId: string, id: string): Promise<string | null>;
-}
-
-export interface MarcaDeCredencial {
-  /** `credencial_ref = edge:<gateway>` y, si se entregó una clave, su huella. */
-  enElEdge(copropiedadId: string, id: string, edgeId: string, huella: string | null): Promise<void>;
-}
-
-export type Huella = (copropiedadId: string, dispositivoId: string, clave: string) => string;
 
 const ESTADOS: readonly unknown[] = ['en_linea', 'fuera_de_linea', 'degradado'];
 

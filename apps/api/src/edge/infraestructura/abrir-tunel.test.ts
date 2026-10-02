@@ -4,14 +4,18 @@ import { RUTA_DEL_TUNEL, SesionDeTunel, enlacesEnMemoria } from '@ncr/providers'
 import type { Hola } from '@ncr/providers';
 import { AuditoriaEnMemoria } from '../../comun/auditoria/auditoria-en-memoria';
 import { TunelesDeEdge } from '../../proveedores';
-import { AuditoriaDelTunelEnMemoria } from '../infraestructura/auditoria-del-tunel';
-import { GatewaysEnMemoria } from '../infraestructura/edge-en-memoria';
-import { PuentesEnMemoria } from '../infraestructura/puentes-en-memoria';
-import { referenciaDeGeneracion } from '../infraestructura/referencia-de-credencial';
-import { AbrirTunel, CIERRE } from './abrir-tunel';
-import { AcreditarEdge } from './acreditar-edge';
-import { derivarCredencial, firmarSolicitud, solicitudCanonica } from './credencial-del-edge';
-import type { GatewayRegistrado } from './puertos';
+import { AuditoriaDelTunelEnMemoria } from './auditoria-del-tunel';
+import { GatewaysEnMemoria } from './edge-en-memoria';
+import { PuentesEnMemoria } from './puentes-en-memoria';
+import { referenciaDeGeneracion } from './referencia-de-credencial';
+import { AbrirTunel, CIERRE } from '../aplicacion/abrir-tunel';
+import { AcreditarEdge } from '../aplicacion/acreditar-edge';
+import {
+  derivarCredencial,
+  firmarSolicitud,
+  solicitudCanonica,
+} from '../aplicacion/credencial-del-edge';
+import type { GatewayRegistrado } from '../aplicacion/puertos';
 
 /**
  * 15-Q2 · A1 · quién abre el túnel: la identidad de la 15-Q, el nonce, el
@@ -35,7 +39,16 @@ const montar = () => {
     maestra: MAESTRA,
     ventanaSegundos: 300,
   });
-  const abrir = new AbrirTunel(acreditar, puentes, delTunel, tuneles, reloj, bitacora, 300);
+  const abrir = new AbrirTunel(
+    acreditar,
+    puentes,
+    delTunel,
+    tuneles,
+    reloj,
+    bitacora,
+    300,
+    RUTA_DEL_TUNEL,
+  );
   const alta = (copropiedadId: string, n: number, puente = true): GatewayRegistrado => {
     const g: GatewayRegistrado = {
       id: `a000000${String(n)}-0000-4000-8000-000000000001`,
