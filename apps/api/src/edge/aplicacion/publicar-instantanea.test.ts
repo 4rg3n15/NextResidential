@@ -111,6 +111,7 @@ describe('contenido de la instantánea (15-Q, Q1)', () => {
     expect(c.vehiculos).toEqual([
       {
         placa: 'ABC123',
+        vehiculoId: '50000000-0000-4000-8000-000000000001',
         personaId: 'vehiculo:50000000-0000-4000-8000-000000000001',
         viviendaId: VIVIENDA,
       },

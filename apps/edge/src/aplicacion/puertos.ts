@@ -1,15 +1,12 @@
 /**
  * Puertos del Edge. El dominio declara, la infraestructura cumple (§2.2, DIP).
  *
- * Ninguno de estos nombres sabe qué es SQLite, ni HTTP, ni `fetch`. Es la misma
- * disciplina de la API y aquí tiene una consecuencia práctica añadida: las
- * pruebas de los 30 minutos sin WAN y de las 24 horas de autonomía se ejecutan
- * **en memoria y en milisegundos** porque el reloj, el enlace y la nube son
- * puertos. Con un `fetch` dentro, esa prueba duraría 24 horas y nadie la
- * correría.
+ * Ninguno sabe qué es SQLite, ni HTTP, ni `fetch`: por eso las pruebas de los
+ * 30 minutos sin WAN y de las 24 horas de autonomía corren en memoria y en
+ * milisegundos. Con un `fetch` dentro durarían 24 horas y nadie las correría.
  */
 import type { ResultadoAcceso } from '@ncr/domain-core';
-import type { InstantaneaDeReglas } from './instantanea-de-reglas';
+import type { InstantaneaDeReglas, ReglasVigentes } from './instantanea-de-reglas';
 
 /** La caché versionada, tal como la ve la aplicación. */
 export interface CacheDeReglas {
@@ -64,8 +61,11 @@ export interface ResultadoDeEnvio {
 export interface ClienteDeNube {
   /** Envía un lote EN ORDEN y devuelve un resultado por clave. */
   reconciliar(lote: readonly EnvioPendiente[]): Promise<readonly ResultadoDeEnvio[]>;
-  /** Pide la instantánea más reciente. `null` si no hay una más nueva. */
-  descargarReglas(copropiedadId: string, versionActual: number): Promise<InstantaneaDeReglas | null>;
+  /** La instantánea más nueva, o «sin cambios» con la fe de vida (15-Q). `null`: nada útil. */
+  descargarReglas(
+    copropiedadId: string,
+    versionActual: number,
+  ): Promise<InstantaneaDeReglas | ReglasVigentes | null>;
 }
 
 /** Lo que el Edge decidió, listo para viajar. */

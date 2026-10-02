@@ -11,5 +11,5 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../../packages/domain-core" }]
+  "references": [{ "path": "../../packages/domain-core" }, { "path": "../../packages/providers" }]
 }

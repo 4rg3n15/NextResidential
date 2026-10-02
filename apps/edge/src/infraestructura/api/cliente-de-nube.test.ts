@@ -6,21 +6,15 @@ import type { EnvioPendiente } from '../../aplicacion/puertos';
 /**
  * LA FIRMA DEL EDGE CONTRA EL VERIFICADOR DE LA API, EL DE VERDAD.
  *
- * ═════════════════════════════════════════════════════════════════════════════
- * POR QUÉ SE IMPORTA EL VERIFICADOR REAL Y NO SE REESCRIBE AQUÍ
+ * Se importa el verificador REAL, no se reescribe: dos implementaciones de un
+ * acuerdo que «deberían coincidir» acaban divergiendo (RN-16 aplicado a la
+ * firma), y el síntoma sería un 401 a mitad de una reconciliación.
  *
- * Es el mismo razonamiento que RN-16 aplicado a la firma: dos implementaciones
- * de un acuerdo que «deberían coincidir» acaban divergiendo, y el día que lo
- * hagan el síntoma será un 401 en mitad de una reconciliación —es decir, a las
- * tres de la mañana y con la bandeja llena—. Aquí el que verifica es el mismo
- * código que corre en producción, así que un cambio en el mensaje canónico
- * rompe esta prueba antes de llegar al equipo.
- *
- * Es una importación cruzada entre aplicaciones y **solo en pruebas**: el
- * código de producción del Edge no importa nada de la API. Lo que se comparte
- * es un contrato de bytes, no una dependencia.
+ * Importación cruzada entre aplicaciones **solo en pruebas**: lo que se
+ * comparte es un contrato de bytes, no una dependencia.
  */
 const SECRETO = 'un-secreto-de-al-menos-treinta-y-dos-caracteres';
+const BASE = { urlBase: 'http://nube.invalid', secreto: SECRETO, gatewayId: 'edge-1' };
 
 describe('firma HMAC · el Edge firma lo que la API verifica', () => {
   it('una firma del Edge la acepta el verificador de la API', () => {
@@ -95,8 +89,7 @@ describe('cliente de nube', () => {
     let firmaEnviada = '';
     let marcaEnviada = '';
     const cliente = new ClienteHttpDeNube({
-      urlBase: 'http://nube.invalid',
-      secreto: SECRETO,
+      ...BASE,
       copropiedadId: 'cop',
       transporte: (async (_url: string, init: RequestInit) => {
         cuerpoEnviado = String(init.body);
@@ -119,17 +112,21 @@ describe('cliente de nube', () => {
 
     expect(cuerpoEnviado).toBe(`{"eventos":[${crudo}]}`);
     expect(r[0]?.aceptado).toBe(true);
-    // Y lo enviado es exactamente lo firmado.
-    expect(firmaEnviada).toBe(firmar(SECRETO, marcaEnviada, cuerpoEnviado));
+    // Y lo enviado es exactamente lo firmado (15-Q: con método y ruta, por su identidad).
+    const ruta = '/copropiedades/cop/edge/reconciliacion';
+    expect(firmaEnviada).toBe(firmar(SECRETO, marcaEnviada, `POST ${ruta}\n${cuerpoEnviado}`));
   });
 
   it('una clave sin respuesta NO se da por aceptada', async () => {
     const cliente = new ClienteHttpDeNube({
-      urlBase: 'http://nube.invalid',
-      secreto: SECRETO,
+      ...BASE,
       copropiedadId: 'cop',
       transporte: (async () =>
-        ({ ok: true, status: 202, json: async () => ({ aceptado: true, resultados: [] }) }) as Response) as unknown as typeof fetch,
+        ({
+          ok: true,
+          status: 202,
+          json: async () => ({ aceptado: true, resultados: [] }),
+        }) as Response) as unknown as typeof fetch,
     });
     const r = await cliente.reconciliar([pendiente('k1', '{}')]);
     expect(r[0]?.aceptado).toBe(false);
@@ -138,8 +135,7 @@ describe('cliente de nube', () => {
 
   it('el estado HTTP viaja en el mensaje: un 401 y un 503 se tratan distinto', async () => {
     const cliente = new ClienteHttpDeNube({
-      urlBase: 'http://nube.invalid',
-      secreto: SECRETO,
+      ...BASE,
       copropiedadId: 'cop',
       transporte: (async () => ({ ok: false, status: 401 }) as Response) as unknown as typeof fetch,
     });
@@ -149,8 +145,7 @@ describe('cliente de nube', () => {
   it('un lote vacío no toca la red', async () => {
     let llamadas = 0;
     const cliente = new ClienteHttpDeNube({
-      urlBase: 'http://nube.invalid',
-      secreto: SECRETO,
+      ...BASE,
       copropiedadId: 'cop',
       transporte: (async () => {
         llamadas += 1;
@@ -163,8 +158,7 @@ describe('cliente de nube', () => {
 
   it('una instantánea de OTRA copropiedad se descarta (RN-15)', async () => {
     const cliente = new ClienteHttpDeNube({
-      urlBase: 'http://nube.invalid',
-      secreto: SECRETO,
+      ...BASE,
       copropiedadId: 'cop-a',
       transporte: (async () =>
         ({
@@ -183,8 +177,10 @@ describe('cliente de nube', () => {
     }) as unknown as typeof fetch);
     expect(await sonda.hayEnlace()).toBe(false);
 
-    const buena = new SondaHttp('http://nube.invalid', (async () =>
-      ({ ok: true }) as Response) as unknown as typeof fetch);
+    const buena = new SondaHttp(
+      'http://nube.invalid',
+      (async () => ({ ok: true }) as Response) as unknown as typeof fetch,
+    );
     expect(await buena.hayEnlace()).toBe(true);
   });
 });

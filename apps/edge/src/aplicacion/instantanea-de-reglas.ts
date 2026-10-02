@@ -24,16 +24,7 @@
  * negras, el Edge tendría su propio criterio y RN-16 dejaría de cumplirse el
  * día que los dos se separaran — en silencio, que es como se separan.
  */
-import {
-  Autorizacion,
-  HorarioDeZona,
-  VersionDeReglas,
-  Vigencia,
-  PatronRecurrencia,
-  FranjaHoraria,
-  esFallo,
-} from '@ncr/domain-core';
-import type { ContextoDeAcceso, MetodoDeAcceso, ZonaSolicitada } from '@ncr/domain-core';
+import type { MetodoDeAcceso } from '@ncr/domain-core';
 
 /** Una autorización tal como viaja y se guarda: plana, serializable. */
 export interface AutorizacionEnCache {
@@ -58,6 +49,8 @@ export interface AutorizacionEnCache {
     readonly minutoFin: number;
     readonly desplazamientoUtcMinutos: number;
   } | null;
+  /** 15-Q · la placa de la autorización de visitante: la nube la reconoce por aquí. */
+  readonly placa?: string | null;
 }
 
 export interface VehiculoEnCache {
@@ -65,11 +58,15 @@ export interface VehiculoEnCache {
   readonly placa: string;
   readonly personaId: string;
   readonly viviendaId: string;
+  /** 15-Q · el derecho del residente es `residente:<vehiculoId>` (S-33). */
+  readonly vehiculoId?: string;
 }
 
 export interface ZonaEnCache {
   readonly id: string;
   readonly restringida: boolean;
+  /** 15-Q · cerrada por el operador o de baja: no abre por horario. */
+  readonly abierta?: boolean;
   readonly aforoMaximo: number;
   readonly ocupacionActual: number;
   readonly desplazamientoUtcMinutos: number;
@@ -95,6 +92,14 @@ export interface InstantaneaDeReglas {
   readonly zonas: readonly ZonaEnCache[];
   readonly personasConConsentimiento: readonly string[];
   readonly umbralDeConfianza: number;
+  /** 15-Q · la plantilla que una terminal reconoce: id y titular, NUNCA el vector. */
+  readonly plantillas?: readonly {
+    readonly plantillaId: string;
+    readonly personaId: string;
+    readonly reconocibleHasta: string | null;
+  }[];
+  /** 15-Q · SHA-256 del contenido, el de `versiones_de_reglas` (0010). */
+  readonly hash?: string;
 }
 
 /**
@@ -129,8 +134,21 @@ export const instantaneaUsable = (x: unknown): x is InstantaneaDeReglas => {
     'zonas',
     'personasConConsentimiento',
   ];
+  // 15-Q · las plantillas son opcionales (instantáneas anteriores), pero si
+  // vienen tienen que ser una lista: lo contrario tumbaría el contexto facial.
+  if (i.plantillas !== undefined && !Array.isArray(i.plantillas)) return false;
   return colecciones.every((c) => Array.isArray(i[c]));
 };
+
+/**
+ * 15-Q · «sin cambios»: la nube da fe, en `generadaEn`, de que `version` sigue
+ * siendo la vigente. KPI-31 se mide desde ahí, no desde la descarga.
+ */
+export interface ReglasVigentes {
+  readonly sinCambios: true;
+  readonly version: number;
+  readonly generadaEn: string;
+}
 
 /** El hecho que llega del hardware, antes de saber quién es. */
 export interface HechoLocal {
@@ -151,152 +169,5 @@ export interface IdentidadResuelta {
   readonly placaConocida: boolean;
 }
 
-/**
- * Resuelve la identidad SOLO por lo que la caché conoce.
- *
- * Una placa que no está en la instantánea no se «intenta igual»: se marca como
- * desconocida y el motor decide qué hacer con eso (`politicaPlacaConocida`).
- * Adivinar aquí sería tomar una decisión de acceso fuera del motor.
- */
-export const resolverIdentidad = (
-  instantanea: InstantaneaDeReglas,
-  hecho: HechoLocal,
-): IdentidadResuelta => {
-  if (hecho.placaLeida !== null) {
-    const v = instantanea.vehiculos.find((x) => x.placa === hecho.placaLeida);
-    if (v !== undefined) {
-      return { personaId: v.personaId, viviendaId: v.viviendaId, placaConocida: true };
-    }
-    // Placa ilegible o de un visitante sin vehículo registrado: el hecho sigue
-    // adelante con lo que se sepa de la persona, si se sabe algo.
-    return { personaId: hecho.personaId, viviendaId: null, placaConocida: false };
-  }
-  if (hecho.personaId !== null) {
-    const a = instantanea.autorizaciones.find((x) => x.personaId === hecho.personaId);
-    return {
-      personaId: hecho.personaId,
-      viviendaId: a?.viviendaId ?? null,
-      placaConocida: false,
-    };
-  }
-  return { personaId: null, viviendaId: null, placaConocida: false };
-};
-
-const autorizacionDesde = (a: AutorizacionEnCache, copropiedadId: string): Autorizacion | null => {
-  const vigencia = Vigencia.crear(new Date(a.desde), new Date(a.hasta));
-  if (esFallo(vigencia)) return null;
-
-  let patron: PatronRecurrencia | null = null;
-  if (a.patron !== null) {
-    const p = PatronRecurrencia.crear({
-      dias: [...a.patron.dias],
-      minutoInicio: a.patron.minutoInicio,
-      minutoFin: a.patron.minutoFin,
-      desplazamientoUtcMinutos: a.patron.desplazamientoUtcMinutos,
-    });
-    // Un patrón corrupto NO se ignora dejando la autorización sin patrón: eso
-    // la volvería permanente, que es abrir de más. La autorización entera se
-    // descarta y el motor resuelve sin ella, que es cerrar de más (§2.1.4).
-    if (esFallo(p)) return null;
-    patron = p.valor;
-  }
-
-  // `rehidratar` y no `crear`: lo que está en la caché YA ocurrió y ya se
-  // validó cuando ocurrió. `crear` la devolvería vigente aunque esté revocada.
-  return Autorizacion.rehidratar({
-    id: a.id,
-    copropiedadId,
-    viviendaId: a.viviendaId,
-    personaId: a.personaId,
-    vigencia: vigencia.valor,
-    estado: a.estado,
-    acompanantes: a.acompanantes,
-    zonasPermitidas: a.zonasPermitidas,
-    patron,
-    maximoAcompanantes: a.maximoAcompanantes,
-    revocadaEn: null,
-    motivoRevocacion: null,
-  });
-};
-
-const zonaDesde = (z: ZonaEnCache, ahora: Date): ZonaSolicitada => {
-  const franjas: FranjaHoraria[] = [];
-  for (const f of z.franjas) {
-    const creada = FranjaHoraria.crear({
-      dia: f.dia,
-      minutoInicio: f.minutoInicio,
-      minutoFin: f.minutoFin,
-      ...(f.continuaDelDiaAnterior === undefined
-        ? {}
-        : { continuaDelDiaAnterior: f.continuaDelDiaAnterior }),
-    });
-    if (!esFallo(creada)) franjas.push(creada.valor);
-  }
-  const horario = HorarioDeZona.crear(franjas, z.desplazamientoUtcMinutos);
-  // Sin horario legible la zona se considera CERRADA, no abierta: §2.1.4.
-  const dentroDeHorario = esFallo(horario) ? false : horario.valor.estaAbiertaEn(ahora);
-
-  return {
-    id: z.id,
-    dentroDeHorario,
-    aforoCompleto: z.aforoMaximo > 0 && z.ocupacionActual >= z.aforoMaximo,
-    restringida: z.restringida,
-  };
-};
-
-/**
- * Instantánea + hecho → `ContextoDeAcceso`. **El mismo tipo que usa la nube.**
- *
- * Devuelve `null` si la versión no es construible, que es el único caso en que
- * el Edge no puede ni siquiera armar el contexto. Lo resuelve la política de
- * contingencia, no este fichero.
- */
-export const contextoDesde = (
-  instantanea: InstantaneaDeReglas,
-  hecho: HechoLocal,
-  identidad: IdentidadResuelta,
-): ContextoDeAcceso | null => {
-  const version = VersionDeReglas.crear(instantanea.version, instantanea.copropiedadId);
-  if (esFallo(version)) return null;
-
-  const autorizaciones =
-    identidad.personaId === null
-      ? []
-      : instantanea.autorizaciones
-          .filter((a) => a.personaId === identidad.personaId)
-          .map((a) => autorizacionDesde(a, instantanea.copropiedadId))
-          .filter((a): a is Autorizacion => a !== null);
-
-  const zonaEnCache =
-    hecho.zonaId === null ? undefined : instantanea.zonas.find((z) => z.id === hecho.zonaId);
-
-  return {
-    ahora: hecho.ocurridoEn,
-    copropiedadId: instantanea.copropiedadId,
-    versionDeReglas: version.valor,
-    personaId: identidad.personaId,
-    viviendaId: identidad.viviendaId,
-    metodo: hecho.metodo,
-    autorizaciones,
-    personasEnListaNegra: new Set(instantanea.personasEnListaNegra),
-    placasEnListaNegra: new Set(instantanea.placasEnListaNegra),
-    placaLeida: hecho.placaLeida,
-    placaConocida: identidad.placaConocida,
-    viviendaActiva:
-      identidad.viviendaId !== null && instantanea.viviendasActivas.includes(identidad.viviendaId),
-    zona:
-      hecho.zonaId === null
-        ? null
-        : zonaEnCache === undefined
-          ? // Una zona que la caché no conoce se trata como restringida y
-            // cerrada. Es la dirección segura: lo contrario dejaría entrar a
-            // una zona cuyo horario el Edge desconoce.
-            { id: hecho.zonaId, dentroDeHorario: false, aforoCompleto: false, restringida: true }
-          : zonaDesde(zonaEnCache, hecho.ocurridoEn),
-    confianza: hecho.confianza,
-    umbralDeConfianza: instantanea.umbralDeConfianza,
-    consentimientoVigente:
-      identidad.personaId !== null &&
-      instantanea.personasConConsentimiento.includes(identidad.personaId),
-  };
-};
+// 15-Q · el contexto se arma en `contexto-local.ts`, con la semántica de la nube.
+export { contextoDesde, resolverIdentidad } from './contexto-local';

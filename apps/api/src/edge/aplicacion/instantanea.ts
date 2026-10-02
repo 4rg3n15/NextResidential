@@ -53,6 +53,7 @@ export interface ContenidoDeReglas {
   readonly viviendasActivas: readonly string[];
   readonly vehiculos: readonly {
     readonly placa: string;
+    readonly vehiculoId: string;
     readonly personaId: string;
     readonly viviendaId: string;
   }[];
@@ -137,7 +138,14 @@ export const contenidoDe = (
     placasEnListaNegra: unicos(lecturas.vetos.map((v) => v.placa)),
     viviendasActivas: unicos(lecturas.viviendasActivas),
     vehiculos: lecturas.vehiculos
-      .map((v) => ({ placa: v.placa, personaId: personaDelVehiculo(v), viviendaId: v.viviendaId }))
+      .map((v) => ({
+        placa: v.placa,
+        // El derecho del residente es `residente:<vehiculoId>`: el Edge lo
+        // aplica SÓLO a la lectura de ESTE vehículo, como la nube.
+        vehiculoId: v.vehiculoId,
+        personaId: personaDelVehiculo(v),
+        viviendaId: v.viviendaId,
+      }))
       .sort(porClave((v) => v.placa)),
     zonas: lecturas.zonas
       .map((z) => ({ ...z, restringida: true as const }))

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@ncr/domain-core": "workspace:*",
+    "@ncr/providers": "workspace:*",
     "zod": "3.24.1"
   }
 }

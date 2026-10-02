@@ -68,6 +68,7 @@ class AutorizacionEnLaInstantaneaDto {
 
 class VehiculoEnLaInstantaneaDto {
   @ApiProperty() placa!: string;
+  @ApiProperty({ format: 'uuid' }) vehiculoId!: string;
   @ApiProperty() personaId!: string;
   @ApiProperty({ format: 'uuid' }) viviendaId!: string;
 }

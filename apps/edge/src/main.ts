@@ -1,133 +1,65 @@
 /**
- * Raíz de composición del Edge Gateway. Aquí, y solo aquí, se construye todo.
+ * El Edge Gateway en marcha. Aquí, y solo aquí, hay temporizadores y un servidor.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * ES EL ÚNICO FICHERO CON TEMPORIZADORES Y CON UN SERVIDOR
+ * QUÉ HACE AL ARRANCAR, EN ESTE ORDEN (15-Q, P-27 = B)
  *
- * Todo lo demás son funciones y clases que reciben lo que necesitan. Esa
- * disciplina es lo que permite que las pruebas de la DoD —30 minutos sin WAN,
- * 24 horas de autonomía— corran en milisegundos: el tiempo entra por parámetro.
- * Si un `setInterval` viviera dentro del `Gateway`, esas pruebas durarían media
- * hora y un día, y nadie las ejecutaría.
+ * 1. Carga y VALIDA la configuración, la de la ETAPA 12 y la de sitio. Si falta
+ *    algo, no arranca (§2.7.1).
+ * 2. Compone todo (`composicion.ts`): SQLite primero —la bandeja de un corte
+ *    anterior sigue ahí—, luego la nube, los equipos y la contingencia.
+ * 3. Escucha en UNA interfaz (`EDGE_ESCUCHA_HOST`): cámaras y entradas firmadas.
+ * 4. Abre las escuchas de la terminal y el videoportero, y las rearma.
+ * 5. Arranca el tic: sonda del enlace, reconciliación y descarga de reglas.
  *
- * ═════════════════════════════════════════════════════════════════════════════
- * QUÉ HACE AL ARRANCAR, EN ESTE ORDEN
- *
- * 1. Carga y VALIDA la configuración. Si falta algo, no arranca (§2.7.1).
- * 2. Abre SQLite y aplica el esquema. La bandeja de un corte anterior sigue ahí.
- * 3. Levanta el receptor de hechos del hardware.
- * 4. Arranca el tic: sonda del enlace y, si hay, reconciliación.
- *
- * El paso 2 antes del 3 no es casual: aceptar un hecho sin bandeja donde
- * encolarlo sería perder un acceso, y RN-02 no lo admite.
+ * Todo lo demás son funciones y clases que reciben el tiempo por parámetro: es
+ * lo que permite que la DoD —30 min sin WAN, 24 h de autonomía— corra en
+ * milisegundos (`apps/api/test/edge-en-sitio-pg.e2e.test.ts`).
  */
 import { createServer } from 'node:http';
-import { cargarConfiguracion } from './configuracion/esquema';
-import { abrirBase } from './infraestructura/sqlite/esquema';
-import { BandejaSqlite } from './infraestructura/sqlite/bandeja-sqlite';
-import { CacheDeReglasSqlite } from './infraestructura/sqlite/cache-de-reglas';
-import { ClienteHttpDeNube, SondaHttp } from './infraestructura/api/cliente-de-nube';
-import { DecidirLocalmente } from './aplicacion/decidir-localmente';
-import { Reconciliacion } from './aplicacion/reconciliacion';
-import { Gateway } from './aplicacion/gateway';
-import type { HechoLocal } from './aplicacion/instantanea-de-reglas';
+import { cargarConfiguracionDeSitio } from './configuracion/esquema-de-sitio';
+import { componerEdge } from './composicion';
+import type { Registrar } from './composicion';
 
-const registrar = (nivel: 'info' | 'aviso' | 'error', mensaje: string, contexto?: unknown): void => {
-  // Registro estructurado, como en la API. Nunca se registra el secreto ni el
-  // cuerpo de un evento: el primero es una credencial y el segundo lleva placas
-  // y personas, que son datos personales (Ley 1581).
+const registrar: Registrar = (nivel, mensaje, contexto) => {
+  // Registro estructurado, como en la API. Nunca el secreto ni el cuerpo de un
+  // evento: el primero es una credencial y el segundo lleva placas y personas.
   process.stdout.write(
     `${JSON.stringify({ nivel, mensaje, momento: new Date().toISOString(), contexto })}\n`,
   );
 };
 
 const arrancar = (): void => {
-  const config = cargarConfiguracion();
+  const config = cargarConfiguracionDeSitio();
+  const edge = componerEdge(config, { registrar });
 
-  const db = abrirBase(config.SQLITE_PATH);
-  const bandeja = new BandejaSqlite(db);
-  const cache = new CacheDeReglasSqlite(db);
-
-  const nube = new ClienteHttpDeNube({
-    urlBase: config.NEXT_CONTROL_API_URL,
-    secreto: config.EDGE_INGESTA_SECRETO,
-    copropiedadId: config.EDGE_COPROPIEDAD_ID,
-  });
-
-  const gateway = new Gateway(
-    new DecidirLocalmente(cache, {
-      copropiedadId: config.EDGE_COPROPIEDAD_ID,
-      contingencia: config.CONTINGENCIA_SIN_REGLA,
-      cacheObsoletaMinutos: config.CACHE_OBSOLETA_MINUTOS,
-    }),
-    bandeja,
-    new SondaHttp(config.NEXT_CONTROL_API_URL),
-    new Reconciliacion(bandeja, nube, {
-      lote: config.RECONCILIACION_LOTE,
-      intentosMaximos: config.RECONCILIACION_INTENTOS,
-      backoffBaseMs: config.RECONCILIACION_BACKOFF_MS,
-    }),
-    {
-      copropiedadId: config.EDGE_COPROPIEDAD_ID,
-      gatewayId: config.EDGE_GATEWAY_ID,
-      umbrales: {
-        sondasParaCaer: config.SONDAS_PARA_CAER,
-        sondasParaVolver: config.SONDAS_PARA_VOLVER,
-      },
-    },
+  createServer((req, res) => void edge.manejador(req, res)).listen(
+    config.EDGE_ESCUCHA_PUERTO,
+    config.EDGE_ESCUCHA_HOST,
+    () =>
+      registrar('info', 'edge escuchando en la red del conjunto', {
+        host: config.EDGE_ESCUCHA_HOST,
+        puerto: config.EDGE_ESCUCHA_PUERTO,
+        equipos: config.EDGE_EQUIPOS.length,
+      }),
   );
 
-  const servidor = createServer((peticion, respuesta) => {
-    if (peticion.method !== 'POST' || peticion.url !== '/hechos') {
-      respuesta.writeHead(404).end();
-      return;
-    }
-    let crudo = '';
-    // Tope de tamaño: un cuerpo sin límite es una forma de tumbar el gateway
-    // desde la red local (§2.7.8).
-    peticion.on('data', (trozo: Buffer) => {
-      crudo += trozo.toString('utf8');
-      if (crudo.length > 64 * 1024) {
-        respuesta.writeHead(413).end();
-        peticion.destroy();
-      }
+  const rearmar = (): void =>
+    void edge.rearmarEscuchas().then((activas) => {
+      registrar('info', 'escuchas de equipos', { activas });
     });
-    peticion.on('end', () => {
-      try {
-        const cuerpo = JSON.parse(crudo) as Omit<HechoLocal, 'ocurridoEn'> & {
-          ocurridoEn?: string;
-        };
-        const hecho: HechoLocal = {
-          ...cuerpo,
-          ocurridoEn: cuerpo.ocurridoEn === undefined ? new Date() : new Date(cuerpo.ocurridoEn),
-        };
-        const decision = gateway.alRecibirHecho(hecho);
-        respuesta
-          .writeHead(200, { 'content-type': 'application/json' })
-          .end(
-            JSON.stringify({
-              permitido: decision.resultado.permitido,
-              motivo: decision.resultado.permitido ? null : decision.resultado.motivo,
-              versionDeReglas: decision.resultado.versionDeReglas.numero,
-              porContingencia: decision.porContingencia,
-              requiereEscalamiento: decision.requiereEscalamiento,
-            }),
-          );
-      } catch (e) {
-        // Denegar ante un cuerpo ilegible, no abrir. §2.1.4.
-        registrar('error', 'hecho ilegible', { detalle: String(e) });
-        respuesta.writeHead(400).end();
-      }
-    });
-  });
-  servidor.listen(8080, () => registrar('info', 'edge escuchando hechos', { puerto: 8080 }));
+  setInterval(rearmar, config.ESCUCHAS_REARME_SEGUNDOS * 1000).unref();
+  rearmar();
 
   const tic = async (): Promise<void> => {
     try {
-      const r = await gateway.tic(new Date());
+      const r = await edge.contingencia.tic(new Date());
       if (r.conmuto) registrar('aviso', 'el enlace cambió de modo', { modo: r.modo });
       if (r.reconciliacion !== null && r.reconciliacion.enviados > 0) {
         registrar('info', 'bandeja reconciliada', r.reconciliacion);
+      }
+      if (r.descarga !== null && r.descarga.estado !== 'vigente') {
+        registrar(r.descarga.estado === 'nueva' ? 'info' : 'aviso', 'reglas', r.descarga);
       }
     } catch (e) {
       // Un tic que lanza no puede detener los siguientes: el gateway tiene que

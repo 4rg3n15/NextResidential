@@ -163,6 +163,9 @@ importers:
       '@ncr/domain-core':
         specifier: workspace:*
         version: link:../../packages/domain-core
+      '@ncr/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       zod:
         specifier: 3.24.1
         version: 3.24.1
