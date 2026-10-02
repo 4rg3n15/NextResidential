@@ -309,8 +309,21 @@ Sobre `df8ec58` (el commit posterior sólo toca documentación), desde cero (sin
 VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
 ```
 
-El control declarado no ejercido es el mismo de rondas anteriores («0 de ellos
-en linux», con motivo y etapa de revisión vigentes).
+El control declarado no ejercido es el de D-112: las 5 pruebas del arranque en
+frío que la suite salta porque necesitan los claims que escribe el paso 12b, que
+es quien las ejecuta. El 5e (recorrido de la app en el navegador) está declarado
+sólo para macOS («0 de ellos en linux»): en esta corrida, en Linux, se ejerció.
+
+En CI, sobre `7f45904` (job «verificar-etapa.sh --con-base (macos)», run
+37067238771), el mismo verificador en macOS dio:
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 2 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+Los dos son el de D-112 y el 5e, que allí sí aplica. Las tres corridas de la
+suite coincidieron (API 2137, consola 747, proveedores 1225, Edge 277, dominio
+438, configuración 144).
 
 **Las dos corridas anteriores salieron FALLIDAS**, y con razón:
 

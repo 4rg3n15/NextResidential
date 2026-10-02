@@ -908,7 +908,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | E      | Audio por el túnel < 2 s contra el simulado; WHEP hacia el go2rtc del Edge; STUN/TURN con credencial efímera; dónde va el TURN: P-29                                                                                                                                                              |
 | R1     | Una copropiedad sin Edge puente funciona como antes; elección por copropiedad (`edge_gateways.puente`), nunca global                                                                                                                                                                              |
 
-**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `df8ec58` → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe». Las dos corridas anteriores salieron FALLIDAS (regresiones R1 en la consola y en el alta con RLS; frontera O2 y control de entorno); corregidas en `159fa4d` y `df8ec58`.
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `df8ec58` → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe». Las dos corridas anteriores salieron FALLIDAS (regresiones R1 en la consola y en el alta con RLS; frontera O2 y control de entorno); corregidas en `159fa4d` y `df8ec58`. En CI (macOS) sobre `7f45904`: «… correcta CON 2 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) …» (D-112 y el 5e, declarado sólo para macOS).
 
 ---
 
