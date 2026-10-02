@@ -18,6 +18,7 @@ import { FichaDialogo } from './ficha-dialogo';
 import { DialogoDeAtestacion, distintivoDeAtestacion } from './atestacion-dialogo';
 import { fechaCorta } from './ficha-dialogo';
 import { DialogoDeBajaDeEquipo, EquiposDadosDeBaja } from './baja-de-equipo';
+import { EdgeDelConjunto } from './edge-del-conjunto';
 
 /**
  * O4 · lo que el equipo DECLARA, en una frase por tipo. Sale de las capacidades
@@ -288,14 +289,12 @@ export const PantallaDeDispositivos = ({
       ),
     },
     {
-      // Sin dirección ni puerto (ETAPA 15-D, §7.1): la red del conjunto no llega
-      // a este navegador. Con el equipo habla el servidor.
+      // Sin dirección ni puerto (15-D, §7.1): con el equipo habla el servidor, no este navegador.
       clave: 'modelo',
       titulo: 'Modelo · firmware',
       texto: (d) => `${d.modelo ?? ''} ${d.firmware ?? ''}`,
       celda: (d) => {
-        // E5 · 10 (15-M) · si el equipo no está en línea, modelo y firmware son de
-        // otro día: se dice cuál, en vez de enseñarlos como de hoy.
+        // E5 · 10 (15-M) · fuera de línea, modelo y firmware son de otro día: se dice cuál.
         const leidoEl = porId.get(d.id)?.identidadLeidaEn ?? null;
         const viejo = d.estadoDelEquipo.enLinea !== 'en_linea' && leidoEl !== null;
         return (
@@ -527,6 +526,7 @@ export const PantallaDeDispositivos = ({
         }
       />
 
+      <EdgeDelConjunto copropiedadId={copropiedadId} esSuperadmin={puedeAtestar} />
       <AltaDeEquipo
         copropiedadId={copropiedadId}
         abierto={dandoDeAlta}

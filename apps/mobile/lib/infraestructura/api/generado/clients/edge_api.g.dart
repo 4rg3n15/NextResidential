@@ -52,6 +52,39 @@ class _EdgeApi implements EdgeApi {
   }
 
   @override
+  Future<List<FichaDeEdgeDto>> puentesControllerListar({
+    required String id,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<FichaDeEdgeDto>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/edge-gateways',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<FichaDeEdgeDto> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) => FichaDeEdgeDto.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<CredencialDelEdgeDto> gatewaysControllerRotar({
     required String id,
     required String edgeId,
@@ -74,6 +107,73 @@ class _EdgeApi implements EdgeApi {
     late CredencialDelEdgeDto _value;
     try {
       _value = CredencialDelEdgeDto.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<List<TrasladoDeCredencialDto>> puentesControllerMigrarCredenciales({
+    required String id,
+    required String edgeId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<TrasladoDeCredencialDto>>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/edge-gateways/${edgeId}/migrar-credenciales',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<TrasladoDeCredencialDto> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) =>
+                TrasladoDeCredencialDto.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<MarcaDePuenteDto> puentesControllerMarcar({
+    required String id,
+    required String edgeId,
+    required MarcaDePuenteDto body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body.toJson());
+    final _options = _setStreamType<MarcaDePuenteDto>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/copropiedades/${id}/edge-gateways/${edgeId}/puente',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, Object?>>(_options);
+    late MarcaDePuenteDto _value;
+    try {
+      _value = MarcaDePuenteDto.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;

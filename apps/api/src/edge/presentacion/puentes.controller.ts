@@ -38,15 +38,18 @@ export class FichaDeEdgeDto {
   @ApiProperty() nombre!: string;
   @ApiProperty({ description: 'Los equipos del conjunto se operan por su túnel (ADR-035)' })
   puente!: boolean;
-  @ApiPropertyOptional({ format: 'date-time', nullable: true }) puenteDesde!: string | null;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  puenteDesde!: string | null;
   @ApiProperty({ description: 'A3 · el túnel está abierto ahora' }) conectado!: boolean;
   @ApiPropertyOptional({
+    type: String,
     format: 'date-time',
     nullable: true,
     description: 'Desde cuándo está conectado, o desde cuándo NO (null: no se ha visto)',
   })
   conexionDesde!: string | null;
-  @ApiPropertyOptional({ format: 'date-time', nullable: true }) ultimoLatido!: string | null;
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  ultimoLatido!: string | null;
   @ApiProperty() versionDeReglas!: number;
 }
 

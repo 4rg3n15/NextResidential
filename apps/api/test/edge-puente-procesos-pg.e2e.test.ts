@@ -93,7 +93,7 @@ describe.skipIf(URL_BASE === undefined)('15-Q2 · DoD · API y Edge en procesos 
       secreto: VP.clave,
       canalDeAudio: 1,
       canalDeAudioHabilitado: true,
-      // El videoportero simulado en red sólo sirve TwoWayAudio: pide Digest hasta en la
+      // El videoportero simulado en red sólo sirve el audio: pide Digest hasta en la
       // consulta de activación, y el diagnóstico lo leería como credencial mala. Su
       // credencial la prueba E1, que abre el audio con la que sólo el Edge tiene.
       probarConexion: false,

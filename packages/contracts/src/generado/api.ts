@@ -507,7 +507,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Los Edge del conjunto, con su conexión y si son el puente */
+        get: operations["PuentesController_listar"];
         put?: never;
         /** Da de alta un Edge Gateway y entrega su credencial (una vez) */
         post: operations["GatewaysController_registrar"];
@@ -528,6 +529,43 @@ export interface paths {
         put?: never;
         /** Rota la credencial del Edge: la anterior deja de valer ya */
         post: operations["GatewaysController_rotar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/edge-gateways/{edgeId}/migrar-credenciales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * D3 · Muda al Edge puente las credenciales que siguen en la nube
+         * @description Una por una: el Edge la guarda y confirma que el equipo autentica; SÓLO entonces se borra de la nube. Lo que no autentica se queda, con su motivo. Se puede repetir.
+         */
+        post: operations["PuentesController_migrarCredenciales"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/edge-gateways/{edgeId}/puente": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marca (o desmarca) el Edge como puente de los equipos del conjunto */
+        post: operations["PuentesController_marcar"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1096,6 +1134,23 @@ export interface paths {
         get: operations["AtencionController_leer"];
         /** Cambia las preferencias de atención (G2) */
         put: operations["AtencionController_guardar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/guardia/video/ice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los servidores STUN/TURN para negociar la vista en vivo (TURN con credencial efímera) */
+        get: operations["IceController_ice"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3712,6 +3767,25 @@ export interface components {
             agrupacion: string;
             cantidad: number;
         };
+        FichaDeEdgeDto: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** @description Los equipos del conjunto se operan por su túnel (ADR-035) */
+            puente: boolean;
+            /** Format: date-time */
+            puenteDesde?: string | null;
+            /** @description A3 · el túnel está abierto ahora */
+            conectado: boolean;
+            /**
+             * Format: date-time
+             * @description Desde cuándo está conectado, o desde cuándo NO (null: no se ha visto)
+             */
+            conexionDesde?: string | null;
+            /** Format: date-time */
+            ultimoLatido?: string | null;
+            versionDeReglas: number;
+        };
         FichaDelEquipoDto: {
             /** @description E4 · los receptores («HTTP listening») que el equipo tiene escritos */
             receptores?: components["schemas"]["ReceptorDeLaFichaDto"][];
@@ -4039,6 +4113,10 @@ export interface components {
             aceptado: boolean;
             /** @description Uno por evento procesado, EN ORDEN. Se corta en el primero que falla. */
             resultados: components["schemas"]["ResultadoDeReconciliacionDto"][];
+        };
+        MarcaDePuenteDto: {
+            /** @description true: los equipos pasan a operarse por este Edge */
+            puente: boolean;
         };
         MedidasDeFotoDto: {
             rostrosDetectados: number;
@@ -4761,6 +4839,22 @@ export interface components {
             /** Format: date-time */
             momento: string;
         };
+        ServidorIceDto: {
+            /** @example [
+             *       "stun:stun.ejemplo.invalid:3478"
+             *     ] */
+            urls: string[];
+            /** @description Usuario EFÍMERO del TURN: `<expira>:<usuario>` */
+            username?: string;
+            /** @description Credencial EFÍMERA del TURN (caduca sola) */
+            credential?: string;
+        };
+        ServidoresIceDto: {
+            /** @description Vacía sin STUN/TURN configurados */
+            iceServers: components["schemas"]["ServidorIceDto"][];
+            /** @description Vida de la credencial del TURN; pedir otra antes de que caduque */
+            ttlSegundos: number;
+        };
         SesionAbiertaDto: {
             /** @enum {string} */
             estado: "activa" | "patrullaje";
@@ -4831,6 +4925,13 @@ export interface components {
         TotalesDeViviendasDto: {
             activas: number;
             inactivas: number;
+        };
+        TrasladoDeCredencialDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            /** @description En el Edge y borrada de la nube */
+            trasladada: boolean;
+            motivo: string;
         };
         TurnoDto: {
             /** Format: uuid */
@@ -6020,6 +6121,33 @@ export interface operations {
             };
         };
     };
+    PuentesController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FichaDeEdgeDto"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     GatewaysController_registrar: {
         parameters: {
             query?: never;
@@ -6078,6 +6206,79 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PuentesController_migrarCredenciales: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                edgeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrasladoDeCredencialDto"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PuentesController_marcar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                edgeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarcaDePuenteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarcaDePuenteDto"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ya hay otro Edge puente en la copropiedad */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7272,6 +7473,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreferenciasDeAtencionDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    IceController_ice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServidoresIceDto"];
                 };
             };
             /** @description Copropiedad fuera del alcance */
