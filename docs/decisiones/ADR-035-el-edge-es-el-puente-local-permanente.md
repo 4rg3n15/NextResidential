@@ -97,3 +97,36 @@ prueba de regresión de la contingencia.
   se aloja en otro servicio: **PENDIENTE DE DEFINICIÓN** dónde.
 - **Lo que nadie decidió todavía** sigue negando: «escalar al portero» sin WAN
   (P-28).
+
+## Cómo quedó implementado (ronda 15-Q2)
+
+- **La elección es por copropiedad, nunca global (R1).** Una copropiedad va por
+  su Edge sólo si ese Edge está **marcado como puente** (`edge_gateways.puente`,
+  migración 0050; un puente activo por copropiedad, por índice único parcial).
+  Sin marca, la API habla directo con los equipos, como antes: es el modo del
+  portátil en sitio y el de las pruebas existentes (S-186).
+- **El túnel** (`/edge/tunel`, protocolo v1 en `packages/providers/src/remoto`):
+  un WebSocket saliente del Edge, autenticado con su credencial (HMAC, marca,
+  nonce). Pedidos con correlación, clave de idempotencia y plazo; respuestas con
+  resultado tipado; latido; canales binarios multiplexados para el audio;
+  límites de tamaño y de ritmo; cierre ante un mensaje inválido. El segundo
+  Edge de la misma copropiedad se rechaza (4409) y se audita.
+- **Los mismos puertos.** `ProveedorEnrutado` delante del proveedor directo y de
+  un `ProveedorRemoto` por túnel: la suite de contrato corre contra el directo y
+  contra el vía-Edge sin cambiar una aserción (C1).
+- **Un solo actor (B2).** Con la nube viva, la nube decide y el Edge ejecuta;
+  sin respuesta en `EDGE_PLAZO_NUBE_MS`, decide el Edge con su caché. Una orden
+  tardía de la nube se rechaza (`HechoYaResueltoEnElEdge`); el residual está en
+  S-189. Cierra DT-15Q-03 y retira S-184.
+- **Credenciales sólo en el Edge (D).** AES-256-GCM con `EDGE_EQUIPOS_LLAVE`; en
+  la nube, `edge:<gateway>` y una huella HMAC. La migración de las heredadas
+  borra los bytes de la nube sólo cuando el Edge confirma que autentica; la
+  reversión está en `DESPLIEGUE_EDGE.md` §10.6.
+- **Audio y video (E).** El audio va navegador ↔ API ↔ túnel ↔ Edge ↔ conexión
+  persistente del videoportero (medido < 2 s contra el simulado). El video lo
+  negocia el go2rtc que corre junto al Edge; la consola recibe STUN/TURN con
+  credencial efímera (`WEBRTC_*`); dónde va el TURN: P-29.
+- **La prueba de que la API no tiene ruta a los equipos:** la DoD de dos
+  procesos (`apps/api/test/edge-puente-procesos-pg.e2e.test.ts`) pone un
+  guardián en el proveedor directo y en el `fetch` de la API, y exige que no
+  haya tocado ningún equipo.
