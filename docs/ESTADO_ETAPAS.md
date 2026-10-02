@@ -892,7 +892,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Ronda `etapa-15q-edge-en-sitio` — Edge en sitio: contingencia real con los equipos (corrige la ETAPA 12, S-24) · **CERRADA** · 2026-10-02
 
-**Rama:** `etapa-15q-edge-en-sitio` · **Base:** `develop` (`40f0250`, merge del PR #38) · **PR:** sin fusionar (enlace en el informe)
+**Rama:** `etapa-15q-edge-en-sitio` · **Base:** `develop` (`40f0250`, merge del PR #38) · **PR:** [#39](https://github.com/4rg3n15/NextResidential/pull/39), sin fusionar
 **Informe:** [`etapas/ETAPA-15Q.md`](etapas/ETAPA-15Q.md) · **Decisión:** [ADR-034](decisiones/ADR-034-el-edge-es-contingencia.md) (P-27 = B, del cliente)
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -911,7 +911,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | Q7     | `.env.example` del Edge con las 8 variables de sitio y el control `entorno-declarado` leyendo también `esquema-de-sitio.ts`; `pnpm sitio:edge`; `DESPLIEGUE_EDGE.md` reescrita                                                                                                                     |
 | Q8     | DoD contra PostgreSQL: 30 min sin WAN, 20 accesos (15 aperturas), 20 eventos una sola vez en < 5 min con la primera respuesta perdida; paridad nube/Edge con datos reales                                                                                                                          |
 
-**Verificación:** pendiente de la corrida de cierre (ver el informe).
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `fca3b32` → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe». La corrida anterior, sobre `b6881b0`, salió FALLIDA por la prueba de paridad de rostros (biometría en memoria frente a la base); corregida en `fca3b32`.
 
 ---
 
