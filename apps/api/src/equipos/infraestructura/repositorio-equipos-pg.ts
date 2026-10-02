@@ -336,9 +336,7 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     equipoId: string,
     secreto: string,
   ): Promise<void> {
-    // Rotar es DESACTIVAR la anterior y escribir la nueva, nunca sustituir: el
-    // índice único parcial exige que solo haya una activa, y el historial de
-    // rotación se conserva.
+    // Rotar = desactivar la anterior y escribir otra. 15-Q2 · si estaba en el Edge, vuelve aquí.
     await c.query(
       `UPDATE public.credenciales_de_equipo
           SET estado = 'inactivo', desactivado_en = now(), actualizado_por = $3
@@ -347,10 +345,12 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     );
     const [iv, cuerpo, etiqueta] = this.sobreDe(copropiedadId, secreto);
     await c.query(
-      `INSERT INTO public.credenciales_de_equipo
-         (copropiedad_id, dispositivo_id, iv, cuerpo, etiqueta, llave_ref,
-          creado_por, actualizado_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
+      `WITH nueva AS (INSERT INTO public.credenciales_de_equipo (copropiedad_id, dispositivo_id,
+           iv, cuerpo, etiqueta, llave_ref, creado_por, actualizado_por)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING dispositivo_id)
+       UPDATE public.dispositivos SET credencial_ref = 'vault:equipos/' || id,
+              huella_de_credencial = NULL
+        WHERE id = (SELECT dispositivo_id FROM nueva) AND credencial_ref LIKE 'edge:%'`,
       [copropiedadId, equipoId, iv, cuerpo, etiqueta, this.llaveRef, actorId],
     );
   }

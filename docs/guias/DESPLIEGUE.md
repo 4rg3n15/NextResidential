@@ -167,22 +167,37 @@ contra `/ready`. Al revés —vivacidad contra `/ready`— una caída momentáne
 base reiniciaría la API en bucle, que es exactamente lo contrario de lo que se
 quiere.
 
-### 4.4 · Más de una instancia
+### 4.4 · UNA sola instancia (15-Q2, ADR-035)
 
-La API es un monolito modular **sin estado de sesión en memoria**: escalar
-horizontalmente es correcto. Dos avisos:
+> **Corrección de la 15-Q2.** Este apartado decía que la API era «**sin estado
+> de sesión en memoria**» y que escalar horizontalmente era correcto. Desde la
+> 15-Q2 **no lo es**: la API guarda en memoria los **túneles de los Edge**.
 
-- **`PG_POOL_MAX` se multiplica por instancia.** Tres instancias con `10` son
-  treinta conexiones contra el tope del proyecto Supabase. Divida: cada
-  instancia comprueba al arrancar que su `PG_POOL_MAX` + `PGBOSS_POOL_MAX` cabe
-  en `SUPABASE_POOLER_MAX_CLIENTES`, pero no sabe cuántas hermanas tiene (15-O).
-- **El canal de tiempo real es por proceso (D-29).** Un operador conectado a la
-  instancia B no ve lo que publica la A. Con más de una instancia hace falta el
-  peldaño siguiente de la escalera de contingencia (`LISTEN/NOTIFY`), que está
-  registrado y **no construido**. Hasta entonces: una sola instancia, o un
-  balanceador con afinidad de sesión para el canal.
-- **El tablero de latencias también es por proceso**, y lo dice en su propia
-  respuesta (`porProceso: true`). No sume las cifras de dos instancias a ojo.
+Cada Edge puente abre UN WebSocket saliente hacia la API (`/edge/tunel`), y por
+él viajan las órdenes, la sonda, las credenciales, el audio y la negociación del
+video de los equipos de su conjunto. Ese túnel vive en el proceso que lo
+aceptó. Con dos instancias detrás de un balanceador, la orden de un operador
+atendida por la instancia B **no encuentra** el túnel que el Edge abrió contra
+la A, y falla con «el Edge del conjunto no está conectado» aunque lo esté.
+
+**Por eso: UNA instancia.** En Cloud Run, `--min-instances=1 --max-instances=1`
+y sin cortar la CPU fuera de las peticiones (`--no-cpu-throttling`): el túnel
+y su latido corren entre peticiones. El tiempo de espera de la petición debe
+cubrir un WebSocket de larga duración (`--timeout=3600`); el Edge vuelve a
+conectar solo, con retroceso y dispersión, cuando la plataforma lo corta.
+
+Lo que antes eran avisos para varias instancias sigue siendo cierto, y ya no
+hace falta resolverlo mientras sea una:
+
+- **`PG_POOL_MAX` se multiplica por instancia** (15-O): con una, la comprobación
+  de arranque contra `SUPABASE_POOLER_MAX_CLIENTES` es completa.
+- **El canal de tiempo real es por proceso (D-29)** y **el tablero de latencias
+  también** (`porProceso: true`).
+
+Escalar horizontalmente exige primero un enrutador de túneles entre instancias
+(afinidad por copropiedad, o un bus `LISTEN/NOTIFY` que lleve la orden a la
+instancia que tiene el túnel). Está registrado como **PENDIENTE DE DEFINICIÓN**
+en `docs/auditoria/contradicciones-y-supuestos.md` y **no construido**.
 
 ---
 
@@ -379,6 +394,14 @@ Lo único que este documento añade: el Edge usa la **llave secreta**, no un tok
 de usuario, así que la expiración de cinco minutos de los tokens de Supabase no
 le afecta; y su reintento usa retroceso exponencial con dispersión para no
 chocar con el limitador de peticiones de la API (§2.7.5).
+
+Desde la 15-Q2 (ADR-035) el Edge es además el **puente permanente** entre la
+API y los equipos: la API en la nube no tiene ruta hacia la red del conjunto, y
+todo lo que la consola pide a un equipo viaja por el túnel que el Edge abre.
+Consecuencia para este documento: la API va en **una sola instancia** (§4.4).
+Las variables `WEBRTC_STUN_URLS`, `WEBRTC_TURN_URLS`, `WEBRTC_TURN_SECRETO` y
+`WEBRTC_TURN_TTL_SEGUNDOS` de la API dan a la consola los STUN/TURN para ver el
+video que sirve el go2rtc del conjunto (`.env.example`).
 
 ---
 

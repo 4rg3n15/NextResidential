@@ -1,13 +1,19 @@
 -- Reversión de la migración 0050 (RONDA 15-Q2 · el Edge como puente).
 --
--- ANTES de revertir el esquema hay que revertir el DATO: cada credencial que
--- se trasladó a un Edge ya no está en la nube (es el objeto de la 15-Q2) y la
--- base no puede inventarla. El procedimiento está en DESPLIEGUE_EDGE.md
--- («Volver al modo directo»): quitar la marca de puente y volver a escribir la
--- credencial de cada equipo desde la consola. Este guion se NIEGA a seguir
--- mientras quede una sola fila trasladada o un `credencial_ref` `edge:`, porque
--- restaurar los NOT NULL fallaría a medias o, peor, dejaría equipos sin
--- credencial en ningún lado.
+-- Volver al modo DIRECTO no exige revertir el esquema: se quita la marca de
+-- puente y se vuelve a escribir la clave de cada equipo desde la consola
+-- (DESPLIEGUE_EDGE.md §10.6). Con eso la credencial vuelve a la nube y su
+-- referencia, a la bóveda; la 0050 aplicada y sin puentes se comporta como
+-- antes (R1).
+--
+-- Este guion revierte el ESQUEMA, y se NIEGA a seguir en dos casos, con su
+-- motivo:
+--  1. queda algún `credencial_ref` `edge:`: ese equipo NO tiene credencial en
+--     la nube, y revertir lo dejaría sin credencial en ningún lado;
+--  2. hubo algún traslado, aunque ya se haya deshecho: la fila trasladada se
+--     conserva SIN bytes como historial (RN-19 prohíbe borrarla), y restaurar
+--     los NOT NULL exigiría borrarla o inventar bytes. En ese caso el esquema se
+--     queda en la 0050: es el precio de no tener la credencial en la nube.
 --
 -- El valor `tunel_edge_rechazado` del enumerado NO se retira: PostgreSQL no
 -- quita valores de un tipo, y las filas de auditoría que lo usan se conservan.
@@ -15,10 +21,14 @@
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.credenciales_de_equipo WHERE trasladada_en IS NOT NULL)
-     OR EXISTS (SELECT 1 FROM public.dispositivos WHERE credencial_ref LIKE 'edge:%') THEN
+  IF EXISTS (SELECT 1 FROM public.dispositivos WHERE credencial_ref LIKE 'edge:%') THEN
     RAISE EXCEPTION
       '0050_revert: hay credenciales en un Edge. Vuelva a escribirlas desde la consola primero.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.credenciales_de_equipo WHERE trasladada_en IS NOT NULL) THEN
+    RAISE EXCEPTION
+      '0050_revert: hubo traslados al Edge; su historial sin bytes no se borra (RN-19). '
+      'El esquema se queda en la 0050: sin puentes, el comportamiento ya es el directo.';
   END IF;
 END
 $$;
