@@ -1,7 +1,7 @@
 # ETAPA 15-Q2 · El Edge como puente entre la nube y los equipos (P-27 = A)
 
 **Rama:** `etapa-15q2-edge-puente` · **Base:** `develop` (`4849f4e`, merge del PR #39) ·
-**PR:** «PENDIENTE-PR», sin fusionar · **Fecha:** 2026-10-02 ·
+**PR:** [4rg3n15/NextResidential#40](https://github.com/4rg3n15/NextResidential/pull/40), sin fusionar · **Fecha:** 2026-10-02 ·
 **Corrige:** ETAPA 12 (y la 15-Q) · **Decisión:** [ADR-035](../decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md), que sustituye en parte a ADR-034
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -28,11 +28,13 @@
    Ahora la vista en vivo se elige **por copropiedad** (`b508a80`).
 5. **Las pruebas de esta ronda encontraron una docena de defectos en mi código
    nuevo**, todos corregidos antes del cierre (§2, «Lo que destaparon las
-   pruebas»). Dos los encontró la primera corrida del verificador, que salió
-   FALLIDA: el panel del Edge tumbaba la pantalla de Dispositivos ante una
+   pruebas»). **Las dos primeras corridas del verificador salieron FALLIDAS.**
+   La primera: el panel del Edge tumbaba la pantalla de Dispositivos ante una
    respuesta que no era lista, y mi corrección de la reversión hacía reventar
-   el alta de un equipo con un token de usuario (RLS). Yo había corrido sólo
-   las pruebas de los archivos que tocaba, no las suites enteras. El más serio: en la migración de credenciales, una respuesta del
+   el alta de un equipo con un token de usuario (RLS); yo había corrido sólo
+   las pruebas de los archivos que tocaba. La segunda: la capa de aplicación
+   del túnel importaba `@ncr/providers` como valor (frontera O2) y el control
+   de entorno no leía los dos esquemas nuevos. El más serio: en la migración de credenciales, una respuesta del
    Edge `"false"` o `1` contaba como «sí» y **la nube borraba su copia** (D3).
 6. **Hallazgos de la 15-Q que NO se tocaron** porque piden una decisión: un
    evento que la nube rechaza para siempre bloquea la bandeja del Edge
@@ -74,6 +76,15 @@ funciona exactamente como antes.
   el simulado del token `FACE_TEMPLATE_PROVIDER`, que con base ahora es el
   `ProveedorEnrutado` que lo envuelve; lo toma de `PROVEEDOR_DIRECTO`. Ninguna
   aserción cambió y el archivo no creció.
+- **Cuatro piezas cambiaron de capa por la frontera O2** (segunda corrida del
+  verificador). La capa de aplicación sólo puede importar _tipos_ de
+  `@ncr/providers`. `CredencialesDelPuente` es un adaptador del puerto y habla
+  con el túnel: pasó a `edge/infraestructura/`, y sus tipos quedaron como
+  puertos de aplicación (`puertos-del-puente.ts`), con la entrega al Edge
+  inyectada en la migración. `PublicacionesDelEdge` traduce avisos del túnel a
+  casos de uso: pasó a `edge/presentacion/`. `AbrirTunel` recibe la ruta que
+  firma el `hola`. Las pruebas que montan sesiones REALES del túnel salieron de
+  `aplicacion/` (son de integración), sin cambiar aserciones.
 - **Una línea más en el barrido D-72.** `formularios-sin-identificadores.test.tsx`
   exige clasificar cada pantalla que escribe; el panel del Edge escribe sin
   formulario (dos botones) y se declaró en `SIN_FORMULARIO`. Es la única
@@ -182,10 +193,11 @@ sus equipos, como en el portátil en sitio y en todas las pruebas anteriores.
 **API** · `apps/api/src/`
 
 - `edge/aplicacion/abrir-tunel.ts` — acreditar el `hola` y ocupar el túnel de la copropiedad.
-- `edge/aplicacion/publicaciones-del-edge.ts`, `alerta-de-desconexion.ts`, `inventario-del-edge.ts` — eventos reenviados, alerta tras 30 s, inventario vigente.
-- `edge/aplicacion/credenciales-del-puente.ts`, `migrar-credenciales.ts`, `puentes.ts` — D1–D3 y la marca de puente.
-- `edge/infraestructura/*` — puentes, auditoría del túnel y credenciales en PostgreSQL.
-- `edge/presentacion/puerta-del-tunel.ts`, `enlace-ws.ts`, `puentes.controller.ts` — el WebSocket y las rutas de puentes y migración.
+- `edge/aplicacion/alerta-de-desconexion.ts`, `inventario-del-edge.ts` — alerta tras 30 s, inventario vigente.
+- `edge/aplicacion/migrar-credenciales.ts`, `puertos-del-puente.ts`, `puentes.ts` — D3, los puertos del puente y su marca.
+- `edge/infraestructura/credenciales-del-puente.ts` — D1–D2: la entrega por el túnel, con la respuesta del Edge leída con forma estricta.
+- `edge/infraestructura/*` — puentes, auditoría del túnel y credenciales en PostgreSQL; y las pruebas de integración con sesiones reales del túnel.
+- `edge/presentacion/puerta-del-tunel.ts`, `enlace-ws.ts`, `publicaciones-del-edge.ts`, `puentes.controller.ts` — el WebSocket, los avisos del Edge y las rutas de puentes y migración.
 - `edge/tunel-del-edge.module.ts` — el módulo global del túnel.
 - `proveedores/proveedor-enrutado.ts`, `rutas-de-equipos.ts`, `tuneles-de-edge.ts`, `copropiedad-en-curso.ts`, `hecho-en-curso.ts` — enrutado por copropiedad.
 - `equipos/infraestructura/credencial-en-el-edge.ts`, `por-el-edge.ts`, `composicion-con-edge.ts` — repositorio, sonda y corrector por el Edge.
@@ -196,7 +208,7 @@ sus equipos, como en el portátil en sitio y en todas las pruebas anteriores.
 **Edge** · `apps/edge/src/`
 
 - `composicion-puente.ts`, `extras-del-puente.ts`, `configuracion/esquema-del-puente.ts` — el Edge puente y sus variables.
-- `aplicacion/puente-con-la-nube.ts` — B2: decide la nube o, a tiempo vencido, el Edge.
+- `aplicacion/puente-con-la-nube.ts` — B2: decide la nube o, a tiempo vencido, el Edge (su prueba, con sesiones reales, en `apps/edge/test/`).
 - `infraestructura/tunel/cliente-de-tunel.ts`, `enlace-websocket.ts`, `atenciones-del-edge.ts` — el túnel y lo que el Edge atiende.
 - `infraestructura/equipos/registro-cifrado.ts` — credenciales con AES-256-GCM en SQLite.
 - `infraestructura/video/go2rtc-local.ts` — el go2rtc junto al Edge.

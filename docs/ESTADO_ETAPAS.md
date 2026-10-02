@@ -892,7 +892,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Ronda `etapa-15q2-edge-puente` — el Edge como puente entre la nube y los equipos (P-27 = A, corrige la ETAPA 12 y la 15-Q) · **CERRADA** · 2026-10-02
 
-**Rama:** `etapa-15q2-edge-puente` · **Base:** `develop` (`4849f4e`, merge del PR #39; no hay ninguna 15-U en `develop`, C-51) · **PR:** «PENDIENTE-PR», sin fusionar
+**Rama:** `etapa-15q2-edge-puente` · **Base:** `develop` (`4849f4e`, merge del PR #39; no hay ninguna 15-U en `develop`, C-51) · **PR:** [#40](https://github.com/4rg3n15/NextResidential/pull/40), sin fusionar
 **Informe:** [`etapas/ETAPA-15Q2.md`](etapas/ETAPA-15Q2.md) · **Decisión:** [ADR-035](decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md) (sustituye en parte a ADR-034)
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
