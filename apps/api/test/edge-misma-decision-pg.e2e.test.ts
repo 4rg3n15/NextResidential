@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { randomBytes } from 'node:crypto';
+import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
 import type { ResultadoAcceso } from '@ncr/domain-core';
 // `utilidades` PRIMERO: carga `AppModule` en su orden (ciclo eventos ↔ autorizaciones).
@@ -28,17 +30,23 @@ import type { InstantaneaDeReglas } from '../../edge/src/aplicacion/instantanea-
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const CAMARA = '90000000-0000-4000-8000-000000000001';
+const ACTOR = '00000000-0000-4000-8000-000000000002';
 let app: INestApplication | undefined;
+let plantillaPropia = '';
 let instantanea: InstantaneaDeReglas | undefined;
 let disponible = false;
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
+  plantillaPropia = await sembrarRostroReconocible(URL_BASE);
   const firmante = await crearFirmante();
   app = await crearApp(firmante, undefined, {
     PROVEEDOR_DE_EQUIPOS: 'simulado',
     CARGADOR_DE_CONTEXTO: 'postgres',
     PERSISTENCIA_DE_EVENTOS: 'postgres',
+    // Los DOS lados leen el consentimiento de la base. Con la biometría en memoria
+    // la nube negaba todo rostro y la comparación pasaba sin probar nada (15-Q).
+    PERSISTENCIA_DE_BIOMETRIA: 'postgres',
     DATABASE_URL: URL_BASE,
     DATABASE_POOLER_URL: URL_BASE,
   });
@@ -66,6 +74,38 @@ afterAll(async () => {
 });
 
 exigirBase('sin DATABASE_URL_PRUEBAS', () => disponible);
+
+/**
+ * Una persona de ESTA corrida con consentimiento vigente y plantilla activa y
+ * sincronizada: el camino del rostro RECONOCIBLE, que la semilla no garantiza.
+ */
+const sembrarRostroReconocible = async (url: string): Promise<string> => {
+  const pool = new Pool({ connectionString: url, max: 1 });
+  try {
+    const { rows } = await pool.query<{ id: string }>(
+      `WITH p AS (
+         INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
+                                      nombre_completo, creado_por, actualizado_por)
+         VALUES ($1, 'cedula', $2, 'Paridad de rostro', $3, $3) RETURNING id
+       ), c AS (
+         INSERT INTO public.consentimientos_biometricos (copropiedad_id, persona_id,
+                version_politica, canal, estado, otorgado_en, creado_por, actualizado_por)
+         SELECT $1, p.id, 'v1.0', 'presencial', 'vigente', now(), $3, $3 FROM p
+         RETURNING id, persona_id
+       )
+       INSERT INTO public.plantillas_biometricas (copropiedad_id, persona_id, consentimiento_id,
+              calidad, vector_cifrado, llave_ref, algoritmo, suprimir_en, sincronizada_en,
+              estado, creado_por, actualizado_por)
+       SELECT $1, c.persona_id, c.id, 0.9, '\\x0102'::bytea, 'vault:ncr/plantillas/v1',
+              'AES-256-GCM', now() + interval '1 day', now(), 'activa', $3, $3 FROM c
+       RETURNING id`,
+      [COP_A, `PAR${randomBytes(4).toString('hex').toUpperCase()}`, ACTOR],
+    );
+    return rows[0]?.id ?? '';
+  } finally {
+    await pool.end();
+  }
+};
 
 /** Lo que importa de una decisión para RN-16: permiso, motivo, regla y confirmación. */
 const esencia = (r: ResultadoAcceso) => ({
@@ -130,7 +170,11 @@ describe.skipIf(URL_BASE === undefined)('RN-16 · nube y Edge deciden igual (15-
     const motor = (app as INestApplication).get<MotorDeDecision>(MOTOR_DE_DECISION);
     const cache = { vigente: () => instantanea ?? null, guardar: () => false };
     const plantillas = instantanea?.plantillas ?? [];
-    expect(plantillas.length).toBeGreaterThan(0);
+    // El rostro reconocible de esta corrida está, y reconocible: si no, la
+    // comparación sólo cubriría negaciones por consentimiento.
+    expect(
+      plantillas.find((p) => p.plantillaId === plantillaPropia)?.reconocibleHasta,
+    ).toBeTruthy();
     for (const p of plantillas) {
       const solicitud = { personaId: p.personaId, placaLeida: null, zonaId: null, confianza: 1 };
       const nube = await motor.decidir({
