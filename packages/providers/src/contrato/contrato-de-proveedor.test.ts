@@ -24,14 +24,15 @@ import {
   ReinicioNecesario,
 } from '../nucleo/errores';
 import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
+import { viaTunel } from '../remoto/tunel-en-memoria';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * LA PRUEBA DE LSP · §2.3 y KPI-12, y la prueba de fuego de O2 (ETAPA 15-D)
  *
- * La misma suite, las mismas aserciones, **tres proveedores**: el simulado, el
- * real contra un equipo simulado, y **una marca inventada con capacidades
- * reducidas**. Si no fueran intercambiables, esto se pondría rojo; y si para
+ * La misma suite, las mismas aserciones, **cuatro proveedores**: el simulado, el
+ * real contra un equipo simulado, una marca inventada con capacidades reducidas
+ * y el real detrás del túnel del Edge (15-Q2). Si no fueran intercambiables, esto se pondría rojo; y si para
  * ponerlo verde hiciera falta un `if (esOrbita)` dentro de una aserción, el
  * arreglo iría en el adaptador y no aquí.
  *
@@ -52,9 +53,8 @@ import { jpegConMedidas } from '../simulacion/imagenes-de-prueba';
  * es lo que permite que un equipo con menos capacidades pase la suite sin
  * que la suite sepa de qué marca es.
  *
- * El simulado (`MockProvider`) no participa en los mundos adversos: finge un
- * equipo completo y sano, y ampliarlo con perillas de avería sería reescribir
- * lo que funciona. Cada mundo adverso lo ejercitan al menos DOS proveedores,
+ * El simulado no participa en los mundos adversos: finge un equipo completo y
+ * sano. Cada mundo adverso lo ejercitan al menos DOS proveedores,
  * y eso se comprueba abajo: una adversidad que sólo probara uno no sería un
  * contrato, sería una prueba de ese adaptador.
  */
@@ -306,7 +306,7 @@ const FICTICIO: CasoDeContrato = {
   },
 };
 
-const CASOS: readonly CasoDeContrato[] = [SIMULADO, HIKVISION, FICTICIO];
+const CASOS: readonly CasoDeContrato[] = [SIMULADO, HIKVISION, FICTICIO, viaTunel(HIKVISION)];
 
 describe.each(CASOS)('contrato de proveedor · $nombre', (caso) => {
   describe('capacidades', () => {

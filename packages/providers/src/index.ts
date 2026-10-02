@@ -138,9 +138,9 @@ export type {
 // ── El simulado de equipo, que es infraestructura de PRUEBA ──────────────────
 /**
  * Se exporta porque la suite de contrato de la API lo necesita para correr sin
- * hardware, que es justo lo que ADR-03 exige poder hacer. No es una pieza de
- * familia: es un `fetch` que se comporta como un aparato.
+ * hardware (ADR-03): no es una pieza de familia, es un `fetch` que hace de aparato.
  */
 export * from './simulacion/publico';
 // 15-Q · Q3 · el hecho de acceso de un evento, el mismo para la nube y el Edge.
 export * from './equipo/hecho-de-acceso';
+export * from './remoto'; // 15-Q2 · el túnel Edge ↔ API y el proveedor vía Edge
