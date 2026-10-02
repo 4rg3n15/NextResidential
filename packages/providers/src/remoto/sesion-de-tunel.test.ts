@@ -97,11 +97,11 @@ describe('sesión del túnel (15-Q2, A2)', () => {
   it('un aviso llega sin respuesta, y los canales binarios van en orden y se cierran', async () => {
     const { api, edge } = par();
     const avisos: unknown[] = [];
-    edge.alAviso('estado', (c) => avisos.push(c));
+    edge.atender('estado', (c) => void avisos.push(c));
     api.avisar('estado', { modo: 'ok' });
-    const canal = api.abrirCanal();
+    const canal = api.canales.abrir();
     expect(canal.id % 2).toBe(0);
-    const remoto = edge.canal(canal.id);
+    const remoto = edge.canales.delOtroLado(canal.id);
     canal.enviar(new Uint8Array([1]));
     canal.enviar(new Uint8Array([2]));
     const leidos: number[] = [];
@@ -109,7 +109,7 @@ describe('sesión del túnel (15-Q2, A2)', () => {
     for await (const trozo of remoto) leidos.push(...trozo);
     expect(leidos).toEqual([1, 2]);
     expect(avisos).toEqual([{ modo: 'ok' }]);
-    expect(edge.abrirCanal().id % 2).toBe(1);
+    expect(edge.canales.abrir().id % 2).toBe(1);
   });
 
   it('padre y clave llegan al que atiende; un error sin forma o no-Error no rompe el túnel', async () => {
@@ -144,7 +144,7 @@ describe('sesión del túnel (15-Q2, A2)', () => {
     b.enviar('{"v":1,"t":"bienvenida","copropiedadId":"10000000-0000-4000-8000-000000000001"}');
     await new Promise((r) => setTimeout(r, 10));
     expect(motivos).toEqual(['mensaje fuera de protocolo']);
-    expect(api.canal(4).cerrado).toBe(true);
+    expect(api.canales.delOtroLado(4).cerrado).toBe(true);
     api.cerrar(1000, 'otra vez'); // idempotente
     api.avisar('nadie', null); // con el túnel cerrado no sale nada
   });

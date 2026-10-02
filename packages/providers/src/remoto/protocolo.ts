@@ -26,6 +26,8 @@ import { ProtocoloInvalido } from './errores-remotos';
 import type { Transportable } from './serializacion';
 
 export const VERSION_DEL_PROTOCOLO = 1;
+/** La ruta del WebSocket en la API. El `hola` firma `GET <ruta>\n<nonce>`. */
+export const RUTA_DEL_TUNEL = '/edge/tunel';
 /** Una publicación con foto y recorte (8 MiB en el Alarm Server) en base64. */
 export const MENSAJE_MAXIMO_BYTES = 12 * 1024 * 1024;
 /** Holgado para audio (5 tramas/s por sentido) y ráfagas de eventos en vivo. */
@@ -36,6 +38,8 @@ export interface Hola {
   readonly v: 1;
   readonly t: 'hola';
   readonly edgeId: string;
+  /** La que el Edge cree servir: la API la COMPRUEBA contra su registro (RN-15). */
+  readonly copropiedadId: string;
   readonly marca: string;
   readonly nonce: string;
   readonly firma: string;
@@ -123,6 +127,7 @@ export const leerMensaje = (crudo: string): Mensaje => {
         v: 1,
         t: 'hola',
         edgeId: texto(o, 'edgeId', /^[0-9a-f-]{36}$/i),
+        copropiedadId: texto(o, 'copropiedadId', /^[0-9a-f-]{36}$/i),
         marca: texto(o, 'marca', /^\d{1,12}$/),
         nonce: texto(o, 'nonce', /^[A-Za-z0-9_-]{16,64}$/),
         firma: texto(o, 'firma', /^[0-9a-f]{64}$/),

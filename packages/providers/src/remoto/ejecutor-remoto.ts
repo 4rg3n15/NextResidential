@@ -105,14 +105,14 @@ export const ejecutarOrdenes = (
     };
   });
 
-  sesion.alAviso('equipo.detener', (c) => {
+  sesion.atender('equipo.detener', (c) => {
     const { dispositivoId } = (c ?? {}) as { dispositivoId?: unknown };
     if (typeof dispositivoId !== 'string') return;
     escuchas.get(dispositivoId)?.detener();
     escuchas.delete(dispositivoId);
   });
 
-  sesion.alAviso('equipo.olvidar', (c) => {
+  sesion.atender('equipo.olvidar', (c) => {
     const { dispositivoId } = (c ?? {}) as { dispositivoId?: unknown };
     if (typeof dispositivoId === 'string' && opciones.conoce(dispositivoId)) {
       proveedor.olvidar?.(dispositivoId);
@@ -128,7 +128,7 @@ export const ejecutarOrdenes = (
 
   sesion.atender('audio.envio', async (carga: unknown) => {
     const { dispositivoId, canal } = canalDe((carga as { args?: unknown }).args);
-    const cola = sesion.canal(canal);
+    const cola = sesion.canales.delOtroLado(canal);
     void (async () => {
       for await (const trozo of cola) {
         try {
@@ -147,7 +147,7 @@ export const ejecutarOrdenes = (
 
   sesion.atender('audio.recepcion', async (carga: unknown) => {
     const { dispositivoId, canal } = canalDe((carga as { args?: unknown }).args);
-    const cola = sesion.canal(canal);
+    const cola = sesion.canales.delOtroLado(canal);
     const flujo =
       dispositivoId === null
         ? proveedor.recibirAudio()

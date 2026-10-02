@@ -24,7 +24,7 @@ export class AudioPorTunel {
 
   /** Se llama una vez por sesión del túnel: los fallos del equipo vuelven por aquí. */
   instalarEn(sesion: SesionDeTunel): void {
-    sesion.alAviso('audio.fallo', (c) => {
+    sesion.atender('audio.fallo', (c) => {
       const { canal, error } = c as { canal: number; error: Error };
       this.fallos.set(canal, error);
     });
@@ -34,7 +34,7 @@ export class AudioPorTunel {
     const clave = dispositivoId ?? '';
     let envio = this.envios.get(clave);
     if (envio === undefined) {
-      const canal = this.sesionVigente().abrirCanal();
+      const canal = this.sesionVigente().canales.abrir();
       envio = this.pedir('audio.envio', dispositivoId, canal.id).then(() => canal);
       this.envios.set(clave, envio);
       envio.catch(() => this.envios.delete(clave));
@@ -61,7 +61,7 @@ export class AudioPorTunel {
 
   recibir(dispositivoId: string | null): AsyncIterable<Uint8Array> {
     const abrir = async (): Promise<ColaDeCanal> => {
-      const canal = this.sesionVigente().abrirCanal();
+      const canal = this.sesionVigente().canales.abrir();
       await this.pedir('audio.recepcion', dispositivoId, canal.id);
       return canal;
     };

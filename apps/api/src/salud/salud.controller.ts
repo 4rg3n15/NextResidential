@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, ServiceUnavailableException } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -15,6 +15,8 @@ import { SONDA_POSTGRES } from '../arranque/sonda-postgres';
 import type { ResultadoDeLaBase, SondaDePostgres } from '../arranque/sonda-postgres';
 import { PLANIFICADOR } from '../planificacion';
 import type { Planificador } from '../planificacion';
+import { TUNELES_DE_EDGE } from '../proveedores';
+import type { TunelesDeEdge } from '../proveedores';
 import { ListoDto, SaludDto } from './respuestas';
 
 /**
@@ -43,6 +45,8 @@ export class SaludController {
     @Inject(ProveedorDeJwks) private readonly jwks: ProveedorDeJwks,
     @Inject(SONDA_POSTGRES) private readonly postgres: SondaDePostgres,
     @Inject(PLANIFICADOR) private readonly planificador: Planificador,
+    // 15-Q2 · A3 · cuántos Edge tienen el túnel abierto (opcional: hay bancos sin él).
+    @Optional() @Inject(TUNELES_DE_EDGE) private readonly tuneles?: TunelesDeEdge,
   ) {}
 
   @Publico()
@@ -75,14 +79,8 @@ export class SaludController {
       // de la mañana necesita saber si arregla el entorno o el panel. El
       // detalle del error no viaja: `/ready` es pública.
       jwks: describirEstadoDeJwks(await this.jwks.sondear()),
-      /**
-       * **Aquí había una cadena fija.** `'no-conectado-etapa-04'`, escrita
-       * cinco etapas atrás, y `/ready` respondía 200 igualmente. Desde la
-       * ETAPA 04 hay repositorios PostgreSQL en cinco módulos: la API sí
-       * depende de la base, y esto declaraba «listo» sin haberla tocado. Es la
-       * misma familia que el JWKS — una sonda que no sonda—, y por eso se
-       * revisó al mismo tiempo.
-       */
+      // Aquí había una cadena fija (`'no-conectado-etapa-04'`) y `/ready` respondía 200 sin
+      // haber tocado la base: una sonda que no sonda, de la familia del JWKS.
       postgres: 'ok',
     };
     /**
@@ -118,6 +116,7 @@ export class SaludController {
    */
   private avisos(base: ResultadoDeLaBase): Record<string, string> {
     const avisos: Record<string, string> = {};
+    if (this.tuneles !== undefined) avisos.edge = `${String(this.tuneles.conectados)} conectado(s)`;
     const ahora = this.reloj.ahora().getTime();
     const haceSegundos = (m: Date): number => Math.max(0, Math.round((ahora - m.getTime()) / 1000));
     const reciente = (m: Date): boolean => ahora - m.getTime() < VENTANA_DE_AVISO_MS;

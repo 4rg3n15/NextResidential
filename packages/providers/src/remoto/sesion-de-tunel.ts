@@ -8,10 +8,10 @@
  *  · `pedir`   una orden con plazo. Sin respuesta a tiempo, `OrdenVencida`;
  *              con el túnel cerrado, `EdgeDesconectado` EN EL ACTO (C3): una
  *              orden nunca queda colgada.
- *  · `atender` quién contesta cada nombre de pedido. El error del que atiende
- *              viaja con su clase (`serializacion.ts`).
- *  · `avisar`  sin respuesta: una publicación de un equipo, un estado.
- *  · canales   binarios multiplexados para el audio.
+ *  · `atender` quién contesta cada nombre, pedido o aviso. El error del que
+ *              atiende un pedido viaja con su clase (`serializacion.ts`).
+ *  · `avisar`  sin respuesta: un estado, el fallo de un canal.
+ *  · `canales` binarios multiplexados para el audio (`canales-del-tunel.ts`).
  *
  * Y cuida el túnel: latido, cierre si no llega nada en `silencioMaximoMs`,
  * límite de tamaño y de ritmo, cierre ante un mensaje inválido.
@@ -22,7 +22,7 @@ import { EdgeDesconectado, OrdenVencida, ProtocoloInvalido } from './errores-rem
 import { leerMensaje, leerTramaBinaria, MENSAJES_POR_SEGUNDO, tramaBinaria } from './protocolo';
 import type { Mensaje, Pedido } from './protocolo';
 import { codificar, decodificar } from './serializacion';
-import { ColaDeCanal } from './cola-de-canal';
+import { CanalesDelTunel } from './canales-del-tunel';
 
 /** Lo mínimo de un WebSocket que la sesión necesita. */
 export interface Enlace {
@@ -39,7 +39,10 @@ export interface ContextoDePedido {
   readonly plazoMs: number;
 }
 
-export type Atencion = (carga: unknown, contexto: ContextoDePedido) => Promise<unknown>;
+/** Un aviso no tiene respuesta: lo que devuelva su atención se descarta. */
+export type Atencion = (carga: unknown, contexto: ContextoDePedido) => Promise<unknown> | void;
+
+const DE_UN_AVISO: ContextoDePedido = { id: 'aviso', plazoMs: 1 };
 
 export interface OpcionesDeSesion {
   /** `impar` en el Edge, `par` en la API: los canales de cada uno no chocan. */
@@ -62,9 +65,7 @@ export class SesionDeTunel {
   private motivoDeCierre = '';
   private readonly pendientes = new Map<string, Pendiente>();
   private readonly atenciones = new Map<string, Atencion>();
-  private readonly avisos = new Map<string, (carga: unknown) => void>();
-  private readonly canales = new Map<number, ColaDeCanal>();
-  private siguienteCanal: number;
+  readonly canales: CanalesDelTunel;
   private ultimaSenal: number;
   private ventana = { inicio: 0, mensajes: 0 };
   private readonly latido: ReturnType<typeof setInterval> | null;
@@ -74,7 +75,11 @@ export class SesionDeTunel {
     private readonly enlace: Enlace,
     private readonly opciones: OpcionesDeSesion,
   ) {
-    this.siguienteCanal = opciones.paridad === 'impar' ? 1 : 2;
+    this.canales = new CanalesDelTunel(opciones.paridad, {
+      trama: (canal, carga) => this.enlace.enviar(tramaBinaria(canal, carga)),
+      cierre: (canal, motivo) => this.enviar({ v: 1, t: 'canal', canal, motivo }),
+      abierta: () => this.abierta,
+    });
     this.ultimaSenal = this.ahora();
     enlace.alRecibir((dato) => this.recibir(dato));
     enlace.alCerrar((motivo) => this.terminar(motivo));
@@ -105,10 +110,6 @@ export class SesionDeTunel {
 
   atender(nombre: string, atencion: Atencion): void {
     this.atenciones.set(nombre, atencion);
-  }
-
-  alAviso(nombre: string, manejador: (carga: unknown) => void): void {
-    this.avisos.set(nombre, manejador);
   }
 
   pedir(
@@ -142,32 +143,6 @@ export class SesionDeTunel {
     if (this.abierta) this.enviar({ v: 1, t: 'aviso', nombre, carga: codificar(carga) });
   }
 
-  /** Un canal binario nuevo, numerado con la paridad de este lado. */
-  abrirCanal(): ColaDeCanal {
-    const id = this.siguienteCanal;
-    this.siguienteCanal += 2;
-    return this.canal(id);
-  }
-
-  /** El canal que abrió el OTRO lado (su número llegó en un pedido). */
-  canal(id: number): ColaDeCanal {
-    const existente = this.canales.get(id);
-    if (existente !== undefined) return existente;
-    const cola = new ColaDeCanal(
-      id,
-      (carga) => {
-        if (this.abierta) this.enlace.enviar(tramaBinaria(id, carga));
-      },
-      (motivo) => {
-        this.canales.delete(id);
-        if (this.abierta) this.enviar({ v: 1, t: 'canal', canal: id, motivo });
-      },
-    );
-    this.canales.set(id, cola);
-    if (!this.abierta) cola.terminar('túnel cerrado');
-    return cola;
-  }
-
   cerrar(codigo: number, motivo: string): void {
     if (!this.abierta) return;
     this.enlace.cerrar(codigo, motivo);
@@ -193,7 +168,7 @@ export class SesionDeTunel {
       if (typeof dato === 'string') this.despachar(leerMensaje(dato));
       else {
         const { canal, carga } = leerTramaBinaria(dato);
-        this.canales.get(canal)?.entregar(carga);
+        this.canales.entregar(canal, carga);
       }
     } catch (error) {
       const detalle = error instanceof ProtocoloInvalido ? error.detalle : String(error);
@@ -229,11 +204,10 @@ export class SesionDeTunel {
         return;
       }
       case 'aviso':
-        this.avisos.get(mensaje.nombre)?.(decodificar(mensaje.carga));
+        void this.atenciones.get(mensaje.nombre)?.(decodificar(mensaje.carga), DE_UN_AVISO);
         return;
       case 'canal':
-        this.canales.get(mensaje.canal)?.terminar(mensaje.motivo);
-        this.canales.delete(mensaje.canal);
+        this.canales.terminar(mensaje.motivo, mensaje.canal);
         return;
       case 'latido':
         return;
@@ -274,8 +248,7 @@ export class SesionDeTunel {
       p.rechazar(new EdgeDesconectado(`el túnel se cerró: ${motivo}`));
       this.pendientes.delete(id);
     }
-    for (const cola of this.canales.values()) cola.terminar('túnel cerrado');
-    this.canales.clear();
+    this.canales.terminar('túnel cerrado');
     for (const m of this.alCerrarse.splice(0)) m(motivo);
   }
 }
