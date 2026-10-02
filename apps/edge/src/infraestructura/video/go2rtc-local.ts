@@ -5,7 +5,10 @@
  * Lo que go2rtc conteste se limpia de cualquier `rtsp://…` antes de devolverlo.
  */
 export const limpiarRtsp = (texto: string): string =>
-  texto.replace(/rtsps?:\/\/[^\s"'<>]+/gi, 'rtsp://[redactado]');
+  texto
+    .replace(/rtsps?:\/\/[^\s"'<>]+/gi, 'rtsp://[redactado]')
+    // Y su forma codificada, que es como viaja en la consulta del PATCH (`src=`).
+    .replace(/rtsps?%3A%2F%2F[^\s"'<>&]+/gi, 'rtsp://[redactado]');
 
 const conFinDeLinea = (sdp: string): string =>
   sdp.endsWith('\r\n') ? sdp : `${sdp.replace(/[\r\n]+$/, '')}\r\n`;

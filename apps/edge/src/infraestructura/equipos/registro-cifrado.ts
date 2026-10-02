@@ -57,7 +57,17 @@ export class RegistroCifrado implements RegistroDeEquipos {
   ) {
     db.exec(TABLA);
     const filas = db.prepare('SELECT * FROM equipos_cifrados').all() as unknown as Fila[];
-    for (const f of filas) this.memoria.set(f.dispositivo_id, this.descifrar(f));
+    for (const f of filas) {
+      try {
+        this.memoria.set(f.dispositivo_id, this.descifrar(f));
+      } catch {
+        // Con otra llave, GCM no autentica: se dice CUÁL variable, no el error genérico.
+        throw new Error(
+          `El registro cifrado de equipos no se abre con EDGE_EQUIPOS_LLAVE (equipo ` +
+            `${f.dispositivo_id}): ¿cambió la llave? Restaure la anterior o vuelva a migrar.`,
+        );
+      }
+    }
   }
 
   async buscar(dispositivoId: string): Promise<EquipoRegistrado | null> {

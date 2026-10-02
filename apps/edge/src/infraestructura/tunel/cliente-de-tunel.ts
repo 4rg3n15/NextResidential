@@ -60,6 +60,7 @@ export class ClienteDeTunel {
   private actual: SesionDeTunel | null = null;
   private intentos = 0;
   private detenido = false;
+  private enApreton: Enlace | null = null;
 
   constructor(private readonly o: OpcionesDelTunel) {}
 
@@ -76,12 +77,16 @@ export class ClienteDeTunel {
   detener(): void {
     this.detenido = true;
     this.actual?.cerrar(1000, 'el Edge se detiene');
+    // Uno que aún no recibió `bienvenida` también se cierra: si no, abriría sesión después.
+    this.enApreton?.cerrar(1000, 'el Edge se detiene');
   }
 
   private conectar(): void {
+    if (this.detenido) return;
     const abrir =
       this.o.abrirSocket ?? ((url: string) => new WebSocket(url) as unknown as SocketWeb);
     const enlace = enlaceWebSocket(abrir(urlDelTunel(this.o.urlApi)));
+    this.enApreton = enlace;
     enlace.alAbrir(() => enlace.enviar(JSON.stringify(this.hola())));
     let sesion: SesionDeTunel | null = null;
     let plazo: ReturnType<typeof setTimeout> | null = null;
@@ -93,6 +98,11 @@ export class ClienteDeTunel {
         if (m?.t !== 'bienvenida' || m.copropiedadId !== this.o.copropiedadId) throw new Error();
       } catch {
         enlace.cerrar(1008, 'se esperaba bienvenida de su copropiedad');
+        return;
+      }
+      this.enApreton = null;
+      if (this.detenido) {
+        enlace.cerrar(1000, 'el Edge se detiene');
         return;
       }
       sesion = this.abrirSesion(enlace);

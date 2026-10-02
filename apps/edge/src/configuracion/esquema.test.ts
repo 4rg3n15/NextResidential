@@ -54,11 +54,16 @@ describe('configuración del Edge', () => {
     const opcionales = Object.entries(esquemaDelEdge.shape)
       .filter(([, tipo]) => tipo.isOptional())
       .map(([clave]) => clave);
-    expect(opcionales.length, 'si no hay opcionales, esta prueba no prueba nada').toBeGreaterThan(3);
+    expect(opcionales.length, 'si no hay opcionales, esta prueba no prueba nada').toBeGreaterThan(
+      3,
+    );
 
     for (const clave of opcionales) {
       expect(() => cargarConfiguracion({ ...MINIMO, [clave]: '' }), `${clave} vacía`).not.toThrow();
-      expect(() => cargarConfiguracion({ ...MINIMO, [clave]: '   ' }), `${clave} en blanco`).not.toThrow();
+      expect(
+        () => cargarConfiguracion({ ...MINIMO, [clave]: '   ' }),
+        `${clave} en blanco`,
+      ).not.toThrow();
       // Y la otra mitad: un valor MALO sí tiene que romper. Sin esta línea, un
       // campo que no valida nada pasaría por «robusto».
       expect(

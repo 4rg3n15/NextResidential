@@ -63,7 +63,8 @@ const sinVacias = (entorno: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
 export const cargarConfiguracionDelPuente = (
   entorno: NodeJS.ProcessEnv = process.env,
 ): ConfiguracionDelPuente => {
-  const puente = esquemaDelPuente.safeParse(entorno);
+  // D-91 también aquí: `EDGE_PLAZO_NUBE_MS=` es «sin configurar», y vale su omisión.
+  const puente = esquemaDelPuente.safeParse(sinVacias(entorno));
   if (!puente.success) {
     const detalle = puente.error.issues.map((i) => `  · ${i.path.join('.')}: ${i.message}`);
     throw new ConfiguracionInvalida(`El Edge NO arranca como puente:\n${detalle.join('\n')}`);
