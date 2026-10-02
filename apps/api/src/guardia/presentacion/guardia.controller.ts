@@ -10,7 +10,12 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -25,6 +30,7 @@ import {
 } from '@nestjs/swagger';
 import { Alerta, BITACORA, GENERADOR_DE_ID, RELOJ, esFallo } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, GeneradorDeId, Reloj, Resultado } from '@ncr/domain-core';
+import { Throttle } from '@nestjs/throttler';
 import { SoloGuardiaRemota } from '../../plataforma';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { ALCANCE_DE_EQUIPOS } from '../../equipos';
@@ -124,6 +130,8 @@ export class GuardiaController {
     // error del cliente, no una falta de permiso, y confundirlos haría que la
     // consola mostrara «sin permiso» a quien sólo olvidó escribir por qué abre.
     if (r.error.codigo === 'OPERACION_NO_PERMITIDA') throw new ForbiddenException(r.error.detalle);
+    // 15-P · un punto de acceso que no es del equipo: 404, como el equipo ajeno.
+    if (r.error.codigo === 'ENTIDAD_NO_ENCONTRADA') throw new NotFoundException(r.error.detalle);
     throw new BadRequestException(r.error.detalle);
   }
 
@@ -158,6 +166,7 @@ export class GuardiaController {
         accion: dto.accion,
         motivo: dto.motivo,
         eventoId: dto.eventoId ?? null,
+        puntoId: dto.puntoId ?? null,
       }),
     );
     return {
@@ -165,6 +174,7 @@ export class GuardiaController {
       momento: orden.momento.toISOString(),
       resultado: orden.resultado ?? null,
       detalle: orden.detalle ?? null,
+      punto: orden.punto ?? null,
     };
   }
 
@@ -244,6 +254,7 @@ export class GuardiaController {
         // con un equipo mudo, y es justo lo que el portero necesita mirar.
         resultado: o.resultado ?? null,
         detalle: o.detalle ?? null,
+        punto: o.punto ?? null,
       })),
     };
   }
@@ -402,6 +413,9 @@ export class GuardiaController {
   @SoloGuardiaRemota()
   @Post('intercom/:dispositivoId/audio')
   @HttpCode(204)
+  // 15-P · límite PROPIO: un trozo cada 200 ms son 300 por minuto, y el global
+  // (120/min por IP) cortaba la ida con 429 a los ~24 s de hablar.
+  @Throttle({ default: { limit: 1200, ttl: 60_000 } })
   @Roles('operador_central', 'portero', 'administrador', 'superadministrador')
   @ApiOperation({ summary: 'Un trozo de audio del operador hacia el equipo' })
   @ApiConsumes('application/octet-stream')

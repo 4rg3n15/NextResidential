@@ -62,7 +62,10 @@ export class AccionadorPorProveedor implements AccionadorDePuerta, BloqueoDeAcce
     dispositivoId: string,
     abrir: boolean,
     actorId: string,
+    numeroDePuerta?: number,
   ): Promise<ResultadoDeAccionamiento> {
+    if (numeroDePuerta !== undefined)
+      return this.abrirSalida(dispositivoId, numeroDePuerta, actorId);
     const control = this.porEntorno(dispositivoId);
     if (control !== null) {
       const resultado = await control.accionar(dispositivoId, abrir);
@@ -89,6 +92,42 @@ export class AccionadorPorProveedor implements AccionadorDePuerta, BloqueoDeAcce
         : ordenInalcanzable('el equipo no respondió a la orden de apertura', r.latenciaMs);
     });
     this.anotar('accionar', dispositivoId, this.rotulo(), resultado);
+    return resultado;
+  }
+
+  /**
+   * 15-P · P3 · abre UNA salida elegida (orden `open` a esa puerta). Quien no
+   * sabe elegir puerta —la barrera de entorno, un proveedor sin `abrirSalida`—
+   * NO abre «la de siempre» en su lugar: rechaza con el motivo. Abrir otra
+   * puerta que la elegida es peor que no abrir.
+   */
+  private async abrirSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    actorId: string,
+  ): Promise<ResultadoDeAccionamiento> {
+    const sinEleccion =
+      this.porEntorno(dispositivoId) !== null
+        ? 'la barrera por entorno (BARRERA_*) no elige puerta'
+        : this.proveedor.abrirSalida === undefined
+          ? 'el proveedor de equipos no abre una puerta concreta'
+          : null;
+    const resultado =
+      sinEleccion !== null
+        ? ordenRechazada(sinEleccion, 0)
+        : await this.traducir(async () => {
+            const r = await this.proveedor.abrirSalida!(dispositivoId, numeroDePuerta, actorId);
+            if (r.aceptado) return ordenAceptada(r.latenciaMs);
+            return r.rechazo !== undefined
+              ? ordenRechazada(r.rechazo, r.latenciaMs)
+              : ordenInalcanzable('el equipo no respondió a la orden de apertura', r.latenciaMs);
+          });
+    this.anotar(
+      `apertura de la puerta ${String(numeroDePuerta)}`,
+      dispositivoId,
+      this.rotulo(),
+      resultado,
+    );
     return resultado;
   }
 

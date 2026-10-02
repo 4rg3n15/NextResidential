@@ -56,6 +56,7 @@ import { comprobarRecursosExternos } from './arranque/recursos-externos';
 import { SONDA_POSTGRES, recursoBaseDeDatos } from './arranque/sonda-postgres';
 import { abrirPuertoMientrasArranca } from './arranque/puerto-mientras-arranca';
 import { instalarCierreOrdenado } from './arranque/cierre-ordenado';
+import { instalarVigilanciaDelProceso } from './arranque/vigilancia-del-proceso';
 import type { SondaDePostgres } from './arranque/sonda-postgres';
 import {
   recursoBucketDeEvidencia,
@@ -92,7 +93,9 @@ async function arrancar(): Promise<void> {
   montarTuberiaHttp(app, config);
   // Otros fallos (15-M) · cierre ordenado: corta el SSE, cierra módulos y
   // pools, y no se cuelga (`cierre-ordenado.ts`). Sustituye a enableShutdownHooks.
-  instalarCierreOrdenado(app, bitacora);
+  const cerrar = instalarCierreOrdenado(app, bitacora);
+  // 15-P · 0.1 · una promesa o una excepción sin manejar no tumban sin rastro.
+  instalarVigilanciaDelProceso(bitacora, cerrar);
 
   await puertoDeArranque?.cerrar();
   await app.listen(config.PORT);

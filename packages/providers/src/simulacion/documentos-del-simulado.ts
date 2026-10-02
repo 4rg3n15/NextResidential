@@ -228,5 +228,38 @@ export const canalesDeAudio = (canales: readonly CanalDeAudioSimulado[]): string
 export const ordenesDePuerta = (guion: GuionDeEquipo): string =>
   '<?xml version="1.0" encoding="UTF-8"?>' +
   `<RemoteControlDoorCap version="2.0" xmlns="${ESPACIO}">` +
+  // 15-P · con salidas declaradas, cuántas puertas abre a distancia.
+  (guion.salidas?.puertas === undefined
+    ? ''
+    : `<doorNo min="1" max="${String(guion.salidas.puertas)}">1</doorNo>`) +
   `<cmd opt="${(guion.ordenesDePuerta ?? ['open', 'close']).join(',')}"/>` +
   '</RemoteControlDoorCap>';
+
+/** 15-P · P3 · lo que el videoportero simulado declara de sus salidas. */
+export const capacidadesDeSalidas = (guion: GuionDeEquipo): string => {
+  const s = guion.salidas ?? {};
+  const b = (nombre: string, valor: boolean | undefined): string =>
+    valor === true ? `<${nombre}>true</${nombre}>` : '';
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?><AccessControl version="2.0" xmlns="${ESPACIO}">` +
+    b('isSupportOpenDoorParams', s.cerraduras) +
+    b('isSupportDoorSecurityModulePairParams', (s.unidadesSeguras?.length ?? 0) > 0) +
+    b('isSupportModuleStatus', (s.unidadesSeguras?.length ?? 0) > 0) +
+    b('isSupportSubModules', (s.submodulos?.length ?? 0) > 0) +
+    b('isSupportElevatorControlCfg', s.ascensor) +
+    '</AccessControl>'
+  );
+};
+
+export const estadoDeUnidadesSeguras = (guion: GuionDeEquipo): string =>
+  (guion.salidas?.unidadesSeguras ?? [])
+    .map(
+      (u) =>
+        `<ModuleStatus version="2.0" xmlns="${ESPACIO}"><securityModuleNo>${u.numero}</securityModuleNo>` +
+        `<onlineStatus>${u.enLinea ? '1' : '0'}</onlineStatus>` +
+        `<desmantelStatus>${u.manipulada === true ? '1' : '0'}</desmantelStatus></ModuleStatus>`,
+    )
+    .join('');
+
+export const listaDeSubmodulos = (guion: GuionDeEquipo): string =>
+  JSON.stringify({ SubModules: guion.salidas?.submodulos ?? [] });

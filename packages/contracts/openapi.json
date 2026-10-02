@@ -2109,6 +2109,70 @@
         ]
       }
     },
+    "/copropiedades/{id}/equipos/{equipoId}/puntos": {
+      "get": {
+        "operationId": "SalidasController_puntos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuntosDeAccesoDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los puntos de acceso que se pueden abrir en este equipo",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
     "/copropiedades/{id}/equipos/{equipoId}/reactivacion": {
       "post": {
         "operationId": "EquiposController_reactivar",
@@ -2148,6 +2212,216 @@
           }
         ],
         "summary": "Vuelve a poner en servicio un equipo dado de baja",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/salidas": {
+      "get": {
+        "operationId": "SalidasController_consultar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidasDelEquipoDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Las salidas que el videoportero declara y las persistidas",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/salidas/descubrir": {
+      "post": {
+        "operationId": "SalidasController_descubrir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidasDelEquipoDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lee las salidas del videoportero y las persiste como puntos de acceso",
+        "tags": [
+          "equipos"
+        ]
+      }
+    },
+    "/copropiedades/{id}/equipos/{equipoId}/salidas/{puntoId}": {
+      "patch": {
+        "operationId": "SalidasController_renombrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "equipoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "puntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NombreDePuntoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuntoDeAccesoDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia el nombre de un punto de acceso",
         "tags": [
           "equipos"
         ]
@@ -3298,6 +3572,70 @@
           }
         ],
         "summary": "Un trozo de audio del operador hacia el equipo",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete": {
+      "post": {
+        "operationId": "AudioController_billete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BilleteDeAudioDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad o equipo fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sin la palabra o transporte HTTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Billete de un solo uso para abrir el WebSocket de audio (ADR-01, 15-P)",
         "tags": [
           "guardia"
         ]
@@ -8779,6 +9117,28 @@
           "desactivado"
         ]
       },
+      "BilleteDeAudioDto": {
+        "type": "object",
+        "properties": {
+          "billete": {
+            "type": "string",
+            "description": "Se presenta UNA vez en `ruta?billete=…`; no es el token de sesión"
+          },
+          "caducaEnSegundos": {
+            "type": "number",
+            "description": "Segundos que vale para abrir el WebSocket"
+          },
+          "ruta": {
+            "type": "string",
+            "description": "Ruta del WebSocket en la API (la consola la expone en su origen)"
+          }
+        },
+        "required": [
+          "billete",
+          "caducaEnSegundos",
+          "ruta"
+        ]
+      },
       "BitacoraDePorteriaDto": {
         "type": "object",
         "properties": {
@@ -11024,6 +11384,14 @@
             "type": "string",
             "nullable": true,
             "description": "A4 · códec que el equipo anuncia para el audio (p. ej. g711u). Null sin transporte. La consola decodifica lo que el equipo dice."
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "websocket",
+              "http"
+            ],
+            "description": "15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). «websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); «http»: un GET de bajada y un POST por trozo."
           }
         },
         "required": [
@@ -11034,7 +11402,8 @@
           "timeoutSegundos",
           "transporte",
           "detalleTransporte",
-          "formatoDeAudio"
+          "formatoDeAudio",
+          "via"
         ]
       },
       "EstadoDeDispositivosDto": {
@@ -13078,6 +13447,62 @@
           "motivo"
         ]
       },
+      "NodoDeSalidasDto": {
+        "type": "object",
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "description": "`equipo/propio/puerta-1`"
+          },
+          "padre": {
+            "type": "string",
+            "nullable": true
+          },
+          "nivel": {
+            "type": "number",
+            "description": "1 equipo · 2 módulo · 3 salida"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "equipo",
+              "modulo",
+              "salida"
+            ]
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "en_linea",
+              "fuera_de_linea",
+              "manipulada",
+              "averiada"
+            ],
+            "nullable": true
+          },
+          "nota": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ruta",
+          "padre",
+          "nivel",
+          "tipo",
+          "nombre",
+          "numeroDePuerta",
+          "estado",
+          "nota"
+        ]
+      },
       "NombreDeEquipoDto": {
         "type": "object",
         "properties": {
@@ -13107,6 +13532,19 @@
           "nombre",
           "tipo",
           "activo"
+        ]
+      },
+      "NombreDePuntoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "nombre"
         ]
       },
       "NotasDeAlertaDto": {
@@ -13260,6 +13698,15 @@
             "type": "string",
             "nullable": true,
             "description": "Lo que contestó el equipo."
+          },
+          "punto": {
+            "nullable": true,
+            "description": "15-P · el punto elegido; nulo = la puerta de la ficha del equipo.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PuntoDeLaOrdenDto"
+              }
+            ]
           }
         },
         "required": [
@@ -13272,7 +13719,8 @@
           "momento",
           "eventoId",
           "resultado",
-          "detalle"
+          "detalle",
+          "punto"
         ]
       },
       "OrdenManualDto": {
@@ -13300,6 +13748,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Evento que se está atendiendo"
+          },
+          "puntoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "15-P · el punto de acceso del equipo que se abre. Sin él, la puerta de la ficha. Un punto de otro equipo, de otra copropiedad o dado de baja: 404 y la orden no sale."
           }
         },
         "required": [
@@ -13905,6 +14358,55 @@
           "dudoso"
         ]
       },
+      "PuntoDeAccesoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          },
+          "modulo": {
+            "type": "string",
+            "nullable": true
+          },
+          "rutaEnElEquipo": {
+            "type": "string",
+            "nullable": true
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "descubierto",
+              "manual"
+            ]
+          },
+          "descubiertoEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "dispositivoId",
+          "nombre",
+          "numeroDePuerta",
+          "modulo",
+          "rutaEnElEquipo",
+          "origen",
+          "descubiertoEn"
+        ]
+      },
       "PuntoDeFrecuenciaDto": {
         "type": "object",
         "properties": {
@@ -13919,6 +14421,40 @@
         "required": [
           "semana",
           "total"
+        ]
+      },
+      "PuntoDeLaOrdenDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "numeroDePuerta"
+        ]
+      },
+      "PuntosDeAccesoDto": {
+        "type": "object",
+        "properties": {
+          "puntos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PuntoDeAccesoDto"
+            }
+          }
+        },
+        "required": [
+          "puntos"
         ]
       },
       "ReceptorDeLaFichaDto": {
@@ -14643,6 +15179,33 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "SalidasDelEquipoDto": {
+        "type": "object",
+        "properties": {
+          "arbol": {
+            "description": "Vacío si no se pudo leer el equipo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodoDeSalidasDto"
+            }
+          },
+          "motivoSinArbol": {
+            "type": "string",
+            "nullable": true
+          },
+          "puntos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PuntoDeAccesoDto"
+            }
+          }
+        },
+        "required": [
+          "arbol",
+          "motivoSinArbol",
+          "puntos"
         ]
       },
       "SaludDto": {

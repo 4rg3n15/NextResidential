@@ -61,6 +61,15 @@ import { EquiposController } from './presentacion/equipos.controller';
 import { NombresDeEquiposController } from './presentacion/nombres-de-equipos.controller';
 import { ALCANCE_DE_EQUIPOS, AlcanceDeEquipos } from './presentacion/alcance-de-equipos';
 import { REGISTRO_AUDITORIA } from '../comun/auditoria';
+import { REPOSITORIO_DE_PUNTOS } from './aplicacion/puntos-de-acceso';
+import type { RepositorioDePuntos } from './aplicacion/puntos-de-acceso';
+import { LECTOR_DE_SALIDAS, SalidasDelEquipo } from './aplicacion/salidas-del-equipo';
+import type { LectorDeSalidas } from './aplicacion/salidas-del-equipo';
+import { PuntosDeOperacion } from './aplicacion/puntos-de-operacion';
+import { RepositorioDePuntosPg } from './infraestructura/puntos-de-acceso-pg';
+import { RepositorioDePuntosEnMemoria } from './infraestructura/puntos-de-acceso-en-memoria';
+import { LectorDeSalidasPorProveedor } from './infraestructura/lector-de-salidas-por-proveedor';
+import { SalidasController } from './presentacion/salidas.controller';
 import type { RegistroDeAuditoria } from '../comun/auditoria';
 
 /**
@@ -83,6 +92,7 @@ export class EquiposModule {
         NombresDeEquiposController,
         ConfiguracionEnSitioController,
         EquiposSimuladosController,
+        SalidasController,
       ],
       providers: [
         // F3 (corrección de la 15-L) · simulado con equipos reales: se dice al arrancar.
@@ -283,6 +293,41 @@ export class EquiposModule {
             bitacora: Bitacora,
           ) => new AlcanceDeEquipos(equipos, auditoria, bitacora),
         },
+        /**
+         * 15-P · P3 · las salidas del videoportero: se LEEN por el proveedor
+         * (`salidasDe`, opcional: un proveedor que no sabe leerlas dice `null`)
+         * y se persisten en `puntos_de_acceso` con el histórico; sin base, en
+         * el proceso, como las atestaciones.
+         */
+        {
+          provide: REPOSITORIO_DE_PUNTOS,
+          inject: [Pool, CONFIGURACION],
+          useFactory: (pool: Pool, c: Configuracion): RepositorioDePuntos =>
+            c.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new RepositorioDePuntosPg(pool)
+              : new RepositorioDePuntosEnMemoria(),
+        },
+        {
+          provide: LECTOR_DE_SALIDAS,
+          inject: [PROVEEDOR_DE_EQUIPOS],
+          useFactory: (proveedor: ProveedorDeEquipos): LectorDeSalidas =>
+            new LectorDeSalidasPorProveedor(proveedor),
+        },
+        {
+          provide: SalidasDelEquipo,
+          inject: [REPOSITORIO_DE_EQUIPOS, REPOSITORIO_DE_PUNTOS, LECTOR_DE_SALIDAS, RELOJ],
+          useFactory: (
+            equipos: RepositorioDeEquipos,
+            puntos: RepositorioDePuntos,
+            lector: LectorDeSalidas,
+            reloj: Reloj,
+          ) => new SalidasDelEquipo(equipos, puntos, lector, reloj),
+        },
+        {
+          provide: PuntosDeOperacion,
+          inject: [REPOSITORIO_DE_PUNTOS],
+          useFactory: (puntos: RepositorioDePuntos) => new PuntosDeOperacion(puntos),
+        },
         {
           // A3 · lo que biometría pregunta: a qué equipos llega una plantilla.
           provide: TERMINALES_DE_ROSTROS,
@@ -300,6 +345,7 @@ export class EquiposModule {
         EQUIPOS_ACTIVOS,
         COPROPIEDAD_DE_EQUIPO,
         ALCANCE_DE_EQUIPOS,
+        PuntosDeOperacion,
       ],
     };
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { construirCsp, generarNonce, peticionLlegoPorHttps } from './middleware-csp';
+import { renovarSiHaceFalta } from './lib/sesion/renovar-en-middleware';
 
 /**
  * Nonce por petición y cabeceras de seguridad (§2.7.7).
@@ -12,7 +13,7 @@ import { construirCsp, generarNonce, peticionLlegoPorHttps } from './middleware-
  * error visible: simplemente el script no se ejecuta, y la página se queda a
  * medias sin explicar por qué.
  */
-export const middleware = (peticion: NextRequest): NextResponse => {
+export const middleware = async (peticion: NextRequest): Promise<NextResponse> => {
   const nonce = generarNonce();
   /**
    * El esquema REAL de la petición, sellado para el resto del proceso.
@@ -46,6 +47,21 @@ export const middleware = (peticion: NextRequest): NextResponse => {
     peticionSegura: seguro,
   });
 
+  /**
+   * 15-P · 0.3 · la renovación de una NAVEGACIÓN, aquí y no al pintar: los
+   * componentes de servidor no pueden escribir cookies. Se deja el token nuevo
+   * también en la PETICIÓN, para que esta misma página lo lea. `/api/*` renueva
+   * en su manejador, que sí puede escribir.
+   */
+  const renovacion = peticion.nextUrl.pathname.startsWith('/api/')
+    ? ({ tipo: 'nada' } as const)
+    : await renovarSiHaceFalta(peticion, seguro);
+  if (renovacion.tipo === 'renovada') {
+    for (const c of renovacion.cookies) peticion.cookies.set(c.nombre, c.valor);
+  } else if (renovacion.tipo === 'revocada') {
+    for (const nombre of renovacion.borrar) peticion.cookies.delete(nombre);
+  }
+
   const cabeceras = new Headers(peticion.headers);
   cabeceras.set('x-nonce', nonce);
   cabeceras.set('x-ncr-esquema-seguro', seguro ? '1' : '0');
@@ -53,10 +69,18 @@ export const middleware = (peticion: NextRequest): NextResponse => {
 
   const respuesta = NextResponse.next({ request: { headers: cabeceras } });
   respuesta.headers.set('content-security-policy', csp);
+  if (renovacion.tipo === 'renovada') {
+    for (const c of renovacion.cookies) respuesta.cookies.set(c.nombre, c.valor, c.opciones);
+  } else if (renovacion.tipo === 'revocada') {
+    for (const nombre of renovacion.borrar) respuesta.cookies.delete(nombre);
+  }
   return respuesta;
 };
 
 export const config = {
+  // 15-P · 0.3 · Node y no Edge: la renovación usa el cliente de Supabase de la
+  // consola, que es de servidor (`node:crypto`). Estable desde Next 15.5.
+  runtime: 'nodejs',
   // Los estáticos no llevan política: no ejecutan nada y añadir la cabecera a
   // cada icono solo engorda la respuesta.
   matcher: ['/((?!_next/static|_next/image|favicon.ico|iconos/|sw.js|manifest.webmanifest).*)'],

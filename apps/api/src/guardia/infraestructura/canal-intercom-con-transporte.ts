@@ -41,6 +41,8 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
     private readonly turnos: CanalDeIntercom,
     private readonly proveedor: ProveedorDeEquipos,
     private readonly bitacora: Bitacora,
+    /** 15-P · `GUARDIA_AUDIO_TRANSPORTE`: la consola elige su cliente por esto. */
+    private readonly via: EstadoDeCanal['via'] = 'http',
   ) {}
 
   private clave(copropiedadId: string, dispositivoId: string): string {
@@ -60,6 +62,7 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
       transporte: abierto ? 'equipo' : 'ninguno',
       detalleTransporte: abierto ? null : detalleSinTransporte,
       formatoDeAudio: abierto ? (this.formatos.get(clave) ?? null) : null,
+      via: this.via,
     };
   }
 
@@ -215,6 +218,11 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
     } else {
       await this.proveedor.enviarAudio(fragmento);
     }
+  }
+
+  /** 15-P · sólo el titular renueva; el equipo no se toca. */
+  renovar(copropiedadId: string, dispositivoId: string, operadorId: string): Promise<boolean> {
+    return this.turnos.renovar(copropiedadId, dispositivoId, operadorId);
   }
 
   /** C6 · cerrar la sesión de ESTE equipo, sin colgar la de otro videoportero. */

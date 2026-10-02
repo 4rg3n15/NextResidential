@@ -18,6 +18,18 @@ import type { OrigenDeVideo } from '../nucleo/video';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
+import type { NodoDeSalidas } from '../nucleo/salidas';
+import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
+
+/** 15-P · lo que «declara» el videoportero simulado: dos cerraduras, sin periféricos. */
+const ARBOL_SIMULADO = {
+  capacidades:
+    '<AccessControl><isSupportOpenDoorParams>true</isSupportOpenDoorParams></AccessControl>',
+  ordenRemota:
+    '<RemoteControlDoor><doorNo min="1" max="2"/><cmd opt="open,close"/></RemoteControlDoor>',
+  unidadesSeguras: null,
+  submodulos: null,
+};
 
 export interface OpcionesMock {
   readonly perfil?: PerfilDeSimulacion;
@@ -68,7 +80,7 @@ export class MockProvider
   readonly reloj: RelojSimulado;
 
   /** Bitácora de lo ocurrido, para que las pruebas afirmen sobre hechos. */
-  readonly aperturas: { dispositivoId: string; actorId: string }[] = [];
+  readonly aperturas: { dispositivoId: string; actorId: string; numeroDePuerta?: number }[] = [];
   /** Bloqueos vigentes por dispositivo (H-3): estado, no pulso. */
   readonly bloqueos = new Map<string, boolean>();
   /** Veredictos devueltos a terminales que esperaban (A2), para afirmar sobre ellos. */
@@ -137,6 +149,28 @@ export class MockProvider
   async abrir(dispositivoId: string, actorId: string): Promise<ResultadoAccionamiento> {
     const latencia = await this.conReintentos(dispositivoId, 'abrir');
     this.aperturas.push({ dispositivoId, actorId });
+    return { aceptado: true, latenciaMs: latencia };
+  }
+
+  /**
+   * 15-P · P3 · el simulado finge un videoportero de dos cerraduras: lo
+   * necesario para que el selector de punto de la guardia se vea y se use sin
+   * equipo (ADR-03). Lo desconocido, rechaza.
+   */
+  async salidasDe(dispositivoId: string): Promise<NodoDeSalidas> {
+    if (!(await this.conoce(dispositivoId))) {
+      throw new FalloDeHardwareSimulado(dispositivoId, 'salidasDe');
+    }
+    return construirArbolDeSalidas('Equipo simulado', ARBOL_SIMULADO, null);
+  }
+
+  async abrirSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    actorId: string,
+  ): Promise<ResultadoAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'abrir');
+    this.aperturas.push({ dispositivoId, actorId, numeroDePuerta });
     return { aceptado: true, latenciaMs: latencia };
   }
 

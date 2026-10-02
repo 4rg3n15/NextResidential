@@ -18,9 +18,13 @@ import '../models/equipos_dto.dart';
 import '../models/estado_de_equipos_simulados_dto.dart';
 import '../models/motivo_de_configuracion_dto.dart';
 import '../models/nombre_de_equipo_dto.dart';
+import '../models/nombre_de_punto_dto.dart';
+import '../models/punto_de_acceso_dto.dart';
+import '../models/puntos_de_acceso_dto.dart';
 import '../models/resultado_de_configuracion_dto.dart';
 import '../models/resultado_de_correccion_dto.dart';
 import '../models/resultado_de_sondeo_dto.dart';
+import '../models/salidas_del_equipo_dto.dart';
 import '../models/verificacion_remota_dto.dart';
 
 part 'equipos_api.g.dart';
@@ -110,11 +114,41 @@ abstract class EquiposApi {
     @Body() required MotivoDeConfiguracionDto body,
   });
 
+  /// Los puntos de acceso que se pueden abrir en este equipo
+  @GET('/copropiedades/{id}/equipos/{equipoId}/puntos')
+  Future<PuntosDeAccesoDto> salidasControllerPuntos({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+  });
+
   /// Vuelve a poner en servicio un equipo dado de baja
   @POST('/copropiedades/{id}/equipos/{equipoId}/reactivacion')
   Future<EquipoDto> equiposControllerReactivar({
     @Path('id') required String id,
     @Path('equipoId') required String equipoId,
+  });
+
+  /// Las salidas que el videoportero declara y las persistidas
+  @GET('/copropiedades/{id}/equipos/{equipoId}/salidas')
+  Future<SalidasDelEquipoDto> salidasControllerConsultar({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+  });
+
+  /// Lee las salidas del videoportero y las persiste como puntos de acceso
+  @POST('/copropiedades/{id}/equipos/{equipoId}/salidas/descubrir')
+  Future<SalidasDelEquipoDto> salidasControllerDescubrir({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+  });
+
+  /// Cambia el nombre de un punto de acceso
+  @PATCH('/copropiedades/{id}/equipos/{equipoId}/salidas/{puntoId}')
+  Future<PuntoDeAccesoDto> salidasControllerRenombrar({
+    @Path('id') required String id,
+    @Path('equipoId') required String equipoId,
+    @Path('puntoId') required String puntoId,
+    @Body() required NombreDePuntoDto body,
   });
 
   /// F2 · activa o desactiva la verificación remota de la terminal (AcsCfg) y la lee de vuelta. Desactivarla es el plan B sin código

@@ -23,6 +23,10 @@ import type { AjustesDePersona } from '../terminal/persona-en-el-equipo';
 import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
 import { Videoportero } from '../videoportero/videoportero';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
+import { IntercomIsapiPersistente } from '../videoportero/intercom-isapi-persistente';
+import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
+import { leerSalidasDelEquipo } from '../videoportero/salidas-del-equipo';
+import type { NodoDeSalidas } from '../nucleo/salidas';
 import { EscuchaDeAlertStream, transporteSegunCapacidades } from '../equipo/escucha-alertstream';
 import type { EscuchaActiva, TransporteDeEscucha } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
@@ -42,8 +46,9 @@ import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
 import { CapacidadNoSoportada, CredencialRechazada, VideoNoReproducible } from '../nucleo/errores';
-import { POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
+import { MEDIO_DE_ESPERA_REAL, POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
 import type { MedioDeEspera } from '../nucleo/reintentos';
+import { publicarConEspera } from '../nucleo/publicacion-con-espera';
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
@@ -125,7 +130,15 @@ export interface OpcionesDeHikvision {
    * desviado, no se da de alta a nadie con vigencia en él.
    */
   readonly desvioDeRelojMaximoS?: number;
+  /**
+   * 15-P · cómo viajan los bytes del audio con el videoportero:
+   * `persistente` (manual de la familia: `audioData` crudo, sin `chunked`) o
+   * `fetch` (el de siempre). Lo decide `GUARDIA_AUDIO_TRANSPORTE` en la API.
+   */
+  readonly audioDelEquipo?: 'fetch' | 'persistente';
 }
+
+const VACIOS = { capacidades: null, ordenRemota: null, unidadesSeguras: null, submodulos: null };
 
 const FAMILIA_DE: Record<EquipoRegistrado['tipo'], 'camara' | 'terminal' | 'videoportero'> = {
   camara_lpr: 'camara',
@@ -153,7 +166,7 @@ export class HikvisionProvider
   private readonly capacidades = new Map<string, CapacidadesDeEquipo>();
   private readonly puertas = new Map<string, AccessPointProvider>();
   private readonly terminales = new Map<string, TerminalFacial>();
-  private readonly intercomos = new Map<string, IntercomDeEquipo>();
+  private readonly intercomos = new Map<string, IntercomProvider>();
   /** A4 · escuchas abiertas, una por equipo. */
   private readonly escuchas = new Map<string, EscuchaActiva>();
   /**
@@ -280,6 +293,39 @@ export class HikvisionProvider
       };
     }
     // A5 · ocupado o nonce vencido se reintentan con dispersión; nada más.
+    return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
+  }
+
+  // ── 15-P · P3 · salidas del videoportero ─────────────────────────────────
+
+  /** El árbol equipo → módulo → salida que el videoportero DECLARA. */
+  async salidasDe(dispositivoId: string): Promise<NodoDeSalidas> {
+    const equipo = await this.resolver(dispositivoId);
+    const ficha = equipo.numeroDePuerta ?? null;
+    if (equipo.tipo === 'intercom') {
+      return leerSalidasDelEquipo(this.conexionDe(equipo), equipo.modelo ?? 'Videoportero', ficha);
+    }
+    // Otros equipos no se recorren: su salida es la que declara su ficha.
+    return construirArbolDeSalidas(equipo.modelo ?? 'Equipo', VACIOS, ficha);
+  }
+
+  /** Abre UNA salida del videoportero (`open`; nunca libre ni bloqueada). */
+  async abrirSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    actorId: string,
+  ): Promise<ResultadoAccionamiento> {
+    const equipo = await this.resolver(dispositivoId);
+    if (equipo.tipo !== 'intercom') return this.abrir(dispositivoId, actorId);
+    try {
+      await this.exigirQueNoDecidaSolo(equipo);
+      await this.exigirCapacidad(dispositivoId, 'aperturaRemota');
+    } catch (error) {
+      if (error instanceof EquipoInalcanzable)
+        return { aceptado: false, latenciaMs: error.latenciaMs };
+      throw error;
+    }
+    const puerta = new Videoportero({ ...this.conexionDe(equipo), numeroDePuerta });
     return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
   }
 
@@ -520,11 +566,33 @@ export class HikvisionProvider
   ): Promise<void> {
     try {
       for await (const evento of escucha.escuchar(cancelar)) {
-        await this.fuente.publicar({ evento, foto: null, recorte: null, transporte });
+        // 15-P · 0.2 · si la plataforma tropieza, espera con dispersión y SIGUE:
+        // un fallo momentáneo de la base no deja al equipo mudo para siempre.
+        const desenlace = await publicarConEspera(
+          () => this.fuente.publicar({ evento, foto: null, recorte: null, transporte }),
+          cancelar,
+          this.opciones.medioDeReintento ?? MEDIO_DE_ESPERA_REAL,
+          (intento, error) => {
+            this.opciones.traza?.registrar('aviso', 'escucha: la publicación falló, se reintenta', {
+              dispositivoId: escucha.dispositivoId,
+              intento,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          },
+        );
+        if (desenlace === 'perdido') {
+          this.opciones.traza?.registrar(
+            'error',
+            'escucha: evento perdido tras reintentar; se sigue',
+            {
+              dispositivoId: escucha.dispositivoId,
+            },
+          );
+        }
       }
     } catch (error) {
       // La escucha reintenta sola; si salió del bucle es porque se canceló o
-      // porque publicar falló. Lo segundo se DICE (H-SITIO-14).
+      // porque la propia escucha falló. Lo segundo se DICE (H-SITIO-14).
       if (!cancelar.aborted) {
         this.opciones.traza?.registrar('error', 'escucha: el bombeo hacia la fuente se detuvo', {
           dispositivoId: escucha.dispositivoId,
@@ -635,7 +703,7 @@ export class HikvisionProvider
 
   // ── Interno ──────────────────────────────────────────────────────────────
 
-  private sesionDe(dispositivoId: string): IntercomDeEquipo {
+  private sesionDe(dispositivoId: string): IntercomProvider {
     const intercom = this.sesiones.has(dispositivoId)
       ? this.intercomos.get(dispositivoId)
       : undefined;
@@ -933,7 +1001,7 @@ export class HikvisionProvider
     return await this.nuevaTerminal(equipo);
   }
 
-  private async intercomDe(dispositivoId: string): Promise<IntercomDeEquipo> {
+  private async intercomDe(dispositivoId: string): Promise<IntercomProvider> {
     const guardado = this.intercomos.get(dispositivoId);
     if (guardado !== undefined) return guardado;
 
@@ -941,7 +1009,9 @@ export class HikvisionProvider
     // El canal se LEE de lo que el equipo declara (D4): sin capacidad de audio
     // no hay sesión, y sin canal descubierto tampoco.
     const capacidades = await this.exigirCapacidad(dispositivoId, 'audioBidireccional');
-    const creado = new IntercomDeEquipo({
+    const Adaptador =
+      this.opciones.audioDelEquipo === 'persistente' ? IntercomIsapiPersistente : IntercomDeEquipo;
+    const creado = new Adaptador({
       ...this.conexionDe(equipo),
       reloj: this.opciones.reloj,
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,

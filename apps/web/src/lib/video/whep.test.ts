@@ -151,3 +151,53 @@ describe('D3 (15-L) · la conexión que se cae después de negociar', () => {
     expect(cortes).toBe(1);
   });
 });
+
+describe('15-P · 0.4 · una sola negociación en vuelo', () => {
+  const colgada = () => {
+    const conexion = new ConexionFalsa();
+    const fetchFn = vi.fn(
+      (_e: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_ok, mal) => {
+          init?.signal?.addEventListener('abort', () =>
+            mal(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+    ) as unknown as typeof fetch;
+    return { conexion, fetchFn };
+  };
+
+  it('al empezar otra, la que estaba en vuelo se aborta: fetch cancelado y conexión cerrada', async () => {
+    const primera = colgada();
+    const enVuelo = negociarVistaEnVivo(rutaWhep('cop-a', 'disp-1'), {
+      alFlujo: () => undefined,
+      crearConexion: () => primera.conexion as unknown as RTCPeerConnection,
+      fetchFn: primera.fetchFn,
+    });
+    const segunda = new ConexionFalsa();
+    const lista = negociarVistaEnVivo(rutaWhep('cop-a', 'disp-2'), {
+      alFlujo: () => undefined,
+      crearConexion: () => segunda as unknown as RTCPeerConnection,
+      fetchFn: (async () => new Response('v=0', { status: 201 })) as unknown as typeof fetch,
+    });
+    await expect(enVuelo).rejects.toMatchObject({ codigo: 'cancelada' });
+    expect(primera.conexion.cerrada).toBe(true);
+    const salida = await lista;
+    expect(segunda.cerrada).toBe(false);
+    salida.cerrar();
+  });
+
+  it('quien la pidió la cancela (cambio de equipo): se aborta en el acto', async () => {
+    const { conexion, fetchFn } = colgada();
+    const cancelar = new AbortController();
+    const enVuelo = negociarVistaEnVivo(rutaWhep('cop-a', 'disp-1'), {
+      alFlujo: () => undefined,
+      crearConexion: () => conexion as unknown as RTCPeerConnection,
+      fetchFn,
+      senal: cancelar.signal,
+    });
+    cancelar.abort();
+    await expect(enVuelo).rejects.toBeInstanceOf(ErrorDeVistaEnVivo);
+    await expect(enVuelo).rejects.toMatchObject({ codigo: 'cancelada' });
+    expect(conexion.cerrada).toBe(true);
+  });
+});

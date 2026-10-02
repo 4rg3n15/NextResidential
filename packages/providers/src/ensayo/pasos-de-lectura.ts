@@ -155,7 +155,9 @@ export const pasoDeVideo = (d: DiagnosticoDeEquipo, familia: FamiliaDeEnsayo): R
       ? v.sustituido === null || v.sustituido === undefined
         ? ', declarado por el equipo'
         : `, declarado por el equipo en lugar del ${v.sustituido}`
-      : '');
+      : v.origenDelCanal === 'por_omision'
+        ? ', por omisión: el equipo no lista sus canales'
+        : '');
   if (v.clase === 'credencial') {
     return resultado(
       'video',

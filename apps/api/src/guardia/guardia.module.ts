@@ -20,7 +20,9 @@ import {
   PreferenciasDeAtencionPg,
 } from './infraestructura/preferencias-de-atencion-pg';
 import { ConstanciaDeOrdenesEnLineaDeTiempo } from './infraestructura/constancia-de-ordenes';
-import { EquiposModule } from '../equipos';
+import { EquiposModule, PuntosDeOperacion } from '../equipos';
+import { PUNTOS_DEL_EQUIPO } from './aplicacion/puntos-del-equipo';
+import type { PuntosDelEquipo } from './aplicacion/puntos-del-equipo';
 import type { DynamicModule } from '@nestjs/common';
 import { BITACORA, GENERADOR_DE_ID, RELOJ } from '@ncr/domain-core';
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
@@ -58,6 +60,11 @@ import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
 import { Pool } from 'pg';
 import { CanalIntercomConTransporte } from './infraestructura/canal-intercom-con-transporte';
 import { anunciarAccionador } from './infraestructura/aviso-de-arranque-del-accionador';
+import { REGISTRO_DE_CONVERSACIONES } from './aplicacion/conversacion-de-audio';
+import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/conversaciones-pg';
+import { AudioController } from './presentacion/audio/audio.controller';
+import { BilletesDeAudio } from './presentacion/audio/billetes-de-audio';
+import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -84,7 +91,7 @@ export class GuardiaModule {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [GuardiaController, VideoController, AtencionController],
+      controllers: [GuardiaController, VideoController, AtencionController, AudioController],
       providers: [
         /**
          * G1 · G2 (15-N) · la cola de atención (P-22) y las preferencias de la
@@ -208,10 +215,35 @@ export class GuardiaModule {
            * conoce sigue repartiendo turnos sin audio, y lo dice.
            */
           provide: CANAL_DE_INTERCOM,
-          inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA],
-          useFactory: (reloj: Reloj, proveedor: ProveedorDeEquipos, bitacora: Bitacora) =>
-            new CanalIntercomConTransporte(new CanalIntercomEnProceso(reloj), proveedor, bitacora),
+          inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA, CONFIGURACION],
+          useFactory: (
+            reloj: Reloj,
+            proveedor: ProveedorDeEquipos,
+            bitacora: Bitacora,
+            configuracion: Configuracion,
+          ) =>
+            new CanalIntercomConTransporte(
+              new CanalIntercomEnProceso(reloj),
+              proveedor,
+              bitacora,
+              configuracion.GUARDIA_AUDIO_TRANSPORTE,
+            ),
         },
+        /**
+         * 15-P · P2 · el audio por WebSocket (ADR-01, enmienda 15-P): billetes
+         * de un solo uso, la puerta de la actualización y la constancia de cada
+         * conversación (en la base con el histórico; si no, en el proceso).
+         */
+        { provide: BilletesDeAudio, useFactory: () => new BilletesDeAudio() },
+        {
+          provide: REGISTRO_DE_CONVERSACIONES,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (configuracion: Configuracion, pool: Pool) =>
+            configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new ConversacionesPg(pool)
+              : new ConversacionesEnMemoria(),
+        },
+        PuertaDeAudioPorWebSocket,
         {
           /**
            * A5 · el puente de video existe sólo si `GO2RTC_URL` está: sin él
@@ -244,6 +276,23 @@ export class GuardiaModule {
           ) => new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj),
         },
         {
+          /**
+           * 15-P · P3 · la puerta del punto elegido, resuelta por el módulo de
+           * equipos (dueño de `puntos_de_acceso`) con la identidad de quien
+           * ordena: la RLS y el alcance deciden qué puntos existen para él.
+           */
+          provide: PUNTOS_DEL_EQUIPO,
+          inject: [PuntosDeOperacion],
+          useFactory: (operacion: PuntosDeOperacion): PuntosDelEquipo => ({
+            resolver: async (ctx, copropiedadId, dispositivoId, puntoId) => {
+              const p = await operacion.resolver(ctx, copropiedadId, dispositivoId, puntoId);
+              return p === null
+                ? null
+                : { id: p.id, nombre: p.nombre, numeroDePuerta: p.numeroDePuerta };
+            },
+          }),
+        },
+        {
           provide: AccionarPuertaAMano,
           inject: [
             ACCIONADOR_DE_PUERTA,
@@ -252,6 +301,7 @@ export class GuardiaModule {
             GENERADOR_DE_ID,
             REGISTRO_DE_EVENTOS_DE_EQUIPO,
             BITACORA,
+            PUNTOS_DEL_EQUIPO,
           ],
           useFactory: (
             accionador: AccionadorDePuerta,
@@ -260,6 +310,7 @@ export class GuardiaModule {
             ids: GeneradorDeId,
             eventosDeEquipo: RegistroDeEventosDeEquipo,
             bitacora: Bitacora,
+            puntos: PuntosDelEquipo,
           ) =>
             new AccionarPuertaAMano(
               accionador,
@@ -268,6 +319,7 @@ export class GuardiaModule {
               ids,
               // A1 (15-L) · la orden, con su desenlace, en la línea de tiempo.
               new ConstanciaDeOrdenesEnLineaDeTiempo(eventosDeEquipo, bitacora),
+              puntos,
             ),
         },
       ],

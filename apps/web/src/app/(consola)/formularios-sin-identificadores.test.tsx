@@ -524,6 +524,14 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'eventos/alertas-abiertas.tsx':
     'las alertas se marcan de la lista que devuelve la API; sólo el motivo se teclea; prueba propia del cuerpo',
+  /**
+   * 15-P · P3 · las salidas del videoportero: «Descubrir» no lleva cuerpo, y el
+   * punto que se renombra viaja EN LA RUTA con el id que devolvió la API; lo
+   * único que se teclea es el nombre (texto, 1–80). Lo comprueba
+   * `dispositivos/salidas-del-equipo.test.tsx`, que mira ruta y cuerpo.
+   */
+  'dispositivos/salidas-del-equipo.tsx':
+    'descubrir va sin cuerpo; el punto viaja en la ruta con el id de la API; sólo el nombre se teclea; prueba propia de ruta y cuerpo',
 };
 
 /**

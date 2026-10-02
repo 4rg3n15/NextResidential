@@ -31,10 +31,15 @@ interface FilaOrden {
   readonly evento_id: string | null;
   readonly resultado: EstadoDeAccionamiento | null;
   readonly detalle: string | null;
+  readonly punto_de_acceso_id: string | null;
+  readonly numero_de_puerta: number | null;
+  readonly nombre_del_punto: string | null;
 }
 
-const CAMPOS = `id, copropiedad_id, accion, motivo, operador_id, rol, dispositivo_id, momento,
-  evento_id, resultado, detalle`;
+// 15-P · el nombre del punto se lee por la clave ajena (0048): el que tenga HOY.
+const CAMPOS = `o.id, o.copropiedad_id, o.accion, o.motivo, o.operador_id, o.rol, o.dispositivo_id,
+  o.momento, o.evento_id, o.resultado, o.detalle, o.punto_de_acceso_id, o.numero_de_puerta,
+  p.nombre AS nombre_del_punto`;
 
 const aOrden = (f: FilaOrden): OrdenEjecutada => ({
   id: f.id,
@@ -48,6 +53,15 @@ const aOrden = (f: FilaOrden): OrdenEjecutada => ({
   eventoId: f.evento_id,
   resultado: f.resultado,
   detalle: f.detalle,
+  ...(f.punto_de_acceso_id === null || f.numero_de_puerta === null
+    ? {}
+    : {
+        punto: {
+          id: f.punto_de_acceso_id,
+          nombre: f.nombre_del_punto ?? `Puerta ${String(f.numero_de_puerta)}`,
+          numeroDePuerta: f.numero_de_puerta,
+        },
+      }),
 });
 
 export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
@@ -69,8 +83,9 @@ export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
     await this.conServicio(orden.copropiedadId, async (c) => {
       await c.query(
         `INSERT INTO public.ordenes_manuales (id, copropiedad_id, accion, motivo, operador_id, rol,
-           dispositivo_id, momento, evento_id, resultado, detalle, creado_por, actualizado_por)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$5,$5)
+           dispositivo_id, momento, evento_id, resultado, detalle, punto_de_acceso_id,
+           numero_de_puerta, creado_por, actualizado_por)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$5,$5)
          ON CONFLICT (id) DO NOTHING`,
         [
           orden.id,
@@ -84,6 +99,8 @@ export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
           orden.eventoId,
           orden.resultado ?? null,
           orden.detalle ?? null,
+          orden.punto?.id ?? null,
+          orden.punto?.numeroDePuerta ?? null,
         ],
       );
     });
@@ -107,8 +124,10 @@ export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
   async ultimas(copropiedadId: string, cuantas: number): Promise<readonly OrdenEjecutada[]> {
     return this.conServicio(copropiedadId, async (c) => {
       const { rows } = await c.query<FilaOrden>(
-        `SELECT ${CAMPOS} FROM public.ordenes_manuales
-          WHERE copropiedad_id = $1 ORDER BY momento DESC LIMIT $2`,
+        `SELECT ${CAMPOS} FROM public.ordenes_manuales o
+           LEFT JOIN public.puntos_de_acceso p
+             ON p.copropiedad_id = o.copropiedad_id AND p.id = o.punto_de_acceso_id
+          WHERE o.copropiedad_id = $1 ORDER BY o.momento DESC LIMIT $2`,
         [copropiedadId, Math.max(1, Math.min(cuantas, 200))],
       );
       return rows.map(aOrden);

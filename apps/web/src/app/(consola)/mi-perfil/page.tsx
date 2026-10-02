@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { Portero } from '@ncr/contracts';
 import { sesionActual } from '@/lib/sesion/servidor';
-import { tokenVigente } from '@/lib/sesion/token';
+import { tokenDeLectura } from '@/lib/sesion/token';
 import { configuracion } from '@/lib/configuracion';
 import { reenvioDeIpActual } from '@/lib/sesion/ip-del-navegador';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Mi perfil' };
 export const dynamic = 'force-dynamic';
 
 const perfil = async (): Promise<Portero | null> => {
-  const token = await tokenVigente();
+  const token = await tokenDeLectura();
   if (token === null) return null;
   try {
     const r = await fetch(`${configuracion().apiUrl}/porteria/perfil`, {

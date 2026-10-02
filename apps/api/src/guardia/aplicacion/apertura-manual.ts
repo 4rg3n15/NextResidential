@@ -8,6 +8,8 @@ import type {
 } from '@ncr/domain-core';
 import type { ContextoTenant, Rol } from '../../autenticacion';
 import { alcanzaCopropiedad } from '../../autenticacion';
+import { SIN_PUNTOS } from './puntos-del-equipo';
+import type { PuntoDeLaOrden, PuntosDelEquipo } from './puntos-del-equipo';
 
 /**
  * Apertura y negación MANUAL desde portería y guardia virtual.
@@ -55,6 +57,8 @@ export interface OrdenManual {
   readonly motivo: string;
   /** Evento que se está atendiendo, si la orden responde a uno. */
   readonly eventoId?: string | null;
+  /** 15-P · P3 · el punto de acceso elegido; sin él, la puerta de la ficha. */
+  readonly puntoId?: string | null;
 }
 
 /**
@@ -83,6 +87,8 @@ export interface OrdenEjecutada {
   readonly resultado?: EstadoDeAccionamiento | null;
   /** Lo que contestó el equipo, ya en lenguaje del operador. */
   readonly detalle?: string | null;
+  /** 15-P · P3 · el punto que se abrió (o negó) y la puerta que se mandó. */
+  readonly punto?: PuntoDeLaOrden | null;
 }
 
 /**
@@ -107,6 +113,8 @@ export interface AccionadorDePuerta {
     dispositivoId: string,
     abrir: boolean,
     actorId: string,
+    /** 15-P · P3 · la puerta del punto elegido; sin ella, la de la ficha (R1). */
+    numeroDePuerta?: number,
   ): Promise<ResultadoDeAccionamiento>;
 }
 export const ACCIONADOR_DE_PUERTA = Symbol.for('ncr.puerto.AccionadorDePuerta');
@@ -192,6 +200,7 @@ export class AccionarPuertaAMano {
     private readonly reloj: Reloj,
     private readonly ids: GeneradorDeId,
     private readonly constancia: ConstanciaDeOrdenes = { registrar: async () => undefined },
+    private readonly puntos: PuntosDelEquipo = SIN_PUNTOS,
   ) {}
 
   async ejecutar(
@@ -212,6 +221,27 @@ export class AccionarPuertaAMano {
     const motivo = motivoValido(orden.motivo);
     if (!motivo.ok) return motivo;
 
+    // 15-P · P3 · también ANTES de registrar: un punto que no existe no es
+    // una orden que falló, es una orden que no se da.
+    let punto: PuntoDeLaOrden | null = null;
+    if (orden.puntoId !== undefined && orden.puntoId !== null) {
+      punto = await this.puntos.resolver(
+        ctx,
+        orden.copropiedadId,
+        orden.dispositivoId,
+        orden.puntoId,
+      );
+      if (punto === null) {
+        return fallo(
+          errorDominio(
+            'ENTIDAD_NO_ENCONTRADA',
+            'Ese punto de acceso no es de este equipo o está dado de baja: la orden no sale',
+            'RN-08',
+          ),
+        );
+      }
+    }
+
     const ejecutada: OrdenEjecutada = {
       id: this.ids.nuevo(),
       copropiedadId: orden.copropiedadId,
@@ -222,6 +252,7 @@ export class AccionarPuertaAMano {
       dispositivoId: orden.dispositivoId,
       momento: this.reloj.ahora(),
       eventoId: orden.eventoId ?? null,
+      ...(punto === null ? {} : { punto }),
     };
 
     /**
@@ -238,7 +269,15 @@ export class AccionarPuertaAMano {
       return exito(ejecutada);
     }
 
-    const resultado = await this.accionador.accionar(orden.dispositivoId, true, ctx.usuarioId);
+    const resultado =
+      punto === null
+        ? await this.accionador.accionar(orden.dispositivoId, true, ctx.usuarioId)
+        : await this.accionador.accionar(
+            orden.dispositivoId,
+            true,
+            ctx.usuarioId,
+            punto.numeroDePuerta,
+          );
     const detalle = resultado.estado === 'aceptada' ? null : resultado.motivo;
     await this.bitacora.anotarResultado(
       ejecutada.copropiedadId,

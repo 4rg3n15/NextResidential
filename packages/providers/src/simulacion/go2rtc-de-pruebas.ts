@@ -110,5 +110,25 @@ export const arrancarGo2rtc = async (
   return { url, rutaYaml, yaml: () => readFileSync(rutaYaml, 'utf8'), cerrar };
 };
 
+/**
+ * 15-P · P1 · las DOS fuentes del flujo cuando el puente lleva también el audio
+ * (opción A del ADR-01 enmendado, contingencia): el RTSP del equipo sin el canal
+ * de retorno ONVIF —el fallo del 28/09— y el canal de retorno del fabricante.
+ * Sólo para el banco de medida y el procedimiento de sitio: el producto no lo usa.
+ */
+export const fuentesDeAudioParaGo2rtc = (equipo: {
+  readonly host: string;
+  readonly puertoHttp: number;
+  readonly puertoRtsp: number;
+  readonly usuario: string;
+  readonly clave: string;
+}): readonly [string, string] => {
+  const credencial = `${encodeURIComponent(equipo.usuario)}:${encodeURIComponent(equipo.clave)}`;
+  return [
+    `rtsp://${credencial}@${equipo.host}:${String(equipo.puertoRtsp)}/Streaming/Channels/101#backchannel=0`,
+    `isapi://${credencial}@${equipo.host}:${String(equipo.puertoHttp)}/`,
+  ];
+};
+
 /** La misma oferta con la que el ensayo en sitio negocia contra el puente real. */
 export { OFERTA_SDP_DE_SONDA as OFERTA_SDP_DE_PRUEBA } from '../ensayo/oferta-sdp-de-sonda';

@@ -44,6 +44,21 @@ const registrar = (puente: Go2rtcDePruebas, metodo: 'PUT' | 'PATCH', nombre: str
     method: metodo,
   });
 
+/**
+ * 15-P · go2rtc v1.9.14 contesta la negociación en cuanto el productor tiene
+ * pistas (tras `SETUP`) y manda el `PLAY` en una gorrutina aparte
+ * (`internal/streams/add_consumer.go:111` → `producer.go:157`, `go p.worker`).
+ * Bajo carga, mirar los métodos justo al recibir la respuesta pierde esa
+ * carrera. Esto ESPERA al `PLAY` —hasta 3 s— antes de la misma aserción; no
+ * la cambia: si el `PLAY` no llega, sigue fallando.
+ */
+const hastaQue = async (condicion: () => boolean, plazoMs = 3000): Promise<void> => {
+  const limite = Date.now() + plazoMs;
+  while (!condicion() && Date.now() < limite) {
+    await new Promise((listo) => setTimeout(listo, 25));
+  }
+};
+
 const negociar = async (puente: Go2rtcDePruebas, nombre: string) => {
   const r = await fetch(`${puente.url}/api/webrtc?${new URLSearchParams({ src: nombre })}`, {
     method: 'POST',
@@ -121,6 +136,7 @@ describe.skipIf(binario === null)(
       // Ni un DESCRIBE con backchannel más: la corrección evita la conexión cerrada.
       expect(camara.describesConBackchannel()).toBe(1);
       expect(camara.metodos()).toContain('SETUP');
+      await hastaQue(() => camara.metodos().includes('PLAY'));
       expect(camara.metodos()).toContain('PLAY');
       // Sin STUN la respuesta llega enseguida (KPI-33): con el STUN por omisión tardaba 5 s.
       expect(tardo).toBeLessThan(3000);

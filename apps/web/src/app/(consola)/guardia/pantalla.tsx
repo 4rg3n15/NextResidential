@@ -1,11 +1,19 @@
 'use client';
 
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mic, MicOff, PhoneCall, Siren } from 'lucide-react';
 import { ControlesDeAudio } from '@/componentes/controles-de-audio';
+import { ControlesDeAudioWs } from '@/componentes/controles-de-audio-ws';
 import { EquiposEnVivo } from './equipos-en-vivo';
+import {
+  SelectorDePunto,
+  faltaElegirPunto,
+  puntoDeLaOrden,
+  usePuntosDelEquipo,
+} from './selector-de-punto';
+import type { PuntoElegido } from './selector-de-punto';
 import { cliente, desenvolver, ErrorDeApi } from '@/lib/api/cliente';
 import { useColaDeAtencion } from '@/lib/api/consultas';
 import { useAtencion } from '@/lib/atencion/use-atencion';
@@ -132,6 +140,21 @@ export const PantallaDeGuardiaVirtual = ({
           } · esperando ${String(actual.esperaSegundos)} s`,
         };
 
+  /**
+   * 15-P · P3 · el punto elegido, atado al equipo en que se eligió: cambiar de
+   * equipo en atención lo olvida sin efecto aparte (no se abre la cerradura 2
+   * de otro videoportero porque se eligió aquí).
+   */
+  const [eleccion, setEleccion] = useState<{
+    readonly dispositivoId: string;
+    readonly punto: PuntoElegido | null;
+  } | null>(null);
+  const puntos = usePuntosDelEquipo(copropiedadId, foco?.dispositivoId);
+  const elegido =
+    eleccion?.dispositivoId === foco?.dispositivoId ? (eleccion?.punto ?? null) : null;
+  const punto = puntoDeLaOrden(puntos.data, elegido);
+  const hayQueElegir = faltaElegirPunto(puntos.data, elegido);
+
   const canal = useQuery({
     queryKey: ['guardia', copropiedadId, 'canal', foco?.dispositivoId],
     enabled: foco !== undefined,
@@ -143,6 +166,20 @@ export const PantallaDeGuardiaVirtual = ({
         }),
       ),
   });
+
+  /**
+   * 15-P · el billete del WebSocket de audio, del equipo en foco. Estable
+   * mientras no cambie el equipo: el componente reabre el audio si cambia.
+   */
+  const dispositivoEnFoco = foco?.dispositivoId;
+  const pedirBillete = useCallback(async (): Promise<string> => {
+    const r = desenvolver(
+      await cliente.POST('/copropiedades/{id}/guardia/intercom/{dispositivoId}/billete', {
+        params: { path: { id: copropiedadId, dispositivoId: dispositivoEnFoco ?? '' } },
+      }),
+    );
+    return r.billete;
+  }, [copropiedadId, dispositivoEnFoco]);
 
   const invalidar = (): void => {
     void clienteDeConsulta.invalidateQueries({ queryKey: ['guardia', copropiedadId] });
@@ -193,6 +230,8 @@ export const PantallaDeGuardiaVirtual = ({
             // en vez de viajar como `undefined`. El DTO lo declara opcional, no
             // «opcional o nulo», y la diferencia la comprueba el compilador.
             ...(foco?.eventoId === undefined ? {} : { eventoId: foco.eventoId }),
+            // 15-P · P3 · la puerta elegida; sin punto, la de la ficha del equipo.
+            ...(punto === null ? {} : { puntoId: punto.id }),
           },
         }),
       ),
@@ -428,11 +467,21 @@ export const PantallaDeGuardiaVirtual = ({
 
                   {/* ── A4 · el audio en sí, sólo con la palabra y con transporte ── */}
                   {tienePalabra && canal.data?.transporte === 'equipo' ? (
-                    <ControlesDeAudio
-                      copropiedadId={copropiedadId}
-                      dispositivoId={foco.dispositivoId}
-                      formatoAnunciado={canal.data.formatoDeAudio}
-                    />
+                    canal.data.via === 'websocket' ? (
+                      // 15-P · el canal ordenado (ADR-01, enmienda 15-P). La
+                      // clave por equipo cuelga el anterior al cambiar de foco.
+                      <ControlesDeAudioWs
+                        key={foco.dispositivoId}
+                        formatoAnunciado={canal.data.formatoDeAudio}
+                        pedirBillete={pedirBillete}
+                      />
+                    ) : (
+                      <ControlesDeAudio
+                        copropiedadId={copropiedadId}
+                        dispositivoId={foco.dispositivoId}
+                        formatoAnunciado={canal.data.formatoDeAudio}
+                      />
+                    )
                   ) : tienePalabra ? (
                     <p className="text-distintivo text-aviso-texto" role="status">
                       Tienes la palabra y no hay audio:{' '}
@@ -440,15 +489,26 @@ export const PantallaDeGuardiaVirtual = ({
                     </p>
                   ) : null}
 
+                  {/* ── 15-P · P3 · qué puerta del equipo (la apertura NO va por el audio) ── */}
+                  <SelectorDePunto
+                    puntos={puntos}
+                    elegido={punto}
+                    alElegir={(p) => setEleccion({ dispositivoId: foco.dispositivoId, punto: p })}
+                  />
+
                   <div className="flex flex-wrap gap-2">
                     <Boton
                       variante="exito"
+                      disabled={hayQueElegir}
+                      {...(hayQueElegir
+                        ? { title: 'Elija primero qué puerta abrir: el equipo tiene varias' }
+                        : {})}
                       onClick={() => {
                         setError(undefined);
                         setPidiendo('abrir');
                       }}
                     >
-                      Abrir con motivo
+                      {punto === null ? 'Abrir con motivo' : `Abrir ${punto.nombre} con motivo`}
                     </Boton>
                     <Boton
                       variante="peligro"
@@ -536,7 +596,9 @@ export const PantallaDeGuardiaVirtual = ({
             pidiendo === 'emergencia'
               ? 'Declarar emergencia'
               : pidiendo === 'abrir'
-                ? 'Abrir la puerta'
+                ? punto === null
+                  ? 'Abrir la puerta'
+                  : `Abrir · ${punto.nombre}`
                 : 'Negar el acceso'
           }
           descripcion={

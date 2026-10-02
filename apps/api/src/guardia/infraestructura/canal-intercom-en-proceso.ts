@@ -3,7 +3,9 @@ import {
   TIMEOUT_DE_CANAL_SEGUNDOS,
   canalLibre,
   conVencimientosAplicados,
+  esExito,
   esperaDe,
+  renovarActividad,
   solicitarCanal,
   soltarCanal,
 } from '@ncr/domain-core';
@@ -68,6 +70,7 @@ export class CanalIntercomEnProceso implements CanalDeIntercom {
       transporte: 'ninguno',
       formatoDeAudio: null,
       detalleTransporte: 'canal sin transporte de audio: sólo exclusividad',
+      via: 'http',
     };
   }
 
@@ -113,6 +116,22 @@ export class CanalIntercomEnProceso implements CanalDeIntercom {
     );
     this.canales.set(this.clave(copropiedadId, dispositivoId), vigente);
     return this.aDto(vigente, operadorId);
+  }
+
+  async renovar(
+    copropiedadId: string,
+    dispositivoId: string,
+    operadorId: string,
+  ): Promise<boolean> {
+    const r = renovarActividad(
+      this.leer(copropiedadId, dispositivoId),
+      operadorId,
+      this.reloj.ahora(),
+      this.margenSegundos,
+    );
+    if (!esExito(r)) return false;
+    this.canales.set(this.clave(copropiedadId, dispositivoId), r.valor);
+    return true;
   }
 
   /** En proceso no hay equipo: el turno existe, el audio no. */

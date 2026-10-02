@@ -103,3 +103,43 @@ describe('HikvisionProvider · escuchar (A4)', () => {
     expect(escucha.detalle).toMatch(/servidor de alarma/);
   });
 });
+
+describe('15-P · 0.2 · la plataforma tropieza y el bombeo sigue', () => {
+  it('dos fallos al publicar no dejan al equipo mudo: la llamada entra al tercer intento', async () => {
+    const fuente = new FuenteDePlacas();
+    const recibidas: PublicacionDeEquipo[] = [];
+    let intentos = 0;
+    let avisar = (): void => undefined;
+    const entro = new Promise<void>((listo) => {
+      avisar = listo;
+    });
+    fuente.fijarIngestor({
+      ingerir: async (publicacion) => {
+        intentos += 1;
+        if (intentos <= 2) throw new Error('Connection terminated unexpectedly');
+        recibidas.push(publicacion);
+        avisar();
+        return { registrado: true, motivo: 'tercera' };
+      },
+    });
+    const esperas: number[] = [];
+    const proveedor = new HikvisionProvider({
+      registro: new RegistroEnMemoria(EQUIPOS),
+      reloj: RELOJ,
+      fuente,
+      peticion: equiposSimulados({
+        '203.0.113.12': { familia: 'videoportero', ...CREDENCIAL, flujo: [LLAMADA] },
+      }),
+      medioDeReintento: { esperar: async (ms) => void esperas.push(ms), azar: () => 0.5 },
+    });
+    const escucha = await proveedor.escuchar(PORTERO);
+    await Promise.race([
+      entro,
+      new Promise((_, no) => setTimeout(() => no(new Error('el bombeo se detuvo')), 2000)),
+    ]);
+    escucha.detener();
+    expect(intentos).toBe(3);
+    expect(recibidas[0]?.evento.tipo).toBe('llamada');
+    expect(esperas).toEqual([100, 200]);
+  });
+});

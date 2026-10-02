@@ -48,6 +48,23 @@ export class OrdenManualDto {
   @IsOptional()
   @IsUUID()
   eventoId?: string;
+
+  @ApiProperty({
+    required: false,
+    format: 'uuid',
+    description:
+      '15-P · el punto de acceso del equipo que se abre. Sin él, la puerta de la ficha. ' +
+      'Un punto de otro equipo, de otra copropiedad o dado de baja: 404 y la orden no sale.',
+  })
+  @IsOptional()
+  @IsUUID()
+  puntoId?: string;
+}
+
+export class PuntoDeLaOrdenDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() nombre!: string;
+  @ApiProperty({ type: Number }) numeroDePuerta!: number;
 }
 
 export class OrdenEjecutadaDto {
@@ -81,6 +98,13 @@ export class OrdenEjecutadaDto {
 
   @ApiProperty({ type: String, nullable: true, description: 'Lo que contestó el equipo.' })
   detalle!: string | null;
+
+  @ApiProperty({
+    type: PuntoDeLaOrdenDto,
+    nullable: true,
+    description: '15-P · el punto elegido; nulo = la puerta de la ficha del equipo.',
+  })
+  punto!: PuntoDeLaOrdenDto | null;
 }
 
 export class HistorialDeOrdenesDto {
@@ -230,6 +254,27 @@ export class EstadoDeCanalDto {
       'La consola decodifica lo que el equipo dice.',
   })
   formatoDeAudio!: string | null;
+
+  @ApiProperty({
+    enum: ['websocket', 'http'],
+    description:
+      '15-P · por dónde viaja el audio entre la consola y la API (GUARDIA_AUDIO_TRANSPORTE). ' +
+      '«websocket»: billete de un solo uso y un canal ordenado (ADR-01, enmienda 15-P); ' +
+      '«http»: un GET de bajada y un POST por trozo.',
+  })
+  via!: string;
+}
+
+/** 15-P · el billete del WebSocket de audio: de un solo uso y de vida corta. */
+export class BilleteDeAudioDto {
+  @ApiProperty({ description: 'Se presenta UNA vez en `ruta?billete=…`; no es el token de sesión' })
+  billete!: string;
+
+  @ApiProperty({ description: 'Segundos que vale para abrir el WebSocket' })
+  caducaEnSegundos!: number;
+
+  @ApiProperty({ description: 'Ruta del WebSocket en la API (la consola la expone en su origen)' })
+  ruta!: string;
 }
 
 export class AvisoAlResidenteDto {

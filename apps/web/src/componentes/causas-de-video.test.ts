@@ -79,3 +79,19 @@ describe('V5 (15-N) · el título nombra la causa, no sólo el código', () => {
     expect(fraseDeErrorDeVideo('puente', t)).toBe(t);
   });
 });
+
+describe('15-P · 0.5 · H.265: la consola dice CÓMO pasar a H.264, entero', () => {
+  it('el texto del equipo con los pasos llega sin recortar', () => {
+    // El 409 tal como lo arma la API (`VideoNoReproducible` del proveedor).
+    const mensaje =
+      'Este equipo entrega H.265 en el canal 101 y el navegador no lo reproduce. Para verlo: ' +
+      'en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» elija el ' +
+      'principal (canal 101); en «Codificación de video» ponga H.264 y pulse Guardar; o elija ' +
+      'otro canal en su ficha que ya entregue H.264.';
+    const frase = fraseDeErrorDeVideo('sin_video', mensaje);
+    expect(frase).toContain('Configuración › Video/Audio › Video');
+    expect(frase).toContain('«Codificación de video» ponga H.264 y pulse Guardar');
+    expect(frase).toContain('principal (canal 101)');
+    expect(tituloPorCausa(frase)).toBe('Códec que el navegador no reproduce');
+  });
+});

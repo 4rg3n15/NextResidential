@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { origenRtspDe } from './video-rtsp';
-import { SinCanalDeVideo } from '../nucleo/errores';
 import type { EquipoRegistrado } from './registro-de-equipos';
 
 const equipo = (tipo: EquipoRegistrado['tipo']): EquipoRegistrado => ({
@@ -47,8 +46,11 @@ describe('origen RTSP (A5, S-46)', () => {
     expect(origen?.rtsp).toMatch(/Channels\/101#backchannel=0$/);
   });
 
-  it('V2 · nunca el 102 a ciegas: sin ficha y sin lista, se dice por qué', () => {
-    expect(() => origenRtspDe(equipo('camara_lpr'))).toThrow(SinCanalDeVideo);
+  it('V2 · nunca el 102 a ciegas; 15-P (0.5) · sin ficha y sin lista, el 101 por omisión', () => {
+    // Antes era SinCanalDeVideo → 409 «sin video» que nadie podía corregir.
+    const origen = origenRtspDe(equipo('camara_lpr'));
+    expect(origen?.rtsp).toMatch(/\/Streaming\/Channels\/101#backchannel=0$/);
+    expect(origen?.flujo).toBe('principal');
   });
 
   it('C2/D2 (15-L) · el canal sale de la ficha y el puerto de la configuración', () => {

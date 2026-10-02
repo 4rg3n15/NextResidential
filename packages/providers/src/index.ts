@@ -38,6 +38,8 @@
  */
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
+// 15-P · P3 · el árbol de salidas de un equipo (equipo → módulo → salida).
+export * from './nucleo/salidas';
 // R2 (15-N) · el motivo del dominio con que el equipo negó, por su código.
 export { motivoDelEquipo } from './hikvision/catalogo-de-eventos';
 export type { MotivoDelEquipo } from './hikvision/catalogo-de-eventos';
@@ -144,6 +146,19 @@ export * from './simulacion/camara-que-publica';
 export { jpegConMedidas } from './simulacion/imagenes-de-prueba';
 export { negacionesLocalesPor, personasPor } from './simulacion/personas-simuladas';
 export { servidorRtspSimulado } from './simulacion/servidor-rtsp';
+export { ERROR_CANAL_OCUPADO, videoporteroDeAudioEnRed } from './simulacion/videoportero-de-audio';
+export type {
+  EstadoDelVideoporteroEnRed,
+  GuionDeAudioEnRed,
+  VideoporteroDeAudioEnRed,
+} from './simulacion/videoportero-de-audio';
+export {
+  BYTES_POR_TRAMA,
+  DetectorDeMarcas,
+  FuenteDeTramas,
+  tramaDeSilencio,
+  tramaDeTono,
+} from './simulacion/marcas-de-audio';
 export type { ServidorRtspSimulado, GuionRtsp } from './simulacion/servidor-rtsp';
 // E2/C1 (15-M) · el puente real para las pruebas que lo tengan (`GO2RTC_BIN`).
 export {
@@ -151,6 +166,7 @@ export {
   OMITIDA_SIN_BINARIO,
   arrancarGo2rtc,
   binarioGo2rtc,
+  fuentesDeAudioParaGo2rtc,
 } from './simulacion/go2rtc-de-pruebas';
 export type { Go2rtcDePruebas } from './simulacion/go2rtc-de-pruebas';
 // V1 (15-N) · la oferta del navegador, con su CRLF final, para la prueba extremo a extremo.

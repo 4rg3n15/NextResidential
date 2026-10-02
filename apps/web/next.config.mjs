@@ -1,3 +1,8 @@
+export const POLITICA_SIN_MICROFONO =
+  'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
+export const POLITICA_DE_LA_GUARDIA =
+  'camera=(), microphone=(self), geolocation=(), payment=(), usb=()';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -20,17 +25,25 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
           {
-            // Cámara y micrófono solo donde se capturan. La consola de
-            // administración no captura nada; la guardia virtual de la ETAPA 10
-            // relajará esto en SU ruta, no aquí.
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
-          },
-          {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload',
           },
         ],
+      },
+      /**
+       * Cámara y micrófono solo donde se capturan (§2.7.7). 15-P · la guardia
+       * virtual habla con el visitante: SU ruta, y sólo ella, admite el
+       * micrófono del propio origen. Hasta la 15-P la regla era una para todo
+       * —`microphone=()` también en la guardia— y el navegador negaba el
+       * micrófono en la consola compilada: «pulsar para hablar» no podía abrir.
+       */
+      {
+        source: '/((?!guardia(?:/|$)).*)',
+        headers: [{ key: 'Permissions-Policy', value: POLITICA_SIN_MICROFONO }],
+      },
+      {
+        source: '/guardia/:ruta*',
+        headers: [{ key: 'Permissions-Policy', value: POLITICA_DE_LA_GUARDIA }],
       },
       {
         // El service worker no se cachea: si el navegador sirve uno viejo, la

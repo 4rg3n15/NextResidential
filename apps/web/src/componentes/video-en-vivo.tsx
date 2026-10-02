@@ -48,6 +48,8 @@ const TITULO_POR_CODIGO: Record<string, string> = {
   puente: 'El puente de video no responde',
   sin_permiso: 'Sin permiso para ver este equipo',
   navegador: 'Este navegador no reproduce WebRTC',
+  // 15-P · 0.4 · sólo se ve si la cancelación no la pidió este mismo recuadro.
+  cancelada: 'Video cancelado: se abrió otro equipo',
   red: 'No se pudo negociar el video',
 };
 
@@ -71,9 +73,12 @@ export const VideoEnVivo = ({
   useEffect(() => {
     let vigente = true;
     let conexion: ConexionEnVivo | null = null;
+    // 15-P · 0.4 · al cambiar de equipo se ABORTA la negociación en vuelo.
+    const cancelar = new AbortController();
     inicio.current = performance.now();
     setFase({ tipo: 'conectando' });
     negociar(rutaWhep(copropiedadId, dispositivoId), {
+      senal: cancelar.signal,
       alFlujo: (flujo) => {
         if (video.current !== null) video.current.srcObject = flujo;
       },
@@ -107,6 +112,7 @@ export const VideoEnVivo = ({
       });
     return () => {
       vigente = false;
+      cancelar.abort();
       conexion?.cerrar();
       if (video.current !== null) video.current.srcObject = null;
     };

@@ -19,6 +19,7 @@ export type CodigoDeVistaEnVivo =
   | 'puente' // 502 · el puente falló
   | 'sin_permiso' // 401 · 403 · 404
   | 'navegador' // sin RTCPeerConnection
+  | 'cancelada' // 15-P · otra negociación, o el cambio de equipo, la abortó
   | 'red'; // cualquier otra cosa
 
 export class ErrorDeVistaEnVivo extends Error {
@@ -51,7 +52,20 @@ export interface OpcionesDeNegociacion {
    * negro, diciendo «En vivo».
    */
   readonly alCortarse?: () => void;
+  /** 15-P · 0.4 · quien la pidió ya no la quiere (cambió de equipo): se aborta. */
+  readonly senal?: AbortSignal;
 }
+
+/**
+ * 15-P · 0.4 · UNA SOLA NEGOCIACIÓN EN VUELO POR CONSOLA.
+ *
+ * Al cambiar de equipo, la negociación anterior seguía su curso —la oferta
+ * viajaba, el puente abría una sesión— y sólo al terminar se cerraba. Con
+ * cambios rápidos se acumulaban sesiones a medio abrir en el puente. Ahora la
+ * nueva aborta la que esté en vuelo (su `fetch` y su `RTCPeerConnection`); las
+ * sesiones YA establecidas no se tocan: las cierra su dueño.
+ */
+let enVuelo: AbortController | null = null;
 
 export const rutaWhep = (copropiedadId: string, dispositivoId: string): string =>
   `/api/ncr/copropiedades/${encodeURIComponent(copropiedadId)}/guardia/video/${encodeURIComponent(dispositivoId)}/whep`;
@@ -124,9 +138,23 @@ export const negociarVistaEnVivo = async (
     throw new ErrorDeVistaEnVivo('navegador', 'Este navegador no ofrece WebRTC');
   }
   const fetchFn = opciones.fetchFn ?? ((entrada, init) => fetch(entrada, init));
+  const propia = new AbortController();
+  enVuelo?.abort();
+  enVuelo = propia;
+  if (opciones.senal?.aborted === true) propia.abort();
+  opciones.senal?.addEventListener('abort', () => propia.abort(), { once: true });
   // Sin STUN a propósito: consola y puente están en la misma red del conjunto,
   // y los candidatos del puente los pone go2rtc (`webrtc.candidates`).
   const conexion = crear({ iceServers: [] });
+  propia.signal.addEventListener('abort', () => conexion.close(), { once: true });
+  const exigirVigente = (): void => {
+    if (propia.signal.aborted) {
+      throw new ErrorDeVistaEnVivo(
+        'cancelada',
+        'La negociación se canceló: otro equipo en pantalla',
+      );
+    }
+  };
   conexion.addEventListener('track', (evento) => {
     const [flujo] = evento.streams;
     if (flujo !== undefined) opciones.alFlujo(flujo);
@@ -142,18 +170,23 @@ export const negociarVistaEnVivo = async (
     await esperarIce(conexion, opciones.plazoIceMs ?? 1500);
     const sdp = conexion.localDescription?.sdp ?? oferta.sdp ?? '';
 
+    exigirVigente();
     const inicio = performance.now();
     const respuesta = await fetchFn(url, {
       method: 'POST',
       headers: { 'content-type': 'application/sdp', accept: 'application/sdp' },
       body: sdp,
       cache: 'no-store',
+      signal: propia.signal,
     });
+    exigirVigente();
     if (!respuesta.ok) {
       const { mensaje, correlacion } = await cuerpoDelError(respuesta);
       throw new ErrorDeVistaEnVivo(codigoSegunEstado(respuesta.status, correlacion), mensaje);
     }
-    await conexion.setRemoteDescription({ type: 'answer', sdp: await respuesta.text() });
+    const respuestaSdp = await respuesta.text();
+    exigirVigente();
+    await conexion.setRemoteDescription({ type: 'answer', sdp: respuestaSdp });
     return {
       latenciaNegociacionMs: Math.round(performance.now() - inicio),
       cerrar: () => conexion.close(),
@@ -161,6 +194,14 @@ export const negociarVistaEnVivo = async (
   } catch (error) {
     conexion.close();
     if (error instanceof ErrorDeVistaEnVivo) throw error;
+    if (propia.signal.aborted) {
+      throw new ErrorDeVistaEnVivo(
+        'cancelada',
+        'La negociación se canceló: otro equipo en pantalla',
+      );
+    }
     throw new ErrorDeVistaEnVivo('red', error instanceof Error ? error.message : String(error));
+  } finally {
+    if (enVuelo === propia) enVuelo = null;
   }
 };

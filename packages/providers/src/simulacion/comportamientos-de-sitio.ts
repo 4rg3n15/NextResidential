@@ -72,6 +72,8 @@ export const desenlaceDeApertura = (cuerpo: string): DesenlaceDeApertura => {
  * sabe si el relé se movió.
  */
 export const aperturasFisicasPor = new Map<string, number>();
+/** 15-P · P3 · qué PUERTA abrió cada orden aceptada, por rótulo del equipo. */
+export const puertasAbiertasPor = new Map<string, number[]>();
 export const escriturasSinCuerpoPor = new Map<string, number>();
 
 export const anotarEn = (mapa: Map<string, number>, destino: string | undefined): void => {

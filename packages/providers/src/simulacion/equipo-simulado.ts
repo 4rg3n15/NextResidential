@@ -5,6 +5,7 @@ import {
   DigestDelEquipo,
   anotarEn,
   aperturasFisicasPor,
+  puertasAbiertasPor,
   cuerpoVacio,
   desenlaceDeApertura,
   escriturasSinCuerpoPor,
@@ -33,6 +34,9 @@ import {
   documentoDelReceptor,
   entranceParam,
   ordenesDePuerta,
+  capacidadesDeSalidas,
+  estadoDeUnidadesSeguras,
+  listaDeSubmodulos,
   receptorEscrito,
   receptorInicial,
 } from './documentos-del-simulado';
@@ -41,7 +45,11 @@ import { caminoCasa, respuestaDe } from './respuesta-simulada';
 import { conSituacionesDeSitio } from './situaciones-de-sitio';
 import type { SituacionesDeSitio } from './situaciones-de-sitio';
 
-export { aperturasFisicasPor, escriturasSinCuerpoPor } from './comportamientos-de-sitio';
+export {
+  aperturasFisicasPor,
+  escriturasSinCuerpoPor,
+  puertasAbiertasPor,
+} from './comportamientos-de-sitio';
 export {
   FlujoEnVivo,
   desenlacesDeVerificacionPor,
@@ -183,6 +191,26 @@ export interface GuionDeEquipo {
   readonly bibliotecaAlmacenadas?: number;
   /** Órdenes que la puerta admite desde la plataforma. */
   readonly ordenesDePuerta?: readonly string[];
+  /**
+   * 15-P · P3 · las salidas que el videoportero declara: puertas a distancia,
+   * cerraduras (`OpenDoorParams`), unidades de puerta segura, submódulos y
+   * control de ascensor. Sin él, no declara ninguna (como hasta la 15-P).
+   */
+  readonly salidas?: {
+    readonly puertas?: number;
+    readonly cerraduras?: boolean;
+    readonly unidadesSeguras?: readonly {
+      readonly numero: string;
+      readonly enLinea: boolean;
+      readonly manipulada?: boolean;
+    }[];
+    readonly submodulos?: readonly {
+      readonly id: number;
+      readonly moduleType: string;
+      readonly status: string;
+    }[];
+    readonly ascensor?: boolean;
+  };
   /** El equipo no contesta a la consulta de capacidades: todo queda DESCONOCIDO. */
   readonly sinCapacidades?: boolean;
   /**
@@ -711,8 +739,45 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
       if (desenlace === 'mal_formada') return respuestaDe(400, CONTENIDO_XML_MALO);
       // J (15-L) · engañosa 3: 2xx sin `statusCode 1`, y el relé quieto.
       if (guion.aperturaSinConfirmar === true) return respuestaDe(200, '');
-      if (desenlace === 'acciona') anotarEn(aperturasFisicasPor, guion.destino);
+      if (desenlace === 'acciona') {
+        anotarEn(aperturasFisicasPor, guion.destino);
+        // 15-P · y QUÉ puerta: la del camino `…/door/<n>`.
+        const puerta = Number(/\/door\/(\d+)$/.exec(url.pathname)?.[1] ?? NaN);
+        if (guion.destino !== undefined && Number.isInteger(puerta)) {
+          puertasAbiertasPor.set(guion.destino, [
+            ...(puertasAbiertasPor.get(guion.destino) ?? []),
+            puerta,
+          ]);
+        }
+      }
       return respuestaDe(200, OK);
+    }
+    /**
+     * 15-P · P3 · las salidas, SÓLO si el guion las declara —y la unidad
+     * segura y los submódulos, sólo si declara ESOS módulos—. Sin ellas el
+     * simulado no conoce esas rutas, como antes de la 15-P (404): la misma
+     * `AccessControl/capabilities` es la que la lectura de la biblioteca de
+     * rostros pregunta, y contestarla con 200 cambiaba su veredicto (R1).
+     */
+    const salidas = guion.salidas;
+    const sinEsaRuta =
+      (catalogada.proposito === 'leer las capacidades de control de acceso del videoportero' &&
+        // La lectura de la biblioteca de rostros pregunta la MISMA ruta en
+        // JSON: ésa no es la de las salidas, y su respuesta no cambia.
+        (salidas === undefined || url.searchParams.get('format') === 'json')) ||
+      (catalogada.proposito === 'leer el estado de las unidades de puerta segura' &&
+        salidas?.unidadesSeguras === undefined) ||
+      (catalogada.proposito === 'leer los submódulos del videoportero' &&
+        salidas?.submodulos === undefined);
+    if (sinEsaRuta) return respuestaDe(404, 'not found');
+    if (catalogada.proposito === 'leer las capacidades de control de acceso del videoportero') {
+      return respuestaDe(200, capacidadesDeSalidas(guion));
+    }
+    if (catalogada.proposito === 'leer el estado de las unidades de puerta segura') {
+      return respuestaDe(200, estadoDeUnidadesSeguras(guion));
+    }
+    if (catalogada.proposito === 'leer los submódulos del videoportero') {
+      return respuestaDe(200, listaDeSubmodulos(guion));
     }
     if (catalogada.proposito === 'accionar la barrera vehicular') {
       // J (15-L) · el oráculo de la talanquera, como el de las puertas.

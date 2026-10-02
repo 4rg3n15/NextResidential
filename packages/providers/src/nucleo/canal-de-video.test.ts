@@ -28,13 +28,13 @@ describe('V2 (15-N) · el canal de video sale de lo que el equipo declara', () =
     });
   });
 
-  it('nunca 102 fijo: sin ficha y sin lista, no hay canal', () => {
-    expect(elegirCanalDeVideo(null, undefined)).toEqual({
-      canal: null,
-      origen: 'sin_canal',
-      sustituido: null,
-    });
-    expect(elegirCanalDeVideo('', [])).toMatchObject({ canal: null });
+  it('nunca 102 fijo: sin ficha y sin lista, el 101 «por omisión» (15-P, 0.5)', () => {
+    const e = elegirCanalDeVideo(null, undefined);
+    expect(e).toEqual({ canal: '101', origen: 'por_omision', sustituido: null });
+    expect(elegirCanalDeVideo('', [])).toMatchObject({ canal: '101', origen: 'por_omision' });
+    expect(fraseDeEleccion(e)).toBe(
+      'canal 101 por omisión: el equipo no lista sus canales de video y la ficha no tiene uno',
+    );
   });
 
   it('un equipo que no lista sus canales conserva el de la ficha', () => {

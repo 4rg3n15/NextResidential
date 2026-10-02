@@ -15,6 +15,7 @@ class OrdenManualDto {
     required this.accion,
     required this.motivo,
     this.eventoId,
+    this.puntoId,
   });
   
   factory OrdenManualDto.fromJson(Map<String, Object?> json) => _$OrdenManualDtoFromJson(json);
@@ -27,6 +28,9 @@ class OrdenManualDto {
 
   /// Evento que se está atendiendo
   final String? eventoId;
+
+  /// 15-P · el punto de acceso del equipo que se abre. Sin él, la puerta de la ficha. Un punto de otro equipo, de otra copropiedad o dado de baja: 404 y la orden no sale.
+  final String? puntoId;
 
   Map<String, Object?> toJson() => _$OrdenManualDtoToJson(this);
 }

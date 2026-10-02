@@ -70,6 +70,8 @@ export interface ConfiguracionDeProveedor {
   readonly puertoRtsp?: number;
   /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: con el reloj más desviado, no hay altas con vigencia. */
   readonly desvioDeRelojMaximoS?: number;
+  /** 15-P · `persistente` con `GUARDIA_AUDIO_TRANSPORTE=websocket`; `fetch` por omisión. */
+  readonly audioDelEquipo?: 'fetch' | 'persistente';
   /** Semilla del simulado: la adversidad tiene que ser reproducible. */
   readonly semilla?: number;
   readonly dispositivosSimulados?: readonly string[];
@@ -189,6 +191,9 @@ registrarAdaptador({
       ...(configuracion.desvioDeRelojMaximoS === undefined
         ? {}
         : { desvioDeRelojMaximoS: configuracion.desvioDeRelojMaximoS }),
+      ...(configuracion.audioDelEquipo === undefined
+        ? {}
+        : { audioDelEquipo: configuracion.audioDelEquipo }),
     }),
 });
 

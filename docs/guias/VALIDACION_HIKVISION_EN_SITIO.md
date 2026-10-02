@@ -950,6 +950,41 @@ Hasta que (2) y (3) estén medidos, el transporte del audio **lanza en vez de
 devolver silencio**, y la consola sigue usando el simulado. Devolver silencio
 haría que la consola diera por bueno un canal que nunca se ha abierto.
 
+#### 8.4.1 · Audio de la guardia por el puente WebSocket (15-P · ADR-01, enmienda 1)
+
+_Añadido en la 15-P (2026-10-01)._ Desde esta ronda el audio de la guardia va
+por un WebSocket ordenado entre la consola y la API, y la API sostiene el
+`audioData` persistente con el equipo. Lo que se mide en sitio es lo que la
+tabla del ADR midió contra el simulado; **la cifra que vale es ésta**.
+
+| #   | Qué hacer                                                                                                                                                                                                                                                                                                                                                        | Resultado (anótelo) |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | **Leer las capacidades** desde la ficha del equipo (Dispositivos → ficha → «Probar conexión»): canal de audio, códec, muestreo, si está habilitado. Nada se supone por modelo.                                                                                                                                                                                   |                     |
+| 2   | Si sale **«canal no habilitado»**: habilitarlo en el equipo (paso 1 de la tabla de arriba) y volver a leer. El sistema no lo habilita por su cuenta.                                                                                                                                                                                                             |                     |
+| 3   | Con `GUARDIA_AUDIO_TRANSPORTE=websocket` (el valor por omisión), abrir la guardia, atender una llamada y pulsar **«Hablar»**: la escucha empieza sola; «Mantener para hablar» transmite.                                                                                                                                                                         |                     |
+| 4   | **Medir < 2 s** (KPI-33, CA-19). El banco `e2e/medir-audio-guardia.mjs` mide contra el SIMULADO, no contra el equipo: en sitio, grabe con un teléfono puesto entre el altavoz del videoportero y el del puesto de guardia y dé una palmada en cada punta; la distancia entre las dos palmadas en la grabación es la latencia de cada sentido ([SUPUESTO] S-180). |                     |
+| 5   | Segundo operador a la vez: debe quedar **en cola**; con otro cliente usando el canal, la consola dice **«canal ocupado»** (`0x40002068`).                                                                                                                                                                                                                        |                     |
+| 6   | Colgar, cambiar de equipo y cerrar la pestaña: el equipo debe quedar **libre** en los tres casos (otra llamada abre el canal sin esperar).                                                                                                                                                                                                                       |                     |
+| 7   | **Volver al transporte anterior** si algo falla: `GUARDIA_AUDIO_TRANSPORTE=http` en el `.env` de la API y reiniciarla. Nada más cambia.                                                                                                                                                                                                                          |                     |
+
+Si el equipo es **semiduplex**, la consola lo dice junto al botón; el manual de
+la familia no lo declara en las capacidades de audio, así que se anota a oído en
+el paso 3 de la tabla de arriba.
+
+#### 8.4.2 · Las salidas del videoportero (15-P · P3)
+
+| #   | Qué hacer                                                                                                                                                                   | Resultado (anótelo) |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | Dispositivos → ficha del videoportero → **«Descubrir salidas»**. Anotar lo que declara: cerraduras, unidad de puerta segura (y su estado), submódulos, control de ascensor. |                     |
+| 2   | Dar a cada punto el **nombre** que el portero reconoce («Portón peatonal», «Puerta del lobby»).                                                                             |                     |
+| 3   | Desde la guardia, **abrir cada salida descubierta** con motivo. Comprobar que se mueve la cerradura correcta y anotar el tiempo (KPI-32 · < 3 s).                           |                     |
+| 4   | Comprobar en el historial de órdenes que cada apertura quedó con el operador, el motivo y el punto.                                                                         |                     |
+
+Dejar una puerta **libre o bloqueada** (`alwaysOpen`/`alwaysClose`) no se ofrece
+desde la consola: **PENDIENTE DE DEFINICIÓN** quién puede hacerlo. Si el equipo
+declara control de ascensor, se anota y no se prueba: llamar el ascensor no es
+abrir una puerta.
+
 ### 8.5 · Las dos pruebas del recorrido de placa
 
 Con el superadministrador, desde la consola:
