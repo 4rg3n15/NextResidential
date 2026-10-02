@@ -100,6 +100,7 @@ export const componerPuente = (
       });
       return puente;
     },
+    audioDelEquipo: extras.audioDelEquipo ?? 'persistente',
     equipos: () => registro?.todos() ?? [],
     camaras,
   });
@@ -113,7 +114,14 @@ export const componerPuente = (
       padreVigente: (hecho) => delPuente.enManosDeLaNube(hecho),
       registrar: (mensaje, contexto) => extras.registrar('aviso', mensaje, contexto),
     });
-    atenderLaNube(s, { registro: conocidos, proveedor: edge.proveedor, camaras, video, ahora });
+    atenderLaNube(s, {
+      registro: conocidos,
+      proveedor: edge.proveedor,
+      camaras,
+      video,
+      ahora,
+      ...(extras.peticionAEquipos === undefined ? {} : { peticion: extras.peticionAEquipos }),
+    });
   };
   return { edge, tunel, puente, sesion: () => sesion };
 };

@@ -16,4 +16,6 @@ export interface ExtrasDelPuente {
   readonly equipos?: () => readonly { readonly dispositivoId: string; readonly tipo: string }[];
   /** La MISMA lista que lee el receptor local: se actualiza en sitio, sin reiniciar. */
   readonly camaras?: CamaraDelEdge[];
+  /** E1 · el audio del videoportero en una conexión persistente (15-P), como la nube. */
+  readonly audioDelEquipo?: 'persistente' | 'fetch';
 }

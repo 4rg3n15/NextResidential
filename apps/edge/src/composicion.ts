@@ -99,6 +99,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
     registro: extras.registro?.(db) ?? new RegistroEnMemoria(config.EDGE_EQUIPOS.map(aRegistrado)),
     fuente,
     ...(extras.peticionAEquipos === undefined ? {} : { peticion: extras.peticionAEquipos }),
+    ...(extras.audioDelEquipo === undefined ? {} : { audioDelEquipo: extras.audioDelEquipo }),
   });
   const contingencia = new ContingenciaEnSitio(
     gateway,

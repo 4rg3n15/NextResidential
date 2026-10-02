@@ -17,6 +17,7 @@ export interface SocketWeb {
 }
 
 const ABIERTO = 1;
+const ESPERA_DEL_CLOSE_MS = 100;
 
 export interface EnlaceWebSocket extends Enlace {
   alAbrir(manejador: () => void): void;
@@ -39,13 +40,18 @@ export const enlaceWebSocket = (socket: SocketWeb): EnlaceWebSocket => {
           : new Uint8Array(data as Uint8Array);
     alRecibir?.(dato);
   };
-  socket.onclose = (evento) => {
+  const terminar = (motivo: string, codigo: number): void => {
     if (cerrado) return;
     cerrado = true;
-    for (const m of alCerrar) m(evento.reason || `cerrado (${String(evento.code)})`, evento.code);
+    for (const m of alCerrar) m(motivo, codigo);
   };
-  // El error de un WebSocket siempre viene seguido de su `close`: allí se decide.
-  socket.onerror = () => undefined;
+  socket.onclose = (evento) =>
+    terminar(evento.reason || `cerrado (${String(evento.code)})`, evento.code);
+  // En Node 22 un socket que no llegó a abrir —conexión rechazada, o cerrado
+  // mientras conectaba— emite `error` y NUNCA `close`. Sin esto el cliente no
+  // se entera y no vuelve a intentarlo. Si el `close` llega, gana él.
+  socket.onerror = () =>
+    void setTimeout(() => terminar('error de conexión', 1006), ESPERA_DEL_CLOSE_MS).unref?.();
 
   return {
     enviar: (dato) => {

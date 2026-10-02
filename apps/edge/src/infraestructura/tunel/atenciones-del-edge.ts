@@ -34,6 +34,8 @@ export interface DependenciasDelEdge {
   readonly camaras: CamaraDelEdge[];
   readonly video: Go2rtcLocal;
   readonly ahora: () => Date;
+  /** El MISMO transporte hacia los equipos que usa el proveedor (en sitio, el `fetch` real). */
+  readonly peticion?: typeof fetch;
 }
 
 const equipoQueLlega = z
@@ -77,6 +79,7 @@ const claveParaElEquipo = (registro: RegistroCifrado, host: unknown, clave: unkn
 };
 
 export const atenderLaNube = (sesion: SesionDeTunel, d: DependenciasDelEdge): void => {
+  const transporte = d.peticion === undefined ? {} : { peticion: d.peticion };
   const retirar = (id: string): void => {
     d.registro.retirar(id);
     d.proveedor.olvidar?.(id);
@@ -130,6 +133,7 @@ export const atenderLaNube = (sesion: SesionDeTunel, d: DependenciasDelEdge): vo
     return diagnosticarEquipo({
       ...op,
       clave: claveParaElEquipo(d.registro, op.host, op.clave) as string,
+      ...transporte,
     });
   });
 
@@ -138,6 +142,7 @@ export const atenderLaNube = (sesion: SesionDeTunel, d: DependenciasDelEdge): vo
     return aplicarCorreccion({
       ...op,
       clave: claveParaElEquipo(d.registro, op.host, op.clave) as string,
+      ...transporte,
     });
   });
 

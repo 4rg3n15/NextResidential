@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@ncr/domain-core": ["../../../../packages/domain-core/src/index.ts"],
+      "@ncr/providers": ["../../../../packages/providers/src/index.ts"]
+    }
+  },
+  "include": ["./*.ts"]
+}
