@@ -38,7 +38,6 @@ const arrancar = (): void => {
     config.EDGE_ESCUCHA_HOST,
     () =>
       registrar('info', 'edge escuchando en la red del conjunto', {
-        host: config.EDGE_ESCUCHA_HOST,
         puerto: config.EDGE_ESCUCHA_PUERTO,
         equipos: config.EDGE_EQUIPOS.length,
       }),

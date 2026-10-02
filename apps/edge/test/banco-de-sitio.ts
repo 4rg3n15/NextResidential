@@ -1,5 +1,7 @@
 import { construirClaveIdempotencia } from '@ncr/domain-core';
 import { FlujoEnVivo, equiposSimulados } from '@ncr/providers';
+// Para las pruebas de `aplicacion/`, que no importan providers como valor (O2).
+export { hechoDeAccesoDe } from '@ncr/providers';
 import { hashDelContenido } from '../src/aplicacion/descarga-de-reglas';
 import type { InstantaneaDeReglas } from '../src/aplicacion/instantanea-de-reglas';
 

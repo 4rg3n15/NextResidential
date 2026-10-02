@@ -6,12 +6,10 @@ import type { EventoDeEquipoNuevo, RegistrarAcceso } from '../../eventos';
 import { IngestorDeEquipos } from './ingestor-de-publicaciones';
 import { CopropiedadDelEquipoPorRegistro } from './copropiedad-del-equipo';
 import { filaDeEventoDeEquipo } from './fila-de-evento-de-equipo';
+import { INTERPRETE_DE_HECHOS } from '../infraestructura/interprete-de-hechos';
 
-/**
- * 15-L · lo que el receptor deja en la línea de tiempo (Bloque B) y lo que A1
- * y A4 añaden sobre una lectura: nada se descarta, nada que no sea un acceso
- * pasa por el motor, y la apertura y «la cámara decidió» quedan a la vista.
- */
+/** 15-L · línea de tiempo (B), A1 y A4: nada se descarta, sólo los accesos van al
+ * motor, y la apertura y «la cámara decidió» quedan a la vista. */
 const COP = '10000000-0000-4000-8000-000000000001';
 const EQUIPO = '90000000-0000-4000-8000-000000000001';
 
@@ -99,6 +97,7 @@ const montar = (
     { ahora: () => new Date() },
     { porUnidad: async () => null },
     { llamadaEntrante: async (l) => void llamadas.push(l) },
+    INTERPRETE_DE_HECHOS,
     undefined,
     {
       eventosDeEquipo: {

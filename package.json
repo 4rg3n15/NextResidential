@@ -20,6 +20,7 @@
     "portabilidad": "node scripts/lib/portabilidad.mjs",
     "sitio:video": "node scripts/sitio-video.mjs",
     "sitio:ensayo": "node scripts/sitio-ensayo.mjs",
+    "sitio:edge": "node scripts/sitio-edge.mjs",
     "metricas": "node scripts/lib/metricas.mjs",
     "mermaid": "node scripts/lib/mermaid-analizable.mjs",
     "pwa": "node scripts/lib/pwa-instalable.mjs",

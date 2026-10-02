@@ -3,7 +3,7 @@ import type { AccionadorLocal } from '../../aplicacion/contingencia-en-sitio';
 
 /**
  * 15-Q · Q4 · el brazo del Edge sobre los equipos: el MISMO `ProveedorDeEquipos`
- * que usa la nube (`packages/providers`), sin una línea de ISAPI aquí. La barrera
+ * que usa la nube (`packages/providers`), sin protocolo del fabricante. La barrera
  * se abre con `abrir` —que antes comprueba que la cámara no decida sola, como
  * en la nube— y a la terminal se le contesta con `responderVerificacionRemota`.
  *

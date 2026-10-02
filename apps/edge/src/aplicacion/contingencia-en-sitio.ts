@@ -42,8 +42,8 @@ import type {
   IngestorDePublicaciones,
   PublicacionDeEquipo,
   ResultadoDeIngesta,
+  hechoDeAccesoDe,
 } from '@ncr/providers';
-import { hechoDeAccesoDe } from '@ncr/providers';
 import type { DescargaDeReglas, ResultadoDeDescarga } from './descarga-de-reglas';
 import type { Gateway, ResultadoDelTic } from './gateway';
 import type { HechoLocal } from './instantanea-de-reglas';
@@ -81,6 +81,8 @@ export interface MemoriaDeAccesos {
 
 export interface OpcionesDeContingencia {
   readonly copropiedadId: string;
+  /** El hecho de acceso de un evento: `hechoDeAccesoDe` de providers, inyectado (O2). */
+  readonly interpretar: typeof hechoDeAccesoDe;
   readonly ahora?: () => Date;
   readonly registrar?: (
     nivel: 'info' | 'aviso' | 'error',
@@ -121,7 +123,7 @@ export class ContingenciaEnSitio implements IngestorDePublicaciones {
   /** Un evento de un equipo (alertStream o Alarm Server local), por `FuenteDePlacas`. */
   async ingerir(publicacion: PublicacionDeEquipo): Promise<ResultadoDeIngesta> {
     const evento = publicacion.evento;
-    const acceso = hechoDeAccesoDe(evento);
+    const acceso = this.opciones.interpretar(evento);
     if (acceso === null) return { registrado: false, motivo: 'no es un acceso' };
     if (await this.laNubeAtiende()) {
       return { registrado: false, motivo: 'la nube lo atiende (P-27 B)' };

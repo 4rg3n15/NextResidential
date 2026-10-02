@@ -6,11 +6,7 @@ import type {
   ResultadoDeIngesta,
   VeredictoRemoto,
 } from '@ncr/providers';
-import {
-  CONFIANZA_DE_ROSTRO_RECONOCIDO,
-  referenciaDePlaca,
-  referenciaDeRostro,
-} from '@ncr/providers';
+import type { InterpreteDeHechos } from './interprete-de-hechos';
 import type { AlertasDeEquipo, RegistrarAcceso } from '../../eventos';
 import { alertaDeAtencionDeEquipo } from './alerta-de-atencion';
 import { registroSinBase } from '../../eventos';
@@ -37,13 +33,6 @@ export interface RespondedorDeVerificacionRemota {
     veredicto: VeredictoRemoto,
   ): Promise<{ readonly aceptado: boolean; readonly latenciaMs: number }>;
 }
-
-/**
- * [SUPUESTO] S-40 · la confianza de un rostro ya reconocido. Desde la 15-Q vive
- * en `@ncr/providers` (`equipo/hecho-de-acceso.ts`), junto a la referencia del
- * hecho: la nube y el Edge tienen que calcular la MISMA clave para el mismo paso.
- */
-export { CONFIANZA_DE_ROSTRO_RECONOCIDO } from '@ncr/providers';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -126,6 +115,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     /** A4 · la llamada del videoportero: quién resuelve la vivienda y quién avisa. */
     private readonly viviendas: ResolutorDeViviendaDeLlamada,
     private readonly avisador: AvisadorDeLlamadas,
+    /** 15-Q · la referencia del hecho, la misma del Edge (`./interprete-de-hechos`). */
+    private readonly hechos: InterpreteDeHechos,
     /** H-15I-07 · la fila de `evidencias` que el evento referencia (con base). */
     private readonly registroDeEvidencia: RegistroDeEvidencia = registroSinBase,
     private readonly complementos: ComplementosDelIngestor = {},
@@ -231,7 +222,7 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     // la latencia se mide con la hora de recepción, nunca con la del equipo.
     void this.avisarSiElRelojSeDesvio(evento, copropiedadId);
 
-    const referencia = referenciaDePlaca(evento);
+    const referencia = this.hechos.referenciaDePlaca(evento);
     const evidenciaId = await this.guardarEvidencia(
       publicacion.foto ?? publicacion.recorte,
       evento.dispositivoId,
@@ -460,8 +451,8 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         copropiedadId,
         dispositivoId: evento.dispositivoId,
         metodo: 'facial',
-        referenciaExterna: referenciaDeRostro(evento),
-        confianza: evento.confianza ?? CONFIANZA_DE_ROSTRO_RECONOCIDO,
+        referenciaExterna: this.hechos.referenciaDeRostro(evento),
+        confianza: evento.confianza ?? this.hechos.confianzaDeRostroReconocido,
         personaId: titularId,
         evidenciaId,
         ocurridoEn: evento.ocurridoEn,

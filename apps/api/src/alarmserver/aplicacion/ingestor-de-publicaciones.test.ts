@@ -5,13 +5,12 @@ import { exito, fallo, errorDominio, ordenAceptada } from '@ncr/domain-core';
 import type { EventoDeEquipo, PublicacionDeEquipo, VeredictoRemoto } from '@ncr/providers';
 import type { RegistrarAcceso } from '../../eventos';
 import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
-import { CONFIANZA_DE_ROSTRO_RECONOCIDO, IngestorDeEquipos } from './ingestor-de-publicaciones';
+import { IngestorDeEquipos } from './ingestor-de-publicaciones';
+import { INTERPRETE_DE_HECHOS } from '../infraestructura/interprete-de-hechos';
 
 /**
- * A2 · EL PRINCIPIO RECTOR EN LA TERMINAL, EN UNA FRASE: la terminal reporta y
- * espera; el MISMO caso de uso que decide placas decide el rostro; y el
- * veredicto vuelve al equipo, que es quien abre. Aquí no se acciona ningún
- * relé: una segunda apertura abriría dos veces.
+ * A2 · LA TERMINAL reporta y espera; el MISMO caso de uso de las placas decide el
+ * rostro; el veredicto vuelve al equipo, que abre. Aquí no se acciona relé alguno.
  */
 const EQUIPO: EquipoDeclarado = {
   copropiedadId: '10000000-0000-4000-8000-000000000001',
@@ -127,6 +126,7 @@ const montar = (opciones: {
           : null,
     },
     { llamadaEntrante: async (llamada) => void llamadas.push(llamada) },
+    INTERPRETE_DE_HECHOS,
   );
   return { ingestor, ejecutar, accionar, veredictos, lineas, respondedor, llamadas };
 };
@@ -142,7 +142,7 @@ describe('A2 · el rostro que espera veredicto', () => {
         dispositivoId: 'terminal-1',
         metodo: 'facial',
         personaId: TITULAR,
-        confianza: CONFIANZA_DE_ROSTRO_RECONOCIDO,
+        confianza: INTERPRETE_DE_HECHOS.confianzaDeRostroReconocido,
         referenciaExterna: 'ev-rostro-1',
       }),
       expect.any(String),

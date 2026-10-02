@@ -27,9 +27,11 @@ export class VersionesPg implements PublicadorDeVersiones {
 
   async ultima(copropiedadId: string): Promise<VersionPublicada | null> {
     return this.conServicio(copropiedadId, async (c) => {
+      // `v.numero` y no `numero`: el ORDER BY prefiere la columna de SALIDA, que es
+      // texto, y '9' > '10' dejaría al Edge sin reglas nuevas desde la versión 10.
       const { rows } = await c.query<{ numero: string; hash: string }>(
-        `SELECT numero::text, hash FROM public.versiones_de_reglas
-          WHERE copropiedad_id = $1 ORDER BY numero DESC LIMIT 1`,
+        `SELECT v.numero::text AS numero, v.hash FROM public.versiones_de_reglas v
+          WHERE v.copropiedad_id = $1 ORDER BY v.numero DESC LIMIT 1`,
         [copropiedadId],
       );
       const fila = rows[0];

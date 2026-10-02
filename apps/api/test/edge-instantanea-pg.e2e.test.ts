@@ -6,6 +6,7 @@ import type { INestApplication } from '@nestjs/common';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { URL_BASE, exigirBase } from './base-exigida';
 import { cabecerasDelEdge } from './edge-de-prueba';
+import { VersionesPg } from '../src/edge/infraestructura/versiones-pg';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -106,6 +107,19 @@ describe.skipIf(URL_BASE === undefined)('la instantánea del Edge contra la base
     expect(r.body.version).toBe(version + 1);
     expect(r.body.placasEnListaNegra).toContain(placa);
     version = r.body.version;
+  });
+
+  it('la versión 10 sigue a la 9: «la última» se ordena como número, no como texto', async () => {
+    // Defecto real de la 15-Q: con `ORDER BY numero` sobre `numero::text`, '9' > '10'
+    // y desde la versión 10 toda publicación chocaba con el disparador (500 permanente).
+    const versiones = new VersionesPg(pool as Pool);
+    const actor = '00000000-0000-4000-8000-000000000003';
+    let ultima = (await versiones.ultima(COP_B))?.numero ?? 0;
+    for (const tope = Math.max(ultima, 9) + 2; ultima < tope; ultima += 1) {
+      const hash = randomBytes(32).toString('hex');
+      expect(await versiones.publicar(COP_B, { numero: ultima + 1, hash }, actor)).toBe(true);
+      expect(await versiones.ultima(COP_B)).toEqual({ numero: ultima + 1, hash });
+    }
   });
 
   it('la nube anota qué versión tiene ese Edge y cuándo se oyó de él (D-16)', async () => {

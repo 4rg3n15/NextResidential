@@ -22,9 +22,6 @@
  * arranca igual. §2.7.5 exige rate limiting configurado; lo que había era rate
  * limiting configurable en un nombre que nadie lee.
  *
- * Es la familia de siempre con una cara nueva: el control existía —el
- * comparador— y comparaba contra un documento que nadie comprobaba.
- *
  * ═════════════════════════════════════════════════════════════════════════════
  * CÓMO SE COMPRUEBA
  *
@@ -51,11 +48,8 @@ import { readFileSync, existsSync } from 'node:fs';
  * D-90 nació en la API y la causa no era de la API: era que **nadie comprobaba
  * que el ejemplo dijera la verdad**. El Edge estrena exactamente la misma
  * pareja —un esquema Zod que valida al arrancar y un `.env.example` que es su
- * única documentación—, así que hereda el mismo modo de fallar. Cerrarlo solo
- * en un sitio habría sido dejar la puerta abierta en el otro y esperar a que
- * alguien lo descubriera desplegando.
- *
- * Añadir una superficie nueva es añadir una entrada a esta lista.
+ * única documentación—, así que hereda el mismo modo de fallar. Añadir una
+ * superficie es añadir una entrada; 15-Q: una superficie puede tener varios.
  * ════════════════════════════════════════════════════════════════════════════
  */
 const SUPERFICIES = [
@@ -66,7 +60,10 @@ const SUPERFICIES = [
   },
   {
     nombre: 'Edge',
-    esquema: 'apps/edge/src/configuracion/esquema.ts',
+    esquema: [
+      'apps/edge/src/configuracion/esquema.ts',
+      'apps/edge/src/configuracion/esquema-de-sitio.ts',
+    ],
     ejemplo: 'apps/edge/.env.example',
   },
 ];
@@ -134,14 +131,17 @@ const problemas = [];
 let totalEsquema = 0;
 
 for (const { nombre, esquema, ejemplo } of SUPERFICIES) {
-  if (!existsSync(esquema) || !existsSync(ejemplo)) {
+  const esquemas = [esquema].flat();
+  if (![...esquemas, ejemplo].every((f) => existsSync(f))) {
     console.error(`FALLO no encuentro ${esquema} o ${ejemplo}`);
     process.exit(1);
   }
 
   /** Claves del objeto Zod: una sangría de dos espacios y dos puntos. */
   const delEsquema = new Set(
-    [...readFileSync(esquema, 'utf8').matchAll(/^ {2}([A-Z][A-Z0-9_]*):/gm)].map((m) => m[1]),
+    esquemas
+      .flatMap((e) => [...readFileSync(e, 'utf8').matchAll(/^ {2}([A-Z][A-Z0-9_]*):/gm)])
+      .map((m) => m[1]),
   );
   totalEsquema += delEsquema.size;
 

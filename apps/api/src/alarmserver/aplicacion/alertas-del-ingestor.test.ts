@@ -5,13 +5,12 @@ import type { EventoDeEquipo, PublicacionDeEquipo } from '@ncr/providers';
 import type { AlertaDeEquipoNueva, EventoDeEquipoNuevo, RegistrarAcceso } from '../../eventos';
 import { IngestorDeEquipos } from './ingestor-de-publicaciones';
 import { CopropiedadDelEquipoPorRegistro } from './copropiedad-del-equipo';
+import { INTERPRETE_DE_HECHOS } from '../infraestructura/interprete-de-hechos';
 
 /**
- * E5 (15-M) · lo que el receptor hace con las CONDICIONES de un equipo:
- *  · la cámara que decide sola es UNA alerta por cámara, no una por lectura;
- *  · el reloj desviado se avisa UNA vez con el valor, y la latencia nunca sale
- *    de la hora del equipo;
- *  · el volcado histórico no deja una línea de bitácora por evento.
+ * E5 (15-M) · las CONDICIONES de un equipo: la cámara que decide sola es UNA alerta
+ * por cámara; el reloj desviado, UNA con el valor (la latencia nunca sale de la
+ * hora del equipo); el volcado histórico no deja una línea por evento.
  */
 const COP = '10000000-0000-4000-8000-000000000001';
 const CAMARA = '90000000-0000-4000-8000-000000000001';
@@ -94,6 +93,7 @@ const montar = (opciones: { decideSolo?: boolean; conAlertas?: boolean } = {}) =
     { ahora: () => AHORA },
     { porUnidad: async () => null },
     { llamadaEntrante: async () => undefined },
+    INTERPRETE_DE_HECHOS,
     undefined,
     {
       eventosDeEquipo: {

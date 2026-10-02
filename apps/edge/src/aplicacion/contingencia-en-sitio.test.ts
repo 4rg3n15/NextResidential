@@ -6,7 +6,7 @@ import { BandejaSqlite } from '../infraestructura/sqlite/bandeja-sqlite';
 import { CacheDeReglasSqlite } from '../infraestructura/sqlite/cache-de-reglas';
 import { FeDeVidaSqlite } from '../infraestructura/sqlite/fe-de-vida';
 import { MemoriaDeAccesosSqlite } from '../infraestructura/sqlite/memoria-de-accesos';
-import { COP, PLANTILLA, instantaneaDePrueba } from '../../test/banco-de-sitio';
+import { COP, PLANTILLA, hechoDeAccesoDe, instantaneaDePrueba } from '../../test/banco-de-sitio';
 import { ContingenciaEnSitio } from './contingencia-en-sitio';
 import type { AccionadorLocal } from './contingencia-en-sitio';
 import { DecidirLocalmente } from './decidir-localmente';
@@ -102,7 +102,7 @@ const montar = (opciones: {
     sonda,
     accionador,
     new MemoriaDeAccesosSqlite(db),
-    { copropiedadId: COP },
+    { copropiedadId: COP, interpretar: hechoDeAccesoDe },
   );
   return { contingencia, bandeja, veredictos };
 };

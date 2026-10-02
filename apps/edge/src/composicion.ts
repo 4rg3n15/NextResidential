@@ -9,7 +9,12 @@
  * la prueba de la DoD compone el MISMO Edge y le pasa el tiempo y la red.
  */
 import type { Reloj } from '@ncr/domain-core';
-import { FuenteDePlacas, RegistroEnMemoria, crearProveedorDeEquipos } from '@ncr/providers';
+import {
+  FuenteDePlacas,
+  RegistroEnMemoria,
+  crearProveedorDeEquipos,
+  hechoDeAccesoDe,
+} from '@ncr/providers';
 import type { EquipoRegistrado, ProveedorDeEquipos } from '@ncr/providers';
 import type { ConfiguracionDeSitio, EquipoDelEdge } from './configuracion/esquema-de-sitio';
 import { ContingenciaEnSitio } from './aplicacion/contingencia-en-sitio';
@@ -92,7 +97,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
 
   const fuente = new FuenteDePlacas();
   const proveedor: ProveedorDeEquipos = crearProveedorDeEquipos({
-    clase: 'hikvision',
+    clase: 'hikvision', // kpi-11-exento: en sitio, los equipos reales; las pruebas inyectan `peticion`
     reloj,
     registro: new RegistroEnMemoria(config.EDGE_EQUIPOS.map(aRegistrado)),
     fuente,
@@ -110,6 +115,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
     new MemoriaDeAccesosSqlite(db),
     {
       copropiedadId: config.EDGE_COPROPIEDAD_ID,
+      interpretar: hechoDeAccesoDe,
       ahora: () => reloj.ahora(),
       registrar: extras.registrar,
     },

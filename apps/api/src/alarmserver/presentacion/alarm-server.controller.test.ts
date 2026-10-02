@@ -15,6 +15,7 @@ import {
   IngestorDeEquipos,
   PRESUPUESTO_DE_EVIDENCIA_MS,
 } from '../aplicacion/ingestor-de-publicaciones';
+import { INTERPRETE_DE_HECHOS } from '../infraestructura/interprete-de-hechos';
 
 /**
  * LA PRUEBA DEL PRINCIPIO RECTOR, EN UNA FRASE: el relé se acciona **cuando y
@@ -34,10 +35,8 @@ import {
  * puerto**. La evidencia, el caso de uso y el relé viven en el ingestor, que es
  * el único suscriptor de esa fuente.
  *
- * Las aserciones de abajo **no se han tocado**, y eso es lo que demuestra que
- * el refactor no cambió el comportamiento: el mismo sobre entra por el mismo
- * sitio y produce exactamente las mismas llamadas. Lo único que cambia es el
- * montaje, que ahora cablea la fuente y el ingestor como lo hace el módulo.
+ * Las aserciones **no se han tocado** (tampoco en la 15-Q, que inyecta el
+ * intérprete de hechos): el mismo sobre produce las mismas llamadas.
  */
 
 const EQUIPO: EquipoDeclarado = {
@@ -134,6 +133,7 @@ const montar = (opciones: {
     reloj,
     { porUnidad: async () => null },
     { llamadaEntrante: async () => undefined },
+    INTERPRETE_DE_HECHOS,
   );
   const fuente = new FuenteDePlacas();
   fuente.fijarIngestor(ingestor);
