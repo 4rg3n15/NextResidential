@@ -11,7 +11,9 @@
 > hechos fabricados contra una caché sembrada a mano: probaba el motor, la
 > bandeja y la reconciliación, no un Edge en una portería.
 >
-> La ronda 15-Q lo completa con P-27 = B (ADR-034: **el Edge es contingencia**):
+> La ronda 15-Q lo completa con P-27 = B (ADR-034: **el Edge es contingencia**;
+> **corregido en la 15-Q2**: P-27 = A, el Edge es el puente local permanente,
+> ADR-035):
 > instantánea versionada servida por la API a una identidad de Edge validada en
 > la aplicación; descarga periódica y al recuperar el WAN; escuchas y receptor
 > de Alarm Server reutilizando `packages/providers`; actuación local auditada y

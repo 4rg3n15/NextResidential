@@ -8,6 +8,13 @@ prueba de corte de WAN con los equipos de verdad.
 > escribe el código. Cada paso dice qué hacer, qué tiene que pasar, y qué
 > significa si no pasa.
 
+> **Corrección 15-Q2 · P-27 = A (ADR-035).** El cliente decidió que el Edge es el
+> **puente local permanente**: los equipos hablan **sólo** con el Edge y la nube
+> les llega a través de él. Lo que esta guía describe como «contingencia» (P-27 =
+> B, ADR-034) fue la opción que el agente recomendó en la 15-Q, y queda
+> sustituida. La guía se reescribe para A en la ronda 15-Q2; hasta entonces, **no
+> configure la cámara con dos destinos**.
+
 > **Regla de oro de esta guía.** IPs, usuarios y claves de los equipos van
 > **solo** en el `.env` del gateway (RN-21, KPI-11). Nunca en un documento, un
 > ticket, un chat ni una captura. Donde esta guía escribe `<…>`, es un marcador.
