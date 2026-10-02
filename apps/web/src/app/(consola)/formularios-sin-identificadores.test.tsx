@@ -434,6 +434,7 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'guardia/pantalla.tsx':
     'las órdenes actúan sobre el elemento en atención; no se introduce ninguna identidad',
   'dispositivos/pantalla.tsx': 'botones por fila del inventario; no hay campos que rellenar',
+  'dispositivos/edge-del-conjunto.tsx': 'dos botones (15-Q2); el edgeId viene de la fila',
   /**
    * ETAPA 15-D (O4) · la ficha de un equipo en servicio: el equipo viene de la
    * fila, el servidor lo sondea con la clave guardada, y lo único que se

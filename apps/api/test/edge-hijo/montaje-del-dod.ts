@@ -14,7 +14,6 @@ import { CONFIGURACION } from '../../src/configuracion/configuracion.module';
 import { CREDENCIALES_EN_EL_EDGE } from '../../src/comun/credenciales-en-el-edge';
 import * as conEdge from '../../src/equipos/infraestructura/composicion-con-edge';
 import type { DatosDeSondeo, RepositorioDeEquipos, SondaDeEquipo } from '../../src/equipos';
-import { URL_BASE, exigirBase } from '../base-exigida';
 import { conHijo, guardianDeEquipos } from './banco-del-padre';
 import type { Hijo } from './banco-del-padre';
 
@@ -114,7 +113,7 @@ export const alta = async (cuerpo: Record<string, unknown>) =>
     ...cuerpo,
   });
 
-const arrancar = async (): Promise<void> => {
+const arrancar = async (URL_BASE: string | undefined): Promise<void> => {
   if (URL_BASE === undefined || URL_BASE === '') return;
   const pool = new Pool({ connectionString: URL_BASE, max: 3 });
   dod.pool = pool;
@@ -194,9 +193,8 @@ const desmontar = async (): Promise<void> => {
   await dod.pool?.end();
 };
 
-/** Se llama dentro del fichero de prueba: registra el montaje y la exigencia de base. */
-export const montarDoD = (): void => {
-  beforeAll(arrancar, 90_000);
+/** Se llama dentro del fichero de prueba, que registra además su `exigirBase` y le da la base. */
+export const montarDoD = (urlBase: string | undefined): void => {
+  beforeAll(() => arrancar(urlBase), 90_000);
   afterAll(desmontar);
-  exigirBase('sin DATABASE_URL_PRUEBAS', () => dod.disponible);
 };

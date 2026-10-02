@@ -56,11 +56,13 @@ export const EdgeDelConjunto = ({
     // Un rol que no la puede leer, o una API anterior: sin panel, como antes.
     queryFn: async (): Promise<FichaDeEdge[]> => {
       try {
-        return desenvolver(
+        const fichas: unknown = desenvolver(
           await cliente.GET('/copropiedades/{id}/edge-gateways', {
             params: { path: { id: copropiedadId } },
           }),
         );
+        // Lo que no es una lista no se pinta: una respuesta rara no tumba la pantalla.
+        return Array.isArray(fichas) ? (fichas as FichaDeEdge[]) : [];
       } catch {
         return [];
       }

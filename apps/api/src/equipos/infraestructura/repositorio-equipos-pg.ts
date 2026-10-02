@@ -345,12 +345,12 @@ export class RepositorioDeEquiposPg implements RepositorioDeEquipos {
     );
     const [iv, cuerpo, etiqueta] = this.sobreDe(copropiedadId, secreto);
     await c.query(
+      // Sin RETURNING: la fila del sobre no la lee ningún token (A.1), ni aquí.
       `WITH nueva AS (INSERT INTO public.credenciales_de_equipo (copropiedad_id, dispositivo_id,
            iv, cuerpo, etiqueta, llave_ref, creado_por, actualizado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING dispositivo_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7))
        UPDATE public.dispositivos SET credencial_ref = 'vault:equipos/' || id,
-              huella_de_credencial = NULL
-        WHERE id = (SELECT dispositivo_id FROM nueva) AND credencial_ref LIKE 'edge:%'`,
+              huella_de_credencial = NULL WHERE id = $2 AND credencial_ref LIKE 'edge:%'`,
       [copropiedadId, equipoId, iv, cuerpo, etiqueta, this.llaveRef, actorId],
     );
   }

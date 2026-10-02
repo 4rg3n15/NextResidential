@@ -19,7 +19,7 @@ import {
 import { direccionDe, tokenDe } from './utilidades';
 import { OFERTA_SDP_DE_NAVEGADOR } from '@ncr/providers';
 import { medirAudio, viviendaConPlaca, visitaConFoto } from './edge-hijo/acciones-del-dod';
-import { URL_BASE } from './base-exigida';
+import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -31,7 +31,8 @@ import { URL_BASE } from './base-exigida';
  * el Edge puente real con los equipos simulados, que sólo él alcanza.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-montarDoD();
+montarDoD(URL_BASE);
+exigirBase('sin DATABASE_URL_PRUEBAS', () => dod.disponible);
 
 describe.skipIf(URL_BASE === undefined)('15-Q2 · DoD · API y Edge en procesos distintos', () => {
   it('A1/A3 · el túnel está abierto: /ready lo cuenta y la ficha dice «conectado»', async () => {
