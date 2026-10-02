@@ -58,7 +58,7 @@ funciona exactamente como antes.
 | **B1–B3** · eventos      | **Hecho.** Los equipos reportan sólo al Edge, que reenvía con clave de idempotencia; con nube, decide la nube y ejecuta el Edge; sin respuesta en `EDGE_PLAZO_NUBE_MS`, decide el Edge; nunca los dos (cierra DT-15Q-03, retira S-184); la API no se suscribe a equipos de una copropiedad con puente                                                                                     |
 | **C1–C3** · órdenes      | **Hecho.** `ProveedorEnrutado` detrás de los mismos puertos; la suite de contrato corre contra directo y vía Edge sin cambiar aserciones; abrir por punto con motivo, plantillas (con consentimiento; el Edge no las guarda), «Probar conexión», diagnóstico, salidas y reloj; con el Edge caído, fallan en el acto con 503 `EDGE_NO_DISPONIBLE`. Libre/bloqueado: P-25 sigue sin existir |
 | **D1–D4** · credenciales | **Hecho.** AES-256-GCM con `EDGE_EQUIPOS_LLAVE`, fuera del SQLite; en la nube, referencia `edge:` y huella HMAC; alta y edición por el túnel sin persistir ni registrar la clave; migración que borra de la nube sólo tras confirmar el Edge; reversión documentada y probada; go2rtc junto al Edge (cierra DT-15N-05)                                                                    |
-| **E1** · audio           | **Hecho.** Navegador ↔ API (WS con billete) ↔ túnel ↔ Edge ↔ `audioData` persistente: ida «IDA» ms, vuelta «VUELTA» ms contra el videoportero simulado en red (KPI-33, CA-19)                                                                                                                                                                                                         |
+| **E1** · audio           | **Hecho.** Navegador ↔ API (WS con billete) ↔ túnel ↔ Edge ↔ `audioData` persistente: ida 5 ms, vuelta 2 ms contra el videoportero simulado en red (KPI-33, CA-19)                                                                                                                                                                                                                    |
 | **E2** · video           | **Hecho, salvo el TURN.** WHEP por la API hacia el go2rtc del Edge por el túnel; STUN/TURN por variables con credencial TURN efímera. **Dónde va el TURN: PENDIENTE DE DEFINICIÓN (P-29); no se probó con un TURN real** (no hay coturn en este entorno ni forma de probar NAT)                                                                                                           |
 
 ## Lo que se hizo distinto del encargo
@@ -284,23 +284,54 @@ una palabra del protocolo en un comentario de la DoD, hasta quitarla.
 
 ### Resultado
 
-«RESULTADO»
+Paso 5 de la corrida correcta: `@ncr/config` 144 · `@ncr/domain-core` 438 ·
+`@ncr/edge` **277** (eran 159) · `@ncr/providers` **1225** (eran 1156) ·
+`@ncr/web` **747** (eran 737) · `@ncr/api` **2132** + 5 saltadas declaradas (las
+ejecuta el paso 12b) de **2137** (eran 1971). **4968 pruebas**, las mismas por
+los dos caminos (paso 7b) y tres veces seguidas sin caché (paso 14). 458 de 458
+ficheros de prueba recogidos. KPI-25 (paso 11): p50 8 ms · p95 26 ms · p99 43 ms.
+31 de 31 pasos ejecutados.
 
-| Medida de la DoD (dos procesos, PostgreSQL, equipos simulados) | Valor               |
-| -------------------------------------------------------------- | ------------------- |
-| Pruebas de la DoD                                              | 12 de 12            |
-| Audio por el túnel, ida / vuelta                               | «IDA» / «VUELTA» ms |
-| Aperturas de la barrera por un acceso con la nube viva         | 1                   |
-| Intentos de la API de tocar un equipo (guardián)               | 0                   |
-| Accesos reconciliados tras el corte                            | 3 de 3, una vez     |
+| Medida de la DoD (dos procesos, PostgreSQL, equipos simulados) | Valor           |
+| -------------------------------------------------------------- | --------------- |
+| Pruebas de la DoD                                              | 12 de 12        |
+| Audio por el túnel, ida / vuelta                               | 5 / 2 ms        |
+| Aperturas de la barrera por un acceso con la nube viva         | 1               |
+| Intentos de la API de tocar un equipo (guardián)               | 0               |
+| Accesos reconciliados tras el corte                            | 3 de 3, una vez |
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-«VEREDICTO»
+Sobre `df8ec58` (el commit posterior sólo toca documentación), desde cero (sin
+`dist/`, `.turbo/` ni `coverage/`, instalación con `--frozen-lockfile`):
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado no ejercido es el mismo de rondas anteriores («0 de ellos
+en linux», con motivo y etapa de revisión vigentes).
+
+**Las dos corridas anteriores salieron FALLIDAS**, y con razón:
+
+- **Sobre `2303350`…`66e4ea0` (la primera, detenida en el paso 5):** siete
+  pruebas rojas de la consola (el panel del Edge con una respuesta que no era
+  lista; el barrido D-72 sin clasificar la pantalla nueva) y la DoD sin su
+  guardián `exigirBase` en el propio fichero. La suite de la API, corrida a
+  mano, destapó además el `RETURNING` que rompía el alta con RLS.
+- **Sobre `159fa4d`:** suite verde, pero el paso 10 (frontera O2: la capa de
+  aplicación del túnel importaba `@ncr/providers` como valor) y el paso 9 (el
+  control de entorno no leía los dos esquemas nuevos).
 
 ### Cobertura por capa
 
-«COBERTURA»
+| Capa                                          | Líneas  | Ramas   | Funciones | Umbral |
+| --------------------------------------------- | ------- | ------- | --------- | ------ |
+| Dominio (`packages/domain-core/src`)          | 96,20 % | 96,91 % | 96,04 %   | 90 %   |
+| Aplicación (`**/aplicacion/**`, 142 archivos) | 97,10 % | 90,92 % | 98,08 %   | 90 %   |
+| Global (887 archivos)                         | 87,23 % | 87,21 % | 86,39 %   | 70 %   |
+
+`domain-core` no se modificó: su cobertura es la de la 15-Q.
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -354,4 +385,21 @@ una palabra del protocolo en un comentario de la DoD, hasta quitarla.
 
 Rama `etapa-15q2-edge-puente`, desde `develop@4849f4e`:
 
-«COMMITS»
+- `884ba4f` docs(etapa-15q2): informe al día con la reorganización por O2 y el PR #40
+- `df8ec58` fix(etapa-15q2): O2 — la capa de aplicación no importa @ncr/providers como valor; el control de entorno lee los esquemas nuevos
+- `66e4ea0` docs(etapa-15q2): informe y ESTADO en borrador (el veredicto llega con la corrida del verificador en curso)
+- `159fa4d` fix(etapa-15q2): lo que encontró la primera corrida del verificador (R1 en la consola y en el alta con RLS)
+- `d88f5ab` docs(etapa-15q2): registro de la ronda (C-51, C-52, S-185 a S-192, P-29 a P-31) y ADR-035 implementado
+- `93b807c` chore(etapa-15q2/edge): esquema.test.ts vuelve a su forma de la base (lo reformateó un prettier de paso)
+- `7791d48` docs(etapa-15q2): el Edge como puente en DESPLIEGUE_EDGE §10, una instancia en DESPLIEGUE §4.4 y la reversión del traslado
+- `86473b8` fix(etapa-15q2/edge): detener frena de verdad, VAR= vale su omisión y la URL codificada no se filtra
+- `6b25707` fix(etapa-15q2/api): la entrega al Edge se valida, el alta no queda a medias y las alertas no se cortan
+- `b4f129f` feat(etapa-15q2/consola): el Edge del conjunto en Dispositivos y contrato regenerado (A3, D3)
+- `b508a80` feat(etapa-15q2/video): STUN/TURN con credencial efímera y vista en vivo por copropiedad (E2, R1)
+- `2303350` feat(etapa-15q2/dod): API y Edge en procesos distintos, la API sin ruta a los equipos
+- `7d72b6b` feat(etapa-15q2/api,edge): credenciales sólo en el Edge, sonda y video por el túnel, Edge puente (B, C2, D, E2)
+- `45bc4f5` feat(etapa-15q2/api): túnel Edge→API, puente por copropiedad y proveedor enrutado (A1-A3, B1, C1)
+- `99232f2` feat(etapa-15q2/providers): túnel Edge↔API y proveedor vía Edge (A2, C1)
+- `3e32458` docs(etapa-15q2): P-27 = A — ADR-035 sustituye en parte a ADR-034
+
+Y el commit de cierre que añade este veredicto.
