@@ -2,6 +2,7 @@ import { isIP } from 'node:net';
 import { z } from 'zod';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import { problemaDelPresupuesto } from './presupuesto-de-conexiones';
+import { ESQUEMA_DE_ICE, problemaDeIce } from './esquema-de-ice';
 
 /**
  * Configuración tipada y validada (§2.7.1).
@@ -73,6 +74,7 @@ const secreto = (nombre: string, minimo: number) =>
     });
 
 export const esquemaConfiguracion = z.object({
+  ...ESQUEMA_DE_ICE,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
 
@@ -399,13 +401,10 @@ export const esquemaConfiguracion = z.object({
   PERSISTENCIA_DE_BIOMETRIA: z.enum(['postgres', 'memoria']).default('postgres'),
 
   /**
-   * A5 (15-E) · el puente de video RTSP → WebRTC (go2rtc), visto DESDE LA API.
-   * Opcional: sin él la vista en vivo responde 503 con motivo y el resto de la
-   * consola sigue. Es una dirección INTERNA (`http://127.0.0.1:1984` cuando
-   * go2rtc corre junto a la API) y nunca llega al navegador: el navegador
-   * negocia WebRTC contra la API, que valida sesión, rol y copropiedad antes
-   * de hablar con el puente, y la URL RTSP con la credencial del equipo sólo
-   * viaja de la API a go2rtc (RN-12, RN-21).
+   * A5 (15-E) · el go2rtc de la API (opcional: sin él, 503 con motivo). Dirección INTERNA que
+   * nunca llega al navegador: éste negocia contra la API, que valida sesión, rol y copropiedad,
+   * y la URL RTSP con credencial sólo viaja de la API a go2rtc (RN-12, RN-21). 15-Q2 · con Edge
+   * puente, el video lo negocia el go2rtc del Edge y esta variable no le hace falta.
    */
   GO2RTC_URL: z
     .string()
@@ -697,8 +696,8 @@ export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion =
   }
   if (malFormados.length > 0) throw new ErrorDeConfiguracion(malFormados);
 
-  // 15-O · el pool de la API y el de pg-boss caben en el pooler de Supabase.
-  const presupuesto = problemaDelPresupuesto(resto);
+  // 15-O · los pools caben en el pooler de Supabase. 15-Q2 · un TURN no va sin su secreto.
+  const presupuesto = problemaDelPresupuesto(resto) ?? problemaDeIce(resto);
   if (presupuesto !== null) throw new ErrorDeConfiguracion([presupuesto]);
 
   return { ...resto, origenesPermitidos };

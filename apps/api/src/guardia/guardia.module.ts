@@ -48,7 +48,6 @@ import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from './aplicacion/bloqueo
 import type { RegistroDeBloqueos } from './aplicacion/bloqueo-de-acceso';
 import { CANAL_DE_INTERCOM, PUENTE_DE_VIDEO } from './aplicacion/puertos';
 import type { PuenteDeVideo } from './aplicacion/puertos';
-import { NegociarVistaEnVivo } from './aplicacion/vista-en-vivo';
 import { PuenteGo2rtc } from './infraestructura/puente-go2rtc';
 import { CanalIntercomEnProceso } from './infraestructura/canal-intercom-en-proceso';
 import {
@@ -65,9 +64,9 @@ import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/con
 import { AudioController } from './presentacion/audio/audio.controller';
 import { BilletesDeAudio } from './presentacion/audio/billetes-de-audio';
 import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio';
-import { CREDENCIALES_EN_EL_EDGE } from '../comun/credenciales-en-el-edge';
-import type { CredencialesEnElEdge as Edge } from '../comun/credenciales-en-el-edge';
-import { PuenteDeVideoPorElEdge } from './infraestructura/puente-de-video-por-el-edge';
+import { PROVEEDOR_DE_VISTA_EN_VIVO } from './infraestructura/puente-de-video-por-el-edge';
+import { PROVEEDOR_DE_SERVIDORES_ICE } from './infraestructura/servidores-ice-de-configuracion';
+import { IceController } from './presentacion/ice.controller';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -91,7 +90,13 @@ export class GuardiaModule {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [GuardiaController, VideoController, AtencionController, AudioController],
+      controllers: [
+        GuardiaController,
+        VideoController,
+        IceController,
+        AtencionController,
+        AudioController,
+      ],
       providers: [
         /**
          * G1 · G2 (15-N) · la cola de atención (P-22) y las preferencias de la
@@ -245,10 +250,9 @@ export class GuardiaModule {
         },
         PuertaDeAudioPorWebSocket,
         {
-          // A5 · sin `GO2RTC_URL`, `null` y 503 con motivo. 15-Q2 · E2: con puentes, envuelto.
           provide: PUENTE_DE_VIDEO,
-          inject: [CONFIGURACION, BITACORA, { token: CREDENCIALES_EN_EL_EDGE, optional: true }],
-          useFactory: (configuracion: Configuracion, bitacora: Bitacora, edge?: Edge | null) => {
+          inject: [CONFIGURACION, BITACORA],
+          useFactory: (configuracion: Configuracion, bitacora: Bitacora): PuenteDeVideo | null => {
             const url = configuracion.GO2RTC_URL;
             bitacora.registrar(
               url === undefined ? 'aviso' : 'info',
@@ -257,22 +261,12 @@ export class GuardiaModule {
                 : 'vista en vivo con puente go2rtc configurado (RTSP → WebRTC por la API)',
               { configurado: url !== undefined },
             );
-            const directo = url === undefined ? null : new PuenteGo2rtc(url);
-            return edge === undefined || edge === null
-              ? directo
-              : new PuenteDeVideoPorElEdge(directo, edge);
+            return url === undefined ? null : new PuenteGo2rtc(url);
           },
         },
-        {
-          provide: NegociarVistaEnVivo,
-          inject: [PROVEEDOR_DE_EQUIPOS, PUENTE_DE_VIDEO, BITACORA, RELOJ],
-          useFactory: (
-            proveedor: ProveedorDeEquipos,
-            puente: PuenteDeVideo | null,
-            bitacora: Bitacora,
-            reloj: Reloj,
-          ) => new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj),
-        },
+        // 15-Q2 · E2 · STUN/TURN de la consola, y la vista en vivo POR COPROPIEDAD (R1).
+        PROVEEDOR_DE_SERVIDORES_ICE,
+        PROVEEDOR_DE_VISTA_EN_VIVO,
         {
           /**
            * 15-P · P3 · la puerta del punto elegido, resuelta por el módulo de

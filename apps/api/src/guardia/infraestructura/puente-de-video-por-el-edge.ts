@@ -1,8 +1,17 @@
+import type { FactoryProvider } from '@nestjs/common';
+import { BITACORA, RELOJ } from '@ncr/domain-core';
 import { FUENTE_EN_EL_EDGE } from '@ncr/providers';
+import { CREDENCIALES_EN_EL_EDGE } from '../../comun/credenciales-en-el-edge';
+import { PROVEEDOR_DE_EQUIPOS } from '../../proveedores';
+import { PUENTE_DE_VIDEO } from '../aplicacion/puertos';
 import type { CredencialesEnElEdge } from '../../comun/credenciales-en-el-edge';
 import { copropiedadEnCurso } from '../../proveedores';
 import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado } from '../aplicacion/puertos';
 import type { PuenteDeVideo } from '../aplicacion/puertos';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
+import type { ProveedorDeEquipos } from '@ncr/providers';
+import { NegociarVistaEnVivo } from '../aplicacion/vista-en-vivo';
+import type { SolicitudDeVistaEnVivo } from '../aplicacion/vista-en-vivo';
 import { redactar } from './puente-go2rtc';
 
 /**
@@ -68,3 +77,54 @@ export class PuenteDeVideoPorElEdge implements PuenteDeVideo {
     }
   }
 }
+
+type Negociacion = Pick<NegociarVistaEnVivo, 'ejecutar'>;
+
+/**
+ * R1 · la elección es POR COPROPIEDAD: sin Edge puente, el caso de uso de
+ * siempre —con el go2rtc de la API o, sin `GO2RTC_URL`, su 503 ANTES de mirar
+ * el equipo—; con puente, el que negocia por el go2rtc del Edge.
+ */
+export class VistaEnVivoPorCopropiedad implements Negociacion {
+  constructor(
+    private readonly deSiempre: Negociacion,
+    private readonly porElEdge: Negociacion,
+    private readonly edge: CredencialesEnElEdge,
+  ) {}
+
+  async ejecutar(solicitud: SolicitudDeVistaEnVivo) {
+    const puente = await this.edge.puenteDe(solicitud.copropiedadId);
+    return (puente === null ? this.deSiempre : this.porElEdge).ejecutar(solicitud);
+  }
+}
+
+/** La fábrica del caso de uso en `guardia.module`: sin Edge en la app, el de siempre, tal cual. */
+export const vistaEnVivoPorCopropiedad = (
+  proveedor: ProveedorDeEquipos,
+  puente: PuenteDeVideo | null,
+  bitacora: Bitacora,
+  reloj: Reloj,
+  edge?: CredencialesEnElEdge | null,
+): Negociacion => {
+  const deSiempre = new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj);
+  if (edge === undefined || edge === null) return deSiempre;
+  const conEdge = new NegociarVistaEnVivo(
+    proveedor,
+    new PuenteDeVideoPorElEdge(puente, edge),
+    bitacora,
+    reloj,
+  );
+  return new VistaEnVivoPorCopropiedad(deSiempre, conEdge, edge);
+};
+
+export const PROVEEDOR_DE_VISTA_EN_VIVO: FactoryProvider<Negociacion> = {
+  provide: NegociarVistaEnVivo,
+  inject: [
+    PROVEEDOR_DE_EQUIPOS,
+    PUENTE_DE_VIDEO,
+    BITACORA,
+    RELOJ,
+    { token: CREDENCIALES_EN_EL_EDGE, optional: true },
+  ],
+  useFactory: vistaEnVivoPorCopropiedad,
+};
