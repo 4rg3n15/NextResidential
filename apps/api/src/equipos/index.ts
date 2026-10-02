@@ -4,12 +4,12 @@
  */
 export { EquiposModule } from './equipos.module';
 /**
- * ETAPA 15-D (D5) · el registro que el proveedor de hardware necesita para
- * resolver un identificador de dispositivo a dirección y credencial. Sale por
- * el barril porque lo compone `app.module.ts`, no otro módulo: es la ÚNICA
- * pieza de infraestructura de este módulo que se expone, y sólo su clase.
+ * ETAPA 15-D (D5) · el registro que el proveedor de hardware necesita para resolver un
+ * equipo a dirección y credencial (lo compone `app.module.ts`). 15-Q2 · y el secreto
+ * del Alarm Server: los componen el túnel del Edge (D2), que los entrega al conjunto.
  */
 export { RegistroDeEquiposPg } from './infraestructura/registro-de-equipos-pg';
+export { SecretosDeAlarmServerPg } from './infraestructura/secretos-de-alarm-server-pg';
 export {
   REPOSITORIO_DE_EQUIPOS,
   SONDA_DE_EQUIPO,

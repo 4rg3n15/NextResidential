@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import type { DynamicModule } from '@nestjs/common';
 import { Pool } from 'pg';
 import { BITACORA, RELOJ } from '@ncr/domain-core';
@@ -10,13 +11,22 @@ import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import { REGISTRO_AUDITORIA } from '../comun/auditoria/registro';
 import type { RegistroDeAuditoria } from '../comun/auditoria/registro';
 import { ALERTAS_DE_EQUIPO } from '../eventos';
-import { EQUIPOS_ACTIVOS, EquiposModule } from '../equipos';
+import {
+  EQUIPOS_ACTIVOS,
+  EquiposModule,
+  RegistroDeEquiposPg,
+  SecretosDeAlarmServerPg,
+} from '../equipos';
+import { CREDENCIALES_EN_EL_EDGE } from '../comun/credenciales-en-el-edge';
 import {
   FUENTE_DE_PLACAS,
+  InterceptorDeCopropiedadEnCurso,
+  PROVEEDOR_DE_EQUIPOS,
   RUTAS_DE_EQUIPOS,
   TUNELES_DE_EDGE,
   enHechoDelEdge,
 } from '../proveedores';
+import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { RutasDeEquipos, TunelesDeEdge } from '../proveedores';
 import { AbrirTunel, AUDITORIA_DEL_TUNEL } from './aplicacion/abrir-tunel';
 import type { AuditoriaDelTunel } from './aplicacion/abrir-tunel';
@@ -24,6 +34,14 @@ import { AcreditarEdge } from './aplicacion/acreditar-edge';
 import { AlertaDeDesconexion } from './aplicacion/alerta-de-desconexion';
 import type { AlertaParaEquipo, EquiposDelConjunto } from './aplicacion/alerta-de-desconexion';
 import { PublicacionesDelEdge } from './aplicacion/publicaciones-del-edge';
+import { CredencialesDelPuente } from './aplicacion/credenciales-del-puente';
+import { InventarioDelEdge } from './aplicacion/inventario-del-edge';
+import { MigrarCredencialesAlEdge } from './aplicacion/migrar-credenciales';
+import {
+  CredencialesEnLaNubePg,
+  LecturaParaElEdgePg,
+  huellaConLlave,
+} from './infraestructura/credenciales-pg';
 import { REPOSITORIO_DE_PUENTES } from './aplicacion/puentes';
 import type { RepositorioDePuentes } from './aplicacion/puentes';
 import { REPOSITORIO_DE_GATEWAYS } from './aplicacion/puertos';
@@ -44,6 +62,7 @@ import { PuertaDelTunel } from './presentacion/puerta-del-tunel';
  * túnel se monta encima de ella. Con base, PostgreSQL; sin ella, los dobles —y
  * ningún Edge es puente: todo va directo (R1)—.
  */
+@Global() // CREDENCIALES_EN_EL_EDGE la consumen `equipos` y `guardia` (D2, E2)
 @Module({})
 export class TunelDelEdgeModule {
   static registrar(): DynamicModule {
@@ -132,7 +151,70 @@ export class TunelDelEdgeModule {
           },
         },
         PuertaDelTunel,
+        { provide: APP_INTERCEPTOR, useClass: InterceptorDeCopropiedadEnCurso },
+        {
+          provide: InventarioDelEdge,
+          inject: [EQUIPOS_ACTIVOS, BITACORA],
+          useFactory: (equipos: EquiposDelConjunto, bitacora: Bitacora) =>
+            new InventarioDelEdge(equipos, bitacora),
+        },
+        {
+          // D2 · sin base no hay puentes: `null`, y `equipos` y `guardia` quedan como siempre (R1).
+          provide: CREDENCIALES_EN_EL_EDGE,
+          inject: [Pool, CONFIGURACION, RUTAS_DE_EQUIPOS, TUNELES_DE_EDGE, BITACORA],
+          useFactory: (
+            pool: Pool,
+            c: Configuracion,
+            rutas: RutasDeEquipos,
+            tuneles: TunelesDeEdge,
+            bitacora: Bitacora,
+          ) =>
+            conBase(c)
+              ? new CredencialesDelPuente(
+                  rutas,
+                  tuneles,
+                  new LecturaParaElEdgePg(
+                    new RegistroDeEquiposPg(pool, c.EQUIPOS_LLAVE),
+                    new SecretosDeAlarmServerPg(pool, c.EQUIPOS_LLAVE),
+                  ),
+                  new CredencialesEnLaNubePg(pool, new RegistroDeEquiposPg(pool, c.EQUIPOS_LLAVE)),
+                  huellaConLlave(c.EQUIPOS_LLAVE),
+                  bitacora,
+                )
+              : null,
+        },
+        {
+          provide: MigrarCredencialesAlEdge,
+          inject: [
+            Pool,
+            CONFIGURACION,
+            RUTAS_DE_EQUIPOS,
+            TUNELES_DE_EDGE,
+            PROVEEDOR_DE_EQUIPOS,
+            BITACORA,
+          ],
+          useFactory: (
+            pool: Pool,
+            c: Configuracion,
+            rutas: RutasDeEquipos,
+            tuneles: TunelesDeEdge,
+            proveedor: ProveedorDeEquipos,
+            bitacora: Bitacora,
+          ) => {
+            const registro = new RegistroDeEquiposPg(pool, c.EQUIPOS_LLAVE);
+            return new MigrarCredencialesAlEdge(
+              rutas,
+              tuneles,
+              new LecturaParaElEdgePg(registro, new SecretosDeAlarmServerPg(pool, c.EQUIPOS_LLAVE)),
+              new CredencialesEnLaNubePg(pool, registro),
+              huellaConLlave(c.EQUIPOS_LLAVE),
+              (id) => proveedor.olvidar?.(id),
+              bitacora,
+            );
+          },
+        },
       ],
+      exports: [CREDENCIALES_EN_EL_EDGE],
     };
   }
 }

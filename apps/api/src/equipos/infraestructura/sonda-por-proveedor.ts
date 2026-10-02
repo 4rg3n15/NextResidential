@@ -69,6 +69,8 @@ export class SondaPorProveedor implements SondaDeEquipo {
     private readonly puertoRtsp?: number,
     /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`: la ficha juzga el reloj con el umbral de las altas. */
     private readonly desvioDeRelojMaximoS?: number,
+    /** 15-Q2 · C2 · con puente, el mismo diagnóstico corre en el Edge (`por-el-edge.ts`). */
+    private readonly diagnosticar: typeof diagnosticarEquipo = diagnosticarEquipo,
   ) {}
 
   async probar(datos: DatosDeSondeo): Promise<ResultadoDeSondeo> {
@@ -78,19 +80,15 @@ export class SondaPorProveedor implements SondaDeEquipo {
      * con cinco «no comprobado» que no le aplican, sino la suya: si espera el
      * veredicto, si su biblioteca cabe, si abre desde aquí.
      */
-    const diagnostico = await diagnosticarEquipo({
+    const diagnostico = await this.diagnosticar({
       host: datos.host,
       puerto: datos.puerto,
       protocolo: datos.protocolo,
       usuario: datos.usuario,
       clave: datos.secreto,
       familia: familiaDe(datos.tipo),
-      /**
-       * E1-e (15-M) · esta sonda la dispara una PERSONA (alta, edición,
-       * «Probar conexión», diagnóstico): si el equipo rechazó la clave hace
-       * un rato, aquí se decide presentarla una vez más. El sondeo periódico
-       * no pasa por aquí y respeta la marca.
-       */
+      // E1-e (15-M) · la dispara una PERSONA: se presenta la clave una vez más aunque
+      // el equipo la rechazara hace un rato. El sondeo periódico respeta la marca.
       olvidarRechazo: true,
       ...(this.desvioDeRelojMaximoS === undefined
         ? {}

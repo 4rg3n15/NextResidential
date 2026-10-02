@@ -65,6 +65,9 @@ import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/con
 import { AudioController } from './presentacion/audio/audio.controller';
 import { BilletesDeAudio } from './presentacion/audio/billetes-de-audio';
 import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio';
+import { CREDENCIALES_EN_EL_EDGE } from '../comun/credenciales-en-el-edge';
+import type { CredencialesEnElEdge as Edge } from '../comun/credenciales-en-el-edge';
+import { PuenteDeVideoPorElEdge } from './infraestructura/puente-de-video-por-el-edge';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -75,13 +78,10 @@ import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio'
  * decide qué ve el operador no puede ser la que envejece.
  *
  * Desde la 15-E los dos puertos de hardware de esta consola —accionar y
- * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura de cualquier
- * dispositivo resuelve por `AccessPointProvider` contra el registro y por
- * capacidades, y el canal de intercom abre el del aparato por
- * `IntercomProvider` cuando el turno se concede. Con `PROVEEDOR_DE_EQUIPOS=
- * simulado` el comportamiento observable es el de siempre (ADR-03); con el
- * real, las mismas líneas hablan con los equipos dados de alta en la consola.
- * La exclusividad sigue en la máquina de estados del dominio: lo que cambia es
+ * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura resuelve por
+ * `AccessPointProvider` y el intercom abre el del aparato por `IntercomProvider`
+ * cuando el turno se concede. Con el simulado, lo de siempre (ADR-03); con el
+ * real, los equipos de la consola. La exclusividad sigue en el dominio: cambia
  * el transporte, no las reglas.
  */
 @Module({})
@@ -245,15 +245,10 @@ export class GuardiaModule {
         },
         PuertaDeAudioPorWebSocket,
         {
-          /**
-           * A5 · el puente de video existe sólo si `GO2RTC_URL` está: sin él
-           * se inyecta `null` y la vista en vivo responde 503 con motivo. Se
-           * anuncia al arrancar SIN el valor —es una dirección interna— para
-           * que «no hay video» no se confunda con «el puente cayó».
-           */
+          // A5 · sin `GO2RTC_URL`, `null` y 503 con motivo. 15-Q2 · E2: con puentes, envuelto.
           provide: PUENTE_DE_VIDEO,
-          inject: [CONFIGURACION, BITACORA],
-          useFactory: (configuracion: Configuracion, bitacora: Bitacora): PuenteDeVideo | null => {
+          inject: [CONFIGURACION, BITACORA, { token: CREDENCIALES_EN_EL_EDGE, optional: true }],
+          useFactory: (configuracion: Configuracion, bitacora: Bitacora, edge?: Edge | null) => {
             const url = configuracion.GO2RTC_URL;
             bitacora.registrar(
               url === undefined ? 'aviso' : 'info',
@@ -262,7 +257,10 @@ export class GuardiaModule {
                 : 'vista en vivo con puente go2rtc configurado (RTSP → WebRTC por la API)',
               { configurado: url !== undefined },
             );
-            return url === undefined ? null : new PuenteGo2rtc(url);
+            const directo = url === undefined ? null : new PuenteGo2rtc(url);
+            return edge === undefined || edge === null
+              ? directo
+              : new PuenteDeVideoPorElEdge(directo, edge);
           },
         },
         {

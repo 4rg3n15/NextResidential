@@ -31,6 +31,7 @@ const gateway: GatewayRegistrado = {
 };
 const rutas: RutasDeEquipos = {
   puenteDe: async (id) => ({ 'cam-a': COP_A, 'cam-b': COP_B })[id] ?? null,
+  edgeDe: async () => null,
   olvidar: () => undefined,
 };
 const publicacion = (dispositivoId: string) =>

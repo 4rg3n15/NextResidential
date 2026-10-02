@@ -18,6 +18,8 @@ import { conCliente } from '../persistencia/con-cliente';
 export interface RutasDeEquipos {
   /** La copropiedad cuyo Edge es el puente de este equipo, o `null` si va directo. */
   puenteDe(dispositivoId: string): Promise<string | null>;
+  /** El Edge puente de la COPROPIEDAD (para lo que aún no es un equipo: un alta). */
+  edgeDe(copropiedadId: string): Promise<string | null>;
   /** Tras editar o dar de baja un equipo, o cambiar el puente: se vuelve a leer. */
   olvidar(dispositivoId?: string): void;
 }
@@ -27,6 +29,7 @@ export const RUTAS_DE_EQUIPOS = Symbol.for('ncr.proveedores.RutasDeEquipos');
 /** Sin base (la suite en memoria): todo va directo, como antes de la 15-Q2. */
 export const TODO_DIRECTO: RutasDeEquipos = {
   puenteDe: () => Promise.resolve(null),
+  edgeDe: () => Promise.resolve(null),
   olvidar: () => undefined,
 };
 
@@ -49,27 +52,46 @@ export class RutasDeEquiposPg implements RutasDeEquipos {
     private readonly ahora: () => number = Date.now,
   ) {}
 
-  async puenteDe(dispositivoId: string): Promise<string | null> {
-    if (!ES_UUID.test(dispositivoId)) return null;
-    const guardada = this.memoria.get(dispositivoId);
-    if (guardada !== undefined && guardada.hasta > this.ahora()) return guardada.puente;
-    const puente = await conCliente(this.pool, async (cliente) => {
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        CLAIMS_DE_LECTURA,
-      ]);
-      const { rows } = await cliente.query<{ copropiedad_id: string }>(
-        `SELECT d.copropiedad_id
+  puenteDe(dispositivoId: string): Promise<string | null> {
+    return this.recordada(dispositivoId, () =>
+      this.leer(
+        `SELECT d.copropiedad_id AS valor
            FROM public.dispositivos d
            JOIN public.edge_gateways e
              ON e.copropiedad_id = d.copropiedad_id AND e.puente AND e.estado = 'activo'
           WHERE d.id = $1
           LIMIT 1`,
-        [dispositivoId],
-      );
-      return rows[0]?.copropiedad_id ?? null;
-    });
-    this.memoria.set(dispositivoId, { puente, hasta: this.ahora() + VIDA_MS });
+        dispositivoId,
+      ),
+    );
+  }
+
+  edgeDe(copropiedadId: string): Promise<string | null> {
+    return this.recordada(`copropiedad:${copropiedadId}`, () =>
+      this.leer(
+        `SELECT e.id AS valor FROM public.edge_gateways e
+          WHERE e.copropiedad_id = $1 AND e.puente AND e.estado = 'activo' LIMIT 1`,
+        copropiedadId,
+      ),
+    );
+  }
+
+  private async recordada(clave: string, leer: () => Promise<string | null>) {
+    const guardada = this.memoria.get(clave);
+    if (guardada !== undefined && guardada.hasta > this.ahora()) return guardada.puente;
+    const puente = ES_UUID.test(clave.replace('copropiedad:', '')) ? await leer() : null;
+    this.memoria.set(clave, { puente, hasta: this.ahora() + VIDA_MS });
     return puente;
+  }
+
+  private leer(sql: string, id: string): Promise<string | null> {
+    return conCliente(this.pool, async (cliente) => {
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
+        CLAIMS_DE_LECTURA,
+      ]);
+      const { rows } = await cliente.query<{ valor: string }>(sql, [id]);
+      return rows[0]?.valor ?? null;
+    });
   }
 
   olvidar(dispositivoId?: string): void {

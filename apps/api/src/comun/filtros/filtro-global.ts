@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import type { Bitacora } from '@ncr/domain-core';
 import type { ReporteDeErrores } from '../../observabilidad';
 import { esErrorDeConexion } from '../../persistencia/con-cliente';
+import { motivoDelTunel } from './error-del-tunel';
 
 /**
  * Manejo global de errores.
@@ -19,14 +20,9 @@ import { esErrorDeConexion } from '../../persistencia/con-cliente';
  * ═══════════════════════════════════════════════════════════════════════════
  * EL CUERPO DEL ERROR NO NOMBRA LA CLASE QUE LO LANZÓ · H-13-24
  *
- * Medido al ejercer el limitador bajo carga:
- *
- *   429 -> {"estado":429,…,"mensaje":"ThrottlerException: Too Many Requests"}
- *
- * `ThrottlerException` es el nombre interno de `@nestjs/throttler`. No es una
- * brecha, pero sí le dice a quien sondea qué biblioteca hay detrás y dónde
- * buscarle los CVE — información que §2.7.8 clasifica como fuga por mensaje de
- * error y que a un cliente legítimo no le sirve de nada.
+ * Medido al ejercer el limitador: `"ThrottlerException: Too Many Requests"`. No es
+ * una brecha, pero le dice a quien sondea qué biblioteca hay detrás y dónde
+ * buscarle los CVE: fuga por mensaje de error (§2.7.8).
  *
  * Se retira el prefijo `<Algo>Exception: ` de forma genérica, y no sólo para el
  * 429, porque cualquier `HttpException` de una dependencia futura llegará con
@@ -75,6 +71,7 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
     const esHttp = excepcion instanceof HttpException;
     // 15-O · un corte de la base no es un fallo del programa: 503 y Retry-After.
     const sinBase = !esHttp && esErrorDeConexion(excepcion);
+    const sinEdge = esHttp || sinBase ? null : motivoDelTunel(excepcion); // 15-Q2 · C3
     /**
      * ═══════════════════════════════════════════════════════════════════════
      * EL 4xx QUE NO ES DE NEST SIGUE SIENDO UN 4xx · H-13-12
@@ -106,13 +103,11 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
 
     const estado = esHttp
       ? excepcion.getStatus()
-      : sinBase
+      : sinBase || sinEdge !== null
         ? HttpStatus.SERVICE_UNAVAILABLE
         : (codigoDeBiblioteca ?? HttpStatus.INTERNAL_SERVER_ERROR);
 
-    // `correlacion` NO se repite en el contexto: desde la ETAPA 14 la bitácora
-    // la pone en el nivel superior de TODA línea, y duplicarla aquí solo hacía
-    // la entrada más larga sin decir nada nuevo.
+    // `correlacion` NO se repite: la bitácora ya la pone en TODA línea (ETAPA 14).
     this.bitacora.registrar(estado >= 500 ? 'error' : 'aviso', 'peticion fallida', {
       metodo: peticion.method,
       ruta: peticion.url,
@@ -138,7 +133,9 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
       });
     }
 
-    if (sinBase) respuesta.setHeader('Retry-After', String(SEGUNDOS_ANTES_DE_REINTENTAR));
+    if (sinBase || sinEdge !== null) {
+      respuesta.setHeader('Retry-After', String(SEGUNDOS_ANTES_DE_REINTENTAR));
+    }
     respuesta.status(estado).json({
       estado,
       correlacion,
@@ -150,11 +147,13 @@ export class FiltroGlobalDeExcepciones implements ExceptionFilter {
         ? sinNombreDeClase(excepcion.getResponse())
         : sinBase
           ? MENSAJE_BASE_DE_DATOS_NO_DISPONIBLE
-          : codigoDeBiblioteca === undefined
-            ? 'Error interno'
-            : // A3 (15-E) · sólo un error PROPIO marcado dice su motivo; el de
-              // una dependencia sigue normalizado (H-13-12).
-              (mensajeExpuesto(excepcion) ?? 'Petición rechazada'),
+          : sinEdge !== null
+            ? sinEdge
+            : codigoDeBiblioteca === undefined
+              ? 'Error interno'
+              : // A3 (15-E) · sólo un error PROPIO marcado dice su motivo; el de
+                // una dependencia sigue normalizado (H-13-12).
+                (mensajeExpuesto(excepcion) ?? 'Petición rechazada'),
     });
   }
 }

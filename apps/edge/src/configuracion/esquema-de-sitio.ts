@@ -13,7 +13,7 @@ import { ConfiguracionInvalida, cargarConfiguracion } from './esquema';
 import type { ConfiguracionDelEdge } from './esquema';
 
 /** Lo que admite el receptor de una cámara, y cada equipo con su credencial. */
-const equipo = z
+export const esquemaDeEquipo = z
   .object({
     dispositivoId: z.string().uuid('dispositivoId es el UUID del equipo en Next Control'),
     tipo: z.enum(['camara_lpr', 'terminal_facial', 'intercom']),
@@ -31,7 +31,7 @@ const equipo = z
     message: 'una cámara necesita su secretoAlarmServer (32+ caracteres) para publicar al Edge',
   });
 
-export type EquipoDelEdge = z.infer<typeof equipo>;
+export type EquipoDelEdge = z.infer<typeof esquemaDeEquipo>;
 
 const listaDeEquipos = z.string().transform((texto, ctx): EquipoDelEdge[] => {
   let crudo: unknown;
@@ -41,7 +41,7 @@ const listaDeEquipos = z.string().transform((texto, ctx): EquipoDelEdge[] => {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'EDGE_EQUIPOS no es JSON' });
     return z.NEVER;
   }
-  const r = z.array(equipo).min(1).max(64).safeParse(crudo);
+  const r = z.array(esquemaDeEquipo).min(1).max(64).safeParse(crudo);
   if (!r.success) {
     // El detalle nombra el campo, nunca el valor: ahí van claves de equipos.
     for (const i of r.error.issues) {

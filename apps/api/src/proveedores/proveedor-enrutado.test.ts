@@ -60,6 +60,7 @@ const montar = (opciones: { conTunel?: boolean; resuelto?: string } = {}) => {
   const tuneles = new TunelesDeEdge();
   const rutas: RutasDeEquipos = {
     puenteDe: async (id) => (id.startsWith('remoto') ? COP : null),
+    edgeDe: async () => null,
     olvidar: (id) => void registro.push(`rutas:olvidar:${String(id)}`),
   };
   const directo = proveedorQueAnota('directo', registro);

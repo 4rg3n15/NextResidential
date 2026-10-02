@@ -14,7 +14,8 @@
  *     resolvió por contingencia, se RECHAZA (`HechoYaResueltoEnElEdge`). Llegó
  *     tarde, y ejecutarla sería accionar dos veces.
  *  4. La URL de video con credencial no sale del conjunto (D4): `origenDeVideo`
- *     contesta `null`; el video lo sirve el go2rtc que corre junto al Edge.
+ *     contesta el origen con `FUENTE_EN_EL_EDGE` en lugar de la URL; el video
+ *     lo negocia el go2rtc que corre junto al Edge (pedido `video.whep`, E2).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import type { ProveedorDeEquipos } from '../nucleo/proveedor';
@@ -23,6 +24,12 @@ import { EquipoNoRegistrado } from '../hikvision/registro-de-equipos';
 import { HechoYaResueltoEnElEdge, ProtocoloInvalido } from './errores-remotos';
 
 export { HechoYaResueltoEnElEdge };
+/**
+ * La «URL» de un video que sólo el Edge sabe abrir. RTSP en la forma (el puerto
+ * lo exige), sin credencial, y con un dominio reservado que nunca resuelve
+ * (`.invalid`, RFC 2606): si algo intentara abrirla, no llegaría a ningún sitio.
+ */
+export const FUENTE_EN_EL_EDGE = 'rtsp://edge-del-conjunto.invalid/';
 import type { ContextoDePedido, SesionDeTunel } from './sesion-de-tunel';
 
 const PERMITIDOS = new Set([
@@ -92,7 +99,11 @@ export const ejecutarOrdenes = (
     const valor = await funcion.apply(proveedor, args);
     // D4 · se pregunta al proveedor (un equipo desconocido sigue rechazando),
     // pero la URL con la credencial se queda aquí: el video lo sirve el go2rtc local.
-    if (metodo === 'origenDeVideo') return null;
+    if (metodo === 'origenDeVideo') {
+      return valor === null
+        ? null
+        : { ...(valor as object), rtsp: `${FUENTE_EN_EL_EDGE}${String(args[0])}` };
+    }
     if (metodo !== 'escuchar') return valor;
     const escucha = valor as EscuchaActiva;
     escuchas.get(escucha.dispositivoId)?.detener();

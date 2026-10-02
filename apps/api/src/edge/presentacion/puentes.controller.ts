@@ -29,6 +29,7 @@ import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { RUTAS_DE_EQUIPOS, TUNELES_DE_EDGE } from '../../proveedores';
 import type { RutasDeEquipos, TunelesDeEdge } from '../../proveedores';
+import { MigrarCredencialesAlEdge } from '../aplicacion/migrar-credenciales';
 import { REPOSITORIO_DE_PUENTES } from '../aplicacion/puentes';
 import type { RepositorioDePuentes } from '../aplicacion/puentes';
 
@@ -55,6 +56,12 @@ export class MarcaDePuenteDto {
   puente!: boolean;
 }
 
+export class TrasladoDeCredencialDto {
+  @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
+  @ApiProperty({ description: 'En el Edge y borrada de la nube' }) trasladada!: boolean;
+  @ApiProperty() motivo!: string;
+}
+
 const fecha = (d: Date | null): string | null => (d === null ? null : d.toISOString());
 
 /**
@@ -73,6 +80,7 @@ export class PuentesController {
     @Inject(TUNELES_DE_EDGE) private readonly tuneles: TunelesDeEdge,
     @Inject(RUTAS_DE_EQUIPOS) private readonly rutas: RutasDeEquipos,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    @Inject(MigrarCredencialesAlEdge) private readonly migrar: MigrarCredencialesAlEdge,
   ) {}
 
   @Get()
@@ -131,5 +139,25 @@ export class PuentesController {
     }
     this.rutas.olvidar();
     return { puente: dto.puente };
+  }
+
+  @Post(':edgeId/migrar-credenciales')
+  @HttpCode(200)
+  @Roles('superadministrador')
+  @ApiOperation({
+    summary: 'D3 · Muda al Edge puente las credenciales que siguen en la nube',
+    description:
+      'Una por una: el Edge la guarda y confirma que el equipo autentica; SÓLO entonces se ' +
+      'borra de la nube. Lo que no autentica se queda, con su motivo. Se puede repetir.',
+  })
+  @ApiOkResponse({ type: [TrasladoDeCredencialDto] })
+  @ApiForbiddenResponse()
+  async migrarCredenciales(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('edgeId', ParseUUIDPipe) _edgeId: string,
+  ): Promise<TrasladoDeCredencialDto[]> {
+    await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'edge-gateways');
+    return this.migrar.ejecutar(ctx, copropiedadId);
   }
 }

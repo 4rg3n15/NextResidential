@@ -12,6 +12,7 @@ import { atenderActualizacion } from '../../comun/despachador-de-actualizaciones
 import { TUNELES_DE_EDGE } from '../../proveedores';
 import type { TunelesDeEdge } from '../../proveedores';
 import { AbrirTunel } from '../aplicacion/abrir-tunel';
+import { InventarioDelEdge } from '../aplicacion/inventario-del-edge';
 import { PublicacionesDelEdge } from '../aplicacion/publicaciones-del-edge';
 import { enlaceWs } from './enlace-ws';
 
@@ -43,6 +44,7 @@ export class PuertaDelTunel implements OnApplicationBootstrap, OnModuleDestroy {
     @Inject(HttpAdapterHost) private readonly anfitrion: HttpAdapterHost,
     @Inject(AbrirTunel) private readonly abrir: AbrirTunel,
     @Inject(PublicacionesDelEdge) private readonly publicaciones: PublicacionesDelEdge,
+    @Inject(InventarioDelEdge) private readonly inventario: InventarioDelEdge,
     @Inject(TUNELES_DE_EDGE) private readonly tuneles: TunelesDeEdge,
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
@@ -98,6 +100,7 @@ export class PuertaDelTunel implements OnApplicationBootstrap, OnModuleDestroy {
     const { tunel, gateway } = apertura;
     enlace.enviar(JSON.stringify({ v: 1, t: 'bienvenida', copropiedadId: gateway.copropiedadId }));
     this.publicaciones.instalar(tunel.sesion, gateway);
+    void this.inventario.enviar(tunel.sesion, gateway.copropiedadId);
     tunel.sesion.alCerrar((motivo) => {
       this.tuneles.liberar(tunel, this.reloj.ahora());
       this.bitacora.registrar('aviso', 'túnel del Edge cerrado', {

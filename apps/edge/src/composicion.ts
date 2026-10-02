@@ -1,12 +1,8 @@
 /**
- * 15-Q · LA RAÍZ DE COMPOSICIÓN DEL EDGE EN SITIO (P-27 = B)
- *
- * Construye, sin arrancar nada, todo lo que `main.ts` pone en marcha: la caché
- * y la bandeja en SQLite, el cliente de la nube con la identidad del Edge, el
- * proveedor de equipos de `packages/providers` —el mismo de la nube, con los
- * equipos del `.env` local—, la contingencia que decide y acciona sin WAN, y
- * el manejador de las entradas locales. Sin temporizadores ni servidores: así
- * la prueba de la DoD compone el MISMO Edge y le pasa el tiempo y la red.
+ * 15-Q · LA RAÍZ DE COMPOSICIÓN DEL EDGE EN SITIO: SQLite, la nube con la identidad del
+ * Edge, el proveedor de `packages/providers`, la contingencia y las entradas locales. Sin
+ * temporizadores ni servidores: la DoD compone el MISMO Edge y le pasa el tiempo y la red.
+ * 15-Q2 · con puente, `ExtrasDelPuente` cambia el registro, la sonda y el ingestor.
  */
 import type { Reloj } from '@ncr/domain-core';
 import {
@@ -30,6 +26,7 @@ import { BandejaSqlite } from './infraestructura/sqlite/bandeja-sqlite';
 import { CacheDeReglasSqlite } from './infraestructura/sqlite/cache-de-reglas';
 import { FeDeVidaSqlite } from './infraestructura/sqlite/fe-de-vida';
 import { MemoriaDeAccesosSqlite } from './infraestructura/sqlite/memoria-de-accesos';
+import type { ExtrasDelPuente } from './extras-del-puente';
 
 export type Registrar = (
   nivel: 'info' | 'aviso' | 'error',
@@ -37,7 +34,7 @@ export type Registrar = (
   contexto?: unknown,
 ) => void;
 
-export interface ExtrasDeComposicion {
+export interface ExtrasDeComposicion extends ExtrasDelPuente {
   readonly registrar: Registrar;
   /** Hacia la nube. En las pruebas, el corte de WAN se simula aquí. */
   readonly transporteDeNube?: typeof fetch;
@@ -99,7 +96,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
   const proveedor: ProveedorDeEquipos = crearProveedorDeEquipos({
     clase: 'hikvision', // kpi-11-exento: en sitio, los equipos reales; las pruebas inyectan `peticion`
     reloj,
-    registro: new RegistroEnMemoria(config.EDGE_EQUIPOS.map(aRegistrado)),
+    registro: extras.registro?.(db) ?? new RegistroEnMemoria(config.EDGE_EQUIPOS.map(aRegistrado)),
     fuente,
     ...(extras.peticionAEquipos === undefined ? {} : { peticion: extras.peticionAEquipos }),
   });
@@ -110,7 +107,8 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
       cadaSegundos: config.REGLAS_DESCARGA_SEGUNDOS,
     }),
     cache,
-    new SondaHttp(config.NEXT_CONTROL_API_URL, transporte, config.SONDA_POR_EVENTO_MS),
+    extras.sondaInmediata ??
+      new SondaHttp(config.NEXT_CONTROL_API_URL, transporte, config.SONDA_POR_EVENTO_MS),
     new AccionadorPorProveedor(proveedor, config.EDGE_SERVICE_USER_ID),
     new MemoriaDeAccesosSqlite(db),
     {
@@ -120,7 +118,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
       registrar: extras.registrar,
     },
   );
-  fuente.fijarIngestor(contingencia);
+  fuente.fijarIngestor(extras.envolverIngestor?.(contingencia) ?? contingencia);
 
   const manejador = crearManejador(
     {
@@ -135,24 +133,23 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
     {
       secretoLocal: config.EDGE_LOCAL_SECRETO,
       limitePorMinuto: config.EDGE_LIMITE_POR_MINUTO,
-      camaras: config.EDGE_EQUIPOS.flatMap((e) =>
-        e.secretoAlarmServer === undefined
-          ? []
-          : [{ dispositivoId: e.dispositivoId, host: e.host, secreto: e.secretoAlarmServer }],
-      ),
+      camaras:
+        extras.camaras ??
+        config.EDGE_EQUIPOS.flatMap((e) =>
+          e.secretoAlarmServer === undefined
+            ? []
+            : [{ dispositivoId: e.dispositivoId, host: e.host, secreto: e.secretoAlarmServer }],
+        ),
       ahora: () => reloj.ahora().getTime(),
       registrar: extras.registrar,
     },
   );
 
-  /**
-   * Q3 · las escuchas (alertStream o suscripción, según declare el equipo) de
-   * la terminal y el videoportero. `escuchar` es idempotente en el proveedor:
-   * rearmar sólo vuelve a abrir la que terminó. La cámara no se escucha: publica.
-   */
+  /** Q3 · terminal y videoportero (la cámara publica): rearmar sólo reabre la que terminó. */
   const rearmarEscuchas = async (): Promise<number> => {
     let activas = 0;
-    for (const e of config.EDGE_EQUIPOS.filter((x) => x.tipo !== 'camara_lpr')) {
+    const equipos = extras.equipos?.() ?? config.EDGE_EQUIPOS;
+    for (const e of equipos.filter((x) => x.tipo !== 'camara_lpr')) {
       try {
         const escucha = await proveedor.escuchar(e.dispositivoId);
         if (escucha.transporte !== 'ninguna') activas += 1;

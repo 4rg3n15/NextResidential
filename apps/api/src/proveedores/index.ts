@@ -6,3 +6,4 @@ export type { EstadoDelTunel, TunelVivo } from './tuneles-de-edge';
 export { RUTAS_DE_EQUIPOS } from './rutas-de-equipos';
 export type { RutasDeEquipos } from './rutas-de-equipos';
 export { enHechoDelEdge } from './hecho-en-curso';
+export { copropiedadEnCurso, InterceptorDeCopropiedadEnCurso } from './copropiedad-en-curso';
