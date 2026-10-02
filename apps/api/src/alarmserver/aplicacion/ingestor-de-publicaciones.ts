@@ -6,6 +6,11 @@ import type {
   ResultadoDeIngesta,
   VeredictoRemoto,
 } from '@ncr/providers';
+import {
+  CONFIANZA_DE_ROSTRO_RECONOCIDO,
+  referenciaDePlaca,
+  referenciaDeRostro,
+} from '@ncr/providers';
 import type { AlertasDeEquipo, RegistrarAcceso } from '../../eventos';
 import { alertaDeAtencionDeEquipo } from './alerta-de-atencion';
 import { registroSinBase } from '../../eventos';
@@ -34,18 +39,11 @@ export interface RespondedorDeVerificacionRemota {
 }
 
 /**
- * ═════════════════════════════════════════════════════════════════════════════
- * [SUPUESTO] S-40 · LA CONFIANZA DE UN ROSTRO QUE LA TERMINAL YA RECONOCIÓ
- *
- * El evento de control de acceso no trae una confianza comparable a la de la
- * placa: la terminal ya comparó contra su biblioteca con su propio umbral y
- * sólo publica cuando reconoció. Se entrega 1 al motor —«identificación
- * cierta»— y se deja escrito: si el firmware publica una similitud, se lee de
- * ahí (`confianza` del evento) y este valor deja de usarse. No es decidir por
- * el equipo: la autorización, la vigencia, la lista negra y el consentimiento
- * siguen siendo del motor.
+ * [SUPUESTO] S-40 · la confianza de un rostro ya reconocido. Desde la 15-Q vive
+ * en `@ncr/providers` (`equipo/hecho-de-acceso.ts`), junto a la referencia del
+ * hecho: la nube y el Edge tienen que calcular la MISMA clave para el mismo paso.
  */
-export const CONFIANZA_DE_ROSTRO_RECONOCIDO = 1;
+export { CONFIANZA_DE_ROSTRO_RECONOCIDO } from '@ncr/providers';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -233,8 +231,7 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
     // la latencia se mide con la hora de recepción, nunca con la del equipo.
     void this.avisarSiElRelojSeDesvio(evento, copropiedadId);
 
-    const referencia =
-      evento.referenciaDelEquipo ?? `${evento.placa ?? ''}-${String(+evento.ocurridoEn)}`;
+    const referencia = referenciaDePlaca(evento);
     const evidenciaId = await this.guardarEvidencia(
       publicacion.foto ?? publicacion.recorte,
       evento.dispositivoId,
@@ -463,9 +460,7 @@ export class IngestorDeEquipos implements IngestorDePublicaciones {
         copropiedadId,
         dispositivoId: evento.dispositivoId,
         metodo: 'facial',
-        referenciaExterna:
-          evento.referenciaDelEquipo ??
-          `${plantillaId ?? 'desconocida'}-${String(evento.serieDelEquipo ?? +evento.ocurridoEn)}`,
+        referenciaExterna: referenciaDeRostro(evento),
         confianza: evento.confianza ?? CONFIANZA_DE_ROSTRO_RECONOCIDO,
         personaId: titularId,
         evidenciaId,

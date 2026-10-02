@@ -2,19 +2,14 @@ import { Body, Controller, HttpCode, Inject, Post, UseGuards } from '@nestjs/com
 import { BadRequestException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Bitacora, MotivoAcceso, Reloj } from '@ncr/domain-core';
-import { BITACORA, RELOJ, VersionDeReglas, negar, permitir } from '@ncr/domain-core';
+import type { Bitacora, Reloj } from '@ncr/domain-core';
+import { BITACORA, RELOJ } from '@ncr/domain-core';
 import { Publico, SinRecursoDeTenant } from '../../comun/decoradores';
-import { RegistrarAcceso } from '../../eventos';
+import { ReconciliarDecisiones, RegistrarAcceso } from '../../eventos';
 import { REPOSITORIO_DISPOSITIVOS } from '../../eventos';
 import type { RepositorioDispositivos } from '../../eventos';
 import { GuardiaDeFirmaDeIngesta } from './guardia-firma';
-import {
-  EventoIngestaDto,
-  LoteDeReconciliacionDto,
-  LoteReconciliadoDto,
-  ResultadoDeReconciliacionDto,
-} from './dtos';
+import { EventoIngestaDto, LoteDeReconciliacionDto, LoteReconciliadoDto } from './dtos';
 import { LatidoDto } from '../../eventos';
 import { MideKpi } from '../../observabilidad';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
@@ -166,77 +161,10 @@ export class IngestaController {
       'idempotencia y responde 202 también a los duplicados (RN-17, CA-22).',
   })
   async reconciliar(@Body() dto: LoteDeReconciliacionDto): Promise<LoteReconciliadoDto> {
-    const resultados: ResultadoDeReconciliacionDto[] = [];
-
-    for (const evento of dto.eventos) {
-      const version = VersionDeReglas.crear(evento.decision.versionDeReglas, evento.copropiedadId);
-      if (!version.ok) {
-        resultados.push({
-          claveIdempotencia: '',
-          aceptado: false,
-          duplicado: false,
-          detalle: version.error.detalle,
-        });
-        break;
-      }
-
-      // CA-16 · una negación sin motivo no es admisible. El tipo del dominio lo
-      // hace imposible; aquí, donde los datos vienen de fuera, se comprueba.
-      if (!evento.decision.permitido && evento.decision.motivo === undefined) {
-        resultados.push({
-          claveIdempotencia: '',
-          aceptado: false,
-          duplicado: false,
-          detalle: 'Una decisión denegada debe traer motivo (CA-16)',
-        });
-        break;
-      }
-
-      const decision = evento.decision.permitido
-        ? permitir(
-            version.valor,
-            evento.decision.reglaAplicada,
-            evento.decision.requiereConfirmacionHumana ?? false,
-          )
-        : negar(
-            evento.decision.motivo as MotivoAcceso,
-            version.valor,
-            evento.decision.reglaAplicada,
-          );
-
-      const constancia = await this.registrar.ejecutar(
-        {
-          copropiedadId: evento.copropiedadId,
-          dispositivoId: evento.dispositivoId,
-          metodo: evento.metodo,
-          referenciaExterna: evento.referenciaExterna,
-          confianza: evento.confianzaCentesimas / 100,
-          personaId: evento.personaId ?? null,
-          placaLeida: evento.placaLeida ?? null,
-          zonaId: evento.zonaId ?? null,
-          decididoPorEdge: true,
-          cachePotencialmenteObsoleto: evento.cachePotencialmenteObsoleto ?? false,
-          decisionDelEdge: decision,
-          ocurridoEn: new Date(evento.ocurridoEn),
-        },
-        ACTOR_INGESTA,
-      );
-
-      if (!constancia.ok) {
-        resultados.push({
-          claveIdempotencia: '',
-          aceptado: false,
-          duplicado: false,
-          detalle: constancia.error.detalle,
-        });
-        break;
-      }
-      resultados.push({
-        claveIdempotencia: constancia.valor.claveIdempotencia,
-        aceptado: true,
-        duplicado: constancia.valor.duplicado,
-      });
-    }
+    // 15-Q · la regla vive en `eventos` y la comparte la ruta del Edge acreditado.
+    const resultados = (
+      await new ReconciliarDecisiones(this.registrar, ACTOR_INGESTA).ejecutar(dto.eventos)
+    ).map(({ eventoId: _eventoId, ...r }) => r);
 
     this.bitacora.registrar('info', 'lote reconciliado desde el Edge', {
       recibidos: dto.eventos.length,

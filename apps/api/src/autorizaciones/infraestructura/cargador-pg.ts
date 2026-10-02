@@ -1,10 +1,9 @@
-import { Autorizacion, Placa, Vigencia, esExito } from '@ncr/domain-core';
+import { Placa, esExito } from '@ncr/domain-core';
 import type { Bitacora, ContextoDeAcceso } from '@ncr/domain-core';
 import type {
   CargadorDeContexto,
   LectorDeConsentimientoBiometrico,
   LectorDeUmbralDeConfianza,
-  PlacaResuelta,
   RepositorioAutorizaciones,
   RepositorioListaNegra,
   RepositorioVersionDeReglas,
@@ -13,6 +12,7 @@ import type {
   SolicitudDeAcceso,
 } from '../aplicacion/puertos';
 import { UMBRAL_CONFIANZA_PLACA_FRACCION } from '../../multiempresa/configuracion';
+import { derechoDelResidente } from '../aplicacion/derecho-del-residente';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -37,26 +37,9 @@ import { UMBRAL_CONFIANZA_PLACA_FRACCION } from '../../multiempresa/configuracio
  * Una consulta por AGREGADO, nunca una por política ni una por autorización:
  * el repositorio rehidrata acompañantes, zonas y patrón en la misma sentencia.
  *
- * ═════════════════════════════════════════════════════════════════════════════
- * EL DERECHO DEL RESIDENTE ES UNA AUTORIZACIÓN, Y SE MODELA COMO TAL
- *
- * El motor razona sobre `Autorizacion`: quién puede entrar, a qué vivienda, en
- * qué vigencia. Un vehículo del padrón no tiene fila en `autorizaciones` —el
- * residente no se autoriza a sí mismo—, pero su derecho a entrar existe y rige
- * mientras su vivienda esté en servicio. Se le entrega al motor como una
- * autorización SINTÉTICA: vigente desde que el vehículo se registró y hasta que
- * la vivienda se dio de baja (RN-13: una vivienda inactiva no genera accesos
- * nuevos). Así el motor aplica las mismas reglas a todos, y una vivienda de
- * baja se niega por `politica.vigencia` y no por un fallo técnico.
- *
- * [SUPUESTO] S-33 · el contrato no tiene motivo «VIVIENDA_INACTIVA». Se usa
- * VIGENCIA_EXPIRADA con la regla `politica.vigencia`, que es literalmente lo
- * que ocurrió: el derecho venció con la baja. Si Grupo Control quiere
- * distinguirlo, es una extensión al contrato (como E-01) y no se inventa aquí.
+ * El derecho del residente (autorización sintética, S-33) vive desde la 15-Q en
+ * `aplicacion/derecho-del-residente.ts`: la instantánea del Edge usa la misma.
  */
-
-/** Cien años: «mientras la vivienda esté en servicio», sin fecha de caducidad. */
-const SIN_CADUCIDAD_MS = 100 * 365 * 24 * 3600 * 1000;
 
 export class CargadorDeContextoPg implements CargadorDeContexto {
   constructor(
@@ -90,7 +73,8 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
       placa,
       personaId,
     });
-    const sintetica = vehiculo === null ? null : this.derechoDelResidente(solicitud, vehiculo);
+    const sintetica =
+      vehiculo === null ? null : derechoDelResidente(solicitud.copropiedadId, vehiculo);
 
     // La vivienda de destino: la del vehículo del padrón, o la de la
     // autorización de visitante que trae esa placa. En ese orden, porque el
@@ -159,27 +143,6 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
     if (leida === null || leida.trim() === '') return null;
     const placa = Placa.crear(leida);
     return esExito(placa) ? placa.valor.valor : leida.trim().toUpperCase();
-  }
-
-  private derechoDelResidente(
-    solicitud: SolicitudDeAcceso,
-    vehiculo: PlacaResuelta,
-  ): Autorizacion | null {
-    const desde = vehiculo.registradoEn;
-    const hasta =
-      vehiculo.viviendaActiva || vehiculo.viviendaDesactivadaEn === null
-        ? new Date(desde.getTime() + SIN_CADUCIDAD_MS)
-        : vehiculo.viviendaDesactivadaEn;
-    const vigencia = Vigencia.crear(desde, hasta);
-    if (!esExito(vigencia)) return null;
-    const derecho = Autorizacion.crear({
-      id: `residente:${vehiculo.vehiculoId}`,
-      copropiedadId: solicitud.copropiedadId,
-      viviendaId: vehiculo.viviendaId,
-      personaId: vehiculo.personaId ?? `vehiculo:${vehiculo.vehiculoId}`,
-      vigencia: vigencia.valor,
-    });
-    return esExito(derecho) ? derecho.valor : null;
   }
 
   private async umbral(copropiedadId: string): Promise<number> {

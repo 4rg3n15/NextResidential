@@ -45,13 +45,13 @@ export {
   UMBRAL_DE_CONFIANZA_POR_DEFECTO,
   VersionDeReglasFija,
 } from './infraestructura/cargador-conservador';
-/**
- * Sale por el barril porque quien COMPONE el motor de decisión es
- * `EventosModule`, y el cargador necesita la lista negra para que RN-06 tenga
- * de dónde leer. La alternativa —que `eventos` importara el fichero del
- * adaptador— rompería la frontera de §2.2, que el verificador comprueba.
- */
+// Sale porque quien COMPONE el motor es `EventosModule` (RN-06 necesita la lista
+// negra) y importar el fichero del adaptador rompería la frontera de §2.2.
 export { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-negra-pg';
+// 15-Q · la instantánea del Edge lee y compone EXACTAMENTE como el cargador (RN-16).
+export { derechoDelResidente } from './aplicacion/derecho-del-residente';
+export { autorizacionesVigentesEn } from './infraestructura/lectura-de-autorizaciones-pg';
+export { EventoReconciliadoDto, LoteReconciliadoDto } from './presentacion/dtos';
 /**
  * F (15-L) · «Generar autorización» desde la consola la orquesta el módulo de
  * visitas: crear, anular (rechazo, F2) y adjuntar la foto son los MISMOS casos

@@ -57,15 +57,15 @@ export {
   LIMITADOR_DISPOSITIVO,
   limitadorPorDispositivo,
 } from './presentacion/limite-por-dispositivo';
-/**
- * `LatidoDto` sale del barril porque el controlador de ingesta —que vive en
- * `autorizaciones`— recibe el latido del dispositivo por la misma puerta que
- * los eventos. Que un DTO cruce la frontera es un olor conocido y queda
- * anotado: lo natural sería que la ingesta entera viviera en `eventos`, y eso
- * se reevalúa cuando la ETAPA 15 traiga el Alarm Server real.
- */
+// `LatidoDto` cruza la frontera porque la ingesta (en `autorizaciones`) recibe el
+// latido por la misma puerta que los eventos: olor conocido y anotado (ETAPA 06).
 export { LatidoDto } from './presentacion/dtos';
-// ETAPA 14 · la vigilancia de latidos sale por el barril porque la invoca el
-// planificador (D-31): era una operación idempotente sin nadie que la llamara.
+// 15-Q · la bandeja del Edge: UNA regla para la ruta de la ingesta y la del Edge.
+export { ReconciliarDecisiones } from './aplicacion/reconciliar-decisiones';
+export type {
+  DecisionReconciliable,
+  DecisionReconciliada,
+} from './aplicacion/reconciliar-decisiones';
+// ETAPA 14 · la vigilancia de latidos: la invoca el planificador (D-31).
 export { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 export type { ParteDeVigilancia } from './aplicacion/vigilancia-latidos';
