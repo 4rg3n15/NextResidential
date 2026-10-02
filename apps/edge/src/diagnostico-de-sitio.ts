@@ -11,7 +11,8 @@
  *   2 · ¿la nube está lista y el reloj coincide? (las firmas llevan marca)
  *   3 · ¿la API acepta ESTA credencial y entrega reglas íntegras de ESTA copropiedad?
  *   4 · ¿cada equipo contesta, con su credencial y en hora? ¿la cámara reporta sin decidir?
- *   5 · ¿qué hay en la base local? (reglas, su edad, accesos sin reconciliar)
+ *   5 · ¿el gateway en marcha contesta en esa interfaz, con ese secreto local?
+ *   6 · ¿qué hay en la base local? (reglas, su edad, accesos sin reconciliar)
  *
  * Es de SÓLO LECTURA: la descarga no se guarda y ningún equipo se acciona.
  * Nunca imprime una IP, un usuario ni una clave (RN-21): equipos por su UUID.
@@ -26,6 +27,7 @@ import type { FamiliaDiagnosticada } from '@ncr/providers';
 import { cargarConfiguracionDeSitio } from './configuracion/esquema-de-sitio';
 import type { ConfiguracionDeSitio, EquipoDelEdge } from './configuracion/esquema-de-sitio';
 import { hashDelContenido } from './aplicacion/descarga-de-reglas';
+import { gatewayEnMarcha } from './diagnostico-local';
 import type { InstantaneaDeReglas } from './aplicacion/instantanea-de-reglas';
 import { ClienteHttpDeNube } from './infraestructura/api/cliente-de-nube';
 import { abrirBase } from './infraestructura/sqlite/esquema';
@@ -43,6 +45,8 @@ export interface Paso {
 export interface DependenciasDelDiagnostico {
   readonly transporteDeNube?: typeof fetch;
   readonly peticionAEquipos?: typeof fetch;
+  /** Hacia el propio gateway en marcha (`GET /estado` firmado). */
+  readonly transporteLocal?: typeof fetch;
   readonly interfaces?: () => readonly string[];
   readonly ahora?: () => Date;
 }
@@ -248,6 +252,8 @@ export const diagnosticarSitio = async (
   ];
   // En serie: un equipo atiende pocas sesiones a la vez y el gateway ya puede estar escuchando.
   for (const e of config.EDGE_EQUIPOS) pasos.push(await equipo(e, deps.peticionAEquipos, ahora));
+  const local = await gatewayEnMarcha(config, deps.transporteLocal ?? fetch, ahora);
+  pasos.push(paso('gateway en marcha', local.estado, local.detalle));
   pasos.push(estadoLocal(config, ahora, reglas.version));
   return pasos;
 };

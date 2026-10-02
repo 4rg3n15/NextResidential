@@ -1579,6 +1579,138 @@
         ]
       }
     },
+    "/copropiedades/{id}/edge-gateways": {
+      "post": {
+        "operationId": "GatewaysController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltaDeEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredencialDelEdgeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de alta un Edge Gateway y entrega su credencial (una vez)",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
+    "/copropiedades/{id}/edge-gateways/{edgeId}/credencial": {
+      "post": {
+        "operationId": "GatewaysController_rotar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "edgeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredencialDelEdgeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rota la credencial del Edge: la anterior deja de valer ya",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
+    "/copropiedades/{id}/edge/reconciliacion": {
+      "post": {
+        "description": "NO vuelve a decidir (RN-16, CA-21). Cada evento debe ser de la copropiedad del Edge; uno solo de otra rechaza el lote entero (RN-15). Duplicados: 202 (RN-17, CA-22).",
+        "operationId": "EdgeController_reconciliar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteDelEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteReconciliadoDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "La bandeja del Edge tras un corte de WAN, con lo que hizo con cada equipo",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
     "/copropiedades/{id}/equipos": {
       "get": {
         "operationId": "EquiposController_listar",
@@ -6318,6 +6450,47 @@
         ]
       }
     },
+    "/copropiedades/{id}/reglas/instantanea": {
+      "get": {
+        "description": "Sólo para el Edge acreditado (firma con su credencial). Sin plantillas biométricas: sólo identificadores. RN-15, RN-16, CA-21, KPI-31.",
+        "operationId": "EdgeController_instantanea",
+        "parameters": [
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "La versión que el Edge ya tiene. 0 (o ausente): no tiene ninguna.",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/InstantaneaDeReglasDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InstantaneaSinCambiosDto"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "La instantánea de reglas de SU copropiedad, si hay una más nueva que `desde`",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
     "/copropiedades/{id}/residentes/cuentas": {
       "get": {
         "operationId": "SupervisionDeResidentesController_listar",
@@ -8248,6 +8421,42 @@
           "hasta"
         ]
       },
+      "AccionamientoDelEdgeDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "apertura",
+              "veredicto"
+            ]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "inalcanzable"
+            ]
+          },
+          "latenciaMs": {
+            "type": "number"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "description": "Cuándo se accionó, en el reloj del Edge"
+          }
+        },
+        "required": [
+          "tipo",
+          "estado",
+          "latenciaMs",
+          "ocurridoEn"
+        ]
+      },
       "AceptadoDto": {
         "type": "object",
         "properties": {
@@ -8272,6 +8481,23 @@
         },
         "required": [
           "agregado"
+        ]
+      },
+      "AcompananteEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "personaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string",
+            "description": "Siempre vacío: el motor no lee nombres (minimización)"
+          }
+        },
+        "required": [
+          "personaId",
+          "nombre"
         ]
       },
       "AgregarAcompananteDto": {
@@ -8417,6 +8643,20 @@
         "required": [
           "usuario",
           "contrasenaInicial",
+          "nombre"
+        ]
+      },
+      "AltaDeEdgeDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Cómo lo verá el operador"
+          }
+        },
+        "required": [
           "nombre"
         ]
       },
@@ -8855,6 +9095,77 @@
           "motivoRevocacion",
           "observaciones",
           "tieneFotografia"
+        ]
+      },
+      "AutorizacionEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "UUID, o `residente:<vehículo>` para el derecho del residente"
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personaId": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasta": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "vigente",
+              "revocada"
+            ]
+          },
+          "zonasPermitidas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "acompanantes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AcompananteEnLaInstantaneaDto"
+            }
+          },
+          "maximoAcompanantes": {
+            "type": "number"
+          },
+          "patron": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PatronEnLaInstantaneaDto"
+              }
+            ]
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "viviendaId",
+          "personaId",
+          "desde",
+          "hasta",
+          "estado",
+          "zonasPermitidas",
+          "acompanantes",
+          "maximoAcompanantes",
+          "patron",
+          "placa"
         ]
       },
       "AutorizarZonaDto": {
@@ -10161,6 +10472,37 @@
           "nombre",
           "tipo",
           "aforoMaximo"
+        ]
+      },
+      "CredencialDelEdgeDto": {
+        "type": "object",
+        "properties": {
+          "edgeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "copropiedadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "credencialRef": {
+            "type": "string",
+            "description": "Lo único que queda en la base (RN-21)"
+          },
+          "secreto": {
+            "type": "string",
+            "description": "La credencial del Edge, para su `EDGE_INGESTA_SECRETO`. Se muestra UNA vez: la API no la guarda"
+          }
+        },
+        "required": [
+          "edgeId",
+          "copropiedadId",
+          "nombre",
+          "credencialRef",
+          "secreto"
         ]
       },
       "CuentaDadaDeBajaDto": {
@@ -11618,6 +11960,67 @@
           "ultimaSenal"
         ]
       },
+      "EventoDelEdgeDto": {
+        "type": "object",
+        "properties": {
+          "copropiedadId": {
+            "type": "string"
+          },
+          "dispositivoId": {
+            "type": "string"
+          },
+          "metodo": {
+            "type": "string",
+            "enum": [
+              "placa",
+              "facial",
+              "manual",
+              "remoto",
+              "tarjeta"
+            ]
+          },
+          "personaId": {
+            "type": "string"
+          },
+          "placaLeida": {
+            "type": "string"
+          },
+          "zonaId": {
+            "type": "string"
+          },
+          "confianzaCentesimas": {
+            "type": "number",
+            "description": "Confianza de la lectura, 0..1"
+          },
+          "referenciaExterna": {
+            "type": "string",
+            "description": "Identificador del evento en el equipo (RN-17)"
+          },
+          "ocurridoEn": {
+            "type": "string",
+            "description": "Instante REAL del acceso, no el de la reconciliación (CA-22)"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/DecisionDelEdgeDto"
+          },
+          "cachePotencialmenteObsoleto": {
+            "type": "boolean",
+            "description": "KPI-31 · decidido con una caché que pudo haber envejecido"
+          },
+          "accionamiento": {
+            "$ref": "#/components/schemas/AccionamientoDelEdgeDto"
+          }
+        },
+        "required": [
+          "copropiedadId",
+          "dispositivoId",
+          "metodo",
+          "confianzaCentesimas",
+          "referenciaExterna",
+          "ocurridoEn",
+          "decision"
+        ]
+      },
       "EventoIngestaDto": {
         "type": "object",
         "properties": {
@@ -12217,6 +12620,29 @@
           "minutoFin"
         ]
       },
+      "FranjaEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "dia": {
+            "type": "number"
+          },
+          "minutoInicio": {
+            "type": "number"
+          },
+          "minutoFin": {
+            "type": "number"
+          },
+          "continuaDelDiaAnterior": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "dia",
+          "minutoInicio",
+          "minutoFin",
+          "continuaDelDiaAnterior"
+        ]
+      },
       "GeneracionAplicadaDto": {
         "type": "object",
         "properties": {
@@ -12668,6 +13094,123 @@
           "copropiedadId"
         ]
       },
+      "InstantaneaDeReglasDto": {
+        "type": "object",
+        "properties": {
+          "copropiedadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number",
+            "description": "VersiónDeReglas publicada (0010): la que sella cada decisión"
+          },
+          "hash": {
+            "type": "string",
+            "description": "SHA-256 del contenido: el Edge puede verificar su caché"
+          },
+          "generadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Desde aquí se mide KPI-31"
+          },
+          "autorizaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutorizacionEnLaInstantaneaDto"
+            }
+          },
+          "personasEnListaNegra": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "placasEnListaNegra": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "viviendasActivas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "vehiculos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VehiculoEnLaInstantaneaDto"
+            }
+          },
+          "zonas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZonaEnLaInstantaneaDto"
+            }
+          },
+          "personasConConsentimiento": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plantillas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlantillaEnLaInstantaneaDto"
+            }
+          },
+          "umbralDeConfianza": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "copropiedadId",
+          "version",
+          "hash",
+          "generadaEn",
+          "autorizaciones",
+          "personasEnListaNegra",
+          "placasEnListaNegra",
+          "viviendasActivas",
+          "vehiculos",
+          "zonas",
+          "personasConConsentimiento",
+          "plantillas",
+          "umbralDeConfianza"
+        ]
+      },
+      "InstantaneaSinCambiosDto": {
+        "type": "object",
+        "properties": {
+          "copropiedadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number"
+          },
+          "sinCambios": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          },
+          "generadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "La nube da fe de la versión AHORA"
+          }
+        },
+        "required": [
+          "copropiedadId",
+          "version",
+          "sinCambios",
+          "generadaEn"
+        ]
+      },
       "LatenciasDto": {
         "type": "object",
         "properties": {
@@ -12810,6 +13353,21 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EventoReconciliadoDto"
+            }
+          }
+        },
+        "required": [
+          "eventos"
+        ]
+      },
+      "LoteDelEdgeDto": {
+        "type": "object",
+        "properties": {
+          "eventos": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventoDelEdgeDto"
             }
           }
         },
@@ -13898,6 +14456,32 @@
           "desplazamientoUtcMinutos"
         ]
       },
+      "PatronEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "dias": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "minutoInicio": {
+            "type": "number"
+          },
+          "minutoFin": {
+            "type": "number"
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "dias",
+          "minutoInicio",
+          "minutoFin",
+          "desplazamientoUtcMinutos"
+        ]
+      },
       "PendientesDto": {
         "type": "object",
         "properties": {
@@ -14138,6 +14722,29 @@
         "required": [
           "agrupaciones",
           "cantidad"
+        ]
+      },
+      "PlantillaEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "plantillaId": {
+            "type": "string",
+            "description": "Identificador de la plantilla en la terminal; NUNCA el vector"
+          },
+          "personaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reconocibleHasta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "plantillaId",
+          "personaId",
+          "reconocibleHasta"
         ]
       },
       "PlazaDeOcupanteDto": {
@@ -15719,6 +16326,31 @@
           "propietarioNombre"
         ]
       },
+      "VehiculoEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string"
+          },
+          "vehiculoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "personaId": {
+            "type": "string"
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "placa",
+          "vehiculoId",
+          "personaId",
+          "viviendaId"
+        ]
+      },
       "VehiculoPropioDto": {
         "type": "object",
         "properties": {
@@ -16376,6 +17008,48 @@
           "horario",
           "desplazamientoUtcMinutos",
           "reservasDelDia"
+        ]
+      },
+      "ZonaEnLaInstantaneaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restringida": {
+            "type": "number",
+            "enum": [
+              true
+            ]
+          },
+          "abierta": {
+            "type": "boolean"
+          },
+          "aforoMaximo": {
+            "type": "number"
+          },
+          "ocupacionActual": {
+            "type": "number"
+          },
+          "desplazamientoUtcMinutos": {
+            "type": "number"
+          },
+          "franjas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FranjaEnLaInstantaneaDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "restringida",
+          "abierta",
+          "aforoMaximo",
+          "ocupacionActual",
+          "desplazamientoUtcMinutos",
+          "franjas"
         ]
       }
     }

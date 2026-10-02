@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { cargarConfiguracionDeSitio } from '../src/configuracion/esquema-de-sitio';
 import { diagnosticarSitio } from '../src/diagnostico-de-sitio';
+import { gatewayEnMarcha } from '../src/diagnostico-local';
 import type { DependenciasDelDiagnostico } from '../src/diagnostico-de-sitio';
 import { abrirBase } from '../src/infraestructura/sqlite/esquema';
+import { CacheDeNonces, verificarLocal } from '../src/infraestructura/http/proteccion-local';
 import { CacheDeReglasSqlite } from '../src/infraestructura/sqlite/cache-de-reglas';
 import { equiposSimulados } from '@ncr/providers';
 import {
@@ -11,6 +13,7 @@ import {
   TERMINAL,
   entornoDeSitio,
   equiposDeSitio,
+  SECRETO_LOCAL,
   instantaneaDePrueba,
 } from './banco-de-sitio';
 import { mkdtempSync } from 'node:fs';
@@ -31,6 +34,23 @@ const conHora = (nube: NubeDePrueba, fecha: Date | null, ready = 200): typeof fe
     return nube.transporte(entrada, init);
   }) as typeof fetch;
 
+/** El gateway «en marcha»: comprueba la firma con el verificador REAL y contesta su estado. */
+const enMarcha = (secreto = SECRETO_LOCAL): typeof fetch =>
+  (async (url: string | URL, init?: RequestInit) => {
+    const h = init?.headers as Record<string, string>;
+    const solicitud = {
+      marca: h['x-ncr-marca-temporal'],
+      nonce: h['x-ncr-nonce'],
+      firma: h['x-ncr-firma'],
+      metodo: 'GET',
+      ruta: new URL(String(url)).pathname,
+      cuerpo: '',
+    };
+    return verificarLocal(secreto, solicitud, Date.now(), new CacheDeNonces()) === null
+      ? new Response(JSON.stringify({ modo: 'en_linea', versionDeReglas: 1, pendientes: 0 }))
+      : new Response('', { status: 401 });
+  }) as typeof fetch;
+
 const montar = (cambios: Record<string, string> = {}, deps: DependenciasDelDiagnostico = {}) => {
   const nube = new NubeDePrueba();
   const config = cargarConfiguracionDeSitio(entornoDeSitio(cambios));
@@ -41,6 +61,7 @@ const montar = (cambios: Record<string, string> = {}, deps: DependenciasDelDiagn
         transporteDeNube: conHora(nube, new Date()),
         peticionAEquipos: equiposDeSitio().peticion,
         interfaces: () => ['127.0.0.1'],
+        transporteLocal: enMarcha(),
         ...deps,
         ...extra,
       }),
@@ -54,10 +75,36 @@ describe('pnpm sitio:edge (15-Q, Q7)', () => {
   it('todo en orden: interfaz, nube en hora, credencial aceptada y los dos equipos alcanzados', async () => {
     const pasos = await montar().correr();
     // La base en memoria del banco no tiene reglas todavía: eso es un AVISO, no un fallo.
-    expect(pasos.map((p) => p.estado)).toEqual(['OK', 'OK', 'OK', 'OK', 'OK', 'AVISO']);
+    expect(pasos.map((p) => p.estado)).toEqual(['OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'AVISO']);
+    expect(pasos.at(-2)?.detalle).toBe('modo en_linea · reglas v1 · 0 pendientes');
     expect(pasos[2]?.detalle).toContain('versión 1 · 1 autorizaciones');
     // Nunca una IP ni una clave en la salida (RN-21).
     expect(JSON.stringify(pasos)).not.toMatch(/127\.0\.0\.1|clave-simulada|servicio/);
+  });
+
+  it('el gateway parado es AVISO; uno con OTRO secreto local, FALLO', async () => {
+    const { correr } = montar();
+    const parado = (async () => {
+      throw new TypeError('fetch failed: ECONNREFUSED');
+    }) as typeof fetch;
+    expect((await correr({ transporteLocal: parado })).at(-2)).toMatchObject({ estado: 'AVISO' });
+    const otro = await correr({ transporteLocal: enMarcha('otro-secreto-local'.repeat(3)) });
+    expect(otro.at(-2)).toMatchObject({ estado: 'FALLO' });
+    expect(otro.at(-2)?.detalle).toContain('EDGE_LOCAL_SECRETO');
+    const roto = (async () => new Response('', { status: 500 })) as typeof fetch;
+    expect((await correr({ transporteLocal: roto })).at(-2)?.detalle).toBe('responde 500');
+  });
+
+  it('una interfaz IPv6 va entre corchetes; sin versión ni pendientes, se dice', async () => {
+    const urls: string[] = [];
+    const v6 = (async (url: string | URL) => {
+      urls.push(String(url));
+      return new Response(JSON.stringify({ modo: 'autonomo' }));
+    }) as typeof fetch;
+    const config = cargarConfiguracionDeSitio(entornoDeSitio({ EDGE_ESCUCHA_HOST: '::1' }));
+    const v = await gatewayEnMarcha(config, v6, () => new Date());
+    expect(urls).toEqual(['http://[::1]:8080/estado']);
+    expect(v.detalle).toBe('modo autonomo · reglas v— · 0 pendientes');
   });
 
   it('una interfaz que no es de este equipo es FALLO', async () => {

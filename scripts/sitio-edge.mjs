@@ -19,7 +19,7 @@
  * Nunca imprime una IP, un usuario ni una clave (RN-21).
  *
  * Salida: 0 sin fallos · 1 algún FALLO · 2 configuración incompleta.
- * Procedimiento completo en docs/guias/DESPLIEGUE_EDGE.md §8.
+ * Procedimiento completo en docs/guias/DESPLIEGUE_EDGE.md §2.4.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { existsSync } from 'node:fs';
