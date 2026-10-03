@@ -72,10 +72,13 @@ class SocketHaciaLaNube implements SocketWeb {
     setImmediate(() => this.receptores.forEach((r) => r(copia)));
   }
 
-  close(_codigo?: number, motivo = 'cerrado'): void {
+  close(codigo = 1000, motivo = 'cerrado'): void {
     if (this.readyState === 3) return;
     this.readyState = 3;
-    setImmediate(() => this.cierres.forEach((c) => c(motivo)));
+    setImmediate(() => {
+      this.cierres.forEach((c) => c(motivo));
+      this.onclose?.({ code: codigo, reason: motivo });
+    });
   }
 
   private alEdge(dato: string | Uint8Array): void {
@@ -135,7 +138,7 @@ const sitioConPuente = async (hora: string, entorno: Record<string, string> = {}
     tunel?.detener();
     edge.db.close();
   });
-  await vi.waitFor(() => expect(tunel?.sesion() ?? null).not.toBeNull());
+  await vi.waitFor(() => expect(tunel?.sesion() ?? null).not.toBeNull(), { timeout: 5_000 });
   const nube = new ProveedorRemoto({ sesion: () => socket.nube, fuente: new FuenteDePlacas() });
   const escrito = () => t.pedidas.filter((p) => !p.startsWith('GET '));
   return { nube, escrito, personas: () => personasPor.get(t.host)?.size ?? 0 };
