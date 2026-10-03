@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
-
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-R · E1 · H-15K-01 · NINGUNA ESCRITURA MIENTRAS CAMBIA LA COPROPIEDAD
@@ -14,6 +12,10 @@ import { useEffect, useRef, useState } from 'react';
  * Mientras dura el cambio, el cliente de la consola retiene toda escritura
  * (POST, PUT, PATCH, DELETE) y la contesta con un 409 legible, sin salir a la
  * red; las lecturas siguen. Al terminar la recarga, la pantalla ya es la nueva.
+ *
+ * Este módulo NO lleva React: lo importa el cliente de la API, que llega a
+ * componentes de servidor. El gancho del conmutador vive aparte, como módulo de
+ * cliente (`usar-cambio-de-copropiedad.ts`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const MENSAJE_CAMBIO_EN_CURSO =
@@ -42,41 +44,4 @@ export const escrituraRetenida = (peticion: Request): Response | null => {
     }),
     { status: 409, headers: { 'Content-Type': 'application/json' } },
   );
-};
-
-/**
- * El estado del cambio para el conmutador: empieza en el clic, termina al
- * acabar la recarga del árbol (`pendiente` de la transición vuelve a falso) o
- * al fallar el guardado de la elección.
- */
-export const usarCambioDeCopropiedad = (
-  pendiente: boolean,
-): {
-  readonly cambiando: boolean;
-  readonly empezar: () => void;
-  readonly fallar: () => void;
-  readonly recargar: () => void;
-} => {
-  const [cambiando, setCambiando] = useState(false);
-  const recargando = useRef(false);
-  useEffect(() => {
-    if (pendiente || !recargando.current) return;
-    recargando.current = false;
-    cambioDeCopropiedad.terminar();
-    setCambiando(false);
-  }, [pendiente]);
-  return {
-    cambiando,
-    empezar: () => {
-      setCambiando(true);
-      cambioDeCopropiedad.iniciar();
-    },
-    fallar: () => {
-      cambioDeCopropiedad.terminar();
-      setCambiando(false);
-    },
-    recargar: () => {
-      recargando.current = true;
-    },
-  };
 };

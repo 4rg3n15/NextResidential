@@ -4,7 +4,7 @@ import type { JSX } from 'react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CopropiedadResumen } from '@ncr/contracts';
-import { usarCambioDeCopropiedad } from '@/lib/cambio-de-copropiedad';
+import { usarCambioDeCopropiedad } from '@/lib/usar-cambio-de-copropiedad';
 
 /**
  * Conmutador de copropiedad de la cabecera.
