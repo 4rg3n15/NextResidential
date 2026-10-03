@@ -21,10 +21,10 @@
  */
 import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
-import { DESVIO_TOLERABLE_SEGUNDOS, diagnosticarEquipo } from '@ncr/providers';
-import type { FamiliaDiagnosticada } from '@ncr/providers';
+import { DESVIO_TOLERABLE_SEGUNDOS } from '@ncr/providers';
 import { cargarConfiguracionDeSitio } from './configuracion/esquema-de-sitio';
-import type { ConfiguracionDeSitio, EquipoDelEdge } from './configuracion/esquema-de-sitio';
+import type { ConfiguracionDeSitio } from './configuracion/esquema-de-sitio';
+import { equipoEnSitio } from './diagnostico-de-equipo';
 import { hashDelContenido } from './aplicacion/descarga-de-reglas';
 import { gatewayEnMarcha } from './diagnostico-local';
 import type { InstantaneaDeReglas } from './aplicacion/instantanea-de-reglas';
@@ -50,12 +50,6 @@ export interface DependenciasDelDiagnostico {
   readonly interfaces?: () => readonly string[];
   readonly ahora?: () => Date;
 }
-
-const FAMILIA: Readonly<Record<EquipoDelEdge['tipo'], FamiliaDiagnosticada>> = {
-  camara_lpr: 'camara',
-  terminal_facial: 'terminal',
-  intercom: 'videoportero',
-};
 
 const paso = (nombre: string, estado: Estado, detalle: string): Paso => ({
   paso: nombre,
@@ -161,43 +155,6 @@ const identidadYReglas = async (
   }
 };
 
-const equipo = async (
-  e: EquipoDelEdge,
-  peticion: typeof fetch | undefined,
-  ahora: () => Date,
-): Promise<Paso> => {
-  const nombre = `${e.tipo} ${e.dispositivoId}`;
-  const d = await diagnosticarEquipo({
-    familia: FAMILIA[e.tipo],
-    host: e.host,
-    puerto: e.puerto,
-    protocolo: e.protocolo,
-    usuario: e.usuario,
-    clave: e.clave,
-    tiempoLimiteMs: 5_000,
-    ahoraDelServidor: ahora,
-    ...(peticion === undefined ? {} : { peticion }),
-  });
-  if (d.contacto.clase === 'sin_equipo') {
-    return paso(nombre, 'FALLO', 'no hay un equipo en esa dirección (host/puerto de EDGE_EQUIPOS)');
-  }
-  if (d.contacto.clase === 'credencial') {
-    return paso(
-      nombre,
-      'FALLO',
-      'credencial rechazada: NO reintente a ciegas, bloquea la cuenta del equipo',
-    );
-  }
-  // «Next Control decide, el hardware ejecuta»: una cámara que decide sola deja al Edge sin papel.
-  if (d.control !== null && !d.control.admisible) {
-    return paso(nombre, 'FALLO', 'la cámara decide por su cuenta: no opera en modo evento');
-  }
-  if (d.hora?.excesiva === true) {
-    return paso(nombre, 'AVISO', `alcanzado, pero con el reloj desviado: ${d.hora.detalle}`);
-  }
-  return paso(nombre, 'OK', `alcanzado en ${String(d.contacto.latenciaMs ?? '?')} ms`);
-};
-
 /** La base local se LEE: si no existe, no se crea (eso lo hace el gateway al arrancar). */
 const estadoLocal = (
   config: ConfiguracionDeSitio,
@@ -251,7 +208,10 @@ export const diagnosticarSitio = async (
     reglas.paso,
   ];
   // En serie: un equipo atiende pocas sesiones a la vez y el gateway ya puede estar escuchando.
-  for (const e of config.EDGE_EQUIPOS) pasos.push(await equipo(e, deps.peticionAEquipos, ahora));
+  for (const e of config.EDGE_EQUIPOS) {
+    const v = await equipoEnSitio(e, config, deps.peticionAEquipos, ahora);
+    pasos.push(paso(`${e.tipo} ${e.dispositivoId}`, v.estado, v.detalle));
+  }
   const local = await gatewayEnMarcha(config, deps.transporteLocal ?? fetch, ahora);
   pasos.push(paso('gateway en marcha', local.estado, local.detalle));
   pasos.push(estadoLocal(config, ahora, reglas.version));

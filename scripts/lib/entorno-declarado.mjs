@@ -41,8 +41,8 @@
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
-/** 15-R · todos los `esquema*.ts` de la carpeta: un grupo nuevo no toca esta lista. */
-const ES_ESQUEMA = /^esquemas?(-.+)?\.ts$/;
+/** 15-R · los `esquema*.ts` de la carpeta, no sus pruebas: un grupo nuevo no toca esta lista. */
+const ES_ESQUEMA = /^esquemas?(-[^.]+)?\.ts$/;
 const esquemasDe = (d) => readdirSync(d).flatMap((f) => (ES_ESQUEMA.test(f) ? [`${d}/${f}`] : []));
 
 /**
@@ -62,11 +62,8 @@ const SUPERFICIES = [
   },
   {
     nombre: 'Edge',
-    esquema: [
-      'apps/edge/src/configuracion/esquema.ts',
-      'apps/edge/src/configuracion/esquema-de-sitio.ts',
-      'apps/edge/src/configuracion/esquema-del-puente.ts',
-    ],
+    // DT-15R-09 · el Edge también por carpeta: con lista fija, `esquema-de-ajustes.ts` quedaba fuera.
+    esquema: esquemasDe('apps/edge/src/configuracion'),
     ejemplo: 'apps/edge/.env.example',
   },
 ];
