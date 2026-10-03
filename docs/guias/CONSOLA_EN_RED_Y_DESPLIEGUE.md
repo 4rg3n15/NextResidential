@@ -250,3 +250,94 @@ Ahí **sí** debe aparecer.
 Si en el paso 2 no hubiera cookies, el mensaje ya **no** dirá «La sesión
 expiró»: dirá que el navegador no devolvió la cookie y qué mirar. Ese cambio es
 parte del arreglo — el mensaje anterior mandaba a reintentar en bucle.
+
+---
+
+## 7 · Consola en Netlify y API en Cloud Run (P-20 · ronda 15-R)
+
+> **Decisión del cliente (15-R):** la consola sigue en Netlify (D8, ADR-028); la
+> API corre en **Cloud Run con UNA instancia** (P-30). El flujo en vivo (SSE) y
+> el audio de la guardia van **directos del navegador a la API** con un billete
+> de un solo uso; todo lo demás sigue pasando por el proxy de la consola.
+> Sin estas variables, la consola funciona exactamente como en sitio (D3).
+
+### 7.1 · Por qué directo, y qué protege el billete
+
+Las funciones de Netlify tienen tiempo máximo: un SSE o un WebSocket colgado
+del proxy se cortaría (C-37). El navegador no tiene el token —vive en la cookie
+`httpOnly` de la consola—, así que:
+
+1. La consola pide un **billete** por una ruta normal, que pasa por el proxy y
+   por todos los guardas de la API (sesión, rol, copropiedad, lista blanca de
+   IP): `POST /copropiedades/:id/eventos/billete` para el flujo y
+   `POST /copropiedades/:id/guardia/intercom/:equipo/billete` para el audio.
+2. El billete vale **una vez**, **15 s**, **desde la IP que lo pidió** y para
+   **un propósito** (el de eventos no abre el audio).
+3. El navegador abre `GET <API>/flujo-directo/eventos?billete=…` (SSE) o
+   `wss://<API>/guardia/audio?billete=…`. El flujo directo se cierra a los
+   **5 min** (la vida de un token) y la consola reabre con otro billete, que
+   exige sesión vigente.
+4. El WebSocket del audio rechaza con **403** todo `Origin` que no esté en
+   `CORS_ALLOWED_ORIGINS` (un WebSocket no pasa por CORS).
+
+### 7.2 · La IP del portero (D4)
+
+En Netlify el proxy de la consola sale por direcciones que la API no conoce, así
+que la API **no** puede creer su `X-Forwarded-For`. La consola lee la IP del
+navegador **sólo** de la cabecera que escribe Netlify y el navegador no puede
+fijar (`x-nf-client-connection-ip`), y se la manda a la API **firmada** con un
+secreto que comparten los dos servidores. Sin firma válida, la API ignora la IP
+declarada: la lista blanca de porteros deniega por omisión.
+
+### 7.3 · Variables
+
+| Dónde             | Variable                           | Valor                                                                                                                                                                                     |
+| ----------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consola (Netlify) | `API_URL`                          | URL de la API en Cloud Run (la usa el proxy)                                                                                                                                              |
+| Consola           | `API_ORIGEN_PUBLICO`               | El **origen** público de la API (`https://api.su-dominio`), sin ruta. Es lo único de la API que entra en la CSP (`connect-src` https + wss)                                               |
+| Consola           | `CONSOLA_CABECERA_IP_DE_CONFIANZA` | `x-nf-client-connection-ip`. La consola **no arranca** con `X-Forwarded-For`, `Forwarded` o `X-Real-IP`                                                                                   |
+| Consola           | `CONSOLA_IP_FIRMA_SECRETO`         | Secreto compartido, ≥ 32 caracteres. Exige la cabecera anterior                                                                                                                           |
+| API (Cloud Run)   | `API_IP_FIRMA_SECRETO`             | **El mismo** secreto                                                                                                                                                                      |
+| API               | `CORS_ALLOWED_ORIGINS`             | El origen de la consola (`https://consola.su-dominio`). Nunca `*`                                                                                                                         |
+| API               | `API_PROXIES_DE_CONFIANZA`         | El proxy de Cloud Run delante de la API, para que el navegador que abre el flujo directo se vea con su IP real. `[SUPUESTO]` S-15R-06: verifíquelo con el registro de la primera petición |
+
+Generar el secreto compartido (una vez; guárdelo en Netlify y en Secret
+Manager, **nunca** en el repositorio):
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+### 7.4 · Cloud Run: lo que no puede faltar
+
+- **`--max-instances=1 --min-instances=1`** (P-30). Los billetes, el canal en
+  vivo y los bloqueos de audio viven en la memoria de esa instancia; con dos,
+  un billete emitido en una no se canjearía en la otra.
+- **CPU siempre asignada** (`--no-cpu-throttling`). Con la CPU sólo durante las
+  peticiones, los trabajos de fondo (pg-boss: reversión de puertas libres o
+  bloqueadas, supresión biométrica, latidos) se congelan entre peticiones.
+- **Tiempo de espera de la petición ≥ 360 s** (`--timeout=360` o más): el flujo
+  directo dura 5 min y el audio lo que dure la conversación.
+- WebSockets: Cloud Run los admite sin configuración extra, dentro de ese
+  tiempo de espera.
+
+### 7.5 · Riesgos declarados
+
+- `[SUPUESTO]` **S-15R-05** — el navegador llega a Netlify y a Cloud Run con la
+  **misma IP pública**. Si una red da IPv6 a uno e IPv4 al otro, el billete se
+  rechaza (falla cerrado: 401 y la consola reintenta). Diagnóstico: el registro
+  de la API dice «billete … de otra IP».
+- Un reinicio de la instancia invalida los billetes vivos (15 s): la consola
+  pide otro al reintentar.
+
+### 7.6 · Cómo comprobarlo
+
+1. Con sesión de portero, en la consola de eventos: la pestaña «Red» del
+   navegador muestra `POST /api/ncr/…/eventos/billete` (201) y luego
+   `GET https://api…/flujo-directo/eventos?billete=…` (200, `text/event-stream`).
+2. Reutilizar esa misma URL en otra pestaña: **401**.
+3. Desde una página de otro origen, `new WebSocket('wss://api…/guardia/audio?billete=x')`
+   se rechaza con **403**.
+4. Pruebas automatizadas: `apps/api/test/flujo-directo.e2e.test.ts`,
+   `apps/api/test/ip-firmada.e2e.test.ts`, `apps/api/test/audio-origen.e2e.test.ts`,
+   `apps/web/src/lib/ip-firmada.test.ts` y `apps/web/src/lib/origen-directo.test.ts`.

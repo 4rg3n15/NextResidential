@@ -32,6 +32,8 @@ export interface OpcionesCsp {
   readonly desarrollo: boolean;
   /** Origen de la API, si se sirve desde otro host que la consola. */
   readonly origenApi?: string | undefined;
+  /** 15-R · D2 · su forma `wss://` (el audio directo), sólo en `connect-src`. */
+  readonly origenApiWebSocket?: string | undefined;
   /** Puente de vídeo de la ETAPA 10; vacío mientras no exista. */
   readonly origenVideo?: string | undefined;
   /**
@@ -67,20 +69,16 @@ export interface OpcionesCsp {
  *   https://<ip-de-red>:3100/_next/static/css/30f39a…css → net::ERR_CONNECTION_RESET
  *   …y las ocho piezas de JavaScript, igual.
  *
- * (Sin escribir la dirección: KPI-11 prohíbe una IP literal fuera de
- * `packages/providers`, y tiene razón — la encontró en este mismo comentario.)
- *
+ * (Sin la dirección: KPI-11 prohíbe IPs literales fuera de `packages/providers`.)
  * Resultado: el HTML llega, la hoja de estilos no, y la consola sale en texto
  * plano. Por `localhost` funcionaba porque el navegador considera el bucle
  * local un origen «potencialmente seguro» y **se salta la subida de esquema**.
  * De ahí que dependiera del origen, y de ahí que ninguna prueba lo viera: el
  * recorrido del navegador corre sobre `127.0.0.1`, que es el caso exento.
  *
- * **Por qué quitarla en HTTP no debilita nada.** La directiva existe para que
- * una página servida por HTTPS no pida subrecursos por HTTP. En una página
- * servida por HTTP no hay nada de eso que proteger: el documento ya viajó en
- * claro. Lo que sí protege el origen es **HSTS**, que `next.config.mjs` emite
- * sin condición.
+ * **Por qué quitarla en HTTP no debilita nada.** En una página servida por HTTP
+ * el documento ya viajó en claro; lo que protege el origen es **HSTS**, que
+ * `next.config.mjs` emite sin condición.
  *
  * **Sobre fiarse de `x-forwarded-proto`.** Sólo puede AÑADIR la directiva. Un
  * valor falsificado provoca más subidas de esquema, nunca menos protección; y
@@ -92,6 +90,7 @@ export const construirCsp = ({
   nonce,
   desarrollo,
   origenApi,
+  origenApiWebSocket,
   origenVideo,
   origenEvidencia,
   peticionSegura,
@@ -157,7 +156,7 @@ export const construirCsp = ({
         : []),
     ],
     ['font-src', "'self'"],
-    ['connect-src', ...conexiones],
+    ['connect-src', ...conexiones, ...(origenApiWebSocket ? [origenApiWebSocket] : [])],
     ['media-src', ...medios],
     ['object-src', "'none'"],
     ['frame-ancestors', "'none'"],

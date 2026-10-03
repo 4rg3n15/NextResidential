@@ -64,6 +64,7 @@ export 'models/baja_de_zona_aplicada_dto.dart';
 export 'models/baja_de_zona_dto.dart';
 export 'models/baja_dto.dart';
 export 'models/billete_de_audio_dto.dart';
+export 'models/billete_del_flujo_dto.dart';
 export 'models/bitacora_de_porteria_dto.dart';
 export 'models/bloqueo_vigente_dto.dart';
 export 'models/bloqueos_vigentes_dto.dart';

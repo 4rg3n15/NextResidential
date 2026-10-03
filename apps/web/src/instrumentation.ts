@@ -28,21 +28,22 @@
  */
 export const register = async (): Promise<void> => {
   if (process.env.NEXT_PHASE === 'phase-production-build') return;
-  // La importación es perezosa a propósito: `configuracion.ts` lleva
-  // `server-only`, y este fichero también se carga en el runtime `edge`, donde
-  // solo hay que no hacer nada.
+  // Importación perezosa: `configuracion.ts` lleva `server-only` y este fichero
+  // también se carga en el runtime `edge`, donde no hay que hacer nada.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
   const { configuracion, ConfiguracionIncompleta } = await import('./lib/configuracion');
   const { registrar } = await import('./lib/registro');
   try {
     const config = configuracion();
-    // Se registra QUÉ se resolvió, nunca los valores: la llave publicable no es
-    // un secreto, pero un registro que imprime llaves acaba imprimiendo la que
-    // sí lo es (§2.7.8).
+    const { despliegue } = await import('./lib/configuracion-de-despliegue');
+    const directo = despliegue(); // 15-R · D2/D4 · mismas reglas: si no cuadra, no arranca
+    // Se registra QUÉ se resolvió, nunca los valores (§2.7.8).
     registrar('info', 'consola: configuracion validada', {
       cookieSegura: config.cookieSegura,
       puenteDeVideo: config.puenteVideoUrl !== undefined,
+      apiDirecta: directo.apiOrigenPublico !== undefined,
+      ipFirmada: directo.ipFirmaSecreto !== undefined,
     });
   } catch (e) {
     if (e instanceof ConfiguracionIncompleta) {
@@ -52,9 +53,7 @@ export const register = async (): Promise<void> => {
       registrar('error', 'consola: configuracion invalida, el proceso no arranca');
       process.stderr.write(`${e.message}\n`);
       process.exit(78); // EX_CONFIG
-      // `exit` no vuelve, pero el `return` está escrito: sin él, el flujo
-      // depende de una promesa sobre el runtime, y esa dependencia se ve solo
-      // cuando alguien intercepta `exit` —una prueba— y el proceso sigue.
+      // `exit` no vuelve; el `return` cubre a quien lo intercepte (una prueba).
       return;
     }
     throw e;

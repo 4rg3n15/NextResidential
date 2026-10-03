@@ -882,6 +882,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/eventos/billete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Billete de un solo uso para abrir el flujo en vivo directo (P-20) */
+        post: operations["FlujoDirectoController_billete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/eventos/exportacion": {
         parameters: {
             query?: never;
@@ -2406,6 +2423,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flujo-directo/eventos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flujo en vivo (SSE) abierto con un billete, sin sesión (P-20) */
+        get: operations["FlujoDirectoController_flujo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -2918,6 +2952,20 @@ export interface components {
             /** @description Segundos que vale para abrir el WebSocket */
             caducaEnSegundos: number;
             /** @description Ruta del WebSocket en la API (la consola la expone en su origen) */
+            ruta: string;
+        };
+        BilleteDelFlujoDto: {
+            /** @description Billete de un solo uso; va en `?billete=` del flujo directo. */
+            billete: string;
+            /**
+             * Format: date-time
+             * @description Caduca a los 15 s si no se usa.
+             */
+            caducaEn: string;
+            /**
+             * @description Ruta en el origen de la API.
+             * @example /flujo-directo/eventos
+             */
             ruta: string;
         };
         BitacoraDePorteriaDto: {
@@ -6998,6 +7046,36 @@ export interface operations {
             };
         };
     };
+    FlujoDirectoController_billete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilleteDelFlujoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     EventosController_exportacion: {
         parameters: {
             query: {
@@ -9952,6 +10030,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConteoDto"];
+                };
+            };
+        };
+    };
+    FlujoDirectoController_flujo: {
+        parameters: {
+            query?: {
+                /** @description El billete emitido por `…/eventos/billete`. */
+                billete?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El mismo flujo que `…/eventos/flujo`; se cierra a los 5 min. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Billete inválido o ya usado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

@@ -34,6 +34,7 @@ import { ConsultaEventosDto, ExportacionEventosDto } from './dtos';
 import { PaginaDeEventosDto, UrlDeEvidenciaDto } from './respuestas';
 import { ErrorApiDto } from '../../comun/respuestas';
 import { aCsv, aExcel, aPdf } from './formatos';
+import { abrirFlujoSse } from './escritor-sse';
 
 /**
  * Histórico, exportación, evidencia y flujo en vivo — HU-32, RN-21, OE-05.
@@ -165,28 +166,7 @@ export class EventosController {
     @Res() respuesta: Response,
   ): Promise<void> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'eventos/flujo');
-
-    respuesta.setHeader('Content-Type', 'text/event-stream');
-    respuesta.setHeader('Cache-Control', 'no-cache, no-transform');
-    respuesta.setHeader('Connection', 'keep-alive');
-    // Sin esto, un proxy con búfer acumula los mensajes y los entrega en
-    // bloque: la latencia medida sería la del búfer, no la del sistema.
-    respuesta.setHeader('X-Accel-Buffering', 'no');
-    respuesta.flushHeaders();
-
-    const baja = this.canal.suscribir(copropiedadId, {
-      entregar: (tema, carga) => {
-        if (respuesta.writableEnded) return false;
-        respuesta.write(`event: ${tema}\ndata: ${JSON.stringify(carga)}\n\n`);
-        return true;
-      },
-    });
-
-    respuesta.write(`event: listo\ndata: {"copropiedadId":"${copropiedadId}"}\n\n`);
-    respuesta.on('close', () => {
-      baja();
-      respuesta.end();
-    });
+    abrirFlujoSse(respuesta, this.canal, copropiedadId);
   }
 }
 

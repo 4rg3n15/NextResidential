@@ -2929,6 +2929,52 @@
         ]
       }
     },
+    "/copropiedades/{id}/eventos/billete": {
+      "post": {
+        "operationId": "FlujoDirectoController_billete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BilleteDelFlujoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Billete de un solo uso para abrir el flujo en vivo directo (P-20)",
+        "tags": [
+          "eventos"
+        ]
+      }
+    },
     "/copropiedades/{id}/eventos/exportacion": {
       "get": {
         "operationId": "EventosController_exportacion",
@@ -8561,6 +8607,49 @@
         ]
       }
     },
+    "/flujo-directo/eventos": {
+      "get": {
+        "operationId": "FlujoDirectoController_flujo",
+        "parameters": [
+          {
+            "name": "billete",
+            "required": false,
+            "in": "query",
+            "description": "El billete emitido por `…/eventos/billete`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El mismo flujo que `…/eventos/flujo`; se cierra a los 5 min.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Billete inválido o ya usado",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Flujo en vivo (SSE) abierto con un billete, sin sesión (P-20)",
+        "tags": [
+          "eventos"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "SaludController_salud",
@@ -10028,6 +10117,30 @@
         "required": [
           "billete",
           "caducaEnSegundos",
+          "ruta"
+        ]
+      },
+      "BilleteDelFlujoDto": {
+        "type": "object",
+        "properties": {
+          "billete": {
+            "type": "string",
+            "description": "Billete de un solo uso; va en `?billete=` del flujo directo."
+          },
+          "caducaEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Caduca a los 15 s si no se usa."
+          },
+          "ruta": {
+            "type": "string",
+            "example": "/flujo-directo/eventos",
+            "description": "Ruta en el origen de la API."
+          }
+        },
+        "required": [
+          "billete",
+          "caducaEn",
           "ruta"
         ]
       },

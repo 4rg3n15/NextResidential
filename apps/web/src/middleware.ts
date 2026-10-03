@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { construirCsp, generarNonce, peticionLlegoPorHttps } from './middleware-csp';
 import { renovarSiHaceFalta } from './lib/sesion/renovar-en-middleware';
+import { despliegue } from './lib/configuracion-de-despliegue';
+import { comoWebSocket } from './lib/origen-directo';
 
 /**
  * Nonce por petición y cabeceras de seguridad (§2.7.7).
@@ -31,19 +33,17 @@ export const middleware = async (peticion: NextRequest): Promise<NextResponse> =
     peticion.nextUrl.protocol,
   );
 
+  // 15-R · D2 · sólo la API que el NAVEGADOR alcanza (Netlify); en sitio, ninguna.
+  const publico = despliegue().apiOrigenPublico;
   const csp = construirCsp({
     nonce,
     desarrollo: process.env.NODE_ENV !== 'production',
-    origenApi: process.env.API_URL,
+    origenApi: publico,
+    origenApiWebSocket: publico === undefined ? undefined : comoWebSocket(publico),
     origenVideo: process.env.PUENTE_VIDEO_URL,
     // El origen del bucket es el de Supabase: la evidencia se sirve desde ahí.
     origenEvidencia: process.env.SUPABASE_URL,
-    /**
-     * Del esquema de ESTA petición, no del modo de compilación. Con el proxy
-     * delante, el esquema real lo dice `x-forwarded-proto`: `nextUrl.protocol`
-     * vería el `http` del salto interno y quitaría la directiva en un
-     * despliegue que sí es HTTPS.
-     */
+    // Del esquema de ESTA petición (`x-forwarded-proto` detrás de un proxy).
     peticionSegura: seguro,
   });
 
