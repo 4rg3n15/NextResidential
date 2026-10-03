@@ -49,6 +49,9 @@ try {
     throw new Error('faltan DATABASE_URL, EQUIPOS_LLAVE (la nueva) o EQUIPOS_LLAVE_REF (la nueva)');
   }
   const pool = new Pool({ connectionString: DATABASE_URL, max: 1 });
+  // 15-O · un corte de la base no tumba el proceso: la copropiedad en curso hace
+  // ROLLBACK y la rotación se repite (lo ya rotado se salta).
+  pool.on('error', (e) => console.error(`⚠ la base cortó una conexión (15-O): ${e.message}`));
   try {
     const informe = await rotarLlaveDeEquipos(pool, {
       anterior,
