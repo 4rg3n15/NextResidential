@@ -680,7 +680,7 @@ con una baja lógica y se puede reintentar.
 ### 10.5 · Mudar al Edge las credenciales que ya estaban en la nube
 
 Para un conjunto que funcionaba en modo directo (las claves estaban cifradas en
-la nube, H-15B-1, AR-05):
+la nube, H-15B-1 · `docs/seguridad/ACEPTACIONES_DE_RIESGO.md`):
 
 1. Edge conectado y marcado como puente (§10.2).
 2. Panel **Edge del conjunto** → **Mudar credenciales al Edge**
@@ -733,11 +733,12 @@ El **medio** va entre el navegador y ese go2rtc por ICE:
   recibe una credencial TURN **efímera** por usuario; el secreto no sale de la
   API.
 
-> **PENDIENTE DE DEFINICIÓN · dónde se aloja el TURN.** Un TURN con IP pública
-> (coturn) es lo que permite ver el video desde fuera del conjunto detrás de
-> NAT simétricos. Mientras no se decida, sin TURN el video funciona en la red
-> del conjunto (y por STUN en NAT sencillos) y **no** desde redes que lo
-> bloqueen. No se probó con un TURN real en esta ronda (§ informe 15-Q2).
+> **P-29 resuelta (15-R):** el TURN es un **coturn en Compute Engine**, con
+> credenciales efímeras que firma la API. Configuración, cortafuegos, secreto y
+> verificación: [`COTURN.md`](COTURN.md). Sin desplegar todavía: hasta que se
+> despliegue, el video funciona en la red del conjunto (y por STUN en NAT
+> sencillos) y **no** desde redes que lo bloqueen. Para el go2rtc de esta
+> máquina basta, en principio, **STUN** (S-15R-08, `COTURN.md` §7.4).
 
 ### 10.8 · El corte de WAN con puente
 

@@ -642,6 +642,19 @@ recibido», y lo reenvía en bucle.
 
 ---
 
+### C-56 · H-15B-1 «rotar `EQUIPOS_LLAVE` = volver a escribir cada clave desde la consola; recifrar es deliberadamente NO» frente a F2 «rotación con recifrado, retirando la anterior» — **Media** · registrada y resuelta en la ronda 15-R
+
+|                 |                                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fuente A**    | `docs/seguridad/AUDITORIA.md`, H-15B-1, procedimiento de rotación, paso 3 (ETAPA 15-B): recifrar «obligaría a tener las dos [llaves] a la vez en el proceso, que es exactamente el momento en que una fuga las entrega juntas»                                                                                                                              |
+| **Fuente B**    | Encargo de la ronda 15-R, F2: «rotación de la llave maestra de la bóveda en la nube (recifrar, retirar la anterior) para que los respaldos queden ilegibles»                                                                                                                                                                                                |
+| **Cómo se vio** | Al diseñar F2: el paso 3 de A prohíbe justo lo que B pide. Y A tenía un defecto que B destapa: reescribir cada clave dejaba las filas del historial cifradas con la llave vieja, y un respaldo previo seguía abriéndose con ella mientras existiera                                                                                                         |
+| **Resolución**  | Prevalece B, conservando la razón de A donde aplica: **la API sigue conociendo una sola llave**; las dos coinciden sólo en una herramienta de operador de un solo uso (`scripts/rotar-llave-de-equipos.mjs`) que recifra por copropiedad en una transacción, comprueba con la nueva antes de confirmar y termina. Procedimiento: `CONEXION_SUPABASE.md` §13 |
+
+**Afecta a:** `docs/seguridad/AUDITORIA.md` H-15B-1 paso 3 (tachado y remitido) · `apps/api/src/equipos/infraestructura/rotacion-de-la-boveda-pg.ts` · `docs/seguridad/ACEPTACIONES_DE_RIESGO.md` (H-15B-1)
+
+---
+
 ## 2. Supuestos · 150 registrados
 
 Cada supuesto se marca `[SUPUESTO]` en el código donde se materialice, y todos son **configurables**, no constantes escondidas.

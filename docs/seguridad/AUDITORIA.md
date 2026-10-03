@@ -1152,12 +1152,15 @@ auditoría en la misma transacción.
    antes de guardar. La escritura desactiva la credencial anterior y escribe la
    nueva en la misma transacción: nunca hay dos vigentes ni un hueco sin
    ninguna.
-3. Si lo que rota es `EQUIPOS_LLAVE` —no la clave del equipo—, hay que volver a
+3. ~~Si lo que rota es `EQUIPOS_LLAVE` —no la clave del equipo—, hay que volver a
    escribir la clave de cada aparato desde la consola, porque el sobre anterior
-   deja de descifrarse. Es deliberado: una rotación de llave maestra que
+   deja de descifrarse.~~ **Sustituido en la 15-R (F2, C-56):** la llave
+   maestra se rota con recifrado, `guias/CONEXION_SUPABASE.md` §13. La razón de
+   abajo sigue en pie para la API, que conoce una sola llave; las dos sólo
+   coinciden en una herramienta de un solo uso. La razón original: «Es deliberado: una rotación de llave maestra que
    descifrase con la vieja para recifrar con la nueva obligaría a tener las dos
    a la vez en el proceso, que es exactamente el momento en que una fuga las
-   entrega juntas.
+   entrega juntas.»
 4. Comprobar en la pantalla de Dispositivos que cada equipo vuelve a
    **verificado**; el que quede en «no verificado» dice por qué.
 
@@ -1321,6 +1324,14 @@ Por capítulo, con el veredicto y el término exacto (§0).
 
 ## 7 · Riesgos aceptados · **pendientes de su firma**
 
+> **Desde la ronda 15-R (F1), el registro vigente es
+> [`ACEPTACIONES_DE_RIESGO.md`](ACEPTACIONES_DE_RIESGO.md):** AR-01 a AR-05 y el
+> riesgo residual de H-15B-1, con estado, firmante y lo que reabre cada uno.
+> Allí AR-02 y AR-04 figuran **cerradas** (corregida y desactivada,
+> respectivamente), AR-03 lleva el procedimiento para cerrarla contra su
+> proyecto y AR-05 es nueva. Lo que sigue es la redacción original, que se
+> conserva como historia: **firme en el registro, no aquí.**
+
 Redactados, **no dados por firmados**. Cada uno lleva lo que se acepta, por qué,
 qué lo acota y qué lo reabriría.
 
@@ -1401,7 +1412,8 @@ DT-15U-01: no viaja a producción.
 
 ## 8 · Qué queda en sus manos
 
-1. **Firmar, o rechazar, las cuatro aceptaciones de riesgo de §7.** Rechazar
+1. **Firmar, o rechazar, las aceptaciones de riesgo** — desde la 15-R, en
+   [`ACEPTACIONES_DE_RIESGO.md`](ACEPTACIONES_DE_RIESGO.md), no en §7. Rechazar
    cualquiera de ellas reabre el hallazgo correspondiente; no hay problema en
    eso, pero hay que decirlo para poder planificarlo.
 2. **Decidir sobre las credenciales del proyecto Supabase real** (§4.2, D-09 y
