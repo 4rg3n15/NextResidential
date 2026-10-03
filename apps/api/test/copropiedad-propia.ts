@@ -17,7 +17,10 @@ import type { RepositorioDeEquipos, ResultadoDeSondeo } from '../src/equipos';
  * deja de demostrar que lo archivado no cuenta.
  *
  * Una copropiedad que nace en la prueba no tiene vecinos, y su conteo es
- * exacto: 0, 1 al guardar, 0 al archivar.
+ * exacto: 0, 1 al guardar, 0 al archivar. Por lo mismo se da de alta aquí lo
+ * de «aparece en Dispositivos» (H-15M-C02): cada corrida dejaba en COP_A dos
+ * equipos activos para siempre, y `dispositivos_endpoint_uk` —único por
+ * copropiedad, host y puerto— acababa chocando con los de una anterior.
  *
  * UNA por corrida, no una por prueba: cada alta toma un número de
  * `pools_de_porteros_numero_seq` y añade una fila a la lista global, y dos
