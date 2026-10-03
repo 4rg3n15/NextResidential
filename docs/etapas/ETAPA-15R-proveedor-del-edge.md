@@ -12,12 +12,14 @@
 
 1. **La rama no sale de `develop`, como pide la regla del 2026-09-06.** DT-15R-09,
    el informe de la 15-R y la §8.3 de `ENTREGA_EN_SITIO.md` sólo existen en
-   `etapa-15r-huecos-y-decisiones`, que no está fusionada ni tiene PR, y que otra
-   sesión estaba cerrando mientras se hacía esto (último commit, 17:11 UTC).
-   Desde `develop` no habría dónde marcar el cierre y `composicion.ts` chocaría
-   con la cuarentena de la 15-R. Tampoco se empujó a la rama de la 15-R: dos
-   sesiones escribiendo en la misma rama a la vez se pisan. **Esta rama se
-   fusiona en la de la 15-R antes de su PR** (o detrás de ella en `develop`).
+   `etapa-15r-huecos-y-decisiones`, sin fusionar
+   ([4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42),
+   abierto), que otra sesión cerró mientras se hacía esto (`0ce8ed5`, fusionado
+   aquí en `da64043`). Desde `develop` no habría dónde marcar el cierre y
+   `composicion.ts` chocaría con la cuarentena de la 15-R. Tampoco se empujó a la
+   rama de la 15-R: dos sesiones escribiendo en la misma rama a la vez se pisan.
+   **Esta rama se fusiona en la de la 15-R antes de fusionar su PR** —contiene su
+   cabeza, así que es un avance rápido— o detrás de ella en `develop`.
 2. **El enunciado se quedaba corto.** La API pasa al proveedor **siete**
    ajustes de su `.env`, no cuatro: el Edge omitía también `puertoRtsp` —con
    puente, el video iba al 554 aunque la API dijera otro puerto, y «Probar
@@ -38,7 +40,7 @@
    abre después de que la nube la diera por «no aceptada». Con 3 s también podía
    pasar —el equipo puede accionar una orden cuya respuesta se cortó—; lo que
    falta es reconciliar el desenlace tardío, no elegir un plazo (DT-15R-C03).
-5. **La primera corrida del verificador salió FALLIDA, y no por esta corrección.**
+5. **Una corrida del verificador salió FALLIDA, y no por esta corrección.**
    La DoD del Edge en sitio (`edge-en-sitio-pg.e2e.test.ts`, 15-Q) cuenta como
    permitida la placa CONC001, que no está en la semilla: la deja la prueba SQL de
    KPI-03 (`30_concurrencia_placas.sh`), que el verificador corre en el paso 12,
@@ -47,7 +49,9 @@
    aperturas de 15 —también sobre `5566b8e`, sin un cambio de esta rama—. Pasaba
    en CI porque el flujo corre antes `--con-pruebas` (que incluye KPI-03), y en la
    máquina del usuario porque su base viene de corridas anteriores: un verde que
-   dependía de la historia de la base. Se corrige (H-15R-C01): la prueba pone su
+   dependía de la historia de la base. El verde de la 15-R sobre `5566b8e`
+   (`0ce8ed5`) no lo contradice: su base venía de dos corridas anteriores, que
+   pasan por el paso 12 `[SUPUESTO]`. Se corrige (H-15R-C01): la prueba pone su
    precondición.
 6. **`pnpm sitio:edge` juzgaba la hora de los equipos con 60 s fijos.** Con el
    arreglo, un equipo 45 s desviado habría salido «OK» en el diagnóstico y el
@@ -227,7 +231,44 @@ Cómo ejecutarlas: `pnpm --filter @ncr/edge test`, o todo con
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-«VEREDICTO»
+Corrida sobre `6050b05`, con base (`DATABASE_URL_PRUEBAS`) recién sembrada
+—`supabase/verificar.sh --con-semillas --modo-supabase`, la que pide el paso
+1c—, desde un árbol limpio de artefactos:
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El declarado es **D-112**: las cinco pruebas saltadas del arranque en frío, que
+ejerce el paso 12b. **31 de 31 pasos**; **5183 pruebas de TypeScript** (API
+2262, proveedores 1231, consola 783, dominio 438, **Edge 325**,
+configuración 144) —46 más que la 15-R, todas del Edge— y **367 de Dart**, tres
+corridas forzadas idénticas; ninguna omisión por falta de base (44 ficheros con su
+guardián); el ensayo de sitio contra los equipos simulados, «SIN FALLOS · 47
+OK»; los 34 controles detectan su violación; escaneo de secretos limpio (6872
+blobs del historial).
+
+### Cobertura por capa
+
+| Capa                                          | Líneas                      | Ramas   | Umbral         |
+| --------------------------------------------- | --------------------------- | ------- | -------------- |
+| Dominio (`packages/domain-core`)              | 96,20 %                     | 96,91 % | 90 %           |
+| Aplicación (`**/aplicacion/**`, 152 ficheros) | 97,18 %                     | 90,64 % | 90 %           |
+| Global (951 ficheros)                         | 87,77 %                     | 87,06 % | 70 %           |
+| App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
+
+### Las corridas anteriores, y lo que vino después
+
+1. **Se detuvo en el paso 1c**: la base de pruebas recién creada no tenía
+   esquema. Se le aplicaron migraciones y semilla, como pide el paso.
+2. **FALLIDA en el paso 5**: la DoD del Edge en sitio dio 12 aperturas de 15
+   (H-15R-C01, «Lo incómodo», 5). Se reprodujo sobre `5566b8e`, se interrumpió
+   la corrida y se corrigió en `857ae2b`.
+
+Después de `6050b05` sólo entró documentación: la fusión del cierre de la 15-R
+(`da64043`) y este cierre. Sobre la cabeza final se repitieron los controles que
+leen documentos: la coherencia de ESTADO (paso 1b), las declaraciones (paso 9),
+los diagramas Mermaid (paso 10) y Prettier.
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -297,11 +338,12 @@ etapa se saca de `develop`»): es una corrección de una ronda sin fusionar, y l
 que corrige sólo existe en esa rama (§ «Lo incómodo», 1). El entorno propuso
 `claude/adoring-mccarthy-8j0tcb`; se renombró antes del primer commit (§2.5).
 
-| Commit          | Qué                                                                               |
-| --------------- | --------------------------------------------------------------------------------- |
-| `0bb66dc`       | El Edge compone su proveedor con los ajustes de la API; pruebas                   |
-| `8a2362d`       | `DESPLIEGUE_EDGE.md` y `ENTREGA_EN_SITIO.md` §8.3                                 |
-| `857ae2b`       | H-15R-C01 · CONC001 la pone la prueba que la necesita                             |
-| `1684d6e`       | El socket de prueba cierra por los dos lados; espera del túnel de 5 s             |
-| «COMMIT_DOCS»   | Este informe, `ETAPA-15R.md`, `ESTADO_ETAPAS.md`, `README.md`, ADR-018 y el plazo |
-| «COMMIT_CIERRE» | Cierre: el veredicto del verificador                                              |
+| Commit    | Qué                                                                               |
+| --------- | --------------------------------------------------------------------------------- |
+| `0bb66dc` | El Edge compone su proveedor con los ajustes de la API; pruebas                   |
+| `8a2362d` | `DESPLIEGUE_EDGE.md` y `ENTREGA_EN_SITIO.md` §8.3                                 |
+| `857ae2b` | H-15R-C01 · CONC001 la pone la prueba que la necesita                             |
+| `1684d6e` | El socket de prueba cierra por los dos lados; espera del túnel de 5 s             |
+| `6050b05` | Este informe, `ETAPA-15R.md`, `ESTADO_ETAPAS.md`, `README.md`, ADR-018 y el plazo |
+| `da64043` | Fusión del cierre de la 15-R (`0ce8ed5`): su veredicto y su PR, sólo documentos   |
+| _este_    | Cierre: el veredicto del verificador                                              |

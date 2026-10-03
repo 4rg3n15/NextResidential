@@ -892,7 +892,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Corrección `etapa-15r-proveedor-del-edge` — el Edge compone su proveedor de equipos como la API (DT-15R-09) · **CERRADA** · 2026-10-03
 
-**Rama:** `etapa-15r-proveedor-del-edge` · **Base:** `etapa-15r-huecos-y-decisiones` (`5566b8e`), **no** `develop`: lo que corrige sólo existe en esa rama, sin fusionar · **PR:** ninguno, se fusiona en la de la 15-R
+**Rama:** `etapa-15r-proveedor-del-edge` · **Base:** `etapa-15r-huecos-y-decisiones` (`5566b8e`), **no** `develop`: lo que corrige sólo existe en esa rama, sin fusionar · **PR:** ninguno, se fusiona en la de la 15-R antes que su PR ([4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42)); contiene su cierre (`0ce8ed5`, fusionado en `da64043`)
 **Informe:** [`etapas/ETAPA-15R-proveedor-del-edge.md`](etapas/ETAPA-15R-proveedor-del-edge.md)
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -908,7 +908,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | H-15R-C01 · fuera del encargo | **CORREGIDO.** La DoD del Edge en sitio (`edge-en-sitio-pg`) contaba como permitida CONC001, que no está en la semilla: la deja la prueba SQL de KPI-03 en el paso 12, después de la suite. Con la base que pide el paso 1c (`--con-semillas`) fallaba (12 de 15), también sin esta corrección; pasaba en CI porque antes corre `--con-pruebas`. Ahora la prueba pone su precondición |
 | Deuda nueva                   | **DT-15R-C01** (el adaptador del Edge sin `traza`), **DT-15R-C02** (la vuelta atrás del audio no llega al Edge), **DT-15R-C03** (apertura por el túnel cumplida tras el «no aceptado» de la nube)                                                                                                                                                                                     |
 
-**Verificación:** «VERIFICACION»
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `6050b05`, con la base recién sembrada (`--con-semillas`) → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe» (D-112). 31 de 31 pasos, 5183 pruebas de TypeScript (46 más que la 15-R, todas del Edge) y 367 de Dart, tres corridas idénticas; dominio 96,20 %, aplicación 97,18 %, global 87,77 % de líneas. La corrida anterior salió FALLIDA por H-15R-C01 —también sobre `5566b8e`—, corregido en `857ae2b`. Después sólo entró documentación: `da64043` (el cierre de la 15-R) y este cierre.
 
 ---
 
