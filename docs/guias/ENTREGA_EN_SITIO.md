@@ -445,19 +445,26 @@ ensayo lo digan.
 _De `PROXIMA-VISITA-15N.md` §2 y §4._
 
 El 29/09 el videoportero iba unas 13 h atrasado con la zona correcta: reconocía
-la cara y negaba con «permiso vencido». Por eso, en modo directo, la plataforma
-**lee la hora del equipo antes de dar de alta a alguien con vigencia** y, si se
-desvía más de `EQUIPOS_DESVIO_DE_RELOJ_S` (30 s por omisión), no escribe nada en
-el equipo —ni la persona— y lo dice: «el reloj del equipo va …: no se le da de
-alta a nadie con vigencia hasta sincronizar su hora». La fila «reloj del equipo»
-de la ficha usa el mismo umbral.
+la cara y negaba con «permiso vencido». Por eso la plataforma **lee la hora del
+equipo antes de dar de alta a alguien con vigencia** y, si se desvía más del
+umbral (30 s por omisión), no escribe nada en el equipo —ni la persona— y lo
+dice: «el reloj del equipo va …: no se le da de alta a nadie con vigencia hasta
+sincronizar su hora». Quién hace esa lectura, y con qué umbral, depende del modo:
+
+| Modo        | Quién da de alta | Umbral del alta                          | Fila «reloj del equipo» de la ficha     |
+| ----------- | ---------------- | ---------------------------------------- | --------------------------------------- |
+| Directo     | la API           | `EQUIPOS_DESVIO_DE_RELOJ_S` de la API    | el mismo                                |
+| Edge puente | el Edge          | `EQUIPOS_DESVIO_DE_RELOJ_S` **del Edge** | el de la API (viaja con el diagnóstico) |
 
 - NTP en los tres equipos (§8.2) y la fila «reloj del equipo» conforme antes de
-  dar de alta rostros.
-- **Con Edge puente, el alta la ejecuta el Edge, que hoy no hace esa lectura
-  previa** (su proveedor se compone sin el umbral): ahí el NTP del equipo es la
-  única defensa. La ficha sí juzga el reloj igual, porque el umbral viaja con el
-  diagnóstico.
+  dar de alta rostros. NTP sigue siendo la protección de fondo: la lectura previa
+  impide escribir en un equipo desviado, no le corrige la hora.
+- **Con Edge puente, el mismo `EQUIPOS_DESVIO_DE_RELOJ_S` en los dos `.env`.**
+  Hasta la corrección de la 15-R (DT-15R-09) el Edge daba de alta sin esta
+  lectura y el NTP del equipo era la única defensa. Si los dos umbrales difieren,
+  la ficha puede decir «conforme» y el alta rechazarse, o al revés. Con el del
+  Edge juzga cada equipo `pnpm sitio:edge`
+  ([`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §5 y §10.1).
 - `--restaurar` no devuelve ni zona ni hora (§6); si el respaldo trae una zona
   distinta de la del conjunto, lo avisa.
 - No cambie la hora de un equipo a mano para «probar» el aviso sin que el cliente
