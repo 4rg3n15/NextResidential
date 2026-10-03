@@ -16,6 +16,7 @@ import {
   ConsultarIndicadores,
 } from '../src/tablero/aplicacion/casos-de-uso';
 import { URL_BASE, exigirBase as guardianDeLaBase } from './base-exigida';
+import { copropiedadDeLaCorrida, equipoPropio } from './copropiedad-propia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -263,17 +264,16 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     const p = exigirBase();
     const tablero = new RepositorioTableroPg(p);
     const alertas = new RepositorioAlertasPg(p, { registrar: () => undefined });
-    // Una alerta de equipo necesita su equipo: el primero del inventario de COP_A.
-    const inventario = await new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE').listar(
-      ctxAdmin(COP_A),
-      COP_A,
-    );
-    const dispositivoId = inventario[0]?.id;
-    if (dispositivoId === undefined) throw new Error('COP_A no tiene ningún equipo');
-    const antes = (await tablero.conteosDeAlertas(COP_A)).pendientes;
+    // H-15M-C01 · copropiedad PROPIA: en COP_A otras suites abren y resuelven
+    // alertas en paralelo, y el conteo exacto sólo vale donde nadie más las abre.
+    const propia = await copropiedadDeLaCorrida(semillas as Pool, CORRIDA);
+    const equipos = new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE');
+    const dispositivoId = await equipoPropio(equipos, propia, CORRIDA);
+    const copropiedadId = propia.id;
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(0);
     const alerta = Alerta.abrir({
       id: randomUUID(),
-      copropiedadId: COP_A,
+      copropiedadId,
       tipo: 'acceso_dudoso',
       severidad: 'informativa',
       generadaEn: new Date(),
@@ -282,16 +282,16 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     });
     if (!esExito(alerta)) throw new Error(alerta.error.detalle);
     await alertas.guardar(alerta.valor, ACTOR_INGESTA);
-    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes + 1);
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(1);
     const archivadas = await alertas.archivar(
-      COP_A,
+      copropiedadId,
       [alerta.valor.id],
       'ruido de prueba',
       ACTOR_INGESTA,
       new Date(),
     );
     expect(archivadas).toBe(1);
-    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes);
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(0);
   });
 
   it('los accesos por hora cuentan los eventos del día en la hora LOCAL del conjunto', async () => {
