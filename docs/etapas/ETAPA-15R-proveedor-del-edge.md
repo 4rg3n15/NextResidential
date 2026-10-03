@@ -1,8 +1,10 @@
 # Corrección de la 15-R · El Edge compone su proveedor de equipos como la API (DT-15R-09)
 
 **Rama:** `etapa-15r-proveedor-del-edge` · **Base:** `etapa-15r-huecos-y-decisiones`
-(`5566b8e`), **no** `develop` (§10) · **PR:** ninguno, no se pidió · **Fecha:** 2026-10-03 ·
-**Cierra:** DT-15R-09 · **Corrige, fuera del encargo:** H-15R-C01 · **Abre:** DT-15R-C01 a DT-15R-C03
+(`5566b8e`), **no** `develop` (§10) · **PR:**
+[4rg3n15/NextResidential#43](https://github.com/4rg3n15/NextResidential/pull/43), contra la rama de la 15-R ·
+**Fecha:** 2026-10-03 · **Cierra:** DT-15R-09 · **Corrige, fuera del encargo:** H-15R-C01 ·
+**Abre:** DT-15R-C01 a DT-15R-C03 · **Registra, previo:** H-15R-C02
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Nada de lo nuevo se ha ejercido contra un equipo real: la terminal es la
@@ -18,8 +20,10 @@
    aquí en `da64043`). Desde `develop` no habría dónde marcar el cierre y
    `composicion.ts` chocaría con la cuarentena de la 15-R. Tampoco se empujó a la
    rama de la 15-R: dos sesiones escribiendo en la misma rama a la vez se pisan.
-   **Esta rama se fusiona en la de la 15-R antes de fusionar su PR** —contiene su
-   cabeza, así que es un avance rápido— o detrás de ella en `develop`.
+   **Su PR
+   ([4rg3n15/NextResidential#43](https://github.com/4rg3n15/NextResidential/pull/43))
+   apunta a la rama de la 15-R y se fusiona antes que el de ésta** —contiene su
+   cabeza, así que es un avance rápido—.
 2. **El enunciado se quedaba corto.** La API pasa al proveedor **siete**
    ajustes de su `.env`, no cuatro: el Edge omitía también `puertoRtsp` —con
    puente, el video iba al 554 aunque la API dijera otro puerto, y «Probar
@@ -270,6 +274,12 @@ Después de `6050b05` sólo entró documentación: la fusión del cierre de la 1
 leen documentos: la coherencia de ESTADO (paso 1b), las declaraciones (paso 9),
 los diagramas Mermaid (paso 10) y Prettier.
 
+**En CI (macOS), sobre `2980cf8`, el verificador salió FALLIDO una vez**, en el
+paso 7: `tablero-pg.test.ts` («una alerta archivada deja de contar como
+pendiente») dio 73 en vez de 74, y el 7b falló en consecuencia. En el mismo job,
+esa suite pasó en el paso 5 y en las tres corridas del 14. Es H-15R-C02 (§8):
+previa y ajena a esta corrección.
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | §2.7              | Qué hizo esta corrección                                                                                                                           |
@@ -313,15 +323,23 @@ los diagramas Mermaid (paso 10) y Prettier.
   Aun con un plazo menor el equipo puede accionar una orden cuya respuesta se
   cortó. El defecto es de la 15-Q2 (no reconciliar el desenlace tardío); esta
   corrección agranda su ventana con el valor por omisión.
+- **H-15R-C02 · una prueba del tablero depende de las suites en paralelo
+  (previa, 15-M).** «Una alerta archivada deja de contar como pendiente» mide el
+  conteo global de alertas pendientes de la copropiedad de la semilla mientras
+  `persistencia-operativa-pg.test.ts` abre y resuelve alertas en ella: si una se
+  abre antes de la primera lectura y se resuelve entre las dos, el conteo no sube.
+  Tumbó una vez el verificador de macOS en CI. No se corrige aquí: no es de esta
+  corrección y `tablero-pg.test.ts` no puede crecer; queda propuesta como tarea
+  aparte (darle a la prueba una copropiedad propia).
 - **Supuestos y contradicciones:** ninguno nuevo.
 
 ## 9 · Qué debe hacer el usuario manualmente
 
-1. **Fusionar esta rama en `etapa-15r-huecos-y-decisiones`** antes de fusionar
-   el PR de la 15-R
-   ([4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42)),
-   o abrir su propio PR contra `develop` cuando la 15-R esté fusionada. Ya
-   contiene el cierre de la 15-R (`0ce8ed5`, fusionado en `da64043` sin
+1. **Fusionar
+   [4rg3n15/NextResidential#43](https://github.com/4rg3n15/NextResidential/pull/43)**,
+   que apunta a `etapa-15r-huecos-y-decisiones`, antes que el PR de la 15-R
+   ([4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42)).
+   Ya contiene el cierre de la 15-R (`0ce8ed5`, fusionado en `da64043` sin
    conflictos): mientras la 15-R no se mueva, es un avance rápido.
 2. **En el `.env` de cada Edge puente**, los siete ajustes iguales a los de la API
    (`DESPLIEGUE_EDGE.md` §10.1). Si la API usa los valores por omisión, el
@@ -348,4 +366,5 @@ que corrige sólo existe en esa rama (§ «Lo incómodo», 1). El entorno propus
 | `6050b05` | Este informe, `ETAPA-15R.md`, `ESTADO_ETAPAS.md`, `README.md`, ADR-018 y el plazo |
 | `da64043` | Fusión del cierre de la 15-R (`0ce8ed5`): su veredicto y su PR, sólo documentos   |
 | `aa1aacc` | Cierre: el veredicto del verificador                                              |
-| _este_    | §9 al día con el PR de la 15-R; esta tabla                                        |
+| `2980cf8` | §9 al día con el PR de la 15-R; esta tabla                                        |
+| _este_    | El PR de esta corrección y H-15R-C02, vista en CI                                 |
