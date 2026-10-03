@@ -638,15 +638,15 @@ habla con los equipos: las altas de rostros, las aperturas y el video los hace e
 Edge, con SU `.env`. Hasta la corrección de la 15-R (DT-15R-09) el Edge los
 ignoraba y, sobre todo, daba de alta sin mirar el reloj del equipo.
 
-| Variable                    | Por omisión      | Qué gobierna en el Edge                                                            |
-| --------------------------- | ---------------- | ---------------------------------------------------------------------------------- |
-| `EQUIPOS_DESVIO_DE_RELOJ_S` | `30`             | Desvío del equipo a partir del cual no hay altas con vigencia; y `sitio:edge`      |
-| `EQUIPOS_TIEMPO_LIMITE_MS`  | `5000`           | Plazo de cada petición a un equipo. La nube da 4 s a una apertura y 30 s a un alta |
-| `EQUIPOS_ZONA_HORARIA`      | `America/Bogota` | Zona en la que se escribe la vigencia de la persona                                |
-| `TERMINAL_PLAN_DE_HORARIO`  | `1`              | Plantilla horaria de la puerta en el alta (`65535` = 7×24 en otros modelos)        |
-| `EQUIPOS_FOTO_KB_MAXIMOS`   | `200`            | Peso máximo de la foto que se sube                                                 |
-| `EQUIPOS_FOTO_LADO_MAXIMO`  | `1024`           | Lado mayor máximo de la foto                                                       |
-| `VIDEO_PUERTO_RTSP`         | `554`            | Puerto RTSP de donde el go2rtc local toma el video                                 |
+| Variable                    | Por omisión      | Qué gobierna en el Edge                                                          |
+| --------------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `EQUIPOS_DESVIO_DE_RELOJ_S` | `30`             | Desvío del equipo a partir del cual no hay altas con vigencia; y `sitio:edge`    |
+| `EQUIPOS_TIEMPO_LIMITE_MS`  | `5000`           | Plazo de cada petición a un equipo. La nube espera 4 s una apertura (DT-15R-C03) |
+| `EQUIPOS_ZONA_HORARIA`      | `America/Bogota` | Zona en la que se escribe la vigencia de la persona                              |
+| `TERMINAL_PLAN_DE_HORARIO`  | `1`              | Plantilla horaria de la puerta en el alta (`65535` = 7×24 en otros modelos)      |
+| `EQUIPOS_FOTO_KB_MAXIMOS`   | `200`            | Peso máximo de la foto que se sube                                               |
+| `EQUIPOS_FOTO_LADO_MAXIMO`  | `1024`           | Lado mayor máximo de la foto                                                     |
+| `VIDEO_PUERTO_RTSP`         | `554`            | Puerto RTSP de donde el go2rtc local toma el video                               |
 
 La ficha de la consola y «Probar conexión» siguen usando los valores de la API
 (viajan con el diagnóstico): si difieren de los del Edge, la ficha puede decir
