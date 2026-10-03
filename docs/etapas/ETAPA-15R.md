@@ -1,7 +1,7 @@
 # ETAPA 15-R · Huecos funcionales, decisiones del cliente y documentación
 
 **Rama:** `etapa-15r-huecos-y-decisiones` · **Base:** `develop` con la 15-U fusionada (`7b31083`, merge del PR #41) ·
-**PR:** «PR_PENDIENTE», sin fusionar · **Fecha:** 2026-10-03 ·
+**PR:** [4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42), sin fusionar · **Fecha:** 2026-10-03 ·
 **Decisiones del cliente que aplica:** P-20, P-23, P-25, P-26, P-29, P-30 y AR-04 · **Cierra:** P-31, C-37, DT-15N-01, DT-15N-02, H-15J-01, H-15K-01, DT-15K-02
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -246,7 +246,43 @@ Cómo ejecutarlas: `./scripts/verificar-etapa.sh --con-base` (base local en
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-«VEREDICTO_PENDIENTE»
+Corrida sobre `5566b8e`, con base (`DATABASE_URL_PRUEBAS`), desde un árbol
+limpio de artefactos:
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El declarado es **D-112**: las pruebas saltadas del arranque en frío, que ejerce
+el paso 12b. **31 de 31 pasos**; **5137 pruebas de TypeScript** (API 2262,
+proveedores 1231, consola 783, dominio 438, Edge 279, configuración 144) y **367
+de Dart**, tres corridas forzadas idénticas; el ensayo de sitio contra los
+equipos simulados, «SIN FALLOS · 47 OK»; la suite de Dart da lo mismo en otro
+huso.
+
+### Cobertura por capa
+
+| Capa                                          | Líneas                      | Ramas   | Umbral         |
+| --------------------------------------------- | --------------------------- | ------- | -------------- |
+| Dominio (`packages/domain-core`)              | 96,20 %                     | 96,91 % | 90 %           |
+| Aplicación (`**/aplicacion/**`, 152 ficheros) | 97,18 %                     | 90,64 % | 90 %           |
+| Global (948 ficheros)                         | 87,66 %                     | 87,05 % | 70 %           |
+| App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
+
+### Lo que destapó el verificador, y se corrigió en la ronda
+
+Las dos corridas anteriores salieron **FALLIDAS**, y las dos por defectos míos de
+esta ronda que ninguna prueba unitaria veía:
+
+1. **`next build` no compilaba la consola** (corrida 1, paso 3). El gancho del
+   cambio de copropiedad (E1) usaba `useEffect`/`useRef`/`useState` sin
+   `'use client'`, y el cliente de la API —que llega a componentes de servidor—
+   lo importaba. Se separó en un módulo de cliente (`dbaf167`).
+2. **La herramienta de rotación abría un `Pool` sin oyente de `'error'`**
+   (corrida 2, `frontera-conexiones`, 15-O): un corte de la base habría
+   terminado el proceso a mitad de la rotación. Se le añadió (`5566b8e`).
+
+El resto de la corrida 2 —estabilidad incluida— ya estaba verde.
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -335,13 +371,16 @@ Cómo ejecutarlas: `./scripts/verificar-etapa.sh --con-base` (base local en
 
 Rama `etapa-15r-huecos-y-decisiones`, desde `develop` con la 15-U fusionada.
 
-| Commit          | Bloque                                                                           |
-| --------------- | -------------------------------------------------------------------------------- |
-| `2aa3d3f`       | A · códigos MFA, bloqueos y operaciones de dispositivo sobreviven al reinicio    |
-| `367d177`       | B · avisos al residente por Web Push estándar, sin Firebase (P-23, ADR-036)      |
-| `506d1f1`       | C · puerta libre y bloqueada con reversión automática (P-25)                     |
-| `37b2346`       | D · SSE y audio directos a la API con billete; IP firmada desde Netlify (P-20)   |
-| `16c900d`       | E · E1–E8                                                                        |
-| `ea02897`       | F · aceptaciones de riesgo, rotación de la bóveda con recifrado y guía de coturn |
-| «COMMIT_G»      | G · documentación al día y registro                                              |
-| «COMMIT_CIERRE» | cierre de la ronda                                                               |
+| Commit    | Bloque                                                                           |
+| --------- | -------------------------------------------------------------------------------- |
+| `2aa3d3f` | A · códigos MFA, bloqueos y operaciones de dispositivo sobreviven al reinicio    |
+| `367d177` | B · avisos al residente por Web Push estándar, sin Firebase (P-23, ADR-036)      |
+| `506d1f1` | C · puerta libre y bloqueada con reversión automática (P-25)                     |
+| `37b2346` | D · SSE y audio directos a la API con billete; IP firmada desde Netlify (P-20)   |
+| `16c900d` | E · E1–E8                                                                        |
+| `ea02897` | F · aceptaciones de riesgo, rotación de la bóveda con recifrado y guía de coturn |
+| `a5bfc0b` | G · documentación al día y registro                                              |
+| `999305d` | informe, a falta del veredicto                                                   |
+| `dbaf167` | la consola compila: el gancho del cambio de copropiedad, en un módulo de cliente |
+| `5566b8e` | la herramienta de rotación escucha el `error` de su `Pool` (15-O)                |
+| _este_    | cierre de la ronda: veredicto en el informe y en ESTADO                          |
