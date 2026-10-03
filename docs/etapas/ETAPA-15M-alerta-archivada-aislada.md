@@ -2,7 +2,7 @@
 
 **Rama:** `etapa-15m-alerta-archivada-aislada` · **Base:** `develop` (`7b31083`, merge del PR #41) ·
 **PR:** ninguno, no se pidió · **Fecha:** 2026-10-03 · **Corrige:** H-15M-C01 ·
-**Corrige, fuera del encargo:** H-15M-C02 · **Abre:** DT-15M-C01
+**Corrige, fuera del encargo:** H-15M-C02 · **Abre:** DT-15M-C01 a DT-15M-C03
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Sólo toca pruebas: ni una línea de producto, ni de migraciones, ni de guiones.
@@ -47,6 +47,18 @@
 5. **Una corrida fallida de la prueba original dejaba basura.** La aserción
    cortaba antes de archivar, así que cada fallo dejaba una alerta pendiente para
    siempre en COP_A. Se vio en el bucle con ruido: el conteo subía uno por fallo.
+6. **El verificador salió FALLIDA dos veces antes del veredicto, y ninguna por
+   esta corrección.** La primera, con la base recién sembrada que pide el paso
+   1c (`--con-semillas`): los pasos 5 y 7 cayeron por **H-15R-C01** —la DoD del
+   Edge en sitio da 12 aperturas de 15 porque CONC001 no está en la semilla—,
+   corregido sólo en `etapa-15r-proveedor-del-edge` (`857ae2b`), sin fusionar; y el
+   paso 9, por una sonda que falló una vez y no se reprodujo (§6). La segunda,
+   con la base preparada como en CI (`--con-pruebas`): todo en verde salvo la
+   corrida 1 de 3 del paso 14, con una roja de la 15-P que no usa la base
+   (`audio-guardia-ws.e2e`, «el WebSocket no abrió»). Las dos quedan anotadas con
+   su mecanismo (DT-15M-C02 y DT-15M-C03) y sin corregir: no son de este encargo.
+   El veredicto es el de la tercera corrida, sobre el mismo commit y sin tocar el
+   árbol entre las tres.
 
 ---
 
@@ -171,8 +183,10 @@ antes, sin depender de otras suites.
   dos veces seguidas: el código anterior falla la segunda con
   `duplicate key value violates unique constraint "dispositivos_endpoint_uk"`; el
   nuevo pasa las dos.
-- **Las dos suites juntas, muchas veces** (lo que pedía el encargo): «PENDIENTE: resultado del bucle de 300».
-  Sobre el código de `develop`, 150 corridas dieron un fallo, el de H-15M-C02.
+- **Las dos suites juntas, muchas veces** (lo que pedía el encargo): **300 de 300**
+  sobre la versión final, en dos tramos —170 y 130— porque el bucle se detuvo para
+  hacer los commits sin cambiarle los ficheros a mitad de corrida. Sobre el código
+  de `develop`, 150 corridas dieron un fallo, el de H-15M-C02.
 - **Una copropiedad por corrida:** 205 → 206 copropiedades tras una corrida de
   `tablero-pg`.
 
@@ -183,7 +197,44 @@ todo, con `./scripts/verificar-etapa.sh --con-base`.
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-«PENDIENTE: veredicto del verificador.»
+Corrida sobre `99669c8`, desde un árbol limpio de artefactos, con la base
+preparada como en CI (`./supabase/verificar.sh --con-pruebas --modo-supabase`),
+Flutter 3.47.4 y el Chromium del entorno (`NCR_CHROMIUM`):
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El declarado es **D-112**: las cinco pruebas saltadas del arranque en frío, que
+ejerce el paso 12b. **31 de 31 pasos**; **4974 pruebas de TypeScript** (API 2143,
+proveedores 1225, consola 747, dominio 438, Edge 277, configuración 144) y **367
+de Dart**, tres corridas forzadas idénticas; ninguna omisión por falta de base (38
+ficheros con su guardián); el ensayo de sitio contra los equipos simulados, «SIN
+FALLOS · 47 OK»; los 34 controles detectan su violación; escaneo de secretos
+limpio (6886 blobs del historial).
+
+### Cobertura por capa
+
+| Capa                                          | Líneas                      | Ramas   | Umbral         |
+| --------------------------------------------- | --------------------------- | ------- | -------------- |
+| Dominio (`packages/domain-core`)              | 96,20 %                     | 96,91 % | 90 %           |
+| Aplicación (`**/aplicacion/**`, 142 ficheros) | 97,10 %                     | 90,91 % | 90 %           |
+| Global (887 ficheros)                         | 87,22 %                     | 87,22 % | 70 %           |
+| App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
+
+### Las dos corridas anteriores, sobre el mismo commit
+
+1. **FALLIDA, con la base recién sembrada** (`--con-semillas`, la del paso 1c).
+   Pasos 5 y 7: H-15R-C01, «expected 12 to be 15» en las dos pruebas de la DoD
+   del Edge en sitio (`edge-en-sitio-pg.e2e.test.ts:152` y `:190`). Paso 9: «un
+   fichero que no carga se informa sin su motivo». Esa sonda, repetida sola dos
+   veces —con y sin `NODE_V8_COVERAGE`, como la corre el paso— y la batería entera
+   de pruebas negativas (182 s, 34 de 34) pasan; buscándole la causa salió
+   DT-15M-C02.
+2. **FALLIDA, con la base como en CI.** Pasos 5, 7 y 9 en verde; paso 14, la
+   corrida 1 de 3 con una roja: `audio-guardia-ws.e2e.test.ts` › «segundo
+   operador: queda en cola, sin billete; al colgar el primero, abre el suyo» →
+   «Error: el WebSocket no abrió»; las corridas 2 y 3, en verde (DT-15M-C03).
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -244,6 +295,24 @@ todo, con `./scripts/verificar-etapa.sh --con-base`.
   | `edge-misma-decision-pg.e2e` L197                                        | Compara Edge y nube en cada plantilla de una instantánea tomada antes; otras suites revocan o suprimen plantillas de COP_A                  | Discrepancia entre los dos lados                                             |
   | `baja-de-residente-pg` L121                                              | Inicia sesión con el código corto de COP_A, que `residentes-y-vehiculos-pg` cambia en cada corrida                                          | Bajo: 401                                                                    |
 
+- **DT-15M-C02 · `metricas.mjs` lee el informe de la corrida anterior si vitest
+  no escribe uno nuevo.** No borra `.informes-de-prueba/<paquete>.json` antes de
+  correr: si vitest muere antes de escribir, culpa a una prueba ajena como «SUITE
+  EN ROJO» en vez de decir «CORRIDA INTERRUMPIDA». Demostrado de forma
+  determinista: con un informe viejo plantado y sin `pnpm` en el `PATH` —vitest no
+  llega a correr—, la salida dice «✗ INFORME VIEJO de otra corrida». Es el
+  mecanismo que explicaría el ✗ del paso 9 en la primera corrida: si la sonda que
+  no carga no dejó informe, se leyó el de la sonda anterior, que sí tenía una
+  roja. Que pasara así es `[Probable]`; por qué murió vitest esa vez, no se sabe.
+  Arreglo propuesto: borrar el informe antes de correr.
+- **DT-15M-C03 · `audio-guardia-ws.e2e` «segundo operador…» falla a veces con «el
+  WebSocket no abrió».** No usa la base: todo en memoria contra el videoportero
+  simulado en red. Causa `[Probable]`: la prueba anterior («el billete vale una
+  vez…») cierra su socket y no espera a que el equipo suelte la sesión, y ésta pide
+  su billete sin comprobar la respuesta; si la sesión anterior no se soltó todavía,
+  el billete puede no salir y el socket se abre con `billete=undefined` → 401.
+  Arreglo propuesto: esperar `!equipo.estado().sesionAbierta` al final de la
+  anterior y exigir 201 al billete.
 - **Riesgo residual de esta corrección.** La copropiedad propia vale mientras sólo
   la suite escriba en la base de pruebas. Una API de desarrollo conectada a esa
   misma base con el planificador encendido abriría «equipo caído» en ella; el 0
@@ -256,9 +325,16 @@ todo, con `./scripts/verificar-etapa.sh --con-base`.
    corridas sin recrearse, `./supabase/verificar.sh --con-semillas --modo-supabase`
    la deja limpia: reinicia las ventanas acumulativas de DT-15M-C01 y se lleva los
    equipos y alertas que la prueba original dejó en COP_A.
-2. **Decidir DT-15M-C01.** Las once quedan anotadas; la más urgente es
-   `persistencia-operativa-pg` L261, que falla siempre tras veinte corridas sin
-   recrear la base.
+2. **Decidir DT-15M-C01 a DT-15M-C03.** Las once de DT-15M-C01 quedan anotadas; la
+   más urgente es `persistencia-operativa-pg` L261, que falla siempre tras veinte
+   corridas sin recrear la base. DT-15M-C02 y DT-15M-C03 son intermitentes y ya
+   tumbaron una corrida del verificador cada una.
+3. **Para verificar en local con la base recién sembrada** (`--con-semillas`),
+   H-15R-C01 hará fallar los pasos 5 y 7 hasta que se fusione la corrección de la
+   15-R; con `--con-pruebas`, como el CI, no.
+4. **Al fusionar** con las dos ramas de la 15-R, `ESTADO_ETAPAS.md` chocará en la
+   cabecera, la tabla del resumen y el sitio donde entra cada ficha: se conservan
+   las tres fichas, la más reciente primero. No comparten ningún fichero de código.
 
 ## 10 · Rama y commits
 
@@ -266,6 +342,9 @@ Rama `etapa-15m-alerta-archivada-aislada`, desde `develop` (`7b31083`). El entor
 proponía `claude/hopeful-keller-lnds0q`; desde el primer commit se trabajó en la
 rama con nombre de etapa (§2.5).
 
-| Commit          | Qué |
-| --------------- | --- |
-| _por completar_ |     |
+| Commit    | Qué                                                                                 |
+| --------- | ----------------------------------------------------------------------------------- |
+| `7ecf1e1` | H-15M-C01 · la alerta archivada, contada en la copropiedad de la corrida: 0, 1, 0   |
+| `7fe1e5b` | H-15M-C02 · «aparece en Dispositivos» da de alta en esa misma copropiedad           |
+| `99669c8` | Este informe y la ficha de `ESTADO_ETAPAS.md`, a falta del veredicto                |
+| _este_    | Cierre: el veredicto del verificador, las dos corridas anteriores y DT-15M-C02, C03 |
