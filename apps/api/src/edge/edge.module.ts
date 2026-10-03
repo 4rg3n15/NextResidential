@@ -41,13 +41,13 @@ import { GuardiaDelEdge } from './presentacion/guardia-del-edge';
  * petición es 401— y una instantánea vacía, que niega todo lo que no conoce.
  *
  * Las reglas se leen de la base sólo con `CARGADOR_DE_CONTEXTO=postgres`, el
- * mismo interruptor que decide si la NUBE lee de la base para decidir: el
- * Edge y la nube deciden con lo mismo o con nada, nunca con cosas distintas.
+ * mismo interruptor de la NUBE: el Edge y la nube deciden con lo mismo o con nada.
  */
 @Module({})
 export class EdgeModule {
+  private static unico: DynamicModule | undefined; // 15-U · Nest 11 deduplica por referencia
   static registrar(): DynamicModule {
-    return {
+    return (EdgeModule.unico ??= {
       module: EdgeModule,
       controllers: [EdgeController, GatewaysController],
       providers: [
@@ -116,6 +116,6 @@ export class EdgeModule {
         GuardiaDelEdge,
       ],
       exports: [REPOSITORIO_DE_GATEWAYS],
-    };
+    });
   }
 }

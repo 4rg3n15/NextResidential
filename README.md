@@ -250,18 +250,18 @@ Si la regla no está en la caché, **niega**; la política de contingencia es co
 
 ## 4. Stack tecnológico
 
-| Capa                                      | Tecnología                     | Por qué                                                         |
-| ----------------------------------------- | ------------------------------ | --------------------------------------------------------------- |
-| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)          | RLS nativa como segunda barrera de aislamiento                  |
-| API y lógica de negocio                   | NestJS + TypeScript estricto   | Inyección de dependencias que hace natural el patrón de puertos |
-| Colas y trabajos programados              | pg-boss                        | Sobre el mismo PostgreSQL: una pieza menos que operar           |
-| Consola web / escritorio                  | Next.js + Tailwind + shadcn/ui | PWA instalable y empaquetado de escritorio desde una sola base  |
-| Aplicación móvil                          | Flutter                        | iOS y Android desde un código                                   |
-| Push                                      | Firebase Cloud Messaging       |                                                                 |
-| Edge Gateway                              | Node.js + SQLite               | Reutiliza el dominio sin modificarlo                            |
-| Video al navegador                        | go2rtc                         | RTSP → WebRTC                                                   |
-| Intercom                                  | ISAPI TwoWayAudio              | Ver ADR-001                                                     |
-| Contratos                                 | OpenAPI generado desde NestJS  | El cliente Dart se genera, nunca se escribe a mano              |
+| Capa                                      | Tecnología                                  | Por qué                                                         |
+| ----------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)                       | RLS nativa como segunda barrera de aislamiento                  |
+| API y lógica de negocio                   | NestJS 11 (Express 5) + TypeScript estricto | Inyección de dependencias que hace natural el patrón de puertos |
+| Colas y trabajos programados              | pg-boss                                     | Sobre el mismo PostgreSQL: una pieza menos que operar           |
+| Consola web / escritorio                  | Next.js + Tailwind + shadcn/ui              | PWA instalable y empaquetado de escritorio desde una sola base  |
+| Aplicación móvil                          | Flutter                                     | iOS y Android desde un código                                   |
+| Push                                      | Firebase Cloud Messaging                    |                                                                 |
+| Edge Gateway                              | Node.js + SQLite                            | Reutiliza el dominio sin modificarlo                            |
+| Video al navegador                        | go2rtc                                      | RTSP → WebRTC                                                   |
+| Intercom                                  | ISAPI TwoWayAudio                           | Ver ADR-001                                                     |
+| Contratos                                 | OpenAPI generado desde NestJS               | El cliente Dart se genera, nunca se escribe a mano              |
 
 ---
 

@@ -30,14 +30,14 @@ import type { RepositorioPadron } from './aplicacion/puertos';
 /**
  * `@Global` desde la 15-D: el módulo de eventos compone el cargador de contexto
  * del motor y necesita `ResolutorDePlaca`, igual que necesita `ResolutorDeZona`
- * de zonas. Sin el global, el primero que se olvidara de importarlo dejaría al
- * motor sin padrón — que es exactamente D-25 otra vez.
+ * de zonas. Sin el global, quien olvidara importarlo dejaría al motor sin padrón (D-25).
  */
 @Global()
 @Module({})
 export class PadronModule {
+  private static unico: DynamicModule | undefined; // 15-U · Nest 11 deduplica por referencia
   static registrar(): DynamicModule {
-    return {
+    return (PadronModule.unico ??= {
       module: PadronModule,
       controllers: [PadronController, PadronDeCopropiedadController],
       providers: [
@@ -100,6 +100,6 @@ export class PadronModule {
         RESOLUTOR_DE_PLACA,
         LOCALIZADOR_DE_VIVIENDA,
       ],
-    };
+    });
   }
 }

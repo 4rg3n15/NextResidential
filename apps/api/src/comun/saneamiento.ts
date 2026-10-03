@@ -215,10 +215,10 @@ export class SaneamientoMiddleware implements NestMiddleware {
           );
         }
       }
-      const limpio = sanear(req.query) as Record<string, unknown>;
-      // `req.query` es de solo lectura en Express 5: se reemplaza su contenido.
-      for (const k of Object.keys(req.query)) delete (req.query as Record<string, unknown>)[k];
-      Object.assign(req.query as Record<string, unknown>, limpio);
+      // 15-U · en Express 5 `req.query` es un getter que reparsea la URL en CADA lectura:
+      // rellenar el objeto que devuelve se perdía. Lo saneado se fija en la petición.
+      const query = { value: sanear(req.query), writable: true, enumerable: true };
+      Object.defineProperty(req, 'query', { ...query, configurable: true });
     }
     next();
   }

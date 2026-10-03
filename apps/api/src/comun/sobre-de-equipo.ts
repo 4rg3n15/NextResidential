@@ -77,13 +77,13 @@ export const acumularSobreCrudo = (req: Request, res: Response, siguiente: NextF
     // pasearle bytes de una imagen no tiene sentido ni es barato.
     req.body = {};
     /**
-     * La marca que `body-parser` usa para saber que el cuerpo YA se leyó.
-     *
-     * Sin ella, `express.json` —que corre después, también para esta ruta—
-     * vuelve a esperar un flujo que este middleware ya consumió y la petición
-     * muere con 500. Se vio contra la suite de aislamiento, que recorre TODA
-     * ruta sin token esperando 401: ésta contestaba 500, y un 500 en una ruta
-     * pública oculta si el guard llegó a ejercerse.
+     * `express.json` corre después, también aquí, y no debe esperar un flujo que
+     * ya se consumió: moría con 500 (lo vio la suite de aislamiento, que espera
+     * 401 en toda ruta sin token). body-parser 1 (Express 4) lo sabía por esta
+     * marca; body-parser 2 (Express 5, 15-U) por `onFinished.isFinished(req)`,
+     * que tras `end` ya es cierto. La marca se queda: no estorba a ninguno, y
+     * `alarm-server.e2e.test.ts` y la regresión del 28/09 prueban el camino.
+     * Un 500 en una ruta pública ocultaría si el guard llegó a ejercerse.
      */
     (req as Request & { _body?: boolean })._body = true;
     siguiente();

@@ -14,19 +14,19 @@ enum InstantaneaSinCambiosDtoSinCambios {
 
   const InstantaneaSinCambiosDtoSinCambios(this.json);
 
-  factory InstantaneaSinCambiosDtoSinCambios.fromJson(num json) => values.firstWhere(
+  factory InstantaneaSinCambiosDtoSinCambios.fromJson(bool json) => values.firstWhere(
         (e) => e.json == json,
         orElse: () => $unknown,
       );
 
-  final num? json;
-  num toJson() {
+  final bool? json;
+  bool toJson() {
     final value = json;
     if (value == null) {
-      throw StateError('Cannot convert enum value with null JSON representation to num. '
+      throw StateError('Cannot convert enum value with null JSON representation to bool. '
           'This usually happens for \$unknown or @JsonValue(null) entries.');
     }
-    return value as num;
+    return value as bool;
   }
 
   @override

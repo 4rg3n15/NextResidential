@@ -54,7 +54,6 @@
   "pnpm": {
     "overrides": {
       "multer": "^2.3.0",
-      "express>path-to-regexp": "^0.1.13",
       "js-yaml": "^4.3.2",
       "lodash": "^4.17.24",
       "postcss": "^8.5.18",

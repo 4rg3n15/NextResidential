@@ -461,13 +461,13 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "informativa",
                 "media",
                 "alta",
                 "critica"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -475,6 +475,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "lista_negra",
                 "sabotaje",
@@ -482,8 +483,7 @@
                 "acceso_dudoso",
                 "panico",
                 "apertura_fallida"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -1270,11 +1270,11 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "true",
                 "false"
-              ],
-              "type": "string"
+              ]
             }
           }
         ],
@@ -2834,14 +2834,14 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "ingreso",
                 "salida",
                 "denegado",
                 "alerta",
                 "manual"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -2849,11 +2849,11 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "permitido",
                 "negado"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -2861,6 +2861,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "VIGENCIA_EXPIRADA",
                 "AFORO_SUPERADO",
@@ -2872,8 +2873,7 @@
                 "PLACA_DESCONOCIDA",
                 "CONFIANZA_INSUFICIENTE",
                 "FALLO_TECNICO"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -2996,14 +2996,14 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "ingreso",
                 "salida",
                 "denegado",
                 "alerta",
                 "manual"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -3011,11 +3011,11 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "permitido",
                 "negado"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -3023,6 +3023,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "VIGENCIA_EXPIRADA",
                 "AFORO_SUPERADO",
@@ -3034,8 +3035,7 @@
                 "PLACA_DESCONOCIDA",
                 "CONFIANZA_INSUFICIENTE",
                 "FALLO_TECNICO"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -3062,12 +3062,12 @@
             "required": true,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "csv",
                 "excel",
                 "pdf"
-              ],
-              "type": "string"
+              ]
             }
           }
         ],
@@ -4697,13 +4697,13 @@
             "in": "query",
             "schema": {
               "default": "mes",
+              "type": "string",
               "enum": [
                 "hoy",
                 "semana",
                 "mes",
                 "todo"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -6335,6 +6335,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "inicio_de_sesion",
                 "acceso_rechazado",
@@ -6352,8 +6353,7 @@
                 "baja_de_portero",
                 "restablecimiento_de_contrasena",
                 "cambio_de_contrasena"
-              ],
-              "type": "string"
+              ]
             }
           }
         ],
@@ -7395,13 +7395,13 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "programada",
                 "vigente",
                 "vencida",
                 "anulada"
-              ],
-              "type": "string"
+              ]
             }
           },
           {
@@ -9255,6 +9255,7 @@
           },
           "patron": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PatronDeAutorizacionDto"
@@ -9343,6 +9344,7 @@
           },
           "patron": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PatronEnLaInstantaneaDto"
@@ -9480,6 +9482,7 @@
           },
           "capacidades": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
@@ -9512,6 +9515,7 @@
           "atestacion": {
             "nullable": true,
             "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AtestacionDeEquipoDto"
@@ -11336,6 +11340,7 @@
           },
           "codigo": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CodigoDelEquipoDto"
@@ -11548,6 +11553,7 @@
           },
           "capacidades": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
@@ -11580,6 +11586,7 @@
           "atestacion": {
             "nullable": true,
             "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AtestacionDeEquipoDto"
@@ -11721,6 +11728,7 @@
           },
           "capacidades": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/CapacidadesDeEquipoDto"
@@ -11753,6 +11761,7 @@
           "atestacion": {
             "nullable": true,
             "description": "D-11 · la atestación física más reciente del instalador, con su vigencia. `null` si nunca se atestó.",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AtestacionDeEquipoDto"
@@ -13439,7 +13448,7 @@
             "type": "number"
           },
           "sinCambios": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]
@@ -14518,6 +14527,7 @@
           "punto": {
             "nullable": true,
             "description": "15-P · el punto elegido; nulo = la puerta de la ficha del equipo.",
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PuntoDeLaOrdenDto"
@@ -15136,6 +15146,7 @@
           },
           "turnoVigente": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/TurnoDto"
@@ -15144,6 +15155,7 @@
           },
           "sesionAbierta": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/SesionAbiertaDto"
@@ -15824,6 +15836,7 @@
           },
           "perfil": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/PerfilDelResidenteDto"
@@ -17342,7 +17355,7 @@
             "format": "uuid"
           },
           "restringida": {
-            "type": "number",
+            "type": "boolean",
             "enum": [
               true
             ]

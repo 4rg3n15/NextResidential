@@ -72,13 +72,13 @@ import * as conEdge from './infraestructura/composicion-con-edge';
  * La sonda es un PUERTO y no una llamada directa: es lo que permite que la
  * suite pruebe los cuatro resultados —alcanzado, decide por su cuenta,
  * credencial rechazada, inalcanzable— **sin un solo equipo y sin red** (ADR-03),
- * y lo que permitirá mañana sondear un fabricante distinto sin tocar el
- * controlador.
+ * y lo que permitirá mañana sondear otro fabricante sin tocar el controlador.
  */
 @Module({})
 export class EquiposModule {
+  private static unico: DynamicModule | undefined; // 15-U · Nest 11 deduplica por referencia
   static registrar(): DynamicModule {
-    return {
+    return (EquiposModule.unico ??= {
       module: EquiposModule,
       controllers: [
         EquiposController,
@@ -323,6 +323,6 @@ export class EquiposModule {
         ALCANCE_DE_EQUIPOS,
         PuntosDeOperacion,
       ],
-    };
+    });
   }
 }

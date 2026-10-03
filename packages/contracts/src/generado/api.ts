@@ -4037,7 +4037,7 @@ export interface components {
             /** Format: uuid */
             copropiedadId: string;
             version: number;
-            /** @enum {number} */
+            /** @enum {boolean} */
             sinCambios: true;
             /**
              * Format: date-time
@@ -5200,7 +5200,7 @@ export interface components {
         ZonaEnLaInstantaneaDto: {
             /** Format: uuid */
             id: string;
-            /** @enum {number} */
+            /** @enum {boolean} */
             restringida: true;
             abierta: boolean;
             aforoMaximo: number;
