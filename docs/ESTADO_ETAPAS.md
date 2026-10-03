@@ -914,7 +914,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Ronda `etapa-15r-huecos-y-decisiones` — huecos funcionales, decisiones del cliente y documentación · **CERRADA** · 2026-10-03
 
-**Rama:** `etapa-15r-huecos-y-decisiones` · **Base:** `develop` (`7b31083`, merge del PR #41, la 15-U) · **PR:** «PR_PENDIENTE», sin fusionar
+**Rama:** `etapa-15r-huecos-y-decisiones` · **Base:** `develop` (`7b31083`, merge del PR #41, la 15-U) · **PR:** [4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42), sin fusionar
 **Informe:** [`etapas/ETAPA-15R.md`](etapas/ETAPA-15R.md)
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -931,7 +931,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | F      | `seguridad/ACEPTACIONES_DE_RIESGO.md` (AR-05 nueva); **rotación de `EQUIPOS_LLAVE` con recifrado** (C-56, `CONEXION_SUPABASE.md` §13); guía de coturn (P-29)                                                                                                         |
 | G      | README y manual de usuario al día, guías de visita archivadas, FCM retirado de los documentos derivados, atribución D-112 corregida en cinco fichas de esta página, registro recontado                                                                               |
 
-**Verificación:** «VEREDICTO_PENDIENTE»
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `5566b8e` → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe» (D-112). 31 de 31 pasos, 5137 pruebas de TypeScript y 367 de Dart, tres corridas idénticas; dominio 96,20 %, aplicación 97,18 %, global 87,66 % de líneas. Las dos corridas anteriores salieron FALLIDAS por defectos de la ronda, corregidos en `dbaf167` (la consola no compilaba: un gancho de React sin `use client`) y `5566b8e` (un `Pool` sin oyente de `error` en la herramienta de rotación).
 
 ---
 
