@@ -1902,6 +1902,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/puertas/ajustes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Duración máxima de una puerta libre o bloqueada */
+        get: operations["ModosDePuertaController_verAjustes"];
+        /** Fija la duración máxima (15 a 720 min) */
+        put: operations["ModosDePuertaController_fijarAjustes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/puertas/modos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Puertas libres o bloqueadas ahora: quién, por qué, desde y hasta cuándo */
+        get: operations["ModosDePuertaController_vigentes"];
+        put?: never;
+        /** Deja una puerta libre o bloqueada, con motivo y plazo (P-25) */
+        post: operations["ModosDePuertaController_fijar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/puertas/modos/reversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revertir ahora: la puerta vuelve a su modo normal */
+        post: operations["ModosDePuertaController_revertir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/reglas/instantanea": {
         parameters: {
             query?: never;
@@ -2605,6 +2658,9 @@ export interface components {
              */
             personaId: string;
             nombre: string;
+        };
+        AjustesDePuertasDto: {
+            duracionMaximaMinutos: number;
         };
         AlcanceDeCopropiedadesDto: {
             /** @description Las copropiedades que el token alcanza, y solo esas. Para el superadministrador son todas las activas; para un administrador, la suya; para un operador de central, las de su turno. Un arreglo vacío es una respuesta legítima. */
@@ -4339,6 +4395,31 @@ export interface components {
             /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
             activo: boolean;
         };
+        ModoVigenteDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            /** @enum {string} */
+            modo: "libre" | "bloqueada";
+            motivo: string;
+            /** Format: uuid */
+            operadorId: string;
+            operadorNombre: string | null;
+            rol: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            revierteEn: string;
+            /** @enum {string|null} */
+            resultado: "aceptada" | "rechazada" | "inalcanzable" | null;
+            /** @description Reversiones automáticas que no llegaron al equipo */
+            reversionesFallidas: number;
+        };
+        ModosVigentesDto: {
+            modos: components["schemas"]["ModoVigenteDto"][];
+        };
         MotivoDeConfiguracionDto: {
             /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
@@ -4400,6 +4481,26 @@ export interface components {
              * @example Mantenimiento de la talanquera, coordinado con la administración
              */
             motivo: string;
+        };
+        OrdenDeModoCumplidaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            resultado: "aceptada" | "rechazada" | "inalcanzable";
+            detalle: string | null;
+            /** Format: date-time */
+            revierteEn: string | null;
+        };
+        OrdenDeModoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            /** @enum {string} */
+            modo: "libre" | "bloqueada";
+            /** @description Obligatorio (RN-08). Sin motivo la puerta no cambia de modo. */
+            motivo: string;
+            /** @description Minutos hasta la reversión; sin él, la duración máxima de la copropiedad. */
+            minutos?: number;
         };
         OrdenEjecutadaDto: {
             /** Format: uuid */
@@ -4870,6 +4971,12 @@ export interface components {
         };
         RetiroDeTurnoDto: {
             motivo: string;
+        };
+        ReversionDeModoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            motivo?: string;
         };
         RevocacionDto: {
             revocada: boolean;
@@ -8936,6 +9043,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HechoDePorteriaDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_verAjustes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AjustesDePuertasDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_fijarAjustes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AjustesDePuertasDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AjustesDePuertasDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_vigentes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModosVigentesDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_fijar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdenDeModoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdenDeModoCumplidaDto"];
+                };
+            };
+            /** @description Sólo la administración */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_revertir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversionDeModoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdenDeModoCumplidaDto"];
                 };
             };
         };

@@ -6786,6 +6786,222 @@
         ]
       }
     },
+    "/copropiedades/{id}/puertas/ajustes": {
+      "get": {
+        "operationId": "ModosDePuertaController_verAjustes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesDePuertasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Duración máxima de una puerta libre o bloqueada",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "put": {
+        "operationId": "ModosDePuertaController_fijarAjustes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjustesDePuertasDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjustesDePuertasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija la duración máxima (15 a 720 min)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/puertas/modos": {
+      "get": {
+        "operationId": "ModosDePuertaController_vigentes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModosVigentesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Puertas libres o bloqueadas ahora: quién, por qué, desde y hasta cuándo",
+        "tags": [
+          "guardia"
+        ]
+      },
+      "post": {
+        "operationId": "ModosDePuertaController_fijar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenDeModoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenDeModoCumplidaDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sólo la administración",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deja una puerta libre o bloqueada, con motivo y plazo (P-25)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/puertas/modos/reversion": {
+      "post": {
+        "operationId": "ModosDePuertaController_revertir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversionDeModoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenDeModoCumplidaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revertir ahora: la puerta vuelve a su modo normal",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
     "/copropiedades/{id}/reglas/instantanea": {
       "get": {
         "description": "Sólo para el Edge acreditado (firma con su credencial). Sin plantillas biométricas: sólo identificadores. RN-15, RN-16, CA-21, KPI-31.",
@@ -8853,6 +9069,19 @@
         "required": [
           "personaId",
           "nombre"
+        ]
+      },
+      "AjustesDePuertasDto": {
+        "type": "object",
+        "properties": {
+          "duracionMaximaMinutos": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 720
+          }
+        },
+        "required": [
+          "duracionMaximaMinutos"
         ]
       },
       "AlcanceDeCopropiedadesDto": {
@@ -14442,6 +14671,92 @@
           "activo"
         ]
       },
+      "ModoVigenteDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numeroDePuerta": {
+            "type": "number"
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "libre",
+              "bloqueada"
+            ]
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "operadorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operadorNombre": {
+            "type": "string",
+            "nullable": true
+          },
+          "rol": {
+            "type": "string"
+          },
+          "desde": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revierteEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "inalcanzable"
+            ]
+          },
+          "reversionesFallidas": {
+            "type": "number",
+            "description": "Reversiones automáticas que no llegaron al equipo"
+          }
+        },
+        "required": [
+          "id",
+          "dispositivoId",
+          "numeroDePuerta",
+          "modo",
+          "motivo",
+          "operadorId",
+          "operadorNombre",
+          "rol",
+          "desde",
+          "revierteEn",
+          "resultado",
+          "reversionesFallidas"
+        ]
+      },
+      "ModosVigentesDto": {
+        "type": "object",
+        "properties": {
+          "modos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModoVigenteDto"
+            }
+          }
+        },
+        "required": [
+          "modos"
+        ]
+      },
       "MotivoDeConfiguracionDto": {
         "type": "object",
         "properties": {
@@ -14653,6 +14968,77 @@
         "required": [
           "dispositivoId",
           "bloqueado",
+          "motivo"
+        ]
+      },
+      "OrdenDeModoCumplidaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "aceptada",
+              "rechazada",
+              "inalcanzable"
+            ]
+          },
+          "detalle": {
+            "type": "string",
+            "nullable": true
+          },
+          "revierteEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "resultado",
+          "detalle",
+          "revierteEn"
+        ]
+      },
+      "OrdenDeModoDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "libre",
+              "bloqueada"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 300,
+            "description": "Obligatorio (RN-08). Sin motivo la puerta no cambia de modo."
+          },
+          "minutos": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 720,
+            "description": "Minutos hasta la reversión; sin él, la duración máxima de la copropiedad."
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "numeroDePuerta",
+          "modo",
           "motivo"
         ]
       },
@@ -16216,6 +16602,28 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "ReversionDeModoDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numeroDePuerta": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "numeroDePuerta"
         ]
       },
       "RevocacionDto": {

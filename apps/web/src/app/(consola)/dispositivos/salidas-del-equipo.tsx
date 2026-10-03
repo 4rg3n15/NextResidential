@@ -8,16 +8,15 @@ import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
+import { ModoDeLaPuerta } from './modo-de-la-puerta';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-P · P3 · LAS SALIDAS DEL VIDEOPORTERO, EN SU FICHA
  *
- * Lo que el equipo DECLARA hoy (equipo → módulo → salida), leído por el
- * servidor con la credencial guardada —que no viaja aquí—, y lo PERSISTIDO:
- * los puntos de acceso que la guardia ofrece, con el nombre que se les dé.
- * «Descubrir» alinea lo segundo con lo primero; el nombre editado sobrevive.
- * El árbol llega plano y tiene tres niveles fijos: se agrupa, no se recorre.
+ * Lo que el equipo DECLARA (equipo → módulo → salida), leído por el servidor, y
+ * lo PERSISTIDO: los puntos de acceso de la guardia, con su nombre. «Descubrir»
+ * alinea lo segundo con lo primero. 15-R: cada punto se deja libre o bloqueado.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const ESTADO: Readonly<
@@ -209,10 +208,11 @@ export const SalidasDelVideoportero = ({
           ))}
         </ul>
       )}
-      <p className="text-distintivo text-texto-apagado">
-        La consola sólo ABRE. Dejar una puerta libre o bloqueada queda fuera (pendiente de definir
-        quién puede hacerlo).
-      </p>
+      <ModoDeLaPuerta
+        copropiedadId={copropiedadId}
+        equipoId={equipoId}
+        puntos={datos?.puntos ?? []}
+      />
     </section>
   );
 };

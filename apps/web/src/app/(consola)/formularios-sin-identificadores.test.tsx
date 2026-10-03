@@ -372,20 +372,14 @@ describe('ningún formulario pide un identificador interno (D-72)', () => {
  */
 const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   /**
-   * ETAPA 15-L (F) · «Generar autorización». No entra en el barrido porque exige
-   * dos cosas que el barrido no sabe dar a propósito: una FOTO que pase la
-   * calidad y la CASILLA marcada por quien registra. El único identificador,
-   * la vivienda, sale de un desplegable que llena la API; la vigencia no se
-   * puede invertir porque es fecha, hora y una duración elegida de una lista.
-   * Lo comprueba `visitantes/generar-autorizacion.test.tsx`: el cuerpo exacto
-   * que envía, y que sin foto o sin casilla no se envía nada.
+   * 15-L (F) · exige FOTO con calidad y CASILLA marcada, que el barrido no da a
+   * propósito; la vigencia es fecha, hora y duración de una lista. Lo prueba
+   * `visitantes/generar-autorizacion.test.tsx` (cuerpo exacto; sin foto o
+   * casilla no se envía nada).
    */
   'visitantes/generar-autorizacion.tsx':
     'foto y casilla obligatorias; la vivienda sale de un desplegable de la API; prueba propia del cuerpo enviado',
-  /**
-   * ETAPA 15-L (F2) · el rechazo de una visita: sólo pide el MOTIVO, que es
-   * texto de persona; la visita viaja en la RUTA desde su tarjeta o el aviso.
-   */
+  /** 15-L (F2) · el rechazo sólo pide el MOTIVO; la visita viaja en la RUTA. */
   'componentes/rechazo-de-visita.tsx': 'sólo pide el motivo; la visita viaja en la ruta',
   'visitantes/pantalla.tsx':
     'lista y filtros; lo que escribe son el reintento de la foto (la plantilla viaja en la ruta) y los diálogos declarados aparte',
@@ -533,6 +527,10 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    */
   'dispositivos/salidas-del-equipo.tsx':
     'descubrir va sin cuerpo; el punto viaja en la ruta con el id de la API; sólo el nombre se teclea; prueba propia de ruta y cuerpo',
+  'dispositivos/modo-de-la-puerta.tsx':
+    '15-R · P-25: el equipo y la puerta salen de la ficha; se elige el plazo de una lista y sólo se teclea el motivo',
+  'componentes/franja-de-puertas.tsx':
+    '15-R · P-25: «revertir ahora» envía el equipo y la puerta de la orden vigente que devolvió la API; nada se teclea',
 };
 
 /**

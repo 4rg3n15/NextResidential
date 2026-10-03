@@ -21,7 +21,9 @@ import { TerminalFacial } from '../terminal/terminal-facial';
 import type { OpcionesDeTerminal } from '../terminal/terminal-facial';
 import type { AjustesDePersona } from '../terminal/persona-en-el-equipo';
 import type { LimitesDeFoto } from '../terminal/foto-del-rostro';
-import { Videoportero } from '../videoportero/videoportero';
+import { Videoportero, VideoporteroSinOperador } from '../videoportero/videoportero';
+import { fijarModoDePuerta } from '../equipo/modo-de-puerta';
+import type { ModoDeSalida } from '../nucleo/proveedor';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
 import { IntercomIsapiPersistente } from '../videoportero/intercom-isapi-persistente';
 import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
@@ -54,30 +56,16 @@ import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * `HikvisionProvider` · UNA CLASE, LOS CUATRO PUERTOS
+ * `HikvisionProvider` · UNA CLASE, LOS CUATRO PUERTOS · resuelve y delega
  *
- * Misma firma exacta que `MockProvider` y que el adaptador ficticio. Es la
- * condición de LSP (§2.3) y de KPI-12: la suite de contrato corre contra los
- * tres **sin una sola rama por implementación**.
+ * Misma firma exacta que `MockProvider` y que el ficticio (LSP, KPI-12): la
+ * suite de contrato corre contra los tres sin una rama por implementación. No
+ * reimplementa protocolo: resuelve el equipo contra el registro y delega.
  *
- * ═════════════════════════════════════════════════════════════════════════════
- * NO REIMPLEMENTA PROTOCOLO. RESUELVE Y DELEGA
- *
- * Los adaptadores de cada familia ya existen y están probados. Esta clase hace
- * lo único que faltaba: **resolver el equipo por su identificador** contra el
- * registro que la consola alimenta, y delegar.
- *
- * ═════════════════════════════════════════════════════════════════════════════
- * DESDE LA 15-D DECIDE POR CAPACIDADES, NO POR TIPO (O2, D2)
- *
- * Antes: «si es cámara, exige veredicto; si es terminal, sincroniza; si es
- * intercom, abre canal». El tipo es una palabra de un formulario. Ahora cada
- * operación pregunta primero `capacidadesDe(dispositivo)` —persistidas por la
- * consola o descubiertas del aparato UNA vez por proceso— y niega con
- * `CapacidadNoSoportada` lo que el equipo no declara. `desconocida` cuenta
- * como no, y el motivo lo dice.
- *
- * Y la guarda del principio rector alcanza a **los tres tipos** (D2):
+ * Desde la 15-D decide por CAPACIDADES, no por tipo (O2, D2): cada operación
+ * pregunta `capacidadesDe` y niega con `CapacidadNoSoportada` lo que el equipo
+ * no declara (`desconocida` cuenta como no). La guarda del principio rector
+ * alcanza a **los tres tipos** (D2):
  *
  * | Equipo        | Cómo podría decidir solo                 | Qué se exige                          |
  * | ------------- | ---------------------------------------- | ------------------------------------- |
@@ -187,11 +175,8 @@ export class HikvisionProvider
   }
 
   /**
-   * C1 (15-L) · lo recordado de un equipo, fuera. Los clientes guardan la
-   * dirección, la credencial y la puerta con que se crearon: sin esto, una
-   * edición en la consola no llegaba al equipo hasta reiniciar la API. La
-   * escucha se cierra y quien la vigila (la API, cada 30 s) la reabre ya con
-   * lo nuevo.
+   * C1 (15-L) · lo recordado de un equipo, fuera: una edición en la consola llega
+   * sin reiniciar la API. La escucha se cierra y la API (cada 30 s) la reabre.
    */
   olvidar(dispositivoId: string): void {
     this.aprobados.delete(dispositivoId);
@@ -309,7 +294,7 @@ export class HikvisionProvider
     return construirArbolDeSalidas(equipo.modelo ?? 'Equipo', VACIOS, ficha);
   }
 
-  /** Abre UNA salida del videoportero (`open`; nunca libre ni bloqueada). */
+  /** Abre UNA salida del videoportero (`open`). */
   async abrirSalida(
     dispositivoId: string,
     numeroDePuerta: number,
@@ -317,16 +302,42 @@ export class HikvisionProvider
   ): Promise<ResultadoAccionamiento> {
     const equipo = await this.resolver(dispositivoId);
     if (equipo.tipo !== 'intercom') return this.abrir(dispositivoId, actorId);
+    const puerta = new Videoportero({ ...this.conexionDe(equipo), numeroDePuerta });
+    return this.enLaPuerta(equipo, () => puerta.abrir(dispositivoId, actorId));
+  }
+
+  /** 15-R · P-25 · libre (`alwaysOpen`), bloqueada (`alwaysClose`) o normal (`close`). */
+  async fijarModoDeSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    modo: ModoDeSalida,
+    actorId: string,
+  ): Promise<ResultadoAccionamiento> {
+    if (actorId.trim() === '') throw new VideoporteroSinOperador();
+    const equipo = await this.resolver(dispositivoId);
+    const familia = FAMILIA_DE[equipo.tipo];
+    if (familia === 'camara')
+      throw new CapacidadNoSoportada(dispositivoId, 'aperturaRemota', false);
+    const conexion = this.conexionDe(equipo);
+    return this.enLaPuerta(equipo, () =>
+      fijarModoDePuerta(conexion, familia, numeroDePuerta, dispositivoId, modo),
+    );
+  }
+
+  /** Antes de tocar una puerta: que el equipo no decida solo y que abra por orden. */
+  private async enLaPuerta(
+    equipo: EquipoRegistrado,
+    orden: () => Promise<ResultadoAccionamiento>,
+  ): Promise<ResultadoAccionamiento> {
     try {
       await this.exigirQueNoDecidaSolo(equipo);
-      await this.exigirCapacidad(dispositivoId, 'aperturaRemota');
+      await this.exigirCapacidad(equipo.dispositivoId, 'aperturaRemota');
     } catch (error) {
       if (error instanceof EquipoInalcanzable)
         return { aceptado: false, latenciaMs: error.latenciaMs };
       throw error;
     }
-    const puerta = new Videoportero({ ...this.conexionDe(equipo), numeroDePuerta });
-    return this.reintentando(() => puerta.abrir(dispositivoId, actorId));
+    return this.reintentando(orden);
   }
 
   /**
@@ -354,12 +365,9 @@ export class HikvisionProvider
   }
 
   /**
-   * Bloqueo persistente (H-3), por dispositivo y por CAPACIDAD. La barrera lo
-   * ejecuta por la misma ruta VERIFICADA con la que abre (`lock`/`unlock`); un
-   * equipo que no declara `bloqueoDeAcceso` se niega con motivo, nunca con una
-   * orden que parece pasar. Un equipo dado de alta antes de la 15-E tiene la
-   * capacidad `desconocida` hasta que la consola lo vuelva a sondear, y eso
-   * también se niega: es la dirección segura de ADR-019.
+   * Bloqueo persistente (H-3), por dispositivo y por CAPACIDAD, por la ruta
+   * VERIFICADA con la que abre (`lock`/`unlock`). Sin `bloqueoDeAcceso` (o con
+   * ella `desconocida`) se niega con motivo: la dirección segura de ADR-019.
    */
   async fijarBloqueo(dispositivoId: string, bloqueado: boolean): Promise<ResultadoDeAccionamiento> {
     const equipo = await this.resolver(dispositivoId);
@@ -768,12 +776,8 @@ export class HikvisionProvider
   }
 
   /**
-   * La guarda del principio rector, para los TRES tipos. Se hace **una vez
-   * por dispositivo**.
-   *
-   * Un equipo inalcanzable NO se da por bueno: no poder comprobarlo es no
-   * saberlo, y la dirección segura de este proyecto es la misma en todas
-   * partes. Lanza `EquipoInalcanzable`, que quien llama ya sabe tratar.
+   * La guarda del principio rector, para los TRES tipos, **una vez por
+   * dispositivo**. Inalcanzable NO se da por bueno: lanza `EquipoInalcanzable`.
    */
   private async exigirQueNoDecidaSolo(equipo: EquipoRegistrado): Promise<void> {
     if (this.opciones.exigirVeredictoDeControl === false) return;
@@ -829,13 +833,9 @@ export class HikvisionProvider
   }
 
   /**
-   * D-11 · la API no confirma que la cámara no decida, pero un instalador lo
-   * VERIFICÓ físicamente con este mismo firmware. Se opera, y se deja escrito
-   * en la bitácora cada vez que se aprueba así: no es un verde, es una firma.
-   *
-   * El firmware se lee EN VIVO: una actualización del aparato deja la
-   * atestación sin efecto aunque la base no se haya enterado todavía. Si no se
-   * puede leer, no se da por el mismo. Añade a `motivos` por qué no vale.
+   * D-11 · un instalador VERIFICÓ físicamente que la cámara no decide, con este
+   * firmware: se opera y queda en la bitácora (una firma, no un verde). El
+   * firmware se lee EN VIVO; si no se puede leer, no vale. Añade a `motivos`.
    */
   private async atestadaParaEsteFirmware(
     equipo: EquipoRegistrado,

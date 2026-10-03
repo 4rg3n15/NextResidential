@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Rol } from '@ncr/contracts';
 import { avisoDeEquiposSimulados, modoPruebasActivo, sesionActual } from '@/lib/sesion/servidor';
 import { FranjaDeModoPruebas } from '@/componentes/franja-modo-pruebas';
+import { FranjaDePuertas } from '@/componentes/franja-de-puertas';
 import { FranjaDeEquiposSimulados } from '@/componentes/franja-equipos-simulados';
 import { claimsVisibles, estadoDePorteria } from '@/lib/sesion/porteria';
 import { BloqueoDePatrullaje } from '@/componentes/bloqueo-de-patrullaje';
@@ -55,15 +56,11 @@ const LayoutDeConsola = async ({
 
   const sesion = await sesionActual();
   if (sesion === null) redirect('/acceso');
-  // El alcance se resuelve UNA vez, aquí, y baja al marco. Que cada pantalla lo
-  // pidiera por su cuenta multiplicaría la llamada y —peor— permitiría que dos
-  // pantallas de la misma página discreparan sobre cuál es la copropiedad
-  // activa.
+  // El alcance se resuelve UNA vez, aquí, y baja al marco: dos pantallas de la
+  // misma página no pueden discrepar sobre cuál es la copropiedad activa.
   const alcance = await alcanceActivo();
   const enPruebas = await modoPruebasActivo();
-  // F3 (corrección de la 15-L) · con equipos simulados, ninguna orden llega a un aparato.
-  // 15-M · la API sólo se lo da a los roles de operación; al residente ninguna
-  // orden suya llega a un aparato, así que no se le pregunta. [SUPUESTO] S-155.
+  // F3 (15-L) · con equipos simulados ninguna orden llega a un aparato; al residente no se le pregunta (S-155).
   const simulados =
     alcance.copropiedadId === null || sesion.rol === 'residente'
       ? null
@@ -73,6 +70,9 @@ const LayoutDeConsola = async ({
     <ProveedorDeConsultas>
       {simulados === null ? null : <FranjaDeEquiposSimulados texto={simulados} />}
       {enPruebas ? <FranjaDeModoPruebas /> : null}
+      {alcance.copropiedadId === null ? null : (
+        <FranjaDePuertas copropiedadId={alcance.copropiedadId} rol={sesion.rol} />
+      )}
       {alcance.copropiedadId !== null && ATIENDEN_LA_COLA.has(sesion.rol) ? (
         <AtencionEnVivo copropiedadId={alcance.copropiedadId} rol={sesion.rol}>
           <MarcoDeConsola

@@ -10,6 +10,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/aceptado_dto.dart';
+import '../models/ajustes_de_puertas_dto.dart';
 import '../models/aviso_al_residente_dto.dart';
 import '../models/billete_de_audio_dto.dart';
 import '../models/bloqueo_vigente_dto.dart';
@@ -18,10 +19,14 @@ import '../models/cola_de_atencion_dto.dart';
 import '../models/emergencia_dto.dart';
 import '../models/estado_de_canal_dto.dart';
 import '../models/historial_de_ordenes_dto.dart';
+import '../models/modos_vigentes_dto.dart';
 import '../models/orden_de_bloqueo_dto.dart';
+import '../models/orden_de_modo_cumplida_dto.dart';
+import '../models/orden_de_modo_dto.dart';
 import '../models/orden_ejecutada_dto.dart';
 import '../models/orden_manual_dto.dart';
 import '../models/preferencias_de_atencion_dto.dart';
+import '../models/reversion_de_modo_dto.dart';
 import '../models/servidores_ice_dto.dart';
 import '../models/solicitud_de_canal_dto.dart';
 
@@ -146,5 +151,38 @@ abstract class GuardiaApi {
     @Path('id') required String id,
     @Path('dispositivoId') required String dispositivoId,
     @Body() required String body,
+  });
+
+  /// Duración máxima de una puerta libre o bloqueada
+  @GET('/copropiedades/{id}/puertas/ajustes')
+  Future<AjustesDePuertasDto> modosDePuertaControllerVerAjustes({
+    @Path('id') required String id,
+  });
+
+  /// Fija la duración máxima (15 a 720 min)
+  @PUT('/copropiedades/{id}/puertas/ajustes')
+  Future<AjustesDePuertasDto> modosDePuertaControllerFijarAjustes({
+    @Path('id') required String id,
+    @Body() required AjustesDePuertasDto body,
+  });
+
+  /// Puertas libres o bloqueadas ahora: quién, por qué, desde y hasta cuándo
+  @GET('/copropiedades/{id}/puertas/modos')
+  Future<ModosVigentesDto> modosDePuertaControllerVigentes({
+    @Path('id') required String id,
+  });
+
+  /// Deja una puerta libre o bloqueada, con motivo y plazo (P-25)
+  @POST('/copropiedades/{id}/puertas/modos')
+  Future<OrdenDeModoCumplidaDto> modosDePuertaControllerFijar({
+    @Path('id') required String id,
+    @Body() required OrdenDeModoDto body,
+  });
+
+  /// Revertir ahora: la puerta vuelve a su modo normal
+  @POST('/copropiedades/{id}/puertas/modos/reversion')
+  Future<OrdenDeModoCumplidaDto> modosDePuertaControllerRevertir({
+    @Path('id') required String id,
+    @Body() required ReversionDeModoDto body,
   });
 }
