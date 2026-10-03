@@ -317,11 +317,12 @@ los diagramas Mermaid (paso 10) y Prettier.
 
 ## 9 · Qué debe hacer el usuario manualmente
 
-1. **Fusionar esta rama en `etapa-15r-huecos-y-decisiones`** antes de abrir el PR
-   de la 15-R (o abrir su propio PR contra `develop` cuando la 15-R esté
-   fusionada). Va encima de `5566b8e`: si la 15-R no se movió, es un avance
-   rápido; si se movió para su cierre, lo previsible es chocar sólo en
-   documentación (`ESTADO_ETAPAS.md`, `ETAPA-15R.md`, `README.md`).
+1. **Fusionar esta rama en `etapa-15r-huecos-y-decisiones`** antes de fusionar
+   el PR de la 15-R
+   ([4rg3n15/NextResidential#42](https://github.com/4rg3n15/NextResidential/pull/42)),
+   o abrir su propio PR contra `develop` cuando la 15-R esté fusionada. Ya
+   contiene el cierre de la 15-R (`0ce8ed5`, fusionado en `da64043` sin
+   conflictos): mientras la 15-R no se mueva, es un avance rápido.
 2. **En el `.env` de cada Edge puente**, los siete ajustes iguales a los de la API
    (`DESPLIEGUE_EDGE.md` §10.1). Si la API usa los valores por omisión, el
    `.env.example` ya los trae iguales.
