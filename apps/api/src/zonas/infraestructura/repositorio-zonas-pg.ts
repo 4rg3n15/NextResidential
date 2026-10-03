@@ -9,6 +9,8 @@ import type {
   ResultadoOcupacion,
 } from '../aplicacion/puertos';
 import { conCliente } from '../../persistencia/con-cliente';
+import { claimsDeLaOperacion } from '../../comun/claims-por-operacion';
+import type { ClaimsDelAdaptador } from '../../comun/claims-por-operacion';
 
 /**
  * `zona_horarios.dia_semana` es ISO 1..7 (lunes..domingo); el dominio usa
@@ -60,21 +62,19 @@ interface FilaHorario {
  * petición: es la misma garantía que ADR-04 exige para las placas y que KPI-03
  * midió con 100 inserciones simultáneas.
  *
- * Por debajo, el `CHECK (conteo_actual <= aforo_maximo)` de la migración 0007
- * hace la violación estructuralmente imposible aunque alguien escriba por otra
- * vía. El código no es la garantía: es quien la usa bien.
+ * Por debajo, el `CHECK (conteo_actual <= aforo_maximo)` (0007) la hace imposible.
  */
 @Injectable()
 export class RepositorioZonasPg implements RepositorioZonas {
   constructor(
     private readonly pool: Pool,
-    private readonly claims: Record<string, unknown>,
+    private readonly claims: ClaimsDelAdaptador,
   ) {}
 
-  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  private async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, cop)),
       ]);
       return await fn(cliente);
     });
@@ -84,7 +84,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   // RN-14 · CA-14 — el incremento atómico
   // ===========================================================================
   async ocupar(copropiedadId: string, zonaId: string): Promise<ResultadoOcupacion> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ conteo_actual: number }>(
         `UPDATE public.zona_aforo
             SET conteo_actual = conteo_actual + 1, actualizado_en = now()
@@ -113,7 +113,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   }
 
   async liberar(copropiedadId: string, zonaId: string): Promise<number> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       // El suelo va en el WHERE, no en el código: una salida sin su entrada
       // —un sensor que falló, CU-05 6a— no puede dejar el contador en negativo.
       const { rows } = await c.query<{ conteo_actual: number }>(
@@ -134,7 +134,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   }
 
   async reiniciar(copropiedadId: string, zonaId: string, ahora: Date): Promise<void> {
-    await this.conContexto((c) =>
+    await this.conContexto(copropiedadId, (c) =>
       c.query(
         `UPDATE public.zona_aforo
             SET conteo_actual = 0, reiniciado_en = $3, actualizado_en = now()
@@ -154,7 +154,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   }
 
   async guardar(zona: Zona, actorId: string): Promise<void> {
-    await this.conContexto(async (c) => {
+    await this.conContexto(zona.copropiedadId, async (c) => {
       await c.query('BEGIN');
       try {
         /**
@@ -232,7 +232,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
     motivo: string,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rowCount } = await c.query(
         `UPDATE public.zonas
             SET estado = 'inactivo', desactivado_en = now(), desactivado_por = $4,
@@ -246,7 +246,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   }
 
   async presentacionDe(copropiedadId: string): Promise<ReadonlyMap<string, PresentacionDeZona>> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ id: string; icono: string | null }>(
         'SELECT id, icono FROM public.zonas WHERE copropiedad_id = $1',
         [copropiedadId],
@@ -261,7 +261,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
     icono: string | null,
     actorId: string,
   ): Promise<void> {
-    await this.conContexto((c) =>
+    await this.conContexto(copropiedadId, (c) =>
       c.query(
         `UPDATE public.zonas SET icono = $3, actualizado_en = now(), actualizado_por = $4
           WHERE copropiedad_id = $1 AND id = $2`,
@@ -271,7 +271,7 @@ export class RepositorioZonasPg implements RepositorioZonas {
   }
 
   private async cargar(copropiedadId: string, zonaId: string | null): Promise<Zona[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const parametros: unknown[] = [copropiedadId];
       let filtro = 'z.copropiedad_id = $1';
       if (zonaId !== null) {
@@ -371,13 +371,13 @@ export class RepositorioZonasPg implements RepositorioZonas {
 export class RepositorioAutorizacionesZonaPg implements RepositorioAutorizacionesZona {
   constructor(
     private readonly pool: Pool,
-    private readonly claims: Record<string, unknown>,
+    private readonly claims: ClaimsDelAdaptador,
   ) {}
 
-  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  private async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, cop)),
       ]);
       return await fn(cliente);
     });
@@ -389,7 +389,7 @@ export class RepositorioAutorizacionesZonaPg implements RepositorioAutorizacione
     zonaId: string,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rowCount } = await c.query(
         `INSERT INTO public.autorizaciones_zona
            (copropiedad_id, autorizacion_id, zona_id, creado_por, actualizado_por)
@@ -402,7 +402,7 @@ export class RepositorioAutorizacionesZonaPg implements RepositorioAutorizacione
   }
 
   async zonasDe(copropiedadId: string, autorizacionId: string): Promise<readonly string[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ zona_id: string }>(
         `SELECT zona_id FROM public.autorizaciones_zona
           WHERE copropiedad_id = $1 AND autorizacion_id = $2`,

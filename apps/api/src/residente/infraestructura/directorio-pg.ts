@@ -12,6 +12,8 @@ import type {
   ViviendaDelResidente,
 } from '../aplicacion/puertos';
 import { conCliente } from '../../persistencia/con-cliente';
+import { claimsDeLaOperacion, SERVICIO_POR_COPROPIEDAD } from '../../comun/claims-por-operacion';
+import type { ClaimsDelAdaptador } from '../../comun/claims-por-operacion';
 
 /**
  * Adaptador PostgreSQL del directorio del residente.
@@ -30,21 +32,20 @@ import { conCliente } from '../../persistencia/con-cliente';
  * «correcta». Es el mismo razonamiento que sostiene el primer eje, aplicado al
  * segundo.
  *
- * `set_config('request.jwt.claims', …)` se fija igual que en el resto de
- * adaptadores para que la RLS siga siendo la segunda barrera cuando la conexión
- * sí esté sujeta a ella.
+ * Los claims de servicio de la copropiedad del ámbito se fijan en cada
+ * operación (E2, 15-R): la RLS es la segunda barrera también aquí.
  */
 @Injectable()
 export class DirectorioDelResidentePg implements DirectorioDelResidente {
   constructor(
     private readonly pool: Pool,
-    private readonly claims: Record<string, unknown> = {},
+    private readonly claims: ClaimsDelAdaptador = SERVICIO_POR_COPROPIEDAD,
   ) {}
 
-  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  private async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, cop)),
       ]);
       return await fn(cliente);
     });
@@ -59,14 +60,12 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
    * residente desactivado conserva su historial (RN-19) y **no** conserva el
    * acceso.
    *
-   * `ORDER BY r.es_titular DESC, r.creado_en` y `LIMIT 1` porque el modelo
-   * admite varios vínculos por persona y la app del residente muestra una
-   * vivienda. Queda anotado como `[SUPUESTO]` S-21: si Grupo Control quiere
-   * multivivienda para un mismo residente, es una HU propia y un selector en la
-   * app, no un cambio en esta consulta.
+   * `ORDER BY r.es_titular DESC, r.creado_en LIMIT 1`: la app muestra una vivienda
+   * (`[SUPUESTO]` S-21; multivivienda sería una HU propia).
    */
-  async vinculoDe(usuarioId: string): Promise<VinculoDeResidente | null> {
-    return this.conContexto(async (c) => {
+  async vinculoDe(usuarioId: string, cop?: string | null): Promise<VinculoDeResidente | null> {
+    if (this.claims === SERVICIO_POR_COPROPIEDAD && !cop) return null; // E2 · sin copropiedad, se niega
+    return this.conContexto(cop ?? '', async (c) => {
       const { rows } = await c.query<{
         copropiedad_id: string;
         vivienda_id: string;
@@ -110,7 +109,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
   }
 
   async vivienda(ambito: AmbitoDelResidente): Promise<ViviendaDelResidente | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         identificador: string;
@@ -152,7 +151,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
   }
 
   async familia(ambito: AmbitoDelResidente): Promise<readonly MiembroDeFamilia[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         nombre: string;
@@ -182,7 +181,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
   }
 
   async vehiculos(ambito: AmbitoDelResidente): Promise<readonly VehiculoDelResidente[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         placa: string;
@@ -211,7 +210,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
   }
 
   async autorizaciones(ambito: AmbitoDelResidente): Promise<readonly AutorizacionDelResidente[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         visitante: string;
@@ -279,7 +278,7 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
     filtro: FiltroDeHistorial,
   ): Promise<readonly EventoDelResidente[]> {
     const dias = { hoy: 1, semana: 7, mes: 30, todo: 3650 }[filtro.periodo];
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         ocurrido_en: Date;

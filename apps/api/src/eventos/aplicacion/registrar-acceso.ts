@@ -28,6 +28,7 @@ import { descriptorDeAtencion } from './disparadores-de-atencion';
 import { TEMA_EVENTOS } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
 import { VENTANA_DE_DUPLICADOS_MS, debeAbrirAlerta } from './deduplicacion-de-alertas';
+import { FilaPorClave } from './fila-por-clave';
 
 export interface HechoEntrante {
   readonly copropiedadId: string;
@@ -68,9 +69,8 @@ export interface HechoEntrante {
   /**
    * El instante REAL del acceso, no el de la reconciliación.
    *
-   * Sin esto, veinte accesos de un corte de media hora aparecerían en el
-   * histórico con la hora en que volvió la conexión, todos juntos, y la línea
-   * de tiempo —que es lo que un informe de auditoría lee— quedaría inservible.
+   * Sin esto, los accesos de un corte aparecerían con la hora en que volvió la
+   * conexión, todos juntos, y la línea de tiempo quedaría inservible.
    * No entra en la clave de idempotencia, y esa separación es deliberada
    * (`construirClaveIdempotencia`, D-11): el instante puede recalcularse sin
    * que el mismo hecho produzca dos claves.
@@ -111,6 +111,7 @@ const dudosa = (d: ResultadoAcceso): boolean =>
   d.permitido && d.requiereConfirmacionHumana === true;
 
 export class RegistrarAcceso {
+  private readonly fila = new FilaPorClave();
   constructor(
     private readonly motor: MotorDeDecision,
     private readonly eventos: RepositorioEventos,
@@ -137,10 +138,8 @@ export class RegistrarAcceso {
     });
     if (esFallo(clave)) return clave;
 
-    // La decisión sellada del Edge SUSTITUYE al motor, no lo complementa.
-    // Consultar el motor «para comparar» y quedarse con uno de los dos sería
-    // tener dos decisiones para un mismo acceso y ninguna forma de explicar
-    // cuál se aplicó.
+    // La decisión sellada del Edge SUSTITUYE al motor: dos decisiones para un
+    // mismo acceso no tendrían forma de explicar cuál se aplicó.
     const decision =
       hecho.decisionDelEdge ??
       (await this.motor.decidir({
@@ -197,7 +196,9 @@ export class RegistrarAcceso {
     }
 
     await this.difundir(acceso);
-    const alertaId = await this.alertar(acceso, actorId);
+    // E5 (15-R) · DT-15N-01: dos lecturas a la vez del mismo equipo ya no abren dos alertas.
+    const deAlerta = `${acceso.copropiedadId}|${acceso.dispositivoId ?? '-'}`;
+    const alertaId = await this.fila.en(deAlerta, () => this.alertar(acceso, actorId));
     await this.avisarAlResidente(acceso);
 
     return exito({
@@ -249,9 +250,8 @@ export class RegistrarAcceso {
      * sitio, cada placa de la cámara sin atestación abría una alerta nueva.
      */
     const ahora = this.reloj.ahora();
-    // [SUPUESTO] S-124 · lista negra y pánico NUNCA se deduplican: dos intentos
-    // seguidos pueden ser dos personas distintas, y cada uno tiene que llegar
-    // al operador (RN-06, RN-18). El ruido de sitio era el `acceso_dudoso`.
+    // [SUPUESTO] S-124 · lista negra y pánico NUNCA se deduplican: pueden ser
+    // dos personas, y cada uno tiene que llegar al operador (RN-06, RN-18).
     const siempre = descriptor.tipo === 'lista_negra' || descriptor.tipo === 'panico';
     const ultima = siempre
       ? null

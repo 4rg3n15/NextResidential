@@ -90,7 +90,7 @@ export class ResidenteModule {
         {
           provide: DIRECTORIO_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new DirectorioDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new DirectorioDelResidentePg(pool),
         },
         ResolverMiAmbito,
         {
@@ -123,17 +123,17 @@ export class ResidenteModule {
         {
           provide: AUTORIZACIONES_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new AutorizacionesDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new AutorizacionesDelResidentePg(pool),
         },
         {
           provide: ZONAS_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new ZonasDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new ZonasDelResidentePg(pool),
         },
         {
           provide: NOTIFICACIONES_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new NotificacionesDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new NotificacionesDelResidentePg(pool),
         },
         {
           provide: CrearMiAutorizacion,

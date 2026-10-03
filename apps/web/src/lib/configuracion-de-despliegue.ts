@@ -6,8 +6,8 @@ import { ConfiguracionIncompleta } from './configuracion';
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-R · D2/D4 · LA CONSOLA FUERA DE LA RED DE LA API (Netlify, P-20)
  *
- * Tres variables OPCIONALES. Sin ninguna, la consola se comporta exactamente
- * como en sitio (D3): todo por su proxy y por `servidor.mjs`.
+ * Variables OPCIONALES. Sin ninguna, la consola se comporta exactamente como en
+ * sitio (D3): todo por su proxy y por `servidor.mjs`. Más la de AR-04 (E8).
  *
  *  · `API_ORIGEN_PUBLICO` — el origen de la API al que el NAVEGADOR abre el
  *    flujo en vivo y el audio (con billete). Es la única API que entra en la
@@ -50,6 +50,9 @@ const esquema = z
           'fijar (no X-Forwarded-For, Forwarded ni X-Real-IP)',
       )
       .optional(),
+    NODE_ENV: z.string().optional(),
+    // E8 (15-R) · AR-04 · sin declarar: desactivada en producción, activa fuera.
+    RECUPERACION_POR_CORREO: z.enum(['activa', 'desactivada']).optional(),
     CONSOLA_IP_FIRMA_SECRETO: z
       .string()
       .refine((v) => v === '' || (v.length >= 32 && !/\s/.test(v)), {
@@ -77,13 +80,17 @@ export interface Despliegue {
   readonly apiOrigenPublico: string | undefined;
   readonly cabeceraIpDeConfianza: string | undefined;
   readonly ipFirmaSecreto: string | undefined;
+  /** E8 (15-R) · AR-04 · ¿se ofrece «olvidé mi contraseña» por correo? */
+  readonly recuperacionPorCorreo: boolean;
 }
 
 const vacioAIndefinido = (v: string | undefined): string | undefined =>
   v === undefined || v === '' ? undefined : v;
 
 /** Valida y devuelve; si algo no cuadra, `ConfiguracionIncompleta` con los nombres (nunca los valores). */
-export const despliegue = (entorno: NodeJS.ProcessEnv = process.env): Despliegue => {
+export const despliegue = (
+  entorno: Readonly<Record<string, string | undefined>> = process.env,
+): Despliegue => {
   const r = esquema.safeParse(entorno);
   if (!r.success) {
     throw new ConfiguracionIncompleta(
@@ -94,5 +101,9 @@ export const despliegue = (entorno: NodeJS.ProcessEnv = process.env): Despliegue
     apiOrigenPublico: vacioAIndefinido(r.data.API_ORIGEN_PUBLICO),
     cabeceraIpDeConfianza: vacioAIndefinido(r.data.CONSOLA_CABECERA_IP_DE_CONFIANZA),
     ipFirmaSecreto: vacioAIndefinido(r.data.CONSOLA_IP_FIRMA_SECRETO),
+    recuperacionPorCorreo:
+      r.data.RECUPERACION_POR_CORREO === undefined
+        ? r.data.NODE_ENV !== 'production'
+        : r.data.RECUPERACION_POR_CORREO === 'activa',
   };
 };

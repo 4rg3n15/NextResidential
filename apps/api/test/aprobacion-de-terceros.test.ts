@@ -69,14 +69,12 @@ describe('ADR-027 · la aprobación de la app pasa por la política', () => {
     expect(escrituras.creadas.size).toBe(0);
   });
 
-  it('H-15I-06 · una recurrente desde la app falla cerrada y no escribe (H-15I-05 abierto)', async () => {
-    const { caso, escrituras } = montar(false);
-    const r = await caso.ejecutar(ctx, COP_A, {
-      ...visita(20),
-      patron: { dias: [2], minutoInicio: 840, minutoFin: 1080, desplazamientoUtcMinutos: -300 },
-    });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.regla).toBe('RN-22');
-    expect(escrituras.creadas.size).toBe(0);
+  it('H-15J-01 (15-R, C-54) · la recurrente de la app se crea; un patrón inválido, no', async () => {
+    const { caso } = montar(false);
+    const p = { dias: [2], minutoInicio: 840, minutoFin: 1080, desplazamientoUtcMinutos: -300 };
+    const r = await caso.ejecutar(ctx, COP_A, { ...visita(20), patron: p });
+    expect(r.ok && r.valor.creada).toBe(true);
+    const malo = await caso.ejecutar(ctx, COP_A, { ...visita(21), patron: { ...p, minutoFin: 1 } });
+    expect(!malo.ok && malo.error.regla).toBe('RN-22');
   });
 });

@@ -1,5 +1,6 @@
 import createClient from 'openapi-fetch';
 import type { paths } from '@ncr/contracts';
+import { escrituraRetenida } from '../cambio-de-copropiedad';
 
 /**
  * Cliente HTTP de la consola, **tipado desde el contrato** (§2.6).
@@ -23,11 +24,10 @@ export const cliente = createClient<paths>({
    * `openapi-fetch` guarda la referencia que encuentre al construirse, y eso
    * ata el cliente al `fetch` que existía en ese instante. En producción da
    * igual; en las pruebas significaba que las siete pantallas **no se podían
-   * montar con un servidor falso**: el cliente seguía llamando al `fetch` real
-   * y salía a la red. Una capa de red que no se puede sustituir es una capa
-   * que no se puede probar, y eso ya es un defecto de diseño.
+   * montar con un servidor falso**: el cliente seguía llamando al `fetch` real.
    */
-  fetch: (peticion) => globalThis.fetch(peticion),
+  // E1 (15-R) · H-15K-01: mientras cambia la copropiedad, ninguna escritura sale.
+  fetch: async (peticion) => escrituraRetenida(peticion) ?? globalThis.fetch(peticion),
   // Las cookies de sesión son de primera parte y `httpOnly`; sin esto el
   // navegador no las enviaría en una petición hecha desde JavaScript.
   credentials: 'same-origin',

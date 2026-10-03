@@ -104,9 +104,9 @@ describe('constanciaDeAccionamiento (15-Q, Q4)', () => {
     expect(constanciaDeAccionamiento(acceso({}, 'con espacios'), gateway, null)).toBeNull();
   });
 
-  it('[COMPORTAMIENTO ACTUAL] una referencia válida de 115+ caracteres se queda sin constancia', () => {
-    // El DTO admite hasta 128; el sufijo `.edge-apertura` (14) la saca del límite de la clave.
-    expect(constanciaDeAccionamiento(acceso({}, 'r'.repeat(120)), gateway, null)).toBeNull();
-    expect(constanciaDeAccionamiento(acceso({}, 'r'.repeat(114)), gateway, null)).not.toBeNull();
+  it('E7 (15-R, C-55) · una referencia válida de 115+ caracteres ya deja constancia, estable', () => {
+    const c = (n: number) => constanciaDeAccionamiento(acceso({}, 'r'.repeat(n)), gateway, null);
+    expect(c(120)?.claveIdempotencia).toMatch(/:h-[0-9a-f]{64}\.edge-apertura$/);
+    expect(c(114)?.claveIdempotencia).toMatch(/:r{114}\.edge-apertura$/); // la de siempre
   });
 });

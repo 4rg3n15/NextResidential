@@ -24,6 +24,7 @@ import {
   RepositorioZonasPg,
 } from './infraestructura/repositorio-zonas-pg';
 import { ZonasController } from './presentacion/zonas.controller';
+import { SERVICIO_POR_COPROPIEDAD } from '../comun/claims-por-operacion';
 
 /**
  * Raíz de composición del módulo de zonas.
@@ -34,13 +35,10 @@ import { ZonasController } from './presentacion/zonas.controller';
  * otro (§2.2): el de zonas no sabe que existe un motor de reglas, y el de
  * autorizaciones no sabe que hay una tabla `zona_aforo`.
  *
- * **ETAPA 15-D (P1) · los adaptadores son los de PostgreSQL.** Hasta aquí se
- * cableaba el doble en memoria «por D-17» —sin contraseña la API no se
- * conectaba— y D-17 llevaba cerrado desde la 09-B: padrón y autorizaciones ya
- * persistían de verdad mientras cada zona creada o configurada desde la consola
- * se perdía al reiniciar. El doble sigue existiendo y se sigue proveyendo por su
- * clase para que las suites sin base lo sustituyan (`test/utilidades.ts`), pero
- * ya no es lo que un despliegue usa.
+ * **ETAPA 15-D (P1) · los adaptadores son los de PostgreSQL** (antes, el doble
+ * en memoria, que perdía las zonas al reiniciar). El doble se sigue proveyendo
+ * por su clase para las suites sin base (`test/utilidades.ts`). E2 (15-R): con
+ * claims de servicio por copropiedad, no `{}` (DT-15K-02).
  */
 @Global()
 @Module({})
@@ -57,13 +55,14 @@ export class ZonasModule {
         {
           provide: REPOSITORIO_ZONAS,
           inject: [Pool],
-          useFactory: (pool: Pool) => new RepositorioZonasPg(pool, {}),
+          useFactory: (pool: Pool) => new RepositorioZonasPg(pool, SERVICIO_POR_COPROPIEDAD),
         },
         { provide: RepositorioZonasEnMemoria, useValue: enMemoria },
         {
           provide: REPOSITORIO_AUTORIZACIONES_ZONA,
           inject: [Pool],
-          useFactory: (pool: Pool) => new RepositorioAutorizacionesZonaPg(pool, {}),
+          useFactory: (pool: Pool) =>
+            new RepositorioAutorizacionesZonaPg(pool, SERVICIO_POR_COPROPIEDAD),
         },
         {
           provide: CrearZona,

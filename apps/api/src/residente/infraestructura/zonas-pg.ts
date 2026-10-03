@@ -35,7 +35,7 @@ import type { ZonaParaResidente, ZonasDelResidente } from '../aplicacion/puertos
 @Injectable()
 export class ZonasDelResidentePg extends BaseDelResidentePg implements ZonasDelResidente {
   async zonas(ambito: AmbitoDelResidente, ahora: Date): Promise<readonly ZonaParaResidente[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         nombre: string;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { conRecuperacionActiva } from '@/lib/recuperacion';
 import { Limitador, claveDeIdentidad, ipDe } from '@/lib/limitador';
 import { FalloDeAcceso, solicitarRecuperacion } from '@/lib/sesion/supabase-auth';
 import { textoDeFalloDeAcceso } from '@/lib/sesion/mensajes';
@@ -16,9 +17,8 @@ export const runtime = 'nodejs';
  * diferencia de tiempo que medir. Un formulario que responde «no encontramos
  * ese correo» es un enumerador de usuarios con formulario.
  *
- * Dos limitadores, porque uno solo deja un hueco: por IP contra quien prueba
- * muchos correos desde un sitio, y por identidad contra quien inunda un buzón
- * concreto desde muchas IP.
+ * Dos limitadores: por IP (muchos correos desde un sitio) y por identidad (un
+ * buzón inundado desde muchas IP). E8 (15-R): desactivada, 403 sin mirar nada.
  */
 const POR_IP = new Limitador({ permitidos: 10, ventanaMs: 15 * 60_000 });
 const POR_IDENTIDAD = new Limitador({ permitidos: 3, ventanaMs: 15 * 60_000 });
@@ -31,7 +31,7 @@ const RESPUESTA_UNIFORME =
 const esCorreo = (v: unknown): v is string =>
   typeof v === 'string' && v.length >= 5 && v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
-export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
+export const POST = conRecuperacionActiva(async (peticion: NextRequest): Promise<NextResponse> => {
   let correo: unknown;
   try {
     correo = ((await peticion.json()) as Record<string, unknown>).correo;
@@ -72,4 +72,4 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
   }
 
   return NextResponse.json({ mensaje: RESPUESTA_UNIFORME });
-};
+});
