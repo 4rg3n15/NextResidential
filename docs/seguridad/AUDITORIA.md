@@ -1073,6 +1073,22 @@ Las 12 restantes en producción son **moderadas y bajas**, todas de dependencias
 transitivas sin versión corregida publicada. Se declaran, no se ocultan: §7
 lleva su aceptación de riesgo redactada.
 
+**Cierre · 2026-10-03 · ronda 15-U.** El cliente no aceptó AR-02, y con razón:
+al 2026-10-02 las 12 tenían versión corregida publicada. La subida a NestJS 11
+y Express 5 las corrige —qs, body-parser y file-type son transitivas de esa
+subida— **sin ningún `override` nuevo**:
+
+```
+$ pnpm audit --prod                       # develop@57fddf5, antes
+12 vulnerabilities found
+Severity: 3 low | 9 moderate
+
+$ pnpm audit --prod                       # etapa-15u-dependencias, después
+No known vulnerabilities found
+```
+
+Detalle, versiones y lo que la subida rompía: `etapas/ETAPA-15U.md`.
+
 ---
 
 ### H-15B-1 · **ALTA** · Guardar la credencial del equipo en la base amplía lo que cuesta un volcado
@@ -1329,24 +1345,16 @@ qué lo acota y qué lo reabriría.
 >
 > Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
 
-### AR-02 · Las 12 vulnerabilidades moderadas y bajas que quedan en producción (H-13-26)
+### AR-02 · Las 12 vulnerabilidades moderadas y bajas que quedan en producción (H-13-26) · **CERRADO** · 2026-10-03
 
-> Acepto que el árbol de dependencias de producción conserve 12
-> vulnerabilidades —3 bajas y 9 moderadas— después de llevar las críticas y las
-> altas a cero.
->
-> **Lo acepto porque** todas son de dependencias transitivas sin versión
-> corregida publicada al 2026-09-22, y forzarlas con un `override` sin techo es
-> el riesgo distinto que ya se materializó en esta misma etapa: `>=` arrastró
-> Vite 8 y vitest 5 y dejó 350 pruebas en rojo.
->
-> **Queda acotado** por el paso de auditoría en CI, que vuelve a medir en cada
-> integración, y por las `overrides` acotadas con `^`, que sí recogen las
-> correcciones de parche y menor.
->
-> **Se reabre si** alguna sube a alta o crítica, o si aparece versión corregida.
->
-> Firma: \***\*\*\*\*\***\_\_\***\*\*\*\*\*** Fecha: \***\*\_\_\_\_\*\***
+**No se firma: se corrigió.** Proponía aceptar 12 vulnerabilidades (3 bajas, 9
+moderadas) «sin versión corregida publicada». El cliente no la aceptó, y al
+volver a medir el 2026-10-02 las 12 tenían versión corregida. La ronda 15-U
+(`etapas/ETAPA-15U.md`) sube NestJS a la 11 y Express a la 5, y con ellas qs
+(6.16.0), body-parser (2.3.0) y file-type (21.3.4): `pnpm audit --prod` pasa de
+**12** a **0**, sin `override` nuevo y sin tocar una aserción. Lo que sí queda
+es el árbol de **desarrollo** (`pnpm audit`: 18, de 30), registrado como
+DT-15U-01: no viaja a producción.
 
 ### AR-03 · D-09 y D-12 demostrados en un clúster que REPRODUCE Supabase, no en Supabase
 
