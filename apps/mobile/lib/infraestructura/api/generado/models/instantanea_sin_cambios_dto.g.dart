@@ -12,7 +12,7 @@ InstantaneaSinCambiosDto _$InstantaneaSinCambiosDtoFromJson(
   copropiedadId: json['copropiedadId'] as String,
   version: json['version'] as num,
   sinCambios: InstantaneaSinCambiosDtoSinCambios.fromJson(
-    json['sinCambios'] as num,
+    json['sinCambios'] as bool,
   ),
   generadaEn: DateTime.parse(json['generadaEn'] as String),
 );

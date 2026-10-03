@@ -66,14 +66,14 @@ export const ALMACEN_DE_PLANTILLAS = Symbol.for('ncr.biometria.AlmacenDePlantill
  * ejecución, y los cerrojos de RN-09 y RN-11 —construidos en la ETAPA 08 y
  * probados contra PostgreSQL— no actuaban sobre nada. `PERSISTENCIA_DE_BIOMETRIA`
  * decide, igual que el histórico de eventos: `postgres` por omisión y
- * `memoria` para la suite, que lo declara. Un proceso en `memoria` lo avisa
- * al arrancar, porque en ese modo la supresión «de inmediato» de CA-11 es una
- * frase y no una fila.
+ * `memoria` para la suite, que lo declara. Un proceso en `memoria` lo avisa al
+ * arrancar: en ese modo la supresión «de inmediato» de CA-11 es una frase.
  */
 @Module({})
 export class BiometriaModule {
+  private static unico: DynamicModule | undefined; // 15-U · Nest 11 deduplica por referencia
   static registrar(): DynamicModule {
-    return {
+    return (BiometriaModule.unico ??= {
       module: BiometriaModule,
       imports: [EquiposModule.registrar()],
       controllers: [BiometriaController],
@@ -299,6 +299,6 @@ export class BiometriaModule {
         BOVEDA_DE_PLANTILLAS,
         AlmacenEnMemoria,
       ],
-    };
+    });
   }
 }

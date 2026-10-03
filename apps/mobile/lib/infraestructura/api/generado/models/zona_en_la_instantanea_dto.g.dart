@@ -11,7 +11,7 @@ ZonaEnLaInstantaneaDto _$ZonaEnLaInstantaneaDtoFromJson(
 ) => ZonaEnLaInstantaneaDto(
   id: json['id'] as String,
   restringida: ZonaEnLaInstantaneaDtoRestringida.fromJson(
-    json['restringida'] as num,
+    json['restringida'] as bool,
   ),
   abierta: json['abierta'] as bool,
   aforoMaximo: json['aforoMaximo'] as num,

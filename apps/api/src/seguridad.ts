@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import type { Configuracion } from './configuracion/esquema';
@@ -28,12 +29,11 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
    * petición de la consola: la lista blanca de porteros no serviría, «la
    * misma IP que el superadministrador» sería siempre cierto y el límite de
    * peticiones trataría a todos como uno. La `X-Forwarded-For` sólo se cree si
-   * la petición llega de un proxy declarado; la app móvil llega directa y
-   * cuenta la IP de su socket.
+   * la petición llega de un proxy declarado; la app móvil usa la IP de su socket.
    */
-  const express = app.getHttpAdapter().getInstance() as {
-    set(clave: string, valor: unknown): void;
-  };
+  const express = app.getHttpAdapter().getInstance() as { set(c: string, v: unknown): void };
+  // 15-U · Express 5 pasó el parser de consulta a `simple`; se conserva `qs` (H-13-13).
+  express.set('query parser', 'extended');
   express.set(
     'trust proxy',
     config.API_PROXIES_DE_CONFIANZA.split(',').map((x) => x.trim()),
@@ -62,10 +62,9 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
     }),
   );
 
-  // Lista blanca explícita: se compara contra la lista, nunca se refleja el
-  // origen recibido. Un origen no permitido NO produce un error de servidor —
-  // simplemente no se emiten cabeceras CORS y el navegador bloquea la respuesta.
-  // Devolver 500 convertiría un rechazo correcto en ruido de incidentes.
+  // Lista blanca explícita: nunca se refleja el origen recibido. Un origen no
+  // permitido NO es un error de servidor: no se emiten cabeceras CORS y el
+  // navegador bloquea. Un 500 convertiría un rechazo correcto en ruido.
   app.enableCors({
     origin: (origen, callback) =>
       callback(null, !origen || config.origenesPermitidos.includes(origen)),
@@ -96,7 +95,8 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
     exposedHeaders: ['x-request-id', 'Retry-After'],
     credentials: true,
     maxAge: 600,
-  });
+    // 15-U · `satisfies`: en Nest 11 `INestApplication.enableCors` recibe `any`.
+  } satisfies CorsOptions);
 
   app.useGlobalPipes(
     new ValidationPipe({

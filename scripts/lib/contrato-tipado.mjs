@@ -110,7 +110,7 @@ const escalarUtil = (e) =>
 
 /** Un `$ref` que no resuelve dentro del documento rompe al generador. */
 const refColgante = (esquema, profundidad = 0) => {
-  if (esquema === undefined || esquema === null || profundidad > 6) return false;
+  if (esquema === undefined || esquema === null || profundidad > 9) return false;
   if (typeof esquema.$ref === 'string') {
     const destino = resolver(esquema);
     // No basta con que ESTE `$ref` resuelva: el colgante puede estar dentro de
@@ -131,7 +131,7 @@ const refColgante = (esquema, profundidad = 0) => {
 /** ¿El esquema aporta forma, o es un `object` vacío que vuelve a ser `unknown`? */
 const tieneForma = (esquema, profundidad = 0) => {
   const e = resolver(esquema);
-  if (e === undefined || e === null || profundidad > 6) return false;
+  if (e === undefined || e === null || profundidad > 9) return false;
   if (e.type === 'array') return tieneForma(e.items, profundidad + 1);
   // Una composición vale por sus miembros, no por existir. Un `$ref` colgando
   // dentro de un `oneOf` daba verde aquí y hacía **abortar al generador**:
@@ -144,8 +144,8 @@ const tieneForma = (esquema, profundidad = 0) => {
     if (e.additionalProperties !== undefined && e.additionalProperties !== false) return true;
     const propiedades = Object.entries(e.properties ?? {});
     if (propiedades.length === 0) return false;
-    // Regla 4: cada propiedad tiene que aportar forma ella misma. Recursión
-    // acotada a 6 niveles (§2.4): estos esquemas anidan tres como mucho.
+    // Regla 4: cada propiedad aporta forma ella misma. Recursión acotada (§2.4) a 9
+    // niveles: con swagger 11 un `$ref` anulable suma uno (`type: object` + `allOf`).
     return propiedades.every(([, v]) => {
       const p = resolver(v);
       if (p === undefined || p === null) return false;

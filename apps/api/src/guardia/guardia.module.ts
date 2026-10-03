@@ -80,13 +80,13 @@ import { IceController } from './presentacion/ice.controller';
  * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura resuelve por
  * `AccessPointProvider` y el intercom abre el del aparato por `IntercomProvider`
  * cuando el turno se concede. Con el simulado, lo de siempre (ADR-03); con el
- * real, los equipos de la consola. La exclusividad sigue en el dominio: cambia
- * el transporte, no las reglas.
+ * real, los equipos de la consola. La exclusividad sigue en el dominio.
  */
 @Module({})
 export class GuardiaModule {
+  private static unico: DynamicModule | undefined; // 15-U · Nest 11 deduplica por referencia
   static registrar(): DynamicModule {
-    return {
+    return (GuardiaModule.unico ??= {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
@@ -316,6 +316,6 @@ export class GuardiaModule {
         },
       ],
       exports: [CANAL_DE_INTERCOM, BITACORA_DE_ORDENES, REGISTRO_DE_BLOQUEOS],
-    };
+    });
   }
 }
