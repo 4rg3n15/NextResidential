@@ -30,6 +30,7 @@ import {
   AdjuntarFotografiaDeVisitante,
   UrlDeFotografiaDeVisitante,
 } from './aplicacion/fotografia-de-visitante';
+import { SERVICIO_POR_COPROPIEDAD } from '../comun/claims-por-operacion';
 
 /**
  * Módulo de autorizaciones. Expone la ingesta firmada, que desde la ETAPA 06
@@ -37,13 +38,9 @@ import {
  * y el repositorio de dispositivos— los aporta `EventosModule`, que es
  * `@Global`, así que aquí no hay que importarlo ni conocer su cableado.
  *
- * **La ETAPA 09-B añade la persistencia del agregado.** Hasta ahora el
- * agregado y el motor de reglas eran puros y nadie los guardaba: se probaban
- * sin base porque no la necesitan. La pantalla de visitantes es el primer
- * consumidor real, y con ella entra `RepositorioAutorizacionesPg` — el mismo
- * `Pool` y el mismo patrón de contexto RLS que el padrón, que ya se conecta de
- * verdad. No se elige memoria aquí: los visitantes de ayer tienen que seguir
- * estando mañana, y un adaptador en memoria los pierde al reiniciar.
+ * **La ETAPA 09-B añade la persistencia del agregado** (`RepositorioAutorizacionesPg`,
+ * el mismo `Pool` y contexto RLS que el padrón). No en memoria: los visitantes
+ * de ayer tienen que seguir estando mañana.
  */
 /**
  * `@Global` desde la 15-D, por la misma razón que zonas y padrón: el módulo de
@@ -64,12 +61,14 @@ export class AutorizacionesModule {
         {
           provide: RepositorioAutorizacionesPg,
           inject: [Pool, CONFIGURACION, RELOJ],
-          // El nombre del bucket va a `evidencias.bucket` (D-19): el real cuando
-          // está declarado, y el del almacén provisional cuando no. El reloj es
-          // el MISMO que usa el motor: con él se resuelve la zona horaria del
-          // patrón (H-15I-05).
+          // El bucket va a `evidencias.bucket` (D-19); el reloj es el del motor (H-15I-05).
           useFactory: (pool: Pool, c: Configuracion, reloj: Reloj) =>
-            new RepositorioAutorizacionesPg(pool, {}, c.EVIDENCIA_BUCKET ?? 'en-memoria', reloj),
+            new RepositorioAutorizacionesPg(
+              pool,
+              SERVICIO_POR_COPROPIEDAD,
+              c.EVIDENCIA_BUCKET ?? 'en-memoria',
+              reloj,
+            ),
         },
         { provide: REPOSITORIO_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },
         { provide: CONSULTA_AUTORIZACIONES, useExisting: RepositorioAutorizacionesPg },

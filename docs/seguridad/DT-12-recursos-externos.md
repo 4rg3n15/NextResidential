@@ -19,6 +19,8 @@
 
 ### 2.1 · FCM — **no es deuda: es orden de etapas, y ya tiene fecha**
 
+> **Sustituido en la ronda 15-R** ([ADR-036](../decisiones/ADR-036-avisos-por-web-push-sin-firebase.md), C-53): los avisos al residente van por **Web Push estándar (VAPID), sin Firebase**. Lo que sigue es el razonamiento de entonces; el estado de hoy y su comprobación están en [`AVISOS_WEB_PUSH.md`](../guias/AVISOS_WEB_PUSH.md) §3.
+
 El `NotificadorPush` cableado **anota en la bitácora y no envía**. No es un
 adaptador a medias: es el adaptador correcto para hoy, y lo dice.
 

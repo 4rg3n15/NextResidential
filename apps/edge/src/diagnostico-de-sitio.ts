@@ -2,8 +2,7 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-Q · Q7 · `pnpm sitio:edge` — EL EDGE, COMPROBADO ANTES DE CONFIAR EN ÉL
  *
- * Un gateway mal configurado no se nota con WAN: la nube decide y todo abre.
- * Se nota en el corte, que es justo cuando nadie está mirando. Este diagnóstico
+ * Un gateway mal configurado se nota en el corte, cuando nadie mira. Este diagnóstico
  * hace las preguntas del corte ANTES del corte, con el MISMO código que arranca
  * el gateway (validador, cliente firmado, diagnóstico de `providers`, SQLite):
  *
@@ -12,7 +11,7 @@
  *   3 · ¿la API acepta ESTA credencial y entrega reglas íntegras de ESTA copropiedad?
  *   4 · ¿cada equipo contesta, con su credencial y en hora? ¿la cámara reporta sin decidir?
  *   5 · ¿el gateway en marcha contesta en esa interfaz, con ese secreto local?
- *   6 · ¿qué hay en la base local? (reglas, su edad, accesos sin reconciliar)
+ *   6 · ¿qué hay en la base local? (reglas, su edad, sin reconciliar, en cuarentena)
  *
  * Es de SÓLO LECTURA: la descarga no se guarda y ningún equipo se acciona.
  * Nunca imprime una IP, un usuario ni una clave (RN-21): equipos por su UUID.
@@ -33,6 +32,7 @@ import { ClienteHttpDeNube } from './infraestructura/api/cliente-de-nube';
 import { abrirBase } from './infraestructura/sqlite/esquema';
 import { BandejaSqlite } from './infraestructura/sqlite/bandeja-sqlite';
 import { CacheDeReglasSqlite } from './infraestructura/sqlite/cache-de-reglas';
+import { CuarentenaSqlite } from './infraestructura/sqlite/cuarentena-sqlite';
 
 export type Estado = 'OK' | 'AVISO' | 'FALLO';
 
@@ -214,6 +214,7 @@ const estadoLocal = (
   const db = abrirBase(config.SQLITE_PATH);
   try {
     const pendientes = new BandejaSqlite(db).cuantosPendientes();
+    const apartados = new CuarentenaSqlite(db).listar().length; // E6 (15-R) · P-31
     const vigente = new CacheDeReglasSqlite(db).vigente(config.EDGE_COPROPIEDAD_ID);
     if (vigente === null) {
       return paso(
@@ -222,15 +223,14 @@ const estadoLocal = (
         'sin reglas en caché: en un corte, TODO se negaría (CU-04, 3a)',
       );
     }
-    // La versión sólo avanza (Q2): si la nube va por DETRÁS, el Edge rechaza todo lo que
-    // le baje y se queda con reglas que la nube ya no tiene. Pasa al restaurar su base.
+    // La versión sólo avanza (Q2): con la nube por DETRÁS (al restaurar su base), §4.4.
     if (versionDeLaNube !== null && vigente.version > versionDeLaNube) {
       const cifras = `caché v${String(vigente.version)}, nube v${String(versionDeLaNube)}`;
       return paso('base local', 'FALLO', `la caché va por delante de la nube (${cifras}): §4.4`);
     }
     const edad = Math.round((ahora().getTime() - Date.parse(vigente.generadaEn)) / 60_000);
-    const resumen = `reglas v${String(vigente.version)} de hace ${String(edad)} min · ${String(pendientes)} accesos sin reconciliar`;
-    return edad > config.CACHE_OBSOLETA_MINUTOS || pendientes > 0
+    const resumen = `reglas v${String(vigente.version)} de hace ${String(edad)} min · ${String(pendientes)} accesos sin reconciliar · ${String(apartados)} en cuarentena`;
+    return edad > config.CACHE_OBSOLETA_MINUTOS || pendientes + apartados > 0
       ? paso('base local', 'AVISO', resumen)
       : paso('base local', 'OK', resumen);
   } finally {

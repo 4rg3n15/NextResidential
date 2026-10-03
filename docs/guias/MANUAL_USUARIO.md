@@ -10,14 +10,14 @@ seis trabajos distintos, y cada uno ve una consola distinta. La interfaz oculta
 lo que no le toca a cada uno, pero **quien deniega de verdad es el servidor**:
 si un enlace llevara a una pantalla ajena, la API respondería 403 igualmente.
 
-| Rol                    | Superficie             | En una frase                                                     |
-| ---------------------- | ---------------------- | ---------------------------------------------------------------- |
-| Superadministrador     | Consola web            | Opera la plataforma y ve **todas** las copropiedades             |
-| Administrador          | Consola web            | Opera **una** copropiedad: padrón, zonas, dispositivos, informes |
-| Portero / Seguridad    | Consola web (Portería) | Atiende **su** puerta                                            |
-| Operador de central    | Consola web (Guardia)  | Atiende **varias** copropiedades desde la central                |
-| Residente              | App móvil              | Autoriza visitas a **su** vivienda                               |
-| Servicio / Integración | Sin interfaz           | Identidad de máquina: Edge Gateway y trabajos programados        |
+| Rol                    | Superficie                      | En una frase                                                     |
+| ---------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| Superadministrador     | Consola web                     | Opera la plataforma y ve **todas** las copropiedades             |
+| Administrador          | Consola web                     | Opera **una** copropiedad: padrón, zonas, dispositivos, informes |
+| Portero / Seguridad    | Consola web (Portería)          | Atiende **su** puerta                                            |
+| Operador de central    | Consola web (Guardia)           | Atiende **varias** copropiedades desde la central                |
+| Residente              | App Android y consola web (PWA) | Autoriza visitas a **su** vivienda                               |
+| Servicio / Integración | Sin interfaz                    | Identidad de máquina: Edge Gateway y trabajos programados        |
 
 ---
 
@@ -57,8 +57,36 @@ turno en una incidencia.
 
 ### Si pierde el acceso
 
-- **Contraseña olvidada:** enlace «¿Olvidó su contraseña?» en la pantalla de
-  acceso. Llega un correo con un enlace de un solo uso.
+**Contraseña olvidada: la restablece una persona, no un correo.** En
+producción la recuperación por correo está **desactivada** (decisión del
+cliente AR-04, ronda 15-R): el correo no se pudo verificar de punta a punta, y
+una contraseña nueva la debe dar alguien que sepa a quién se la da. La pantalla
+de acceso no ofrece enlace; dice «¿Olvidaste tu contraseña? **Contacta al
+administrador** de tu copropiedad: te asigna una temporal.» La app del residente
+tampoco tiene enlace: el camino es el mismo.
+
+1. Quien restablece escribe una **contraseña temporal** que cumple la política
+   y se la da **en persona**. El sistema no la genera ni la envía por ningún
+   canal: una contraseña generada tendría que viajar en alguna respuesta.
+2. Usted entra con ella y el sistema **le obliga a cambiarla** en ese mismo
+   ingreso.
+3. El restablecimiento queda registrado con el nombre de quien lo hizo. Si la
+   cuenta es de un portero, su sesión abierta se cierra en el acto.
+
+El aviso dice «administrador», pero quién puede hacerlo depende de la cuenta:
+
+| Cuenta que perdió la contraseña     | Quién la restablece                                   | Dónde, hoy                                                                                           |
+| ----------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Residente                           | Superadministrador; el administrador, sólo por API    | **Residentes** → «Restablecer contraseña»                                                            |
+| Portero                             | Superadministrador                                    | **Porteros** → «Restablecer contraseña»                                                              |
+| Administrador u operador de central | Superadministrador                                    | **Sin pantalla todavía**: por la API, `POST /copropiedades/:id/usuarios/:usuarioId/restablecimiento` |
+| Superadministrador                  | Nadie desde la plataforma, ni otro superadministrador | —                                                                                                    |
+
+Nadie restablece su propia contraseña por esta vía: la propia se **cambia**, no
+se restablece. Si un despliegue activa expresamente la recuperación por correo
+(variable `RECUPERACION_POR_CORREO`), vuelve el enlace «¿Olvidaste tu
+contraseña?»; en producción, por omisión, no está.
+
 - **Teléfono perdido y códigos de recuperación a mano:** entre con uno de ellos
   y vuelva a dar de alta el segundo factor.
 - **Las dos cosas perdidas:** solo un superadministrador puede retirarle el
@@ -72,6 +100,11 @@ la barra de direcciones la deja como una aplicación con su propia ventana. Para
 los puestos fijos —portería, central— hay además un **instalador de escritorio**
 (`.msi`, `.deb`, `.dmg`) que Grupo Control distribuye.
 
+**El residente también la instala**, y en el teléfono es lo que le trae los
+avisos (§6): en Android, Chrome → menú ⋮ → «Instalar aplicación»; en iPhone,
+**Safari** → Compartir → «Añadir a pantalla de inicio» → «Añadir», y desde
+entonces se abre **desde ese ícono**, no desde Safari.
+
 Sin conexión la consola muestra una pantalla que lo dice. **No muestra datos
 viejos presentados como actuales**: en un sistema de control de acceso, un
 aforo de hace dos horas es peor que una pantalla honesta.
@@ -84,13 +117,14 @@ Es el rol de **plataforma**: no pertenece a ninguna copropiedad y las ve todas.
 
 ### Qué puede hacer
 
-| Tarea                                    | Dónde                                   |
-| ---------------------------------------- | --------------------------------------- |
-| Conmutar entre copropiedades             | Selector de la cabecera                 |
-| Todo lo del administrador, en cualquiera | Las mismas pantallas                    |
-| Ver la auditoría del sistema             | Informes → Auditoría de sistema         |
-| Retirar el segundo factor a un usuario   | Procedimiento documentado, con registro |
-| Ver las latencias comprometidas          | **Latencias**                           |
+| Tarea                                              | Dónde                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------- |
+| Conmutar entre copropiedades                       | Selector de la cabecera                                       |
+| Todo lo del administrador, en cualquiera           | Las mismas pantallas                                          |
+| Ver la auditoría del sistema                       | Informes → Auditoría de sistema                               |
+| Retirar el segundo factor a un usuario             | Procedimiento documentado, con registro                       |
+| Restablecer la contraseña de residentes y porteros | **Residentes** / **Porteros** → «Restablecer contraseña» (§1) |
+| Ver las latencias comprometidas                    | **Latencias**                                                 |
 
 ### Lo que conviene mirar cada semana
 
@@ -201,6 +235,47 @@ motivo escrito que queda en la auditoría:
   eventos del equipo, la ficha lo dice como bloqueo, con el remedio:
   deshabilitar el equipo en HikCentral mientras se prueba.
 
+**Puertas del videoportero.** Un videoportero puede mandar varias cerraduras, y
+la guardia elige entre ellas **por su nombre** (§5). En la ficha de un
+videoportero activo, el bloque «Salidas del videoportero»:
+
+1. **«Descubrir salidas»** lee lo que el equipo declara —módulos y salidas— y
+   lo alinea con los **«Puntos de acceso para la guardia»**. Mientras no haya
+   puntos, la guardia abre la puerta de la ficha.
+2. Dé a cada punto un nombre que el operador reconozca sin mirar un plano y
+   pulse **«Guardar nombre»**. Es el nombre que verá en el botón de abrir.
+
+**Dejar una puerta libre o bloqueada** (P-25, ronda 15-R). Debajo de los puntos,
+el bloque «Dejar una puerta libre o bloqueada». **Sólo administración y
+superadministración**: es estado, no un pulso, y deja al conjunto sin control
+de acceso —libre— o sin acceso —bloqueada—. La API vuelve a exigir el rol
+aunque la pantalla ya no se lo ofrezca a nadie más.
+
+1. Elija el plazo en **«Durante»**: 30 min, 1 h o 2 h, «y vuelve sola a normal.»
+2. En la fila de la puerta, **«Dejar libre»** o **«Bloquear»**.
+3. Escriba el **motivo**, obligatorio como en toda orden manual (RN-08), y
+   confirme.
+
+| Modo      | Qué pasa mientras dura                                                              |
+| --------- | ----------------------------------------------------------------------------------- |
+| Libre     | «Cualquiera podrá pasar sin control hasta que venza el plazo o se revierta.»        |
+| Bloqueada | «Nadie podrá abrirla —ni con autorización— hasta que venza el plazo o se revierta.» |
+
+- **Nunca indefinidamente.** Ninguna orden dura más que la duración máxima de
+  la copropiedad (2 h por omisión). Al vencer, el sistema la **devuelve sola a
+  normal**: lo revisa cada minuto, sin que nadie abra la consola.
+- **Si la reversión no llega al equipo**, se reintenta con espera creciente y se
+  abre una **alerta** de severidad alta que se escala (RN-18). Una puerta que
+  sigue libre sin que nadie lo sepa es el peor desenlace posible.
+- **Mientras alguna puerta esté libre o bloqueada, toda la consola lo dice.**
+  Portería, guardia y administración ven arriba, en todas las pantallas, una
+  **franja roja fija** que no se puede cerrar: «**Puerta N LIBRE** desde las
+  HH:MM, por <quién>: «<motivo>». Vuelve sola a normal a las HH:MM.» Si la
+  reversión automática falló, la franja lo añade: «La reversión automática no
+  llegó al equipo (N intentos): se reintenta.» Se actualiza sola cada 30 s.
+- **«Revertir ahora»**, en la misma franja, la devuelve a normal antes de
+  tiempo. Sólo lo ven administración y superadministración.
+
 Si la consola muestra la franja roja **«Equipos simulados: las órdenes no
 llegan a ningún equipo real»**, la API está en modo simulado con equipos reales
 dados de alta: ninguna apertura mueve nada hasta cambiar
@@ -229,46 +304,156 @@ y central (15-L).
 ### El flujo
 
 1. El evento actual aparece arriba, con la evidencia —foto, recorte de placa—,
-   la vivienda de destino y la autorización que aplica.
-2. Decide: **Abrir** o **Denegar**.
+   la vivienda de destino y la autorización que aplica. Se queda en pantalla
+   hasta que se atiende: lo que llega después espera en «En espera».
+2. Decide: **«Abrir con motivo»** o **«Negar con motivo»**.
 3. **El motivo es obligatorio en los dos casos** (CA-16, CA-17, RN-08). Sin
    motivo, el botón no ejecuta nada. No es burocracia: una apertura manual sin
    motivo es indistinguible de una apertura indebida cuando alguien revise el
    histórico tres semanas después.
 
+La orden va al equipo del evento y abre **la puerta de su ficha**: en Portería
+no se elige punto de acceso. Para elegir entre las cerraduras de un
+videoportero, use **Guardia virtual** (§5). «Última orden: …» dice lo que
+**contestó el equipo**, no lo que se pidió.
+
 ### Lo demás de la pantalla
 
-- **Historial inmediato** de lo que ha pasado en su puerta.
+- **«Equipos en vivo»**: el vídeo de cualquier cámara, terminal o videoportero
+  activo. El evento en pantalla propone su equipo y usted puede cambiarlo en
+  «Equipo». «Abrir este equipo» pide motivo y abre la puerta de su ficha.
+- **Historial inmediato** de lo que se abrió o se negó a mano en su portería.
 - **Alertas activas** y **listas negras** vigentes de su copropiedad.
+- **La franja de puertas.** Si la administración dejó una puerta libre o
+  bloqueada, usted lo ve arriba, en todas las pantallas: quién, por qué, desde
+  cuándo y a qué hora vuelve sola a normal (§3.4). El portero no puede
+  revertirla; si no debería seguir así, avise a la administración.
+
+En Portería **no hay audio**: hablar con el visitante por el videoportero se
+hace desde Guardia virtual.
 
 ### Lo que el portero no ve
 
 No ve el padrón completo, ni otras copropiedades, ni los informes, ni el
 tablero. Desde la 15-L (H4) **sí ve la guardia virtual** para atender de forma
-remota, y es la API la que decide en cada petición si su IP está entre las
-permitidas por el superadministrador.
+remota —con su audio de pulsar para hablar y su selector de punto (§5)—, y es
+la API la que decide en cada petición si su IP está entre las permitidas por el
+superadministrador.
 
 ---
 
 ## 5 · Operador de central
 
 La consola **Guardia virtual**, para atender varias copropiedades desde un solo
-puesto.
+puesto. La usan también el portero —desde las IP que permite el
+superadministrador— y la administración; lo que sigue vale igual para ellos.
 
 ### El flujo de una llamada (CU-03)
 
-1. La **cola de atención** muestra quién espera y **cuánto lleva esperando**.
-2. Al tomar una, aparecen el vídeo en vivo, la ficha de la vivienda y el
-   visitante.
-3. **Audio bidireccional** con el visitante. El canal es **exclusivo por
-   equipo**: si otro operador lo tiene tomado, usted ve que está ocupado y
-   espera, en vez de pisarse los dos.
-4. Puede **contactar con el residente** antes de decidir.
-5. **Abrir** o **denegar**, siempre con motivo, y queda atribuido a usted.
-6. **Alerta de emergencia** si hace falta escalar.
+1. La **«Cola de atención»** muestra quién espera y **cuánto lleva esperando**,
+   en segundos; lo que pasa del umbral sale en rojo. Si usted no atiende a
+   nadie, lo primero de la cola pasa solo a **«Atención»** y el vídeo de su
+   equipo se abre sin clic. Si ya atiende a alguien, el nuevo espera en la cola
+   y no le quita la pantalla.
+2. «Atención» dice qué pasa, la vivienda, cuánto lleva esperando, la placa
+   leída si la hay y la evidencia. Debajo, **«Equipos en vivo»** muestra el
+   vídeo del equipo que se atiende; puede mirar otro en «Equipo» sin perder la
+   llamada.
+3. **Hable con el visitante**: «Hablar» y, con la palabra, pulsar para hablar
+   (abajo).
+4. **«Avisar al residente»** le manda un aviso al teléfono (§6) y la consola
+   dice a cuántos aparatos llegó. Si responde que **«no le llega a la app del
+   residente»**, nadie de esa vivienda activó los avisos: llámelo o use el
+   citófono. Sin vivienda identificada el botón se apaga: no hay a quién avisar.
+5. **Elija la puerta** si el equipo tiene varias (abajo) y pulse **«Abrir …
+   con motivo»** o **«Negar con motivo»**. Queda con su nombre, la hora y la
+   copropiedad que atiende. «Última orden: …» dice lo que **contestó el
+   equipo**, no lo que se pidió.
+6. **«Emergencia»** → «Declarar emergencia»: escala con severidad crítica a
+   todos los operadores conectados. También exige decir qué ocurre.
 
 Si el residente no responde, o responde que no, o usted está ocupado en otra
 copropiedad, el flujo tiene salida para cada caso y la consola la ofrece.
+
+### Hablar con el visitante: pulsar para hablar
+
+**El canal de audio es exclusivo por equipo** (ADR-01): una conversación a la
+vez, para que dos operadores no se pisen.
+
+| La pantalla dice          | Qué significa                        | Botón              |
+| ------------------------- | ------------------------------------ | ------------------ |
+| «Canal libre»             | Nadie habla con ese equipo           | «Hablar» lo pide   |
+| «Tienes la palabra»       | El canal es suyo                     | «Colgar» lo suelta |
+| «En cola · N por delante» | Otro operador lo tiene; usted espera | «Salir de la cola» |
+
+El canal se libera solo tras el tiempo sin actividad que indica la pantalla.
+Con la palabra aparece el panel de audio:
+
+1. **Escucha desde que abre**: «Escuchando al equipo · <formato>».
+2. Para hablar, **mantenga pulsado «Mantener para hablar»** —con el ratón o el
+   dedo— o la **barra espaciadora** con el foco en el panel. Mientras lo
+   sostiene, el botón dice «Hablando… suelte para escuchar» y el distintivo
+   «Usted habla».
+3. **Suelte para escuchar.** El micrófono se abre al pulsar y se cierra al
+   soltar: el piloto del navegador sólo se enciende mientras tanto.
+
+Debajo va el **turno de palabra**: «Turno de palabra: usted» o «… el
+visitante». Hay equipos **semiduplex** que no lo declaran: mientras usted
+habla, puede no oírse al visitante. Hable por turnos, como por radio.
+
+- La primera vez, el navegador pide el micrófono. Si se negó: «El navegador no
+  dio el micrófono: permítalo para esta página y vuelva a pulsar».
+- Si la conversación se corta, la consola dice por qué, en palabras: «El turno
+  caducó por inactividad», «La palabra la tiene otro operador», «Demasiado
+  audio en poco tiempo: la API cortó la conversación», «El equipo cerró el
+  canal de audio», «Se perdió la conexión con la API».
+- La consola reproduce G.711. Si el equipo anuncia otro formato, lo dice en vez
+  de sonar a ruido.
+- «Tienes la palabra y no hay audio: …» significa que ese equipo no tiene
+  transporte de audio; el resto de la frase dice por qué.
+- **Colgar, cambiar de equipo o cerrar la pestaña cuelga**: nunca queda un canal
+  huérfano ocupando el equipo.
+
+### Qué puerta se abre: el selector de punto
+
+Un videoportero puede mandar varias cerraduras. En «Atención», encima de los
+botones, el grupo **«Punto de acceso»** las lista con el nombre que les dio la
+administración (§3.4):
+
+- **Una sola:** se usa sin preguntar.
+- **Varias:** hay que elegir. Hasta entonces la consola dice «Elija qué puerta
+  abrir: el equipo tiene N.» y el botón de abrir no responde. Elegida, el botón
+  dice «Abrir <nombre> con motivo».
+- **Ninguna descubierta:** «Este equipo no tiene puntos de acceso descubiertos:
+  se abre la puerta de su ficha.»
+- **Sin conexión con la API** no se pueden leer los puntos, y la consola avisa
+  de que la orden abriría la puerta de la ficha.
+
+La elección va atada al equipo: si cambia el equipo en atención, se olvida. Así
+no se abre la cerradura 2 de otro videoportero porque se eligió aquí. **La
+apertura no viaja por el canal de audio**: es una orden aparte, atribuida a
+usted y auditada. «Abrir este equipo», en «Equipos en vivo», no tiene selector:
+abre la puerta de la ficha.
+
+### El vídeo y el audio son los del equipo
+
+El vídeo llega del equipo real: la consola lo negocia con la API —que comprueba
+sesión, rol y copropiedad— y lo recibe por WebRTC desde un go2rtc que traduce el
+RTSP del equipo. Cuando el Edge del conjunto es el puente, ese go2rtc corre
+junto a él, y el audio y las órdenes también pasan por el Edge: la credencial
+del equipo no sale del conjunto y el navegador **nunca** habla con el equipo.
+
+- El micrófono exige **HTTPS**: fuera de un contexto seguro el navegador no lo
+  da, y no hay forma de hablar.
+- Mientras el servidor TURN no esté desplegado, el vídeo se ve desde la red del
+  conjunto y desde redes con NAT sencillo, **no** desde redes que lo bloqueen
+  ([`COTURN.md`](COTURN.md)). Abrir y negar no dependen del vídeo.
+
+### Puertas libres o bloqueadas
+
+Si la administración dejó una puerta libre o bloqueada, la **franja roja** de
+arriba lo dice en todas las pantallas (§3.4). El operador no puede revertirla:
+si no debería seguir así, avise a la administración.
 
 ### Conmutar de copropiedad
 
@@ -276,30 +461,41 @@ El selector cambia el ámbito entero. **No verá ni un dato de la copropiedad qu
 acaba de dejar** (KPI-35): no es solo que la pantalla se limpie; es que el
 servidor deja de responderle por ella.
 
-> **Sobre el vídeo y el audio (ETAPA 15).** Hasta que los equipos Hikvision
-> estén conectados, la consola opera contra un simulador: el flujo, la
-> exclusividad del canal y la atribución de la apertura son reales; la imagen y
-> el sonido, no.
-
 ---
 
 ## 6 · Residente
 
-**App móvil.** El residente **no tiene consola web**: si entra por el navegador,
-el sistema se lo dice en vez de dejarlo en una pantalla vacía.
+**App Android y consola web, con las mismas ocho pantallas.** Desde el
+2026-09-29 (C-44) el residente opera también desde el navegador, con las mismas
+funciones que la app; antes sólo tenía la app. Las dos hablan con la misma API:
+lo que hace en una aparece en la otra.
+
+| Aparato    | Cómo entra                                                                                                                                                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android    | La **app**, un APK firmado por Grupo Control que se descarga de su dominio, sin tienda. La primera vez Android pide permitir instalar desde el navegador. O la consola instalada desde Chrome, que es la que recibe avisos |
+| iPhone     | **Sólo la consola**, instalada desde Safari (§1). En producción no hay app de iPhone para el residente (P-23)                                                                                                              |
+| Computador | La consola en el navegador                                                                                                                                                                                                 |
+
+**En la consola** aterriza en «Mi vivienda» y su menú tiene **sólo** sus ocho
+pantallas, todas bajo `/mi`. No hay ninguna entrada de administración, portería
+ni guardia, y si escribiera la dirección de una, la API la rechazaría igual. La
+vivienda la resuelve el servidor desde su sesión: nunca viaja en la dirección.
 
 ### Las ocho pantallas
 
-| Pantalla        | Para qué                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| Inicio          | Su vivienda, lo que está pasando ahora                                                      |
-| Mi familia      | Los residentes de su vivienda                                                               |
-| Mis vehículos   | Sus placas                                                                                  |
-| Nuevo visitante | **La pantalla principal**: autorizar una visita                                             |
-| Zonas comunes   | Aforo actual y solicitud de acceso                                                          |
-| Historial       | Quién entró a su vivienda, con filtros                                                      |
-| Notificaciones  | Visitas rechazadas, con su motivo, e ingresos de sus visitantes; el contador está en Inicio |
-| Perfil          | Sus datos                                                                                   |
+| Pantalla (app)  | En la consola                                 | Para qué                                                                                     |
+| --------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Inicio          | «Mi vivienda» · `/mi`                         | Su vivienda, lo que está pasando ahora                                                       |
+| Mi familia      | «Mi familia» · `/mi/familia`                  | Los residentes de su vivienda; los vincula la administración                                 |
+| Mis vehículos   | «Mis vehículos» · `/mi/vehiculos`             | Sus placas                                                                                   |
+| Nuevo visitante | «Visitas» · `/mi/visitas` → «Nuevo visitante» | **La pantalla principal**: autorizar una visita                                              |
+| Zonas comunes   | «Zonas comunes» · `/mi/zonas`                 | Aforo y horario de hoy de cada zona                                                          |
+| Historial       | «Historial» · `/mi/historial`                 | Quién entró a su vivienda, con filtros                                                       |
+| Notificaciones  | «Notificaciones» · `/mi/notificaciones`       | Visitas rechazadas, con su motivo, e ingresos de sus visitantes; y en la consola, los avisos |
+| Perfil          | «Perfil» · `/mi/perfil`                       | Sus datos                                                                                    |
+
+**Solicitar acceso a una zona común no está construido** en ninguna de las dos:
+la pantalla de zonas informa, no reserva.
 
 ### Autorizar una visita
 
@@ -307,20 +503,78 @@ el sistema se lo dice en vez de dejarlo en una pantalla vacía.
    sistema la reconoce por su documento.
 2. **Cuándo**: fecha, hora de llegada y **duración**. Fuera de esa ventana no
    entra.
-3. **Foto frontal** del visitante, de frente y con buena luz: **«Tomar foto»**
-   con la cámara o **«Elegir de la galería»** si el visitante se la envió. Las
-   dos pasan por la misma revisión y la app le dice si sirve antes de enviarla.
-   La de la galería se envía sin sus datos ocultos (ubicación, teléfono, fecha).
+3. **Foto frontal** del visitante, de frente y con buena luz. En la app,
+   **«Tomar foto»** con la cámara o **«Elegir de la galería»** si el visitante
+   se la envió; la de la galería se envía sin sus datos ocultos (ubicación,
+   teléfono, fecha). En la consola, el campo **«Foto frontal del visitante»**
+   (JPEG o PNG; en el teléfono ofrece la cámara). Las dos revisan la foto antes
+   de enviarla y dicen si sirve; si el navegador no sabe contar rostros, la
+   consola le pide confirmar que se ve uno solo, de frente y bien encuadrado.
 4. La casilla **«Declaro que <nombre del visitante> me autorizó a usar su foto
    para su ingreso al conjunto»**, con el nombre que usted escribió. Sin ella
    no se envía.
 5. **Placa** si llega en vehículo, y **observaciones** para el portero
    (opcionales).
 
-**Últimos visitantes → Volver a autorizar**: para alguien que ya vino, la app
-copia sus datos y su foto y sólo le pide fecha, hora, duración y la casilla.
+En la consola se envía con **«Registrar visita»**; mientras falte algo, el
+formulario dice qué («Falta: …»).
+
+**Últimos visitantes → Volver a autorizar**: para alguien que ya vino, se
+copian sus datos y su foto y sólo se le pide fecha, hora, duración y la casilla.
+Sin foto guardada no se puede: se registra como visitante nuevo.
 
 Debería llevarle **menos de un minuto** (KPI-10).
+
+Si la pantalla dice «Hoy sólo el titular de la vivienda puede autorizar
+visitantes.», su cuenta no es la del titular. En la consola el botón «Nuevo
+visitante» se ve, apagado, para que sepa que existe y por qué no lo puede usar.
+
+### Avisos al teléfono: Web Push, sin Firebase
+
+Decisión del cliente P-23, ronda 15-R
+([ADR-036](../decisiones/ADR-036-avisos-por-web-push-sin-firebase.md)). **Los
+avisos con el teléfono en el bolsillo llegan a la consola instalada, no a la
+app.**
+
+**Qué llega con la consola cerrada:** el «Avisar al residente» de la guardia
+(«Tienes una visita esperando en la portería») y los accesos registrados o
+denegados en su vivienda. Al tocar el aviso se abre la consola en
+«Notificaciones» o en «Historial», y en ninguna otra pantalla.
+
+**Activarlos, una vez por aparato:**
+
+1. Instale la consola (§1). En iPhone hace falta **iOS 16.4 o posterior** y
+   abrirla **desde el ícono** de la pantalla de inicio: en Safari a secas no hay
+   avisos.
+2. **«Notificaciones» → «Activar avisos en este aparato»** → el navegador
+   pregunta → **Permitir**. El permiso sólo se pide al pulsar, nunca al entrar.
+3. Queda «Los avisos llegan a este aparato.» y el botón pasa a **«Quitar avisos
+   de este aparato»**, que los retira.
+
+Es **por aparato**: si quiere avisos en el teléfono y en el computador,
+actívelos en los dos. Cada aparato recibe los avisos de **una sola** cuenta: si
+otra persona del conjunto los activa en el mismo navegador, a usted dejan de
+llegarle ahí.
+
+| La pantalla dice                                                          | Qué hacer                                                                                              |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| «Para recibir avisos en el iPhone (iOS 16.4 o posterior): …»              | La consola no está instalada. Siga los pasos que indica                                                |
+| «Los avisos están bloqueados para esta consola en este navegador…»        | Usted negó el permiso. Configuración del sitio → Notificaciones → Permitir, y vuelva                   |
+| «Este navegador no admite avisos. Revise esta lista al entrar.»           | Use otro navegador, o revise la lista                                                                  |
+| «Este servidor no envía avisos al teléfono: revise esta lista al entrar.» | El servidor no tiene las llaves de avisos. Lo resuelve TI ([`AVISOS_WEB_PUSH.md`](AVISOS_WEB_PUSH.md)) |
+
+La lista de «Notificaciones» sigue siendo la fuente de verdad: un aviso que no
+llegó está igual en ella.
+
+«Sin Firebase» no significa «sin Google»: cada navegador entrega sus avisos por
+su propio servicio —el de Google en Chrome, el de Apple en Safari—, pero el
+contenido va **cifrado** y ese servicio no puede leerlo. No hay cuenta de
+Firebase ni nada de Firebase en la app.
+
+**La app Android no recibe avisos con la app cerrada**, y no los recibirá: no
+lleva ningún sistema de avisos. Lo dice ella misma: «Los avisos llegan mientras
+la app está abierta». Quien quiera avisos con el teléfono en el bolsillo
+instala también la consola.
 
 ### Lo que conviene saber
 
@@ -333,17 +587,20 @@ Debería llevarle **menos de un minuto** (KPI-10).
 - **La plantilla del rostro se borra sola** al terminar la visita, y de
   inmediato si portería la rechaza o si el visitante revoca su autorización
   (RN-11).
-- **Sin conexión** la visita queda «Pendiente de envío», con su foto, y se envía
-  sola al volver la conexión, sin duplicarse.
+- **Sin conexión, en la app**, la visita queda «Pendiente de envío», con su
+  foto, y se envía sola al volver la conexión, sin duplicarse. **En la consola**
+  no queda nada pendiente: dice «No hay conexión con el servidor.», conserva lo
+  escrito y, al reintentar, tampoco duplica.
 - **La app y la consola ven lo mismo** (ADR-033): cada visita dice si está
   vigente, vencida o **rechazada, con el motivo** que escribió portería. Con la
   app abierta, la pantalla se recarga sola cada 20 s; también al volver a la
-  app y al arrastrar hacia abajo.
-- **Los avisos llegan mientras la app está abierta.** No hay avisos con la app
-  cerrada.
-- **«Servidor»**, en la pantalla de acceso, dice a qué servidor se conecta la
-  app y permite cambiarlo si en sitio la app no llega (la dirección la da quien
-  instala; ver `APP_EN_IPHONE.md`). Cambiarlo cierra la sesión.
+  app y al arrastrar hacia abajo. En la consola, «Visitas», «Zonas comunes» y
+  «Notificaciones» se recargan solas cada 15 s mientras la pestaña está a la
+  vista, y al volver a ella.
+- **«Servidor»**, en la pantalla de acceso de la app, dice a qué servidor se
+  conecta y permite cambiarlo si en sitio la app no llega (la dirección la da
+  quien instala; ver [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md)). Cambiarlo cierra
+  la sesión.
 
 ---
 
@@ -368,15 +625,23 @@ CI (§2.7.6).
 
 ## 8 · Qué hacer cuando algo va mal
 
-| Síntoma                                                | Qué es, y qué hacer                                                                                                |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| «La sesión expiró» al escribir el código               | El código temporal caducó. Espere al siguiente y vuelva a escribirlo                                               |
-| Un rol no ve una pantalla que cree que le toca         | La ve quien la necesita. Si cree que es un error, un administrador puede revisar sus roles                         |
-| Una terminal aparece **caída** y usted la ve encendida | Dejó de latir. Revise red y hora del equipo: un reloj desincronizado produce este síntoma                          |
-| Un aforo que no cuadra                                 | Mire la política de reinicio de la zona. Con `manual` o `nunca`, el contador no se reinicia solo                   |
-| Una placa que el lector no reconoce                    | Compruebe que está **activa** y en la vivienda correcta. La normalización quita espacios y guiones automáticamente |
-| «Demasiadas peticiones» (429)                          | Límite de peticiones (§2.7.5). Espere los segundos que indica la respuesta                                         |
-| La consola no ofrece instalarse                        | Casi siempre es que no está entrando por HTTPS. Sin contexto seguro el navegador no la instala                     |
+| Síntoma                                                          | Qué es, y qué hacer                                                                                                                             |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| «La sesión expiró» al escribir el código                         | El código temporal caducó. Espere al siguiente y vuelva a escribirlo                                                                            |
+| Un rol no ve una pantalla que cree que le toca                   | La ve quien la necesita. Si cree que es un error, un administrador puede revisar sus roles                                                      |
+| Una terminal aparece **caída** y usted la ve encendida           | Dejó de latir. Revise red y hora del equipo: un reloj desincronizado produce este síntoma                                                       |
+| Un aforo que no cuadra                                           | Mire la política de reinicio de la zona. Con `manual` o `nunca`, el contador no se reinicia solo                                                |
+| Una placa que el lector no reconoce                              | Compruebe que está **activa** y en la vivienda correcta. La normalización quita espacios y guiones automáticamente                              |
+| «Demasiadas peticiones» (429)                                    | Límite de peticiones (§2.7.5). Espere los segundos que indica la respuesta                                                                      |
+| La consola no ofrece instalarse                                  | Casi siempre es que no está entrando por HTTPS. Sin contexto seguro el navegador no la instala                                                  |
+| «La recuperación de contraseña por correo está desactivada…»     | Es lo previsto en producción. Pida el restablecimiento a quien corresponda según su cuenta (§1)                                                 |
+| En el iPhone no aparece «Activar avisos en este aparato»         | La consola no se abrió desde el ícono de la pantalla de inicio, o el iPhone tiene una versión anterior a iOS 16.4                               |
+| La guardia lee que el aviso «no le llega a la app del residente» | Nadie de esa vivienda activó los avisos en un aparato, o el servidor no tiene las llaves de avisos. Avísele por teléfono o por el citófono      |
+| «La palabra la tiene otro operador»                              | Otro operador tiene el canal de ese equipo. Espere en la cola o salga de ella con «Salir de la cola»                                            |
+| «El navegador no dio el micrófono…»                              | Permita el micrófono para la página y vuelva a pulsar. Fuera de HTTPS el navegador no lo da                                                     |
+| En la guardia, el botón de abrir no responde                     | El equipo tiene varias puertas: elija una en «Punto de acceso»                                                                                  |
+| El vídeo no carga desde fuera del conjunto                       | Sin TURN desplegado, el vídeo no atraviesa redes que lo bloquean ([`COTURN.md`](COTURN.md)). Abrir no depende de él                             |
+| La franja dice «La reversión automática no llegó al equipo…»     | El equipo o el Edge no contestan. El sistema reintenta y abrió una alerta. Administración: revise la conexión del equipo y use «Revertir ahora» |
 
 ### Cuando reporte un fallo, dé el número de correlación
 
@@ -390,8 +655,12 @@ En la consola aparece en el detalle del error. Cópielo tal cual.
 
 ## Lo que este manual no cubre
 
-- **Instalación y configuración de los equipos Hikvision** — ETAPA 15, con su
-  guía propia frente al equipo.
+- **Instalación y configuración de los equipos Hikvision** —
+  [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md), escrita para
+  seguirla frente al equipo.
+- **Llaves y activación de los avisos por Web Push** —
+  [`AVISOS_WEB_PUSH.md`](AVISOS_WEB_PUSH.md).
+- **Firma y publicación de la app Android** — [`APK_FIRMADO.md`](APK_FIRMADO.md).
 - **Despliegue del sistema** — [`DESPLIEGUE.md`](DESPLIEGUE.md).
 - **Conexión con Supabase** — [`CONEXION_SUPABASE.md`](CONEXION_SUPABASE.md).
 - **Instalación del Edge Gateway** — [`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md).

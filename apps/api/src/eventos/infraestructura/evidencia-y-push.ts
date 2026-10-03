@@ -53,12 +53,11 @@ export class AlmacenEvidenciaFirmado implements AlmacenEvidencia {
 }
 
 /**
- * Notificador push **provisional** (HU-34). FCM llega con la ETAPA 11, que es
- * la dueña del registro de tokens del dispositivo del residente: enviar hoy
- * exigiría inventar ese registro y la 11 tendría que deshacerlo.
+ * Notificador push **provisional** de la ETAPA 06 (HU-34). 15-R · YA NO SE
+ * CABLEA: devolvía 1 sin enviar nada. Lo sustituye Web Push (ADR-036,
+ * `web-push/`); queda sólo como doble de las pruebas que lo usan.
  *
- * Deja constancia de cada aviso en la bitácora y lleva la cuenta, para que la
- * prueba pueda afirmar que el aviso se emitió y no solo que no falló.
+ * Deja constancia de cada aviso en la bitácora y lleva la cuenta.
  */
 export class NotificadorPushRegistrado implements NotificadorPush {
   private readonly emitidos: { copropiedadId: string; viviendaId: string; titulo: string }[] = [];
@@ -74,7 +73,7 @@ export class NotificadorPushRegistrado implements NotificadorPush {
     this.emitidos.push({ copropiedadId, viviendaId, titulo });
     // El cuerpo NO se registra: puede nombrar a una persona y a una vivienda, y
     // la bitácora se envía a un tercero (§2.7.8).
-    this.bitacora.registrar('info', 'aviso al residente encolado (FCM en la ETAPA 11)', {
+    this.bitacora.registrar('info', 'aviso al residente encolado (doble de pruebas)', {
       copropiedadId,
       viviendaId,
       titulo,

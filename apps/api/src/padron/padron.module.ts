@@ -16,16 +16,14 @@ import { PadronDeCopropiedadController } from './presentacion/padron-copropiedad
 import { RESOLUTOR_DE_PLACA } from '../autorizaciones';
 import type { ResolutorDePlaca } from '../autorizaciones';
 import type { RepositorioPadron } from './aplicacion/puertos';
+import { SERVICIO_POR_COPROPIEDAD } from '../comun/claims-por-operacion';
 
 /**
  * Un `Pool` por proceso, no por petición: abrir una conexión por petición
  * agotaría el límite del pooler de Supabase en cuanto haya carga.
  *
- * `claims` se pasa vacío en el proveedor porque el contexto real viaja por
- * petición; el adaptador lo fija en la conexión que toma. Cuando la ETAPA 06
- * necesite el contexto por petición, se sustituye por un proveedor con ámbito
- * de petición sin tocar el adaptador — ese es el punto de que el repositorio
- * reciba los claims por constructor y no los busque.
+ * E2 (15-R) · `SERVICIO_POR_COPROPIEDAD`: cada operación presenta los claims
+ * de servicio de SU copropiedad (antes, `{}`: DT-15K-02).
  */
 /**
  * `@Global` desde la 15-D: el módulo de eventos compone el cargador de contexto
@@ -44,7 +42,7 @@ export class PadronModule {
         {
           provide: REPOSITORIO_PADRON,
           inject: [Pool],
-          useFactory: (pool: Pool) => new RepositorioPadronPg(pool, {}),
+          useFactory: (pool: Pool) => new RepositorioPadronPg(pool, SERVICIO_POR_COPROPIEDAD),
         },
         /**
          * El vocabulario del conjunto llega por el repositorio de

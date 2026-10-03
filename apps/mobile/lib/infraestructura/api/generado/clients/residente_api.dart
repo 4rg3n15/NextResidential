@@ -7,7 +7,9 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_mi_vivienda_dto.dart';
 import '../models/aparato_registrado_dto.dart';
+import '../models/baja_de_suscripcion_dto.dart';
 import '../models/declaracion_de_ocupantes_dto.dart';
+import '../models/estado_de_avisos_web_dto.dart';
 import '../models/estado_de_mi_alta_dto.dart';
 import '../models/mi_autorizacion_dto.dart';
 import '../models/mi_evento_dto.dart';
@@ -27,6 +29,9 @@ import '../models/repetir_visita_dto.dart';
 import '../models/resultado_de_alta_dto.dart';
 import '../models/resultado_de_perfil_dto.dart';
 import '../models/resultado_de_vehiculo_propio_dto.dart';
+import '../models/suscripcion_anulada_dto.dart';
+import '../models/suscripcion_registrada_dto.dart';
+import '../models/suscripcion_web_push_dto.dart';
 import '../models/token_de_notificacion_dto.dart';
 import '../models/vehiculo_desactivado_dto.dart';
 import '../models/vehiculo_propio_dto.dart';
@@ -90,6 +95,26 @@ abstract class ResidenteApi {
   Future<AparatoRegistradoDto> miControllerRegistrarAparato({
     @Path('id') required String id,
     @Body() required TokenDeNotificacionDto body,
+  });
+
+  /// ¿Hay avisos al teléfono? Y la llave pública VAPID para suscribirse
+  @GET('/copropiedades/{id}/mi/notificaciones/web-push')
+  Future<EstadoDeAvisosWebDto> misAvisosWebControllerEstado({
+    @Path('id') required String id,
+  });
+
+  /// Suscribe este navegador a los avisos de mi vivienda (HU-34)
+  @POST('/copropiedades/{id}/mi/notificaciones/web-push')
+  Future<SuscripcionRegistradaDto> misAvisosWebControllerSuscribir({
+    @Path('id') required String id,
+    @Body() required SuscripcionWebPushDto body,
+  });
+
+  /// Quita los avisos de este navegador
+  @POST('/copropiedades/{id}/mi/notificaciones/web-push/baja')
+  Future<SuscripcionAnuladaDto> misAvisosWebControllerAnular({
+    @Path('id') required String id,
+    @Body() required BajaDeSuscripcionDto body,
   });
 
   /// Mis ocupantes y los códigos de las plazas libres (3.3)

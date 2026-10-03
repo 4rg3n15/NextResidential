@@ -8,7 +8,8 @@ import { Tarjeta } from '@/componentes/ui/tarjeta';
 import { useMisNotificaciones } from '@/lib/api/residente';
 import type { MiNotificacion } from '@/lib/api/residente';
 import { fechaYHora } from '@/lib/fechas';
-import { Aviso, estadoDeConsulta } from '../comunes';
+import { estadoDeConsulta } from '../comunes';
+import { AvisosEnEsteAparato } from './avisos-en-este-aparato';
 
 const textoDe = (n: MiNotificacion): string => {
   const visitante = n.visitante ?? 'un visitante';
@@ -41,9 +42,8 @@ const Fila = ({ n }: { readonly n: MiNotificacion }): JSX.Element => {
 };
 
 /**
- * M-7 · «Notificaciones». En la web no hay aviso al teléfono: se ven al abrir
- * la consola y la lista se refresca sola. El registro de aparatos para
- * notificaciones es de la app (FCM) y aquí no aplica.
+ * M-7 · «Notificaciones». La lista se refresca sola; los avisos al teléfono
+ * llegan por Web Push a esta consola instalada (15-R, ADR-036).
  *
  * [SUPUESTO] S-152 · sin estado de «vista»: la API no guarda qué leyó el
  * residente, así que la lista no marca nuevas ni leídas; es la misma que la app.
@@ -61,10 +61,7 @@ export const PantallaDeMisNotificaciones = ({
         titulo="Notificaciones"
         descripcion="Lo que pasó con tus visitas: las que rechazó portería y los ingresos de tus visitantes."
       />
-      <Aviso>
-        Aquí los avisos se ven al abrir la consola y se refrescan solos. Los avisos al teléfono
-        llegan por la aplicación móvil.
-      </Aviso>
+      <AvisosEnEsteAparato copropiedadId={copropiedadId} />
       {estadoDeConsulta(notificaciones, 'Cargando las notificaciones')}
       {notificaciones.data !== undefined && lista.length === 0 ? (
         <EstadoVacio

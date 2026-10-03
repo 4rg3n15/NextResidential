@@ -1,6 +1,5 @@
 /**
- * Service worker de la consola — BASE de la PWA. La ETAPA 14 la completa.
- *
+ * Service worker de la consola (PWA). 15-R: los avisos Web Push, en `sw-avisos.js`.
  * ─────────────────────────────────────────────────────────────────────────────
  * LA REGLA QUE GOBIERNA ESTA ESTRATEGIA
  *
@@ -25,6 +24,7 @@
  *   · Manifiesto e iconos  → caché primero; no llevan datos.
  */
 
+importScripts('/sw-avisos.js');
 const VERSION = 'ncr-consola-v1';
 const ESTATICOS = `${VERSION}-estaticos`;
 const RUTA_SIN_CONEXION = '/sin-conexion';

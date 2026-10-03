@@ -35,6 +35,7 @@
  */
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  PatronRecurrencia,
   Vigencia,
   aprobacionAutomatica,
   errorDominio,
@@ -112,24 +113,9 @@ export class CrearMiAutorizacion {
       );
     }
     if (entrada.patron !== null) {
-      /**
-       * H-15I-06 · FALLA CERRADA a propósito. H-15I-05 —la lectura en UTC de
-       * una franja guardada en hora local— quedó corregido en la 15-J, pero
-       * esta guarda NO es lo único que falta: el adaptador del residente
-       * (`residente/infraestructura/autorizaciones-pg.ts`) inserta la
-       * autorización como `recurrente` y no escribe sus filas de
-       * `patrones_recurrencia`, así que el disparador diferido
-       * `tg_recurrente_con_patron` (0013) la rechazaría al confirmar: sin esta
-       * guarda, la app recibiría un 500 en vez de este rechazo. Reportado como
-       * H-15J-01; mientras tanto, la app crea una visita por día (D5 b).
-       */
-      return fallo(
-        errorDominio(
-          'OPERACION_NO_PERMITIDA',
-          'Las visitas recurrentes están deshabilitadas en la app: cree una visita por día con su franja',
-          'RN-22',
-        ),
-      );
+      // E3 (15-R) · H-15J-01 cerrado: el adaptador escribe el patrón (RN-22); aquí, su forma.
+      const patron = PatronRecurrencia.crear(entrada.patron);
+      if (!patron.ok) return patron;
     }
 
     // ── 3 · Reglas de negocio, con su precedencia en el dominio ─────────────

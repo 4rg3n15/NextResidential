@@ -349,17 +349,17 @@ Lo que sigue no es prudencia genérica: es la lista de acciones que dejan un
 equipo en un estado del que no se vuelve sin tenerlo en las manos, o que rompen
 un requisito del proyecto.
 
-| No haga esto                                                      | Por qué                                                                                                                                                                                                                                |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cambiar la contraseña de administrador**                        | Si hay una plataforma o un instalador que ya conoce la actual, la rompe. Y si se pierde, en varios modelos la recuperación exige el fabricante.                                                                                        |
-| **Restaurar a valores de fábrica / desactivar el equipo**         | Pierde la activación, la red y toda la configuración del instalador. Es la acción irreversible por excelencia.                                                                                                                         |
-| **Actualizar firmware**                                           | Mueve rutas ISAPI —es justo lo que estamos midiendo— y puede degradar un equipo en producción.                                                                                                                                         |
-| **Cambiar IP, máscara, puerta de enlace o pasar a DHCP**          | Se queda sin el equipo en mitad de la sesión, conectado por esa misma red.                                                                                                                                                             |
-| **Reintentar la autenticación en bucle**                          | El bloqueo por intentos fallidos es una función de seguridad del propio equipo: unos pocos fallos seguidos **bloquean la cuenta durante minutos**. Un guion con reintentos le deja fuera. Escriba la contraseña a mano la primera vez. |
-| **Usar `alwaysOpen` en cualquier orden de puerta**                | Deja la puerta desbloqueada **hasta que alguien la cierre a mano**. Para probar se usa `open`, que es momentáneo.                                                                                                                      |
-| **Escribir en la lista blanca o negra de la cámara**              | Es la configuración que decide si la cámara abre sola. Se lee; no se toca.                                                                                                                                                             |
-| **Inscribir el rostro de un tercero en el terminal**              | Es tratamiento de dato biométrico bajo la **Ley 1581 de 2012**: exige consentimiento previo, expreso e informado del titular (RN-09, RN-10). Para validar, use su propio rostro y bórrelo al terminar, o no inscriba ninguno.          |
-| **Modificar el cableado del relé o el tipo de cerradura (NA/NC)** | Un relé mal configurado con cerradura de seguridad puede dejar una puerta abierta o una talanquera bloqueada.                                                                                                                          |
+| No haga esto                                                        | Por qué                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cambiar la contraseña de administrador**                          | Si hay una plataforma o un instalador que ya conoce la actual, la rompe. Y si se pierde, en varios modelos la recuperación exige el fabricante.                                                                                        |
+| **Restaurar a valores de fábrica / desactivar el equipo**           | Pierde la activación, la red y toda la configuración del instalador. Es la acción irreversible por excelencia.                                                                                                                         |
+| **Actualizar firmware**                                             | Mueve rutas ISAPI —es justo lo que estamos midiendo— y puede degradar un equipo en producción.                                                                                                                                         |
+| **Cambiar IP, máscara, puerta de enlace o pasar a DHCP**            | Se queda sin el equipo en mitad de la sesión, conectado por esa misma red.                                                                                                                                                             |
+| **Reintentar la autenticación en bucle**                            | El bloqueo por intentos fallidos es una función de seguridad del propio equipo: unos pocos fallos seguidos **bloquean la cuenta durante minutos**. Un guion con reintentos le deja fuera. Escriba la contraseña a mano la primera vez. |
+| **Usar `alwaysOpen` en cualquier orden de puerta, fuera de §8.4.3** | Deja la puerta desbloqueada **hasta que alguien la revierta**. Para probar se usa `open`, que es momentáneo; el modo libre sólo con la prueba de §8.4.3 y el administrador delante.                                                    |
+| **Escribir en la lista blanca o negra de la cámara**                | Es la configuración que decide si la cámara abre sola. Se lee; no se toca.                                                                                                                                                             |
+| **Inscribir el rostro de un tercero en el terminal**                | Es tratamiento de dato biométrico bajo la **Ley 1581 de 2012**: exige consentimiento previo, expreso e informado del titular (RN-09, RN-10). Para validar, use su propio rostro y bórrelo al terminar, o no inscriba ninguno.          |
+| **Modificar el cableado del relé o el tipo de cerradura (NA/NC)**   | Un relé mal configurado con cerradura de seguridad puede dejar una puerta abierta o una talanquera bloqueada.                                                                                                                          |
 
 ### 1.2 · La red de seguridad, antes del primer comando
 
@@ -714,7 +714,10 @@ Content-Type `application/x-www-form-urlencoded; charset=UTF-8` y el cuerpo
 `<RemoteControlDoor xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0"><cmd>open</cmd></RemoteControlDoor>`
 (el videoportero, con `<?xml version='1.0' encoding='utf-8'?>` delante, como
 su interfaz), en la petición del `401` y en la autenticada. Es momentáneo.
-**Nunca `alwaysOpen`.**
+**El guion nunca envía `alwaysOpen`.** Dejar una puerta libre o bloqueada no es
+una prueba de sitio: desde la 15-R (P-25) lo decide la administración en la
+consola, con motivo y plazo, y la puerta vuelve sola a normal
+(`MANUAL_USUARIO.md` §3.4).
 
 **Salida esperada** (por equipo; host elidido):
 
@@ -980,10 +983,29 @@ el paso 3 de la tabla de arriba.
 | 3   | Desde la guardia, **abrir cada salida descubierta** con motivo. Comprobar que se mueve la cerradura correcta y anotar el tiempo (KPI-32 · < 3 s).                           |                     |
 | 4   | Comprobar en el historial de órdenes que cada apertura quedó con el operador, el motivo y el punto.                                                                         |                     |
 
-Dejar una puerta **libre o bloqueada** (`alwaysOpen`/`alwaysClose`) no se ofrece
-desde la consola: **PENDIENTE DE DEFINICIÓN** quién puede hacerlo. Si el equipo
-declara control de ascensor, se anota y no se prueba: llamar el ascensor no es
-abrir una puerta.
+#### 8.4.3 · Puerta libre y bloqueada, y su vuelta a normal (15-R · P-25)
+
+Desde la 15-R la administración puede dejar **una** puerta libre
+(`alwaysOpen`) o bloqueada (`alwaysClose`), con motivo y plazo; al vencer, la
+plataforma la devuelve a normal con `close`. **Que `close` la devuelva de
+verdad a su modo controlado lo dice la documentación ISAPI y NO se ha visto en
+un equipo** ([SUPUESTO] S-15R-03): hasta probarlo, la consola registra la
+reversión como «aceptada por el equipo», no como «puerta en modo normal».
+Hágalo con el administrador del conjunto delante y la puerta a la vista:
+
+| #   | Qué hacer                                                                                                                                                                                                                                        | Resultado (anótelo) |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| 1   | Dispositivos → ficha del **videoportero** (activo y con sus salidas descubiertas, §8.4.2) → **«Dejar una puerta libre o bloqueada»** → **«Dejar libre»** una puerta, con motivo, **30 min**. La franja de arriba lo dice en todas las pantallas. |                     |
+| 2   | Comprobar que la puerta queda abierta sin credencial, y que en la terminal aparece como siempre abierta.                                                                                                                                         |                     |
+| 3   | **«Revertir ahora»** desde la franja. Comprobar que una credencial válida vuelve a abrirla **y** que sin credencial ya no abre: eso es «modo normal», no sólo «orden aceptada».                                                                  |                     |
+| 4   | Repetir con **«Bloquear»**: una credencial válida **no** abre mientras dure; tras revertir, vuelve a abrir.                                                                                                                                      |                     |
+| 5   | Dejarla libre con el plazo más corto y **no** revertir: al vencer, la plataforma la devuelve sola (trabajo `ncr.revertir-puertas`, cada minuto). Anote cuánto tardó tras el vencimiento.                                                         |                     |
+
+Si en el paso 3 la puerta sigue abierta tras «Revertir ahora», S-15R-03 es
+falso para ese modelo: **anótelo y no use el modo libre en producción** hasta
+corregir la orden de reversión. Si el equipo declara control de ascensor, se
+anota y no se prueba: P-26 quedó **fuera de alcance** por decisión del cliente
+(15-R); llamar el ascensor no es abrir una puerta.
 
 ### 8.5 · Las dos pruebas del recorrido de placa
 

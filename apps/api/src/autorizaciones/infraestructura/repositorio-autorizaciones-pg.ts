@@ -18,6 +18,8 @@ import type {
   RepositorioDeConsultaDeAutorizaciones,
 } from '../aplicacion/puertos';
 import { conCliente } from '../../persistencia/con-cliente';
+import { claimsDeLaOperacion, SERVICIO_POR_COPROPIEDAD } from '../../comun/claims-por-operacion';
+import type { ClaimsDelAdaptador } from '../../comun/claims-por-operacion';
 
 /**
  * Adaptador PostgreSQL del agregado `Autorización` — ETAPA 09-B.
@@ -42,11 +44,9 @@ import { conCliente } from '../../persistencia/con-cliente';
  *    momento y su motivo. El historial es la mitad del producto.
  * 4. **Quien «autoriza» es el titular de la vivienda, no quien pulsa** —ETAPA
  *    15-D, [SUPUESTO] S-38—. La base exige que `autorizado_por` sea un residente
- *    titular activo de la vivienda destino (RN-05, `tg_autorizacion_coherente`),
- *    y hasta ahora se escribía el identificador del USUARIO de la consola: el
- *    disparador lo rechazaba y ninguna autorización creada desde administración
- *    o portería llegaba a existir contra base real (D-131). El administrador
- *    autoriza EN NOMBRE de la vivienda; `creado_por` conserva quién fue.
+ *    titular activo de la vivienda destino (RN-05, `tg_autorizacion_coherente`;
+ *    antes se escribía el USUARIO y el disparador lo rechazaba, D-131). El
+ *    administrador autoriza EN NOMBRE de la vivienda; `creado_por` dice quién.
  * 5. **La franja del patrón es hora LOCAL de la copropiedad** —COMMENT de la
  *    0006— y así se escribe. Al leerla, el desplazamiento sale de
  *    `copropiedades.zona_horaria` en el instante del `Reloj` inyectado, en la
@@ -60,17 +60,17 @@ export class RepositorioAutorizacionesPg
 {
   constructor(
     private readonly pool: Pool,
-    private readonly claims: Record<string, unknown> = {},
+    private readonly claims: ClaimsDelAdaptador = SERVICIO_POR_COPROPIEDAD,
     /** Nombre del bucket que figura en `evidencias.bucket` (D-19). */
     private readonly bucket: string = 'en-memoria',
     /** El instante con el que se resuelve la zona horaria del patrón (decisión 5). */
     private readonly reloj: Reloj,
   ) {}
 
-  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  private async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, cop)),
       ]);
       return await fn(cliente);
     });
@@ -124,7 +124,7 @@ export class RepositorioAutorizacionesPg
   }
 
   async guardar(copropiedadId: string, a: Autorizacion, actorId: string): Promise<void> {
-    await this.conContexto(async (c) => {
+    await this.conContexto(copropiedadId, async (c) => {
       await c.query('BEGIN');
       try {
         const visitanteId = await this.visitanteDe(c, copropiedadId, a.personaId, actorId);
@@ -235,7 +235,7 @@ export class RepositorioAutorizacionesPg
   }
 
   async porId(copropiedadId: string, autorizacionId: string): Promise<Autorizacion | null> {
-    return this.conContexto(async (c) => this.leer(c, copropiedadId, autorizacionId));
+    return this.conContexto(copropiedadId, (c) => this.leer(c, copropiedadId, autorizacionId));
   }
 
   private async leer(
@@ -331,7 +331,7 @@ export class RepositorioAutorizacionesPg
     copropiedadId: string,
     personaId: string,
   ): Promise<readonly Autorizacion[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ id: string }>(
         `SELECT a.id
            FROM public.autorizaciones a
@@ -377,7 +377,7 @@ export class RepositorioAutorizacionesPg
   ): Promise<readonly Autorizacion[]> {
     if (criterio.placa === null && criterio.personaId === null) return [];
     // 15-Q · la misma lectura que la instantánea del Edge (RN-16): un solo sitio.
-    return this.conContexto((c) =>
+    return this.conContexto(copropiedadId, (c) =>
       leerAutorizaciones(
         c,
         copropiedadId,
@@ -392,7 +392,7 @@ export class RepositorioAutorizacionesPg
     copropiedadId: string,
     solo: 'activas' | 'historial',
   ): Promise<readonly AutorizacionEnLista[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         vivienda_id: string;
@@ -491,7 +491,7 @@ export class RepositorioAutorizacionesPg
     fotografia: FotografiaDeVisitante,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       await c.query('BEGIN');
       try {
         const evidencia = await c.query<{ id: string }>(
@@ -531,7 +531,7 @@ export class RepositorioAutorizacionesPg
     copropiedadId: string,
     autorizacionId: string,
   ): Promise<Pick<FotografiaDeVisitante, 'clave' | 'tipoMime'> | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ ruta: string; tipo_mime: string }>(
         `SELECT e.ruta, e.tipo_mime
            FROM public.autorizaciones a

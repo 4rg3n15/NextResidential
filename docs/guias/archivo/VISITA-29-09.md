@@ -1,6 +1,8 @@
+> **Archivada en la ronda 15-R (2026-10-03):** era la guía de los ajustes en el panel web de cada equipo para la visita del 29/09, que ya se hizo, y no contempla el Edge como puente de la 15-Q2 (ADR-035). Lo vigente pasó a [ENTREGA_EN_SITIO.md](../ENTREGA_EN_SITIO.md#8--lo-que-sigue-valiendo-de-las-visitas-archivadas).
+
 # Visita del 29/09 · los ajustes en la web de cada equipo
 
-> **ETAPA 15-M.** Complementa a [`ENTREGA_EN_SITIO.md`](ENTREGA_EN_SITIO.md), que
+> **ETAPA 15-M.** Complementa a [`ENTREGA_EN_SITIO.md`](../ENTREGA_EN_SITIO.md), que
 > sigue siendo el guion del día. Aquí va sólo lo que hay que tocar **en el panel
 > web de cada equipo** y cómo comprobar, desde la plataforma, que quedó bien.
 >
@@ -51,7 +53,7 @@
    pnpm sitio:ensayo -- --equipo="<nombre de la ficha>"
    ```
 5. La lista de verificación del final de
-   [`ETAPA-15M.md`](../etapas/ETAPA-15M.md#lista-de-verificación-en-sitio).
+   [`ETAPA-15M.md`](../../etapas/ETAPA-15M.md#lista-de-verificación-en-sitio).
 
 ---
 

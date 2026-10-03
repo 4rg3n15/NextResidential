@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
 import type { NextRequest } from 'next/server';
+import { conRecuperacionActiva } from '@/lib/recuperacion';
 import { configuracion } from '@/lib/configuracion';
 import { borrarSesion, guardarSesion, marcarFactorPendiente } from '@/lib/sesion/cookies';
 import { contrasenaValida, motivoDeRechazo } from '@/lib/politica-contrasena';
@@ -18,11 +19,9 @@ export const runtime = 'nodejs';
 /**
  * Establece la contraseña nueva a partir del enlace del correo.
  *
- * El canje del `token_hash` ocurre **en el servidor**: el token nunca pasa por
- * JavaScript de la página, y la sesión resultante va directa a la cookie
- * `httpOnly`. El enlace es de un solo uso porque Supabase invalida el hash al
- * canjearlo; no hay que implementarlo, pero sí hay que **no reintentar** en
- * silencio, o el segundo intento fallaría con un mensaje confuso.
+ * El canje del `token_hash` ocurre **en el servidor** (el token nunca pasa por
+ * la página) y la sesión va a la cookie `httpOnly`. El enlace es de un solo
+ * uso: Supabase invalida el hash al canjearlo, así que **no se reintenta**.
  *
  * Al terminar se registra el hecho en `auditoria_seguridad` de la API. Ese
  * registro es el único motivo por el que `/auth/restablecimiento` lleva
@@ -30,7 +29,7 @@ export const runtime = 'nodejs';
  */
 const POR_IP = new Limitador({ permitidos: 20, ventanaMs: 15 * 60_000 });
 
-export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
+export const POST = conRecuperacionActiva(async (peticion: NextRequest): Promise<NextResponse> => {
   const limite = POR_IP.consultar(ipDe(peticion.headers));
   if (!limite.admitido) {
     return NextResponse.json(
@@ -102,7 +101,7 @@ export const POST = async (peticion: NextRequest): Promise<NextResponse> => {
       { status: 503 },
     );
   }
-};
+});
 
 /**
  * El rastro es obligatorio, pero **su fallo no revierte el cambio**: la

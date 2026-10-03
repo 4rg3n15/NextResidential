@@ -18,7 +18,7 @@ import { z } from 'zod';
  *    EFÍMERA (`<expira>:<usuario>` + HMAC-SHA1), que caduca sola.
  *  · `WEBRTC_TURN_TTL_SEGUNDOS` — la vida de esa credencial (sin ella, 10 min).
  *
- * Dónde se aloja el TURN: PENDIENTE DE DEFINICIÓN (registro de la 15-Q2).
+ * Dónde se aloja el TURN: coturn en Compute Engine (P-29, 15-R) · `docs/guias/COTURN.md`.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const listaDe = (nombre: string, esquema: RegExp, ejemplo: string) =>

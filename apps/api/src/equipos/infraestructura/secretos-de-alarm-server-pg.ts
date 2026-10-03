@@ -38,7 +38,7 @@ import { conCliente } from '../../persistencia/con-cliente';
  * registra (RN-21, §2.7.8). La huella tampoco: es un identificador estable.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-const SAL_DE_LA_HUELLA = 'alarm-server';
+export const SAL_DE_LA_HUELLA = 'alarm-server'; // F2 (15-R) · también la rota la bóveda
 
 const CLAIMS_DE_LECTURA = JSON.stringify({
   rol: 'superadministrador',

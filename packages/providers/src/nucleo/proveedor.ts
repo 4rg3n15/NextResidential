@@ -12,10 +12,8 @@ import type {
  * ═════════════════════════════════════════════════════════════════════════════
  * C6 (ETAPA 15-M) · UNA SESIÓN DE AUDIO POR VIDEOPORTERO, NO UNA POR PROCESO
  *
- * El puerto del dominio `IntercomProvider` abre la sesión por dispositivo pero
- * envía, recibe, cierra y consulta SIN decir cuál: nació cuando había un solo
- * videoportero. Con N equipos eso obligaba al adaptador a recordar «la» sesión
- * (un `enSesion` único), y el segundo videoportero pisaba al primero.
+ * `IntercomProvider` abre la sesión por dispositivo pero envía, recibe, cierra y
+ * consulta SIN decir cuál; con N equipos el segundo pisaba al primero.
  *
  * Esto NO cambia el dominio (que sigue expresando intención sin protocolo):
  * añade, en el tipo del paquete, la forma con dispositivo. Un adaptador que la
@@ -36,15 +34,15 @@ import type { DiagnosticoDeVideo, OrigenDeVideo } from './video';
 import type { VeredictoRemoto } from './verificacion-remota';
 import type { NodoDeSalidas } from './salidas';
 
+/** 15-R · P-25 · en qué modo queda una salida: libre, bloqueada o su modo normal. */
+export type ModoDeSalida = 'libre' | 'bloqueada' | 'normal';
+
 /**
  * LO QUE TODO ADAPTADOR CUMPLE: los cuatro puertos del dominio, más UNA
- * pregunta que el dominio no hace y este paquete sí.
- *
- * `capacidadesDe` no es un puerto del dominio y no lo será: el motor de reglas
- * no necesita saber si un equipo tiene biblioteca de rostros. Quien lo necesita
- * es la composición —qué se le pide a qué aparato— y la consola —qué enseñar—.
- * Vive aquí, en el tipo del paquete, y la suite de contrato lo exige igual a
- * los tres adaptadores.
+ * pregunta que el dominio no hace y este paquete sí. `capacidadesDe` no es un
+ * puerto del dominio y no lo será: el motor no necesita saber si un equipo tiene
+ * biblioteca de rostros; lo necesitan la composición y la consola. La suite de
+ * contrato lo exige igual a los tres adaptadores.
  */
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -93,11 +91,7 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * rechaza. La credencial va dentro: nunca cruza a la presentación.
      */
     origenDeVideo(dispositivoId: string): Promise<OrigenDeVideo | null>;
-    /**
-     * V5 (15-N) · por qué no hay video, preguntado al equipo por RTSP. Lo pide
-     * la API sólo cuando el puente falló sin decir el código. Opcional: el
-     * simulado no tiene equipo al que preguntar.
-     */
+    /** V5 (15-N) · por qué no hay video, preguntado al equipo por RTSP (opcional). */
     sondearVideo?(dispositivoId: string): Promise<DiagnosticoDeVideo>;
     /**
      * A4 (15-L) · ¿el equipo decide por su cuenta —una cámara sin control de la
@@ -131,13 +125,17 @@ export type ProveedorDeEquipos = AccessPointProvider &
      * módulo → salida (`nucleo/salidas.ts`). Opcional: sólo quien sabe leerlas.
      */
     salidasDe?(dispositivoId: string): Promise<NodoDeSalidas>;
-    /**
-     * 15-P · P3 · abre UNA salida (orden `open`): la consola elige la puerta.
-     * Dejarla libre o bloqueada no existe aquí (PENDIENTE DE DEFINICIÓN).
-     */
+    /** 15-P · P3 · abre UNA salida (orden `open`): la consola elige la puerta. */
     abrirSalida?(
       dispositivoId: string,
       numeroDePuerta: number,
+      actorId: string,
+    ): Promise<ResultadoAccionamiento>;
+    /** 15-R · P-25 · la deja libre (`alwaysOpen`), bloqueada (`alwaysClose`) o normal. */
+    fijarModoDeSalida?(
+      dispositivoId: string,
+      numeroDePuerta: number,
+      modo: ModoDeSalida,
       actorId: string,
     ): Promise<ResultadoAccionamiento>;
     /** C6 (15-M) · la sesión de audio POR EQUIPO. Ver `IntercomPorEquipo`. */

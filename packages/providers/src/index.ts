@@ -48,7 +48,7 @@ export {
   desvioDelReloj,
   desvioEnPalabras,
 } from './nucleo/reloj-del-equipo';
-export type { ProveedorDeEquipos } from './nucleo/proveedor';
+export type { ModoDeSalida, ProveedorDeEquipos } from './nucleo/proveedor';
 export type { VeredictoRemoto } from './nucleo/verificacion-remota';
 
 // ── Los dos adaptadores y su punto de composición ────────────────────────────

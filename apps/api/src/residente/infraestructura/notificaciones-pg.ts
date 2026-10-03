@@ -34,7 +34,7 @@ export class NotificacionesDelResidentePg
       readonly plataforma: 'ios' | 'android' | 'web';
     },
   ): Promise<{ readonly id: string }> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ id: string }>(
         `INSERT INTO public.dispositivos_de_notificacion
            (copropiedad_id, usuario_id, instalacion_id, token, plataforma,

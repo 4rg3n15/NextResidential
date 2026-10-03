@@ -3,6 +3,7 @@ import { ProveedorRemoto } from '@ncr/providers';
 import type {
   EscuchaActiva,
   FuenteDePlacas,
+  ModoDeSalida,
   ProveedorDeEquipos,
   VeredictoRemoto,
 } from '@ncr/providers';
@@ -20,11 +21,8 @@ import type { TunelesDeEdge } from './tuneles-de-edge';
  * `RutasDeEquipos` por dónde va su equipo. Ningún consumidor cambia (OCP).
  *
  * R1 · los métodos OPCIONALES del puerto existen aquí si y sólo si los tiene el
- * directo: un consumidor que pregunta «¿hay `sondearVideo`?» recibe la misma
- * respuesta que antes de la 15-Q2.
- *
- * B3 · `escuchar` un equipo de un conjunto con puente NO abre nada desde la
- * nube: lo escucha el Edge, y lo que oye llega como publicación por el túnel.
+ * directo. B3 · `escuchar` un equipo con puente NO abre nada desde la nube: lo
+ * escucha el Edge, y lo que oye llega como publicación por el túnel.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const OPCIONALES = [
@@ -34,6 +32,7 @@ const OPCIONALES = [
   'senalDeEventos',
   'salidasDe',
   'abrirSalida',
+  'fijarModoDeSalida',
   'enviarAudioA',
   'recibirAudioDe',
   'cerrarSesionDe',
@@ -62,7 +61,6 @@ export class ProveedorEnrutado implements ProveedorDeEquipos {
     }
   }
 
-  /** El proveedor que llega a ESTE equipo. */
   async hacia(dispositivoId: string): Promise<ProveedorDeEquipos> {
     const copropiedad = await this.rutas.puenteDe(dispositivoId);
     this.vistos.set(dispositivoId, copropiedad);
@@ -95,7 +93,6 @@ export class ProveedorEnrutado implements ProveedorDeEquipos {
     return metodo.bind(p) as Opcionales[K];
   }
 
-  // ── Los puertos del dominio ───────────────────────────────────────────────
   async abrir(id: string, actorId: string) {
     return (await this.hacia(id)).abrir(id, actorId);
   }
@@ -176,6 +173,9 @@ export class ProveedorEnrutado implements ProveedorDeEquipos {
   }
   async abrirSalida(id: string, puerta: number, actorId: string) {
     return this.opcional(await this.hacia(id), 'abrirSalida')(id, puerta, actorId);
+  }
+  async fijarModoDeSalida(id: string, puerta: number, modo: ModoDeSalida, actorId: string) {
+    return this.opcional(await this.hacia(id), 'fijarModoDeSalida')(id, puerta, modo, actorId);
   }
   async enviarAudioA(id: string, fragmento: Uint8Array) {
     return this.opcional(await this.hacia(id), 'enviarAudioA')(id, fragmento);

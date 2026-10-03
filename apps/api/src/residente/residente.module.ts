@@ -49,15 +49,13 @@ import {
   SupervisionDeResidentesController,
 } from './presentacion/supervision-de-residentes.controller';
 import { PROVEEDORES_DEL_HOGAR } from './hogar.providers';
+import { PROVEEDORES_DE_WEB_PUSH } from './web-push.providers';
+import { MisAvisosWebController } from './presentacion/mis-avisos-web.controller';
 
 /**
- * Módulo de la superficie del residente.
- *
- * No exporta su puerto: **nadie más lee por aquí**. El padrón sigue siendo el
- * dueño de las escrituras del padrón y este módulo no las toca; lo único que
+ * Módulo de la superficie del residente. No exporta su puerto: **nadie más lee
+ * por aquí**. El padrón sigue siendo el dueño de sus escrituras; lo único que
  * comparte con el resto es el ámbito del dominio, que vive en `domain-core`.
- * Que el barril no exporte nada operativo es la señal de que la frontera está
- * donde debe (§2.2).
  */
 @Module({})
 export class ResidenteModule {
@@ -73,8 +71,8 @@ export class ResidenteModule {
       imports: [BiometriaModule.registrar()],
       controllers: [
         MiController,
-        // 15-L · lo que le importa al residente, desde la API (sin push).
-        MisNotificacionesController,
+        MisNotificacionesController, // 15-L · la bandeja, desde la API.
+        MisAvisosWebController, // 15-R · B3 · avisos al teléfono por Web Push.
         // ETAPA 15-I · primer ingreso, ocupantes, perfil, vehículos propios y
         // su supervisión por el superadministrador.
         MiAltaController,
@@ -88,10 +86,11 @@ export class ResidenteModule {
       ],
       providers: [
         ...PROVEEDORES_DEL_HOGAR,
+        ...PROVEEDORES_DE_WEB_PUSH,
         {
           provide: DIRECTORIO_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new DirectorioDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new DirectorioDelResidentePg(pool),
         },
         ResolverMiAmbito,
         {
@@ -124,17 +123,17 @@ export class ResidenteModule {
         {
           provide: AUTORIZACIONES_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new AutorizacionesDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new AutorizacionesDelResidentePg(pool),
         },
         {
           provide: ZONAS_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new ZonasDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new ZonasDelResidentePg(pool),
         },
         {
           provide: NOTIFICACIONES_DEL_RESIDENTE,
           inject: [Pool],
-          useFactory: (pool: Pool) => new NotificacionesDelResidentePg(pool, {}),
+          useFactory: (pool: Pool) => new NotificacionesDelResidentePg(pool),
         },
         {
           provide: CrearMiAutorizacion,

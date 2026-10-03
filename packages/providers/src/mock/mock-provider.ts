@@ -16,7 +16,7 @@ import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import type { EscuchaActiva } from '../nucleo/escucha';
 import type { OrigenDeVideo } from '../nucleo/video';
 import { CAPACIDADES_COMPLETAS, CAPACIDADES_SIN_CONSULTAR } from '../nucleo/capacidades';
-import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { ModoDeSalida, ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 import type { NodoDeSalidas } from '../nucleo/salidas';
 import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
@@ -38,22 +38,16 @@ export interface OpcionesMock {
   /** Dispositivos que el simulador reconoce. Cualquier otro está fuera de línea. */
   readonly dispositivos?: readonly string[];
   /**
-   * 15-K (§4) · además de la lista fija, un equipo que el REGISTRO conoce. Con
-   * PostgreSQL y el simulado —la configuración por omisión— el simulado sólo
-   * conocía `disp-porteria` y `disp-talanquera`, así que toda orden a un
-   * equipo dado de alta en la consola fallaba. ADR-03 exige que el sistema
-   * funcione completo contra el simulado, también con base real.
+   * 15-K (§4) · además de la lista fija, un equipo que el REGISTRO conoce: sin
+   * esto toda orden a un equipo dado de alta en la consola fallaba (ADR-03).
    */
   readonly conocido?: (dispositivoId: string) => Promise<boolean>;
 }
 
 /**
- * `MockProvider` — el adaptador que hace cierta la ADR-03.
- *
- * Implementa **los cuatro puertos de proveedor** con la misma firma que
- * implementará `HikvisionProvider` en la ETAPA 15. Que sean intercambiables sin
- * cambiar una sola aserción es la verificación de LSP (§2.3) y de KPI-12: la
- * suite completa corre sin hardware.
+ * `MockProvider` — el adaptador que hace cierta la ADR-03: los cuatro puertos
+ * con la firma de `HikvisionProvider`; intercambiables sin cambiar una
+ * aserción (LSP, KPI-12).
  *
  * Es una única clase y no cuatro porque simula **un equipo**, y el estado que
  * comparte —qué dispositivos existen, qué canal de audio está ocupado— es el
@@ -83,6 +77,8 @@ export class MockProvider
   readonly aperturas: { dispositivoId: string; actorId: string; numeroDePuerta?: number }[] = [];
   /** Bloqueos vigentes por dispositivo (H-3): estado, no pulso. */
   readonly bloqueos = new Map<string, boolean>();
+  /** 15-R · P-25 · el modo de cada salida, por `equipo:puerta`. */
+  readonly modosDeSalida = new Map<string, ModoDeSalida>();
   /** Veredictos devueltos a terminales que esperaban (A2), para afirmar sobre ellos. */
   readonly veredictos: { dispositivoId: string; veredicto: VeredictoRemoto }[] = [];
   readonly plantillas = new Map<string, Set<string>>();
@@ -174,6 +170,16 @@ export class MockProvider
     return { aceptado: true, latenciaMs: latencia };
   }
 
+  async fijarModoDeSalida(
+    dispositivoId: string,
+    numeroDePuerta: number,
+    modo: ModoDeSalida,
+  ): Promise<ResultadoAccionamiento> {
+    const latencia = await this.conReintentos(dispositivoId, 'abrir');
+    this.modosDeSalida.set(`${dispositivoId}:${String(numeroDePuerta)}`, modo);
+    return { aceptado: true, latenciaMs: latencia };
+  }
+
   async estado(dispositivoId: string): Promise<'en_linea' | 'fuera_de_linea' | 'degradado'> {
     if (!(await this.conoce(dispositivoId))) return 'fuera_de_linea';
     return this.azar.ocurre(this.perfil.probabilidadDeFallo) ? 'degradado' : 'en_linea';
@@ -231,16 +237,10 @@ export class MockProvider
   }
 
   /**
-   * Emite una lectura **por el camino de la cámara real**: construye el XML que
-   * el equipo POSTea al Alarm Server y lo hace pasar por el mismo analizador
-   * que usará la ETAPA 15.
-   *
-   * POR QUÉ, y es la diferencia entre un simulado útil y uno decorativo: hasta
-   * ahora `emitirLectura` fabricaba directamente un `LecturaDePlaca` —la forma
-   * de salida—, así que la suite completa corría sin que nadie hubiera
-   * analizado nunca un XML. El día que llegara el equipo, el analizador sería
-   * código recién escrito estrenándose contra hardware. Ahora la normalización
-   * está ejercida desde hoy, y lo que la 15 sustituye es el transporte.
+   * Emite una lectura **por el camino de la cámara real**: el XML que el equipo
+   * POSTea al Alarm Server, por el mismo analizador. Antes se fabricaba el
+   * `LecturaDePlaca` directamente y ningún XML se analizaba hasta tener equipo:
+   * así la normalización está ejercida desde hoy y la 15 sólo cambia transporte.
    */
   async emitirComoCamaraAnpr(placa: string, dispositivoId: string): Promise<LecturaDePlaca> {
     const ahora = this.reloj.ahora();

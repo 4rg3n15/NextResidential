@@ -20,8 +20,7 @@ import { RepositorioTableroEnMemoria } from './infraestructura/repositorio-table
 import { RepositorioTableroPg } from './infraestructura/repositorio-tablero-pg';
 import { TableroController } from './presentacion/tablero.controller';
 import { DispositivosController } from './presentacion/dispositivos.controller';
-import { OPERACIONES_DE_DISPOSITIVO } from './aplicacion/operaciones-de-dispositivo';
-import { OperacionesEnMemoria } from './infraestructura/operaciones-en-memoria';
+import { PROVEEDOR_DE_OPERACIONES } from './infraestructura/composicion-de-operaciones';
 
 /**
  * Raíz de composición del tablero.
@@ -46,8 +45,7 @@ export class TableroModule {
       imports: [EquiposModule.registrar()],
       controllers: [TableroController, DispositivosController],
       providers: [
-        OperacionesEnMemoria,
-        { provide: OPERACIONES_DE_DISPOSITIVO, useExisting: OperacionesEnMemoria },
+        PROVEEDOR_DE_OPERACIONES,
         {
           provide: REPOSITORIO_TABLERO,
           inject: [CONFIGURACION, Pool, BITACORA, REPOSITORIO_EVENTOS, REPOSITORIO_ALERTAS],

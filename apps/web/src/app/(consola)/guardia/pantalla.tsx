@@ -547,8 +547,8 @@ export const PantallaDeGuardiaVirtual = ({
 
                   {avisar.isSuccess ? (
                     <p aria-live="polite" className="text-secundario text-exito-texto">
-                      Aviso registrado en Alertas. Todavía no le llega a la app del residente:
-                      avísele por teléfono o por el citófono.
+                      {avisar.data?.detalle ??
+                        'Aviso registrado. Si no le llega a la app del residente, avísele por teléfono.'}
                     </p>
                   ) : null}
                   {emergencia.isSuccess ? (

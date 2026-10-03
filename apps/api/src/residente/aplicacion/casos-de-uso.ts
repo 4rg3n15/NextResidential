@@ -56,7 +56,7 @@ export class ResolverMiAmbito {
     ctx: ContextoTenant,
     copropiedadId: string,
   ): Promise<Resultado<MiAmbito, ErrorDominio>> {
-    const vinculo = await this.directorio.vinculoDe(ctx.usuarioId);
+    const vinculo = await this.directorio.vinculoDe(ctx.usuarioId, ctx.copropiedadId);
     const resuelto = ambitoDelResidente(
       copropiedadId,
       vinculo === null

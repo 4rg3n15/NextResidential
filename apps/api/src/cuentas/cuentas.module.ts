@@ -6,7 +6,7 @@ import type { Bitacora, Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { VerificadorDeJwt } from '../autenticacion';
-import { IntentosDeAcceso, PresenciaDeSuperadministrador } from '../plataforma';
+import { IntentosDeAcceso } from '../plataforma';
 import { BITACORA_DE_IDENTIDAD } from '../comun/bitacora-de-identidad';
 import type { BitacoraDeIdentidad } from '../comun/bitacora-de-identidad';
 import {
@@ -31,7 +31,7 @@ import { RegistroDeGanchosDeSesion } from './aplicacion/ganchos-de-sesion';
 import { IniciarSesion } from './aplicacion/iniciar-sesion';
 import { CambiarContrasena } from './aplicacion/cambiar-contrasena';
 import { RestablecerContrasena } from './aplicacion/restablecer-contrasena';
-import { CerrarSesion } from './aplicacion/cerrar-sesion';
+import { PROVEEDOR_DEL_CIERRE } from './composicion-del-cierre';
 import { CrearCuentaPorUsuario } from './aplicacion/crear-cuenta';
 import { CuentasSupabase } from './infraestructura/cuentas-supabase';
 import { LectorDeTokenVerificado } from './infraestructura/lector-de-token';
@@ -139,15 +139,7 @@ export class CuentasModule {
             reloj: Reloj,
           ) => new RestablecerContrasena(a, r, g, b, reloj),
         },
-        {
-          provide: CerrarSesion,
-          inject: [PROVEEDOR_DE_IDENTIDAD, GANCHOS_DE_SESION, PresenciaDeSuperadministrador],
-          useFactory: (
-            p: ProveedorDeIdentidad,
-            g: GanchosDeSesion,
-            presencia: PresenciaDeSuperadministrador,
-          ) => new CerrarSesion(p, g, presencia),
-        },
+        PROVEEDOR_DEL_CIERRE, // E4 (15-R) · la revocación remota se reintenta.
         {
           provide: CrearCuentaPorUsuario,
           inject: [ADMINISTRADOR_DE_CUENTAS, REPOSITORIO_DE_CUENTAS],

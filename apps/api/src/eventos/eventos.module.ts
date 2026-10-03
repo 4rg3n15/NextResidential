@@ -68,13 +68,15 @@ import {
 } from './aplicacion/consultar-eventos';
 import { VigilarLatidos } from './aplicacion/vigilancia-latidos';
 import { CanalEnProceso } from './infraestructura/canal-en-proceso';
+import {
+  FlujoDirectoController,
+  PROVEEDOR_DE_BILLETES_DEL_FLUJO,
+} from './presentacion/flujo-directo.controller';
 import { RepositorioEventosPgDeServicio } from './infraestructura/repositorio-eventos-pg-de-servicio';
 import { RepositorioAlertasPg } from './infraestructura/repositorio-alertas-pg';
 import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
-import {
-  AlmacenEvidenciaFirmado,
-  NotificadorPushRegistrado,
-} from './infraestructura/evidencia-y-push';
+import { AlmacenEvidenciaFirmado } from './infraestructura/evidencia-y-push';
+import { PROVEEDOR_DEL_NOTIFICADOR_PUSH } from './infraestructura/web-push/composicion-del-notificador';
 import {
   RepositorioAlertasEnMemoria,
   RepositorioDispositivosEnMemoria,
@@ -125,16 +127,15 @@ export class EventosModule {
         InformesController,
         // 15-L (B2) · accesos y eventos de equipo en una sola línea de tiempo.
         LineaDeTiempoController,
+        FlujoDirectoController, // 15-R · D1 · el SSE directo con billete (P-20).
       ],
       providers: [
+        PROVEEDOR_DE_BILLETES_DEL_FLUJO,
         {
           /**
-           * ETAPA 15-E · el histórico va a PostgreSQL por omisión. La nota de
-           * arriba («sin contraseña de PostgreSQL») dejó de ser cierta en la
-           * 09-B, cuando el `Pool` único empezó a servir al padrón y a las
-           * autorizaciones; el histórico se quedó en memoria por inercia. Se
-           * elige por configuración y el arranque dice cuál quedó activo,
-           * igual que el proveedor de equipos y el cargador de contexto.
+           * ETAPA 15-E · el histórico va a PostgreSQL por omisión (desde la
+           * 09-B el `Pool` único ya servía al padrón). Se elige por
+           * configuración y el arranque dice cuál quedó activo.
            */
           provide: REPOSITORIO_EVENTOS,
           inject: [CONFIGURACION, Pool, BITACORA],
@@ -220,11 +221,7 @@ export class EventosModule {
           useFactory: (bitacora: Bitacora) => new CanalEnProceso(bitacora),
         },
         { provide: CANAL_TIEMPO_REAL, useExisting: CanalEnProceso },
-        {
-          provide: NOTIFICADOR_PUSH,
-          inject: [BITACORA],
-          useFactory: (bitacora: Bitacora) => new NotificadorPushRegistrado(bitacora),
-        },
+        PROVEEDOR_DEL_NOTIFICADOR_PUSH, // 15-R · B1: Web Push (ADR-036), o 0 sin llaves.
         {
           provide: ALMACEN_EVIDENCIA,
           /**
@@ -537,6 +534,7 @@ export class EventosModule {
         VigilarLatidos,
         EscalarAlerta,
         ESCALAMIENTO_DE_ALERTA,
+        NOTIFICADOR_PUSH, // 15-R · DT-15N-02: el aviso de la guardia llega al residente.
         REPOSITORIO_EVENTOS_DE_EQUIPO,
         REGISTRO_DE_EVENTOS_DE_EQUIPO,
       ],

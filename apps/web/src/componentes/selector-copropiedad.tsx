@@ -4,20 +4,17 @@ import type { JSX } from 'react';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CopropiedadResumen } from '@ncr/contracts';
+import { usarCambioDeCopropiedad } from '@/lib/usar-cambio-de-copropiedad';
 
 /**
  * Conmutador de copropiedad de la cabecera.
  *
- * Solo aparece cuando el alcance incluye más de una: al superadministrador
- * (todas) y al operador de central (las de su turno). Un administrador tiene
- * una y ver un desplegable de un elemento sugeriría que hay algo que elegir.
+ * Solo aparece con más de una en el alcance (superadministrador, operador).
  *
- * **La elección no viaja en la URL ni en un campo del cliente.** Va a una ruta
- * del servidor que la contrasta contra el catálogo y la guarda en una cookie
- * `httpOnly`; después se recarga el árbol del servidor para que las pantallas
- * la lean del mismo sitio que siempre. Si la elección viajara por la URL, el
- * identificador sería un dato que el usuario controla — la API lo rechazaría
- * con 404, pero la consola estaría invitando a intentarlo.
+ * **La elección no viaja en la URL ni en un campo del cliente.** Una ruta del
+ * servidor la contrasta con el catálogo y la guarda en una cookie `httpOnly`;
+ * después se recarga el árbol. Por la URL sería un dato que el usuario controla.
+ * Del clic al final de la recarga, ninguna escritura sale (H-15K-01).
  */
 export const SelectorDeCopropiedad = ({
   disponibles,
@@ -31,11 +28,13 @@ export const SelectorDeCopropiedad = ({
   const router = useRouter();
   const [pendiente, iniciarTransicion] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const cambio = usarCambioDeCopropiedad(pendiente); // E1 (15-R) · H-15K-01
 
   if (disponibles.length <= 1) return null;
 
   const cambiar = (id: string): void => {
     setError(null);
+    cambio.empezar();
     void (async () => {
       const respuesta = await fetch('/api/sesion/copropiedad', {
         method: 'POST',
@@ -45,9 +44,11 @@ export const SelectorDeCopropiedad = ({
       }).catch(() => null);
 
       if (respuesta === null || !respuesta.ok) {
+        cambio.fallar();
         setError('No se pudo cambiar de copropiedad. Vuelve a intentarlo.');
         return;
       }
+      cambio.recargar();
       iniciarTransicion(() => router.refresh());
     })();
   };
@@ -60,7 +61,7 @@ export const SelectorDeCopropiedad = ({
       <select
         id="selector-copropiedad"
         value={activa ?? ''}
-        disabled={pendiente}
+        disabled={pendiente || cambio.cambiando}
         onChange={(e) => cambiar(e.target.value)}
         className="h-9 max-w-[16rem] rounded-campo border border-borde bg-tarjeta px-2 text-cuerpo text-texto disabled:opacity-60"
       >
@@ -75,10 +76,9 @@ export const SelectorDeCopropiedad = ({
           Alcance global · {disponibles.length} copropiedades
         </span>
       ) : null}
-      {/* El error se anuncia: un cambio que no ocurre y no dice nada deja al
-          operador mirando los datos de la copropiedad equivocada. */}
+      {/* El error se anuncia: un cambio mudo deja mirando la copropiedad equivocada. */}
       <span role="status" aria-live="polite" className="sr-only">
-        {pendiente ? 'Cambiando de copropiedad' : ''}
+        {pendiente || cambio.cambiando ? 'Cambiando de copropiedad' : ''}
       </span>
       {error !== null ? (
         <span role="alert" className="text-secundario text-peligro">

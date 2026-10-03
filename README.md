@@ -5,7 +5,7 @@ Plataforma SaaS multiempresa de control de acceso para copropiedades —villas, 
 > **Principio rector del producto** > **Next Control decide. El hardware ejecuta.**
 > La cámara opera en modo evento: reporta, no decide. Si el hardware resolviera la apertura por su cuenta, el motor de reglas quedaría decorativo y se perdería la trazabilidad que sostiene la auditoría.
 
-**Estado:** en desarrollo activo · **8 de 17 etapas cerradas** · siguiente habilitada: ETAPA 09 (consola web)
+**Estado:** en desarrollo activo · **15 de 17 etapas cerradas** (00 a 14) y las rondas de la ETAPA 15 hasta la **15-R** (2026-10-03) · la ETAPA 15 sigue **bloqueada sólo por BE-02** (los tres hitos técnicos con el equipo real) · la ETAPA 16 es ejecutable · detalle en [`docs/ESTADO_ETAPAS.md`](docs/ESTADO_ETAPAS.md)
 **Rama de integración:** `develop`
 **Documento de gobierno:** [`CLAUDE.md`](./CLAUDE.md) — contrato de trabajo v3.0
 
@@ -77,6 +77,17 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **15-B a 15-E** | Integración Hikvision · la mitad que no necesita hardware              | `HikvisionProvider` con los cuatro puertos, alta de equipos desde la consola con la clave cifrada, el hardware elegido **por capacidades** (ADR-019), y en la **15-E**: apertura, intercom y placas por los puertos del proveedor, verificación remota de la terminal, CU-02 contra PostgreSQL con el enlace del visitante, llamada del videoportero con audio persistente, **vista en vivo por WHEP a través de la API** (ADR-022) y la hoja de resultados de los 16 escenarios de sitio. **La ETAPA 15 sigue BLOQUEADA**: nada de esto se ejecutó contra un aparato                                                                                        |
 | **15-H**        | Bloque B, sesión 1 · identidad por usuario y portería (extensión E-02) | El portero entra con **usuario y NIT** (correo sintético `.invalid` que no sale de la API, ADR-023); el primer ingreso obliga a cambiar la contraseña **en el servidor**; el turno se impone en **cada petición** con el reloj inyectado y el patrullaje bloquea la sesión en la base (ADR-024); el superadministrador supervisa porteros, turnos y una bitácora append-only. [Informe](docs/etapas/ETAPA-15-H-identidad-y-porteria.md)                                                                                                                                                                                                                      |
 | **15-I**        | Residentes y app · hasta la puerta del sitio                           | Acceso por **código corto** de la copropiedad, usuario y contraseña en app y consola (D1); primer ingreso con cambio de contraseña, alta del residente con su vivienda y **ocupantes definitivos** (D6); vehículos propios con **tope de 2 por vivienda en la base** (D5 a, ADR-026) y de terceros por día y franja (D5 b); punto de extensión de aprobación que **falla cerrado** (D5 c, ADR-027); QR y «compartir» del consentimiento del visitante; cámara real del teléfono; listas negras desde la consola (HU-35); y el **ensayo de los 16 escenarios por canal contra base real**, en SIMULADO. [Informe](docs/etapas/ETAPA-15-I-residentes-y-app.md) |
+
+| **15-K** | Hallazgos de la primera visita a sitio (extensión E-04) | Lo que el 26/09 impidió ejecutar los escenarios, corregido; consentimiento presencial del titular (ADR-029) y atestación del instalador (ADR-030). [Informe](docs/etapas/ETAPA-15-K-hallazgos-de-sitio.md) |
+| **15-L** | Entrega final en sitio (extensión E-05) | Comunicación bilateral con los tres equipos, línea de tiempo de eventos de equipo, porteros por número con lista blanca de IP y modo pruebas (ADR-031), y el consentimiento **declarado por quien registra** (ADR-032) |
+| **15-M** | Visita del 29/09 (extensión E-06) | Terminal y videoportero, video en vivo, indicadores y **el residente también en la consola web** (D-12, C-44): las ocho pantallas bajo `/mi` |
+| **15-N** | Video y guardia | Video en vivo en los tres equipos (SDP con CRLF, RTSP Digest limpio), la cola de atención que sólo trae lo que necesita a una persona (P-22) y la guardia que se abre sola |
+| **15-O** | Resiliencia ante PostgreSQL | Un corte de la base ya no tumba la API: 503 por conexión, pg-boss que se recupera, `/ready` con la base y presupuesto de conexiones |
+| **15-P** | Guardia: intercom y puertas | Audio bidireccional con **pulsar para hablar** y turno de palabra, salidas del videoportero descubiertas y **apertura por punto**; ADR-001 enmendado |
+| **15-Q** | Edge en sitio | Instantánea de reglas versionada e identidad del Edge; decide y acciona con los equipos reales sin WAN. DoD: 30 min sin WAN, 20 accesos, los 20 en la nube una sola vez |
+| **15-Q2** | El Edge como puente (P-27 = A) | **El Edge es el único que habla con los equipos** ([ADR-035](docs/decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md)): túnel saliente a la API, la nube decide y el Edge ejecuta; credenciales de los equipos sólo en el Edge; audio y video a través de él |
+| **15-U** | Vulnerabilidades de dependencias | NestJS 11 y Express 5: `pnpm audit --prod` de **12 a 0** sin tocar una aserción (AR-02 se corrige, no se acepta) |
+| **15-R** | Huecos funcionales y decisiones del cliente | MFA y bloqueos que sobreviven al reinicio; **avisos por Web Push sin Firebase** ([ADR-036](docs/decisiones/ADR-036-avisos-por-web-push-sin-firebase.md)); puerta **libre o bloqueada** con vuelta automática (P-25); SSE y audio **directos a la API** con billete de un solo uso (P-20); cuarentena en el Edge (P-31); rotación de la llave de la bóveda; [aceptaciones de riesgo](docs/seguridad/ACEPTACIONES_DE_RIESGO.md). [Informe](docs/etapas/ETAPA-15R.md) |
 
 **Métricas al cierre de la ETAPA 11:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
@@ -219,49 +230,48 @@ flowchart TB
   API --> SB
   WEB --> SB
   API --> CF
-  EDGE -. "reconciliación con clave de idempotencia" .-> API
+  EDGE -. "túnel saliente · eventos, órdenes y reconciliación" .-> API
 ```
 
 ### El Edge sin WAN
 
-> **Corregido en la 15-Q2:** P-27 = A, el Edge es el **puente local permanente** ([ADR-035](docs/decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md)); lo que sigue describe la 15-Q y se rehace en esa ronda.
-
-El Edge es **contingencia** (ADR-034, P-27 = B): la nube sigue hablando con los equipos y el Edge los escucha en paralelo. Por cada acceso pregunta si la nube puede decidir; sólo si no puede, decide con su caché, **acciona** la barrera o contesta a la terminal, y guarda el acceso. Mire la última flecha, la tachada: al reconectar, el Edge **no vuelve a decidir**. Envía lo que ya decidió, con la versión de reglas que usó.
+Desde la 15-Q2 (P-27 = A, [ADR-035](docs/decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md)) el Edge es el **puente local permanente**: es el único que habla con los equipos del conjunto, **con y sin WAN**. La API en la nube no tiene ruta hacia la red privada del conjunto, así que todo lo que pide la consola viaja por un túnel que el Edge abre **hacia fuera**. Con WAN, **la nube decide** y el Edge ejecuta; sin ella, el Edge decide con su caché de reglas —el mismo `domain-core`—, acciona y reconcilia al volver. Nunca deciden los dos. Mire la última flecha: al reconectar, el Edge **no vuelve a decidir**; envía lo que ya decidió, con la versión de reglas que usó.
 
 ```mermaid
 flowchart LR
-  EQ["Equipos · cámara, terminal, videoportero"] --> NUBE["API · decide y acciona"]
-  EQ --> EDGE["Edge · escucha en paralelo"]
-  EDGE --> P{"¿La nube puede decidir?"}
-  P -- "sí" --> NADA["El Edge no hace nada"]
+  EQ["Equipos · cámara, terminal, videoportero"] --> EDGE["Edge · el único que habla con ellos"]
+  EDGE -- "túnel saliente" --> P{"¿Responde la nube a tiempo?"}
+  P -- "sí" --> NUBE["API · decide con el motor de siempre"]
+  NUBE -- "orden por el túnel" --> ACC["El Edge acciona · barrera, terminal, puerta"]
   P -- "no" --> CACHE[("Caché de reglas versionada · hash verificado")]
   CACHE --> LOCAL["Decisión local que sella la VersiónDeReglas"]
-  LOCAL --> ACC["Acciona · barrera o veredicto a la terminal"]
-  ACC --> BAND[("Bandeja de salida · clave de idempotencia")]
+  LOCAL --> ACC
+  LOCAL --> BAND[("Bandeja de salida · clave de idempotencia")]
   BAND --> REC["Reconciliación ordenada al reconectar"]
   REC --> EVT[("eventos · append-only, exactamente una vez")]
   NUBE --> EVT
   REC -. "NO vuelve a decidir" .-x LOCAL
 ```
 
-Si la regla no está en la caché, **niega**; la política de contingencia es configurable, pero «escalar al portero» sin WAN también niega mientras no se defina qué significa sin nube (P-28, §2.1.4 del contrato).
+Las credenciales de los equipos viven **sólo en el Edge**, cifradas con su propia llave; la nube guarda una referencia y una huella. Audio y video de la guardia también pasan por él (go2rtc junto al Edge). Si la regla no está en la caché, **niega**; «escalar al portero» sin WAN también niega mientras no se defina qué significa sin nube (P-28). Un evento que la nube **rechaza** una y otra vez no bloquea la bandeja: tras los intentos configurados pasa a una cuarentena con su motivo y queda alerta en la nube (P-31, 15-R); un corte de red no cuenta como rechazo. Operación: [`DESPLIEGUE_EDGE.md`](docs/guias/DESPLIEGUE_EDGE.md) §10.
 
 ---
 
 ## 4. Stack tecnológico
 
-| Capa                                      | Tecnología                                  | Por qué                                                         |
-| ----------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
-| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)                       | RLS nativa como segunda barrera de aislamiento                  |
-| API y lógica de negocio                   | NestJS 11 (Express 5) + TypeScript estricto | Inyección de dependencias que hace natural el patrón de puertos |
-| Colas y trabajos programados              | pg-boss                                     | Sobre el mismo PostgreSQL: una pieza menos que operar           |
-| Consola web / escritorio                  | Next.js + Tailwind + shadcn/ui              | PWA instalable y empaquetado de escritorio desde una sola base  |
-| Aplicación móvil                          | Flutter                                     | iOS y Android desde un código                                   |
-| Push                                      | Firebase Cloud Messaging                    |                                                                 |
-| Edge Gateway                              | Node.js + SQLite                            | Reutiliza el dominio sin modificarlo                            |
-| Video al navegador                        | go2rtc                                      | RTSP → WebRTC                                                   |
-| Intercom                                  | ISAPI TwoWayAudio                           | Ver ADR-001                                                     |
-| Contratos                                 | OpenAPI generado desde NestJS               | El cliente Dart se genera, nunca se escribe a mano              |
+| Capa                                      | Tecnología                                                                            | Por qué                                                                                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base de datos, auth, storage, tiempo real | Supabase (PostgreSQL)                                                                 | RLS nativa como segunda barrera de aislamiento                                                                                                        |
+| API y lógica de negocio                   | NestJS 11 (Express 5) + TypeScript estricto                                           | Inyección de dependencias que hace natural el patrón de puertos                                                                                       |
+| Colas y trabajos programados              | pg-boss                                                                               | Sobre el mismo PostgreSQL: una pieza menos que operar                                                                                                 |
+| Consola web / escritorio                  | Next.js + Tailwind + shadcn/ui                                                        | PWA instalable y empaquetado de escritorio desde una sola base                                                                                        |
+| Aplicación móvil                          | Flutter                                                                               | iOS y Android desde un código                                                                                                                         |
+| Push                                      | **Web Push estándar (VAPID), sin Firebase**                                           | ADR-036: a la consola del residente instalada como PWA; ningún SDK ni cuenta de terceros. Android: APK firmado; iPhone: la PWA                        |
+| Edge Gateway                              | Node.js + SQLite                                                                      | Reutiliza el dominio sin modificarlo                                                                                                                  |
+| Video al navegador                        | go2rtc                                                                                | RTSP → WebRTC                                                                                                                                         |
+| Intercom                                  | ISAPI TwoWayAudio                                                                     | Ver ADR-001                                                                                                                                           |
+| Despliegue                                | Consola en Netlify · API en Cloud Run (una instancia) · TURN coturn en Compute Engine | ADR-028, P-20, P-30, P-29: SSE y audio van directos a la API; el TURN, sólo para el video desde redes difíciles ([`COTURN.md`](docs/guias/COTURN.md)) |
+| Contratos                                 | OpenAPI generado desde NestJS                                                         | El cliente Dart se genera, nunca se escribe a mano                                                                                                    |
 
 ---
 
@@ -592,9 +602,10 @@ el resto del código:
    desenlace bueno no dice «listo» sino a quién se le pidió — porque hasta que
    ese alguien responda, la foto no viaja a ninguna terminal (RN-09, RN-10).
 
-**Lo que está declarado y no construido:** los adaptadores reales de **cámara**
-y **FCM**. Los dos llevan binarios nativos y credenciales que §2.5 prohíbe
-versionar, y un permiso del sistema que solo se prueba en un dispositivo. Los
+**Lo que está declarado y no construido:** el adaptador real de **cámara**
+(lleva binarios nativos y un permiso del sistema que solo se prueba en un
+dispositivo). Los avisos con la app cerrada **no se construyen en la app**: desde
+la 15-R llegan por Web Push a la consola instalada (ADR-036), sin Firebase. Los
 puertos, las pantallas y el registro contra el conjunto están construidos y
 probados contra fuentes simuladas; es ADR-03 aplicado al teléfono. La fuente
 simulada **no devuelve siempre una foto buena**, y hay una prueba que lo exige:
@@ -698,6 +709,13 @@ La seguridad es condición de cada etapa desde la 01, no una etapa al final. La 
 | **MFA**             | TOTP obligatorio en los tres roles administrativos, con códigos de recuperación en hash                                                                                         |
 | **Dato biométrico** | Cifrado **autenticado** AES-256-GCM en la aplicación, nunca con la llave en la base. Lo que se persiste junto a la plantilla es una _referencia_ de llave, con CHECK de formato |
 
+**Lo que no se elimina, se firma.** Los riesgos que el proyecto acota pero no
+suprime —con qué se acotan y qué los reabre— están en
+[`docs/seguridad/ACEPTACIONES_DE_RIESGO.md`](docs/seguridad/ACEPTACIONES_DE_RIESGO.md),
+pendientes de la firma del cliente. La llave maestra de la bóveda de equipos se
+rota con recifrado ([`CONEXION_SUPABASE.md`](docs/guias/CONEXION_SUPABASE.md) §13):
+destruida la anterior, ningún respaldo previo abre una credencial.
+
 ### El riesgo número uno: la llave secreta omite RLS
 
 Los workers y la ingesta de eventos usan la llave secreta por diseño, y esa llave **salta Row Level Security por completo**. Por eso el aislamiento se implementa **dos veces**: en RLS y en la capa de aplicación. El Edge, desde la 15-Q, ya no lleva ninguna llave de Supabase: habla con la API con una credencial propia, y la API comprueba en la aplicación que sólo pida lo de su copropiedad (un intento cruzado es 404 y queda en `auditoria_seguridad`).
@@ -718,15 +736,23 @@ La tabla de eventos no admite `UPDATE` ni `DELETE`. Tres barreras superpuestas: 
 
 ## 10. Decisiones de arquitectura (ADR)
 
-| ID          | Decisión                                                                | Estado  |
-| ----------- | ----------------------------------------------------------------------- | ------- |
-| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk          | Cerrada |
-| **ADR-002** | Empaquetado de escritorio con **Tauri**                                 | Cerrada |
-| **ADR-003** | El hardware va al final. Todo el sistema funciona contra `MockProvider` | Cerrada |
-| **ADR-004** | La integridad concurrente se resuelve en la base de datos               | Cerrada |
-| **ADR-005** | Inmutabilidad de eventos por permisos, no por código                    | Cerrada |
+| ID          | Decisión                                                                                           | Estado                              |
+| ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk                                     | Cerrada                             |
+| **ADR-002** | Empaquetado de escritorio con **Tauri**                                                            | Cerrada                             |
+| **ADR-003** | El hardware va al final. Todo el sistema funciona contra `MockProvider`                            | Cerrada                             |
+| **ADR-004** | La integridad concurrente se resuelve en la base de datos                                          | Cerrada                             |
+| **ADR-005** | Inmutabilidad de eventos por permisos, no por código                                               | Cerrada                             |
+| **ADR-018** | Un único punto de composición decide qué proveedor de hardware se inyecta                          | Aceptada (15-C)                     |
+| **ADR-019** | El hardware se elige por **capacidades**, nunca por marca ni modelo                                | Aceptada (15-D)                     |
+| **ADR-022** | La vista en vivo se negocia con la API; el navegador nunca ve RTSP                                 | Aceptada (15-E)                     |
+| **ADR-028** | Netlify aloja sólo la consola; la API va en un servidor con procesos permanentes (Cloud Run, P-20) | Aceptada (15-I)                     |
+| **ADR-032** | Consentimiento declarado por quien registra                                                        | Aceptada (15-L)                     |
+| **ADR-034** | El Edge como contingencia                                                                          | **Sustituida en parte** por ADR-035 |
+| **ADR-035** | **El Edge es el puente local permanente** entre la nube y los equipos                              | Aceptada (15-Q2)                    |
+| **ADR-036** | Avisos al residente por **Web Push estándar, sin Firebase**                                        | Aceptada (15-R)                     |
 
-Detalle en [`docs/decisiones/`](./docs/decisiones/).
+Son 33 en total (ADR-001 a ADR-008 y ADR-012 a ADR-036; ADR-009 a ADR-011 no existen). Índice completo y detalle en [`docs/decisiones/`](./docs/decisiones/).
 
 **Sobre ADR-001:** la sección de stack sugerido del documento de requisitos proponía SIP con puente WebRTC. Prevalece ISAPI TwoWayAudio por decisión del cliente. Ningún requisito, regla de negocio ni criterio de aceptación exige SIP; los indicadores comprometidos son de latencia y trazabilidad, agnósticos al protocolo. La ruta SIP sobrevive como contingencia documentada, realizable como adaptador nuevo detrás del mismo puerto sin tocar el dominio.
 

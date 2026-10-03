@@ -175,7 +175,7 @@ export interface ZonaParaResidente {
  */
 export interface DirectorioDelResidente {
   /** Resuelve identidad → vivienda. Es el único punto donde nace el ámbito. */
-  vinculoDe(usuarioId: string): Promise<VinculoDeResidente | null>;
+  vinculoDe(usuarioId: string, copropiedadId?: string | null): Promise<VinculoDeResidente | null>;
   vivienda(ambito: AmbitoDelResidente): Promise<ViviendaDelResidente | null>;
   familia(ambito: AmbitoDelResidente): Promise<readonly MiembroDeFamilia[]>;
   vehiculos(ambito: AmbitoDelResidente): Promise<readonly VehiculoDelResidente[]>;

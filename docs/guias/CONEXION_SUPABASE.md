@@ -568,13 +568,14 @@ pasado el plazo no quedaría ni el dato ni constancia de haberlo suprimido.
 
 ### Rotación de llaves — qué se rompe y en qué orden
 
-| Llave                           | Al rotarla se rompe                                          | Orden de rotación                                                                                                                                     |
-| ------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Publicable**                  | Web y móvil dejan de autenticar                              | 1. Crear la nueva · 2. Desplegar web · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior**          |
-| **Secreta**                     | Solo lo que use **esa** llave                                | Se pueden tener varias y revocar una sola. **Con una llave por Edge, rotar un equipo no toca a los demás** — esa es la mejora frente a `service_role` |
-| **Llave de firma JWT**          | **Nada, si se respeta el margen**                            | Rotación sin caída, ver abajo. Ya no invalida todas las sesiones como hacía el secreto JWT                                                            |
-| **Credenciales de dispositivo** | Solo el equipo afectado                                      | Rotar en la bóveda; `dispositivos.credencial_ref` no cambia. **Ese es el motivo de que la base guarde una referencia y no la credencial** (D-09b)     |
-| **Llave de cifrado biométrico** | Las plantillas cifradas con la anterior dejan de descifrarse | Cifrado de sobre con `algoritmo` versionado (D-10): descifrar con la vieja, recifrar con la nueva, y solo entonces retirar la vieja                   |
+| Llave                                   | Al rotarla se rompe                                                             | Orden de rotación                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Publicable**                          | Web y móvil dejan de autenticar                                                 | 1. Crear la nueva · 2. Desplegar web · 3. Publicar versión móvil · 4. **Esperar a que los clientes actualicen antes de revocar la anterior**                           |
+| **Secreta**                             | Solo lo que use **esa** llave                                                   | Se pueden tener varias y revocar una sola. **Con una llave por Edge, rotar un equipo no toca a los demás** — esa es la mejora frente a `service_role`                  |
+| **Llave de firma JWT**                  | **Nada, si se respeta el margen**                                               | Rotación sin caída, ver abajo. Ya no invalida todas las sesiones como hacía el secreto JWT                                                                             |
+| **Credenciales de dispositivo**         | Solo el equipo afectado                                                         | Rotar en la bóveda; `dispositivos.credencial_ref` no cambia. **Ese es el motivo de que la base guarde una referencia y no la credencial** (D-09b)                      |
+| **Llave de cifrado biométrico**         | Las plantillas cifradas con la anterior dejan de descifrarse                    | Cifrado de sobre con `algoritmo` versionado (D-10): descifrar con la vieja, recifrar con la nueva, y solo entonces retirar la vieja                                    |
+| **`EQUIPOS_LLAVE`** (bóveda de equipos) | Las credenciales y secretos de cámara cifrados con la anterior dejan de abrirse | Recifrar con la herramienta de §13 (15-R, F2), desplegar la API con la nueva y **destruir** la anterior: desde ese momento, ningún respaldo previo abre una credencial |
 
 ### Rotación de la llave de firma, sin caída
 
@@ -760,3 +761,147 @@ UPDATE public.eventos SET regla_aplicada = 'PRUEBA' WHERE id = '<id>';
 ### 12.6 Riesgo residual
 
 `postgres` conserva `ALTER TABLE … DISABLE TRIGGER`: DDL deliberado, no un `UPDATE` desde el código, y el siguiente despliegue lo detecta. No uses el editor de tablas del panel sobre `eventos`, `evidencias`, `auditoria_seguridad` ni `purgas_retencion`: opera como `postgres` y está para lectura.
+
+---
+
+## 13. Rotar la llave maestra de la bóveda de equipos (`EQUIPOS_LLAVE`)
+
+> **Ronda 15-R · F2.** Sustituye el paso 3 del procedimiento de H-15B-1
+> (`docs/seguridad/AUDITORIA.md`), que mandaba volver a escribir la clave de cada
+> equipo desde la consola. Contradicción registrada como **C-56**.
+
+### 13.1 · Qué protege la rotación, y qué NO
+
+`EQUIPOS_LLAVE` cifra en la nube —AES-256-GCM con llave derivada por
+copropiedad— la clave de cada equipo (`credenciales_de_equipo`, también las
+filas del historial) y el secreto con el que cada cámara publica en el Alarm
+Server (`dispositivos.secreto_alarm_server_sobre`, con su huella HMAC). Un
+respaldo de la base guarda esos bytes **con la llave que tenían ese día**.
+
+- **Lo que se gana:** tras rotar y **destruir** la llave anterior, ningún
+  respaldo tomado antes de la rotación vuelve a abrir una credencial, aunque el
+  respaldo se filtre después. Y los respaldos nuevos sólo abren con la nueva.
+- **Lo que no cubre:** las credenciales que guarda el **Edge** (las cifra con
+  `EDGE_EQUIPOS_LLAVE`, en la máquina del conjunto: `DESPLIEGUE_EDGE.md` §10.1);
+  las plantillas biométricas (otra llave, fila de la tabla de §10); y la clave
+  **del equipo**, que sigue siendo la misma: si lo que se filtró es la clave del
+  aparato, se cambia en el aparato (H-15B-1, pasos 1–2; AR-05).
+- **La huella de las credenciales del Edge** (`dispositivos.huella_de_credencial`)
+  se **retira**: está calculada con la llave anterior y no se puede recalcular
+  sin la clave, que no está en la nube. Nada la lee; la próxima entrega al Edge
+  escribe otra.
+
+### 13.2 · Por qué una herramienta aparte y no la API
+
+La API sólo conoce **una** llave, y así sigue. Para recifrar hacen falta las dos
+a la vez, y el riesgo que H-15B-1 quería evitar era exactamente ese: las dos en
+un proceso de vida larga, donde una fuga las entrega juntas. La herramienta es
+un proceso de un solo uso que vive lo que dura la rotación —segundos— y
+termina.
+
+### 13.3 · Procedimiento (Cloud Run + Secret Manager, una instancia)
+
+1. **Llave nueva como VERSIÓN nueva** del mismo secreto. La anterior sigue
+   activa:
+
+   ```bash
+   openssl rand -base64 48 | gcloud secrets versions add equipos-llave --data-file=-
+   ```
+
+   Anote el número de versión: `<N>` nueva, `<A>` anterior. La referencia nueva
+   es `vault:equipos-llave/v<N>` (sólo el nombre: nunca la llave).
+
+2. **Recifrar.** Desde una máquina con la API compilada y acceso a la base, con
+   la cadena de conexión de la API (`app_api`, §12, o la que use hoy):
+
+   ```bash
+   pnpm --filter @ncr/api build
+   gcloud secrets versions access <A> --secret=equipos-llave \
+     | DATABASE_URL='<cadena de la API>' \
+       EQUIPOS_LLAVE="$(gcloud secrets versions access <N> --secret=equipos-llave)" \
+       EQUIPOS_LLAVE_REF=vault:equipos-llave/v<N> \
+       node scripts/rotar-llave-de-equipos.mjs
+   ```
+
+   La **anterior entra por la entrada estándar**, no por una variable. Debe
+   terminar con una línea de recuentos, sin llaves ni secretos:
+
+   ```text
+   rotación hecha: {"copropiedades":…,"credenciales":…,"secretosDeCamara":…,
+                    "yaRotados":0,"huellasDelEdgeRetiradas":…,"historialIlegible":0}
+   ```
+
+3. **Desplegar la API con la nueva, enseguida:**
+
+   ```bash
+   gcloud run services update <servicio-api> \
+     --update-secrets=EQUIPOS_LLAVE=equipos-llave:<N> \
+     --update-env-vars=EQUIPOS_LLAVE_REF=vault:equipos-llave/v<N>
+   ```
+
+   **La ventana entre 2 y 3** es el tiempo del despliegue (con una instancia,
+   alrededor de un minuto). En ella, la API todavía con la anterior **no abre**
+   lo ya rotado: una orden a un equipo en modo directo falla con error —la
+   etiqueta GCM no cuadra—, y una publicación de cámara se rechaza y la cámara
+   reintenta. **Nunca se abre un secreto equivocado.** Los conjuntos con Edge
+   puente no lo notan para sus equipos: sus claves están en el Edge. Hágalo en
+   horario de poco tráfico.
+
+4. **Comprobar**, antes de destruir nada:
+
+   ```sql
+   -- Una sola referencia: la nueva.
+   SELECT llave_ref, count(*) FROM public.credenciales_de_equipo
+    WHERE iv IS NOT NULL GROUP BY llave_ref;
+   -- Una constancia por copropiedad, con la referencia y sin llaves.
+   SELECT copropiedad_id_objetivo, identificador_solicitado, creado_en
+     FROM public.auditoria_seguridad WHERE recurso = 'equipos/llave-maestra'
+    ORDER BY creado_en DESC;
+   ```
+
+   Y en la consola, **Dispositivos → Probar conexión** en un equipo de modo
+   directo por copropiedad: debe volver a **verificado**.
+
+5. **Destruir la anterior.** Destruir, no deshabilitar: una versión
+   deshabilitada se vuelve a habilitar, y el respaldo sólo queda inservible si
+   la llave deja de existir.
+
+   ```bash
+   gcloud secrets versions destroy <A> --secret=equipos-llave
+   ```
+
+   Borre también cualquier copia fuera de Secret Manager (`.env` de una
+   máquina, gestor de contraseñas). Desde aquí no hay vuelta atrás, y es
+   deliberado.
+
+### 13.4 · Si algo sale mal
+
+- **`… no abre con la llave esperada`, nombrando una fila.** Es una credencial
+  **vigente** (o el secreto de una cámara) que no es de la anterior: dato roto
+  o una tercera llave. Esa copropiedad **no cambió** (cada una es atómica).
+  **No despliegue**: escriba de nuevo la clave de ese equipo desde la consola
+  —la API aún tiene la anterior— y repita el paso 2; lo ya rotado se cuenta en
+  `yaRotados` y se salta.
+- **`historialIlegible` mayor que 0.** Filas **inactivas** que no abre ninguna
+  de las dos: típicamente, las que dejó el procedimiento anterior de H-15B-1
+  (cambiar la llave y reescribir cada clave). Se dejan como están: la API nunca
+  las lee. Si todavía conserva la llave con la que se escribieron, **destrúyala
+  también**; o, para recifrarlas, repita el paso 2 pasando esa llave como
+  anterior (lo ya rotado se salta).
+- **Pasó una llave anterior equivocada.** Se detiene en la primera copropiedad
+  con algo vigente cifrado, sin recifrar nada con una llave errónea. Las que
+  hubiera antes sin nada vigente quedan con su constancia y su huella del Edge
+  retirada: no hay nada que deshacer. Repita con la correcta.
+- **Algo falla tras desplegar (paso 3) y antes del paso 5.** La anterior sigue
+  existiendo y la herramienta es simétrica: córrala con las llaves al revés y
+  la referencia `v<A>`, y despliegue la API con `<A>`.
+- **Se repitió el paso 2 por error.** Nada: lo que ya abre con la nueva se
+  cuenta y no se toca.
+
+**Garantías, probadas por ejecución** (`apps/api/test/rotacion-de-la-boveda-pg.test.ts`,
+contra PostgreSQL con el rol `authenticated`, sin `BYPASSRLS`): tras rotar, todo
+—historial incluido— abre con la nueva y nada con la anterior; los lectores de
+la API leen la credencial y acreditan la cámara con la nueva; repetir no cambia
+un byte; un sobre vigente de una tercera llave detiene la rotación sin tocar su
+copropiedad; el historial de una llave más antigua se cuenta y no se toca; y ni
+la constancia ni los errores contienen una llave o un secreto.

@@ -1,29 +1,21 @@
 /// De dónde salen el identificador del aparato y el token de mensajería.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
-/// QUÉ ESTÁ CONSTRUIDO Y QUÉ NO · declarado, no disimulado
+/// ADR-036 (15-R, P-23) · ESTA APP NO LLEVA SERVICIO DE PUSH, Y ES DEFINITIVO
 ///
-/// De las tres piezas del aviso push, aquí hay **dos**:
+/// El cliente decidió avisos SIN Firebase: llegan por Web Push estándar a la
+/// consola del residente instalada como PWA. La app (APK firmado por descarga
+/// en Android; en iPhone sólo la PWA) no incluye `firebase_messaging` ni ningún
+/// SDK de push de Google o Apple, y por tanto no necesita `google-services.json`
+/// ni `GoogleService-Info.plist`. `SinServicioDeMensajeria` no es un adaptador
+/// provisional: es EL adaptador.
 ///
-///   · el `instalacionId`, que la app genera UNA vez y guarda en el llavero, y
-///   · el registro contra el conjunto, que ya existe (`POST mi/dispositivos`,
-///     migración 0030) con su prueba de aislamiento.
-///
-/// Falta la tercera: el token, que lo emite Firebase Cloud Messaging. Añadir
-/// `firebase_messaging` exige `google-services.json` y `GoogleService-Info.plist`
-/// del proyecto de Grupo Control, que §2.5 prohíbe versionar y que todavía no
-/// existe. Así que el adaptador real llega cuando el proyecto de Firebase esté
-/// aprovisionado, y hasta entonces `SinServicioDeMensajeria` devuelve `null`.
-///
-/// **`null` no es un fallo disfrazado**: la máquina de estados lo traduce a
-/// `sinToken` y la pantalla lo dice con esas palabras. Lo que no hace es
-/// enseñarle al residente un interruptor encendido, que es la única forma de
-/// equivocarse aquí: creer que le avisarán cuando llegue su visitante.
-///
-/// 15-L · y la app tampoco enseña ya el estado de este registro: la pantalla de
-/// notificaciones lista las de la API y dice «Los avisos llegan mientras la app
-/// está abierta». Cuando llegue el adaptador de Firebase, esa frase cambia con
-/// él.
+/// Lo que sí hay: el `instalacionId` estable en el llavero (por si un día se
+/// decide otra cosa, no habrá que inventar uno), y la bandeja, que lee
+/// `GET mi/notificaciones` y se recarga cada 20 s mientras la app está abierta
+/// (`CicloDeRecarga`). **`null` no es un fallo disfrazado**: nada promete al
+/// residente un aviso con la app cerrada; la pantalla dice «Los avisos llegan
+/// mientras la app está abierta».
 library;
 
 import 'dart:math';
@@ -65,7 +57,7 @@ class IdentidadDelAparato {
   }
 }
 
-/// El adaptador mientras Firebase no esté aprovisionado.
+/// El adaptador de esta app: sin servicio de mensajería (ADR-036).
 class SinServicioDeMensajeria implements FuenteDeNotificaciones {
   SinServicioDeMensajeria({required IdentidadDelAparato identidad}) : _identidad = identidad;
 

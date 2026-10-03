@@ -10,7 +10,7 @@ import type { GanchosDeSesion, ProveedorDeIdentidad } from './puertos';
  */
 export class CerrarSesion {
   constructor(
-    private readonly proveedor: ProveedorDeIdentidad,
+    private readonly proveedor: Pick<ProveedorDeIdentidad, 'cerrarSesion'>,
     private readonly ganchos: GanchosDeSesion,
     /**
      * H4 b (15-L) · el superadministrador que cierra sesión deja de contar

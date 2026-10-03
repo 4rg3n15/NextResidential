@@ -93,6 +93,9 @@ sobra y la opción «Servidor» ya admite `https://` hacia cualquier destino.
   cambia entre la casa y el sitio. Queda como plan B desde «Cambiar servidor».
 - **Push con Firebase.** Fuera de esta corrección: exige cuentas y llaves del
   cliente que no existen todavía.
+  _Cerrado en la ronda 15-R por [ADR-036](ADR-036-avisos-por-web-push-sin-firebase.md):
+  no habrá Firebase; los avisos con la app cerrada llegan por Web Push a la
+  consola instalada, y la app sigue diciendo que avisa sólo mientras está abierta._
 
 ## Consecuencias
 
