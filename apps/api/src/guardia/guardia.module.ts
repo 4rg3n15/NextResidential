@@ -50,10 +50,8 @@ import { CANAL_DE_INTERCOM, PUENTE_DE_VIDEO } from './aplicacion/puertos';
 import type { PuenteDeVideo } from './aplicacion/puertos';
 import { PuenteGo2rtc } from './infraestructura/puente-go2rtc';
 import { CanalIntercomEnProceso } from './infraestructura/canal-intercom-en-proceso';
-import {
-  BitacoraDeOrdenesEnMemoria,
-  RegistroDeBloqueosEnMemoria,
-} from './infraestructura/adaptadores-en-memoria';
+import { BitacoraDeOrdenesEnMemoria } from './infraestructura/adaptadores-en-memoria';
+import { PROVEEDOR_DE_REGISTRO_DE_BLOQUEOS } from './infraestructura/composicion-de-bloqueos';
 import { AccionadorPorProveedor } from './infraestructura/accionador-por-proveedor';
 import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
 import { Pool } from 'pg';
@@ -203,7 +201,7 @@ export class GuardiaModule {
             return enBase ? new BitacoraDeOrdenesPg(pool) : new BitacoraDeOrdenesEnMemoria();
           },
         },
-        { provide: REGISTRO_DE_BLOQUEOS, useClass: RegistroDeBloqueosEnMemoria },
+        PROVEEDOR_DE_REGISTRO_DE_BLOQUEOS,
         {
           provide: FijarBloqueoDeAcceso,
           inject: [BLOQUEO_DE_ACCESO, REGISTRO_DE_BLOQUEOS, RELOJ],

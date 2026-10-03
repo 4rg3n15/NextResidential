@@ -6,7 +6,7 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
 import { ProveedorDeJwks } from './infraestructura/jwks';
 import { FactoresSupabase } from './infraestructura/factores-supabase';
-import { RepositorioCodigosMfaEnMemoria } from './infraestructura/codigos-mfa-en-memoria';
+import { PROVEEDOR_DE_CODIGOS_MFA } from './infraestructura/composicion-codigos-mfa';
 import { ADMINISTRADOR_DE_FACTORES, REPOSITORIO_CODIGOS_MFA } from './aplicacion/puertos';
 import { VerificadorDeJwt } from './infraestructura/verificador-jwt';
 import { AutenticacionController } from './presentacion/autenticacion.controller';
@@ -27,11 +27,8 @@ export class AutenticacionModule {
       module: AutenticacionModule,
       controllers: [AutenticacionController],
       providers: [
-        // Adaptador en memoria mientras no haya contraseña de PostgreSQL
-        // (D-17), igual que en el resto del monolito. Lo que no cambia cuando
-        // llegue la credencial es el PUERTO.
-        RepositorioCodigosMfaEnMemoria,
-        { provide: REPOSITORIO_CODIGOS_MFA, useExisting: RepositorioCodigosMfaEnMemoria },
+        // 15-R · A1: en la base con PERSISTENCIA_DE_EVENTOS=postgres (RN-20, CA-25).
+        PROVEEDOR_DE_CODIGOS_MFA,
         {
           provide: ADMINISTRADOR_DE_FACTORES,
           inject: [CONFIGURACION, BITACORA],
@@ -58,12 +55,7 @@ export class AutenticacionModule {
             }),
         },
       ],
-      exports: [
-        ProveedorDeJwks,
-        VerificadorDeJwt,
-        REPOSITORIO_CODIGOS_MFA,
-        RepositorioCodigosMfaEnMemoria,
-      ],
+      exports: [ProveedorDeJwks, VerificadorDeJwt, REPOSITORIO_CODIGOS_MFA],
     };
   }
 }
