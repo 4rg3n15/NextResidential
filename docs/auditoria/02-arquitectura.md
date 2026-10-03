@@ -122,11 +122,11 @@ Coinciden exactamente con `CLAUDE.md` §2.2. El catálogo completo de motivos de
 
 ## 4. Puertos — tres grupos, catorce puertos
 
-| Grupo           | Puertos                                                                               | Adaptador previsto                                            | Etapa        |
-| --------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------ |
-| **Repositorio** | `ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`             | Repositorios Supabase · SQLite en el Edge                     | 01 · 02 · 12 |
-| **Proveedor**   | `AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider` | `MockProvider` (05) · `HikvisionProvider` (15)                | 05 · 15      |
-| **Soporte**     | `Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitacora`               | Sistema · UUID · FCM · Supabase Storage · logger estructurado | 02 · 06      |
+| Grupo           | Puertos                                                                               | Adaptador previsto                                                                                         | Etapa        |
+| --------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------ |
+| **Repositorio** | `ViviendaRepo`, `AutorizacionRepo`, `ZonaRepo`, `EventoRepo`, `ReglaRepo`             | Repositorios Supabase · SQLite en el Edge                                                                  | 01 · 02 · 12 |
+| **Proveedor**   | `AccessPointProvider`, `PlateEventSource`, `FaceTemplateProvider`, `IntercomProvider` | `MockProvider` (05) · `HikvisionProvider` (15)                                                             | 05 · 15      |
+| **Soporte**     | `Reloj`, `GeneradorDeId`, `Notificador`, `AlmacenEvidencia`, `Bitacora`               | Sistema · UUID · Web Push (VAPID; era FCM hasta la 15-R, ADR-036) · Supabase Storage · logger estructurado | 02 · 06      |
 
 **Verificación ISP:** los cuatro puertos de proveedor están segregados por capacidad —punto de acceso, fuente de eventos de placa, plantillas faciales, intercom—, no fundidos en un `HardwareService`. `MockProvider` implementa los cuatro sin lanzar `NotImplemented`.
 
@@ -236,11 +236,11 @@ El diagrama clasifica los contextos delimitados en tres estratos, con una indica
 
 ### Subdominios genéricos — «resueltos con terceros. **No invertir esfuerzo de diseño aquí**»
 
-| Contexto                      | Tercero                                                                          | Relación                            |
-| ----------------------------- | -------------------------------------------------------------------------------- | ----------------------------------- |
-| `Identidad y multiempresa`    | Supabase Auth con claims y MFA — _«No construir un sistema de identidad propio»_ | «autentica y aísla por copropiedad» |
-| `Notificaciones`              | Firebase Cloud Messaging                                                         | «entrega alertas»                   |
-| `Almacenamiento de evidencia` | Supabase Storage con buckets privados y URLs firmadas                            | «guarda la evidencia»               |
+| Contexto                      | Tercero                                                                                                          | Relación                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `Identidad y multiempresa`    | Supabase Auth con claims y MFA — _«No construir un sistema de identidad propio»_                                 | «autentica y aísla por copropiedad» |
+| `Notificaciones`              | Firebase Cloud Messaging · **sustituido en la 15-R por Web Push estándar (VAPID), sin Firebase (ADR-036, C-53)** | «entrega alertas»                   |
+| `Almacenamiento de evidencia` | Supabase Storage con buckets privados y URLs firmadas                                                            | «guarda la evidencia»               |
 
 **Consecuencias operativas de este mapa, que gobiernan el reparto de esfuerzo entre etapas:**
 

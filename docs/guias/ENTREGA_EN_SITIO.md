@@ -8,11 +8,12 @@
 >
 > Documentos de apoyo: [`INTEGRACION_HIKVISION.md`](INTEGRACION_HIKVISION.md)
 > (cada equipo en detalle), [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md)
-> (la hoja de los 16 escenarios), [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) (la app
-> en el iPhone), desde la 15-M, [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
-> en el panel web de cada equipo y cómo los comprueba la plataforma) y, desde la
-> 15-N, [`PROXIMA-VISITA-15N.md`](PROXIMA-VISITA-15N.md) (preparación, video desde
-> otro equipo de la red, relojes y orden de las comprobaciones).
+> (la hoja de los 16 escenarios) y [`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) (la app
+> en el iPhone). Las guías de visita de la 15-M
+> ([`archivo/VISITA-29-09.md`](archivo/VISITA-29-09.md)) y de la 15-N
+> ([`archivo/PROXIMA-VISITA-15N.md`](archivo/PROXIMA-VISITA-15N.md)) están
+> archivadas desde la 15-R: lo que seguía vigente de ellas está en
+> [§8](#8--lo-que-sigue-valiendo-de-las-visitas-archivadas).
 
 ## Índice
 
@@ -26,6 +27,7 @@
 - [5 · Demostración de los tres hitos del reto](#5--demostración-de-los-tres-hitos-del-reto)
 - [6 · Reversión](#6--reversión)
 - [7 · Plan B por equipo](#7--plan-b-por-equipo)
+- [8 · Lo que sigue valiendo de las visitas archivadas](#8--lo-que-sigue-valiendo-de-las-visitas-archivadas)
 
 ---
 
@@ -378,3 +380,153 @@ Lo que se hace si algo no funciona el día de la entrega. Ninguno exige código.
 | **Cualquiera**                | La consola dice el motivo del video en palabras                   | Cada frase trae su remedio: «go2rtc no está en marcha» → `pnpm sitio:video`; «`streams:` sobrante» → parar y rearrancar `pnpm sitio:video` (regenera el fichero); «el equipo cerró la conexión (backchannel)» → canal de la ficha y permiso de vista en vivo del usuario de servicio; «no tiene ese canal» → otro canal de la lista; «rechazó la credencial por RTSP» → permiso de vista en vivo en el panel del equipo (§1 bis).         |
 | **Cualquiera**                | «Rechazó el usuario o la clave»                                   | No reintentar. Corregir el `.env` y la credencial en la ficha (sólo reemplazable). Si el equipo bloqueó la IP del Mac, esperar su tiempo de bloqueo.                                                                                                                                                                                                                                                                                      |
 | **El Mac o la red**           | Nada contesta                                                     | Todo el sistema funciona contra los simulados: `PROVEEDOR_DE_EQUIPOS=simulado` y reinicio de la API. La demostración de la plataforma sigue; los hitos con hardware quedan para otra visita, dicho así en la hoja.                                                                                                                                                                                                                        |
+
+## 8 · Lo que sigue valiendo de las visitas archivadas
+
+> **15-R.** Las guías de la visita del 29/09
+> ([`archivo/VISITA-29-09.md`](archivo/VISITA-29-09.md), 15-M) y de la siguiente
+> a la 15-N ([`archivo/PROXIMA-VISITA-15N.md`](archivo/PROXIMA-VISITA-15N.md))
+> quedaron archivadas. Aquí está lo que de ellas sigue vigente y no estaba ya en
+> §0–§7, comprobado contra el código en la 15-R; cada bloque dice de dónde viene.
+> Lo demás se quedó en el archivo: era de esas visitas o ya está arriba.
+>
+> **Modo.** Como el resto de esta guía, vale para el **modo directo** (el Mac
+> habla con los equipos). Con el **Edge como puente** (15-Q2, ADR-035) los
+> ajustes del panel de cada equipo valen igual, pero la cámara publica **sólo**
+> al Edge y el video lo sirve el go2rtc del Edge:
+> [`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §10.
+
+### 8.1 · Antes de salir, además de §0
+
+_De `PROXIMA-VISITA-15N.md` §0._
+
+1. **`pnpm entorno:diff`.** Si dice `‼ SECRETO OBSOLETO: bórrelo`, quite esa línea
+   del `.env` (y rote la llave si pudo salir del equipo). El guion nunca imprime el
+   valor.
+2. **La clave de los equipos, si go2rtc corrió en `trace` o `debug`.** Con los
+   módulos `api` o `rtsp` a ese nivel, go2rtc escribe en su registro la URL RTSP de
+   cada equipo **con su clave**, sólo codificada para URL (ADR-022, enmienda 1;
+   pasó el 29/09). Si ocurrió alguna vez y la clave no se ha cambiado desde
+   entonces: cámbiela en el panel web de cada equipo, edite cada equipo en la
+   consola con la nueva (en modo directo se cifra en la base; con puente viaja al
+   Edge, [`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §10.4) y borre ese registro de
+   go2rtc.
+   - `pnpm sitio:video` se niega a arrancar con `api` o `rtsp` en esos niveles
+     —también si los heredan del nivel general— salvo con `--permitir-traza`, que
+     avisa y pide rotar la clave al terminar. Para depurar otra cosa,
+     `VIDEO_REGISTRO` (por omisión `info`) sube sólo otros módulos, p. ej.
+     `info,webrtc=debug`.
+   - El go2rtc del Edge puente se configura a mano
+     ([`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §10.7), registra los flujos de la
+     misma manera y nada lo frena: no suba su registro a esos niveles.
+
+### 8.2 · Ajustes en el panel web de cada equipo
+
+_De `VISITA-29-09.md` §1–§3, sin las filas que ya cubren §2 (zona horaria), §2 bis
+(«Enviar eventos a este Mac»), §5 y §7 (quién controla la barrera, verificación remota,
+permiso de vista en vivo)._
+
+Las rutas de menú **no están verificadas** contra el manual de cada modelo y van
+marcadas `[SUPUESTO]`: el nombre puede cambiar con el idioma y el firmware. Lo
+verificado es la comprobación: dé un ajuste por bueno sólo cuando la ficha o el
+ensayo lo digan.
+
+| Ajuste                         | Equipo       | Valor                                                                                                                                                                                                               | Dónde, en su panel web `[SUPUESTO]`                                                              | Cómo lo comprueba la plataforma                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sincronización de hora         | los tres     | **NTP** (un servidor de la red del conjunto) o «sincronizar con el PC»                                                                                                                                              | Configuración → Sistema → Hora → modo de sincronización                                          | Ficha, fila «reloj del equipo», con el mismo umbral que las altas (§8.3). Paso 2 del ensayo                                                                                                                                                                                |
+| Autenticación RTSP             | los tres     | **digest** (o «digest/basic»). Si el equipo ofrece MD5 y SHA-256, que MD5 siga entre los ofrecidos: el puente de video no responde a un Digest sólo SHA-256                                                         | Configuración → Sistema → Seguridad → Autenticación → RTSP                                       | Paso 7 del ensayo y «Probar conexión»: la sonda anota qué esquema ofreció el equipo y cuál se envió, sin la clave. Copie esa línea a la hoja                                                                                                                               |
+| Imágenes que envía al receptor | cámara       | `detectionPicture` (la imagen de la detección); nunca «todas» (`all`), que añade los recortes de rostro del conductor y del acompañante (RN-09, RN-10, Ley 1581)                                                    | Configuración → Red → Configuración avanzada → Notificación HTTP → tipo de imagen                | Ficha: con `all`, aviso «… · qué imágenes envía» y **«Corregirlo en el equipo»**, con motivo                                                                                                                                                                               |
+| País del algoritmo             | cámara       | **210** (Colombia)                                                                                                                                                                                                  | Configuración → Evento → Detección de vehículo → Parámetros de reconocimiento → País/Región      | Ficha, fila «país del algoritmo», y paso 3 del ensayo. Si el equipo no lista 210, la plataforma lo dice y no escribe nada                                                                                                                                                  |
+| Receptores de eventos          | los tres     | Cámara: **un solo** destino, el de «Enviar eventos a este Mac» (§2 bis) o, con puente, el Edge. Terminal y videoportero: **ninguno**, la plataforma los escucha por su flujo. El 29/09 los tres traían uno huérfano | Configuración → Red → Configuración avanzada → Notificación HTTP / Escucha HTTP (HTTP listening) | Terminal y videoportero: fila «receptor de eventos (servidor de alarmas)» con la dirección del huérfano y **«Desactivar el receptor huérfano»**, con motivo y en la auditoría. Cámara, en modo directo: línea «Servidor de alarmas de la cámara» de §2 y paso 4 del ensayo |
+| Audio bidireccional            | videoportero | Canal 1 habilitado, **G.711 µ-law** (la consola entiende también A-law; otro códec no lo reproduce)                                                                                                                 | Configuración → Video/Audio → Audio → Tipo de codificación                                       | Paso 3 del ensayo: «canal de audio bidireccional: canal 1 · g711u». Paso 8: el pitido sólo se envía en G.711                                                                                                                                                               |
+
+### 8.3 · Relojes
+
+_De `PROXIMA-VISITA-15N.md` §2 y §4._
+
+El 29/09 el videoportero iba unas 13 h atrasado con la zona correcta: reconocía
+la cara y negaba con «permiso vencido». Por eso, en modo directo, la plataforma
+**lee la hora del equipo antes de dar de alta a alguien con vigencia** y, si se
+desvía más de `EQUIPOS_DESVIO_DE_RELOJ_S` (30 s por omisión), no escribe nada en
+el equipo —ni la persona— y lo dice: «el reloj del equipo va …: no se le da de
+alta a nadie con vigencia hasta sincronizar su hora». La fila «reloj del equipo»
+de la ficha usa el mismo umbral.
+
+- NTP en los tres equipos (§8.2) y la fila «reloj del equipo» conforme antes de
+  dar de alta rostros.
+- **Con Edge puente, el alta la ejecuta el Edge, que hoy no hace esa lectura
+  previa** (su proveedor se compone sin el umbral): ahí el NTP del equipo es la
+  única defensa. La ficha sí juzga el reloj igual, porque el umbral viaja con el
+  diagnóstico.
+- `--restaurar` no devuelve ni zona ni hora (§6); si el respaldo trae una zona
+  distinta de la del conjunto, lo avisa.
+- No cambie la hora de un equipo a mano para «probar» el aviso sin que el cliente
+  lo autorice; si lo hace, vuelva a poner NTP antes de irse.
+
+### 8.4 · Video desde otro equipo de la red (modo directo)
+
+_De `PROXIMA-VISITA-15N.md` §1. Con puente, el go2rtc es el del Edge:
+[`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §10.7._
+
+La consola negocia el video con la API, pero la imagen viaja **directa** de go2rtc
+(en el Mac) al navegador del operador: al candidato que go2rtc anuncia
+(`VIDEO_IP_ANUNCIADA` o la IP del Mac) y a su puerto WebRTC
+(`VIDEO_PUERTO_WEBRTC`, 8555, TCP y UDP). Desde el propio Mac funciona aunque ese
+candidato no se alcance; desde el portátil de la portería, no.
+
+1. Arranque `pnpm sitio:video` y lea lo que dice:
+   - `⚠ VIDEO_IP_ANUNCIADA=… no es una dirección de este equipo`: ponga en
+     `VIDEO_IP_ANUNCIADA` la IP del Mac **en la red del conjunto** (o déjela
+     vacía). Si no aparece, la IP anunciada es del Mac.
+   - `✓ el puerto WebRTC contesta en <IP del Mac>:8555 (TCP)`. Si en su lugar
+     dice que no contesta, go2rtc no escucha en esa interfaz.
+2. **Cortafuegos de macOS**, además del permiso de `node` de §1 `[SUPUESTO]` (el
+   nombre del menú cambia entre versiones): Ajustes del Sistema → Red →
+   Cortafuegos → Opciones → añada **el binario de go2rtc** (su ruta es la de la
+   línea `▶ … -config …` que imprime `pnpm sitio:video`) con «Permitir conexiones
+   entrantes». El permiso cubre TCP y UDP. Si macOS pregunta al arrancar go2rtc,
+   conteste «Permitir».
+3. Desde el portátil de la portería: la consola por la IP del Mac, la ficha de un
+   equipo y la vista en vivo. Si la negociación termina y el recuadro dice «Sin
+   señal», es el candidato (paso 1) o el cortafuegos (paso 2).
+
+### 8.5 · Durante la visita
+
+_De `VISITA-29-09.md` §0 y §4, y de `PROXIMA-VISITA-15N.md` §3 y §4._
+
+- **Un equipo concreto, por su nombre.** Con más de uno del mismo tipo,
+  `pnpm sitio:ensayo -- --equipo="<nombre de la ficha>"`; `--equipo=` admite
+  también la familia (§4).
+- **Paso 3 del ensayo, en terminal y videoportero:** escribe la forma de alta que
+  se usará, p. ej. «forma de alta: persona «normal» con su vigencia (POST
+  …/UserInfo/Record) · rostro por POST …/FDLib/FaceDataRecord». Anote esa línea
+  de cada equipo en la hoja. Si el FALLO dice que la biblioteca declara sus
+  operaciones en `supportFDFunction` sin «setUp», guarde la respuesta del equipo y
+  repórtela.
+- **La guardia virtual, abierta en un segundo equipo toda la visita.** Lo que
+  necesita a una persona y llega en vivo —la llamada, el rostro o la persona no
+  autorizada, la placa no autorizada, la lista negra, lo dudoso— entra en la cola
+  y, si el operador no atiende ya a otro, pasa solo a «Atención» con el video de
+  **ese** equipo. Sale de la cola pasados `GUARDIA_VIGENCIA_EN_COLA_S` (300 s por
+  omisión) y queda en Eventos. Qué pasa solo a «Atención» se elige en Configuración →
+  «Avisos de la guardia y la portería» (por omisión, todo).
+- **Al terminar,** las alertas de las pruebas se archivan desde Eventos, una a una
+  o en lote, con motivo: no se borran.
+- **Un equipo que se retira** se da de baja desde Dispositivos, con motivo. Sus
+  rostros se retiran del equipo antes; los que no se pudieron quitar porque el
+  equipo no contestó se dicen, para borrarlos en el propio equipo.
+- **En la hoja de resultados, ni direcciones, ni usuarios, ni claves** (§0 ya lo
+  dice de las credenciales).
+
+### 8.6 · Mensajes de la consola que no están en §7
+
+_De `VISITA-29-09.md` §5; las filas de go2rtc, del canal y de «rechazó el usuario
+o la clave» ya están en §4 y §7._
+
+| Qué ve                                                            | Qué significa                                                                                                                  | Qué hacer                                                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| «Credencial rechazada por el equipo … hace N min»                 | La plataforma ya sabe que esa clave no vale y no la vuelve a presentar, para que el equipo no bloquee la cuenta                | Corrija la credencial en la ficha, o **«Probar conexión»**, que la presenta una sola vez más |
+| «… (el equipo declara la cuenta BLOQUEADA: se desbloquea en N s)» | El propio equipo declaró el bloqueo y cuánto le queda                                                                          | Espere ese tiempo antes de volver a probar                                                   |
+| Modelo y firmware con «dato del DD-MM-YYYY»                       | El sondeo de hoy no alcanzó el equipo: son los que se leyeron ese día                                                          | No los dé por actuales; «Probar conexión» cuando el equipo conteste                          |
+| «La API no responde»                                              | La consola no alcanza la API: apagada o reiniciándose                                                                          | Mire la terminal de la API; si está arrancando, espere unos segundos                         |
+| «Servicio no disponible por ahora»                                | La API contestó que le falta algo, y el mensaje dice qué (p. ej. la base de datos, o «el Edge del conjunto no está conectado») | Siga el mensaje                                                                              |

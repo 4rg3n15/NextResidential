@@ -1106,24 +1106,18 @@ anote en qué campo se detuvo: eso es lo accionable, no el número.
 
 ### 14.7 · Las notificaciones dicen la verdad
 
-En la app, Perfil → Notificaciones. **Esperado:** con Firebase aún sin
-aprovisionar, el estado es **«El servicio de avisos no respondió»** y no
-«activadas». Si dijera «Activas en este aparato» sin que exista el proyecto de
-Firebase, la pantalla estaría mintiendo y el residente creería que le avisarán
-cuando llegue su visitante.
+> **Reescrito en la ronda 15-R** (ADR-036, C-53): sin Firebase. La versión
+> anterior de este punto esperaba un proyecto de Firebase y la tabla de tokens
+> de la app; ninguno de los dos existe ya en el camino del aviso.
 
-Con Firebase aprovisionado y el adaptador real conectado, el estado correcto es
-**«Activas en este aparato»** y en la base:
-
-```sql
-select instalacion_id, left(token, 12), actualizado_en
-  from public.dispositivos_de_notificacion where usuario_id = '<su usuario>';
-```
-
-**Esperado: una fila por aparato**, con el token actualizado. Dos filas para el
-mismo teléfono significan que la fila se está identificando por el token y no
-por la instalación, y cada rotación dejaría un registro muerto al que se
-seguiría notificando.
+1. **En la app**, Perfil → Notificaciones. **Esperado:** «Los avisos llegan
+   mientras la app está abierta». Es la verdad: la app no recibe avisos con la
+   app cerrada y no promete otra cosa.
+2. **En la consola instalada** (PWA), Notificaciones → «Activar avisos en este
+   aparato». Lo que debe pasar, paso a paso y por plataforma, está en
+   [`AVISOS_WEB_PUSH.md`](AVISOS_WEB_PUSH.md) §3 y §4; si la API no tiene las
+   llaves VAPID, la guardia lee «no le llega a la app del residente» en vez de
+   un éxito fingido.
 
 ### 14.8 · Que la suite de Dart no dependa del reloj de su máquina
 

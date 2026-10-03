@@ -343,7 +343,7 @@ Aplica **C-04**: «Mis Reservas Activas» queda fuera de alcance; «Solicitar Ac
 | **Tipos observados** | «Visitante en portería» · «Vehículo ingresó» · «Acceso piscina aprobado» · **«Alerta de seguridad»** («Intento de acceso no autorizado con placa XYZ-000») |
 | **Acciones**         | Leer todo · tocar para ir al evento                                                                                                                        |
 
-**Estados ausentes:** sin notificaciones · permiso de notificaciones denegado en el sistema operativo · **token FCM inválido o caducado** · agrupación por día · error de carga.
+**Estados ausentes:** sin notificaciones · permiso de notificaciones denegado en el sistema operativo · **suscripción de avisos inválida o caducada** (era «token FCM» hasta la 15-R, ADR-036) · agrupación por día · error de carga.
 
 ### M-8 · Mi Perfil
 

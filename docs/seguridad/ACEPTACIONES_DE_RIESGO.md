@@ -113,11 +113,16 @@ correo está DESACTIVADA** y que la contraseña la restablece una persona.
 
 Lo hecho (15-R, E8): con `RECUPERACION_POR_CORREO` sin definir, la consola en
 producción **no ofrece** el enlace y sus rutas responden con un mensaje que
-remite al administrador. El restablecimiento lo hace una persona: un
-administrador emite una contraseña temporal
+remite al administrador. El restablecimiento lo hace una persona, que escribe
+una contraseña temporal —el servidor no la genera ni la devuelve— y obliga a
+cambiarla en el siguiente ingreso
 (`POST /copropiedades/:id/usuarios/:usuarioId/restablecimiento`), con constancia
-`restablecimiento_contrasena` en `auditoria_seguridad`
-(`docs/guias/RECUPERACION_Y_USUARIOS.md`). Un riesgo que no existe no se acepta.
+`restablecimiento_contrasena` en `auditoria_seguridad`. **Quién:** el
+superadministrador, a cualquier cuenta que no sea otro superadministrador (en la
+consola, desde Residentes y Porteros); el administrador, **sólo a residentes y
+sólo por la API**: la consola no le da pantalla
+(`apps/api/src/cuentas/aplicacion/restablecer-contrasena.ts`, DT-15R-06). Un
+riesgo que no existe no se acepta.
 
 **Qué la reabre.** Poner `RECUPERACION_POR_CORREO=activa` en producción. Antes de
 hacerlo hay que verificar el ciclo completo en el panel —SMTP propio y URLs de

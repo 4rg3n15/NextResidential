@@ -640,7 +640,7 @@ no se abra al residente (S-151).
 2. Antes de salir: `pnpm sitio:ensayo -- --simulado` debe terminar en
    `VEREDICTO: SIN FALLOS`.
 3. En sitio, seguir [`ENTREGA_EN_SITIO.md`](../guias/ENTREGA_EN_SITIO.md) y los
-   ajustes de [`VISITA-29-09.md`](../guias/VISITA-29-09.md), y completar la
+   ajustes de [`VISITA-29-09.md`](../guias/archivo/VISITA-29-09.md), y completar la
    lista de verificación de abajo.
 4. Aplicar las migraciones 0044 y 0045 en el proyecto Supabase
    (`supabase db push`) antes de arrancar la API.
