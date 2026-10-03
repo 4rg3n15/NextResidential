@@ -347,4 +347,5 @@ que corrige sólo existe en esa rama (§ «Lo incómodo», 1). El entorno propus
 | `1684d6e` | El socket de prueba cierra por los dos lados; espera del túnel de 5 s             |
 | `6050b05` | Este informe, `ETAPA-15R.md`, `ESTADO_ETAPAS.md`, `README.md`, ADR-018 y el plazo |
 | `da64043` | Fusión del cierre de la 15-R (`0ce8ed5`): su veredicto y su PR, sólo documentos   |
-| _este_    | Cierre: el veredicto del verificador                                              |
+| `aa1aacc` | Cierre: el veredicto del verificador                                              |
+| _este_    | §9 al día con el PR de la 15-R; esta tabla                                        |
