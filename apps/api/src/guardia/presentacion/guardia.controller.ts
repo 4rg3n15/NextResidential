@@ -45,6 +45,7 @@ import { AccionarPuertaAMano, BITACORA_DE_ORDENES } from '../aplicacion/apertura
 import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
 import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from '../aplicacion/bloqueo-de-acceso';
 import type { BloqueoVigente, RegistroDeBloqueos } from '../aplicacion/bloqueo-de-acceso';
+import { AvisarAlResidente, detalleDelAviso } from '../aplicacion/aviso-al-residente';
 import {
   CANAL_DE_INTERCOM,
   SinTransporteDeAudio,
@@ -84,14 +85,6 @@ import { MideKpi } from '../../observabilidad';
  * Un recurso de otra copropiedad responde **404 y no 403**: un 403 confirmaría
  * que el identificador existe.
  */
-/** O3 (15-N) · quién avisó, en la constancia del aviso al residente. */
-const QUIEN_AVISA: Readonly<Record<string, string>> = {
-  portero: 'el portero',
-  operador_central: 'la guardia virtual',
-  administrador: 'la administración',
-  superadministrador: 'el superadministrador',
-};
-
 @ApiTags('guardia')
 @ApiBearerAuth()
 @Controller('copropiedades/:id/guardia')
@@ -109,6 +102,7 @@ export class GuardiaController {
     @Inject(GENERADOR_DE_ID) private readonly ids: GeneradorDeId,
     @Inject(FijarBloqueoDeAcceso) private readonly bloquear: FijarBloqueoDeAcceso,
     @Inject(REGISTRO_DE_BLOQUEOS) private readonly bloqueos: RegistroDeBloqueos,
+    @Inject(AvisarAlResidente) private readonly avisarAlResidente: AvisarAlResidente,
   ) {}
 
   private static aDto(b: BloqueoVigente): BloqueoVigenteDto {
@@ -446,13 +440,9 @@ export class GuardiaController {
 
   /**
    * HU-28 · CU-03 flujo alterno 1 — el residente no contesta al intercom, y el
-   * operador le avisa por otra vía.
-   *
-   * Lo que existe es la constancia: que se intentó avisar, a qué vivienda,
-   * desde qué equipo, quién y cuándo. O6 (15-N) · el envío a la app del
-   * residente NO está cableado (el notificador push sigue siendo el
-   * provisional), y la respuesta lo dice en vez de prometerlo:
-   * PENDIENTE DE DEFINICIÓN (DT-15N-02).
+   * operador le avisa por otra vía: la constancia en Alertas y, desde la 15-R,
+   * el aviso por Web Push a su vivienda (DT-15N-02 cerrada, ADR-036). La
+   * respuesta dice a cuántos aparatos llegó; cero, dicho como cero.
    */
   // H4 (15-L) · sólo guardia remota: la IP de portería no basta.
   @SoloGuardiaRemota()
@@ -468,28 +458,10 @@ export class GuardiaController {
     @Body() dto: AvisoAlResidenteDto,
   ): Promise<AceptadoDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'guardia/avisar');
-    const alerta = Alerta.abrir({
-      id: this.ids.nuevo(),
-      copropiedadId,
-      tipo: 'acceso_dudoso',
-      severidad: 'informativa',
-      generadaEn: this.reloj.ahora(),
-      // O3 (15-N) · a nombre del EQUIPO que se atiende (o de la consola, como
-      // la emergencia) y del operador que avisa —`actorId` del escalamiento—;
-      // la vivienda va en la constancia, no en el campo del equipo.
-      dispositivoId: dto.dispositivoId ?? 'consola-guardia',
-      notas:
-        `Aviso al residente de la vivienda ${dto.viviendaId}, ` +
-        `de ${QUIEN_AVISA[ctx.rol] ?? 'un operador'}: ${dto.texto}`,
-    });
-    if (esFallo(alerta)) throw new BadRequestException(alerta.error.detalle);
-    await this.escalar.ejecutar(alerta.valor, ctx.usuarioId);
-    return {
-      aceptado: true,
-      detalle:
-        'Aviso registrado en Alertas. Todavía no le llega a la app del residente: ' +
-        'avísele por teléfono o por el citófono',
-    };
+    const { enviados } = this.desenvolver(
+      await this.avisarAlResidente.ejecutar(ctx, copropiedadId, dto),
+    );
+    return { aceptado: true, detalle: detalleDelAviso(enviados) };
   }
 
   /**

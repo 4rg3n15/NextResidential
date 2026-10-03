@@ -8,6 +8,12 @@ prueba del residente. **Decisión:** [ADR-033](../decisiones/ADR-033-app-en-rele
 > Las pruebas de residente, superadministrador y portero se hacen desde el
 > mismo Mac; las de residente, además, desde el mismo iPhone.
 
+> **15-R · P-23 (decisión del cliente).** En **producción el iPhone usa sólo la
+> consola web instalada como PWA** (iOS 16.4+), que es la que recibe los avisos
+> al teléfono: [AVISOS_WEB_PUSH.md](AVISOS_WEB_PUSH.md) §4. Esta guía queda para
+> la **prueba de entrega** de la app Flutter desde el Mac; Android se entrega
+> como APK firmado por descarga ([APK_FIRMADO.md](APK_FIRMADO.md)).
+
 ---
 
 ## Lo incómodo primero
@@ -17,9 +23,11 @@ prueba del residente. **Decisión:** [ADR-033](../decisiones/ADR-033-app-en-rele
   antes de la entrega y apunte la fecha.
 - **Por HTTP en la red local, el tráfico va sin cifrar**: cualquiera en esa red
   puede leerlo. Vale para la entrega; producción exige HTTPS (ADR-033).
-- **Sin Firebase no hay avisos con la app cerrada.** La app lo dice: «Los
-  avisos llegan mientras la app está abierta». Con la app abierta, la pantalla
-  visible se recarga sola cada 20 s.
+- **La app no recibe avisos con la app cerrada, y no los recibirá** (ADR-036:
+  sin Firebase ni ningún SDK de push). La app lo dice: «Los avisos llegan
+  mientras la app está abierta», y con la app abierta la pantalla visible se
+  recarga sola cada 20 s. Los avisos al teléfono los recibe la **consola
+  instalada** en la pantalla de inicio.
 
 **Una corrección de esta guía.** Su versión anterior decía que la excepción de
 App Transport Security existía sólo en Debug «por decisión del cliente». No

@@ -71,10 +71,8 @@ import { CanalEnProceso } from './infraestructura/canal-en-proceso';
 import { RepositorioEventosPgDeServicio } from './infraestructura/repositorio-eventos-pg-de-servicio';
 import { RepositorioAlertasPg } from './infraestructura/repositorio-alertas-pg';
 import { AlmacenEvidenciaSupabase } from './infraestructura/evidencia-supabase';
-import {
-  AlmacenEvidenciaFirmado,
-  NotificadorPushRegistrado,
-} from './infraestructura/evidencia-y-push';
+import { AlmacenEvidenciaFirmado } from './infraestructura/evidencia-y-push';
+import { PROVEEDOR_DEL_NOTIFICADOR_PUSH } from './infraestructura/web-push/composicion-del-notificador';
 import {
   RepositorioAlertasEnMemoria,
   RepositorioDispositivosEnMemoria,
@@ -220,11 +218,7 @@ export class EventosModule {
           useFactory: (bitacora: Bitacora) => new CanalEnProceso(bitacora),
         },
         { provide: CANAL_TIEMPO_REAL, useExisting: CanalEnProceso },
-        {
-          provide: NOTIFICADOR_PUSH,
-          inject: [BITACORA],
-          useFactory: (bitacora: Bitacora) => new NotificadorPushRegistrado(bitacora),
-        },
+        PROVEEDOR_DEL_NOTIFICADOR_PUSH, // 15-R · B1: Web Push (ADR-036), o 0 sin llaves.
         {
           provide: ALMACEN_EVIDENCIA,
           /**
@@ -537,6 +531,7 @@ export class EventosModule {
         VigilarLatidos,
         EscalarAlerta,
         ESCALAMIENTO_DE_ALERTA,
+        NOTIFICADOR_PUSH, // 15-R · DT-15N-02: el aviso de la guardia llega al residente.
         REPOSITORIO_EVENTOS_DE_EQUIPO,
         REGISTRO_DE_EVENTOS_DE_EQUIPO,
       ],

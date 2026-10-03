@@ -158,7 +158,7 @@ Cada informe de etapa incluye una **tabla de cumplimiento SOLID** de los archivo
 | Colas y trabajos programados              | pg-boss sobre el mismo PostgreSQL                                                                                    |
 | Consola web / escritorio                  | Next.js + TypeScript + **Tailwind CSS** + shadcn/ui, entregada como **PWA instalable** y empaquetada para escritorio |
 | Aplicación móvil                          | **Flutter** (Dart), iOS y Android                                                                                    |
-| Push                                      | Firebase Cloud Messaging                                                                                             |
+| Push                                      | **Web Push estándar (VAPID), sin Firebase** — ADR-036, enmienda de la ronda 15-R (C-53)                              |
 | Edge Gateway                              | Node.js + TypeScript + SQLite                                                                                        |
 | Video de cámaras al navegador             | go2rtc (RTSP → WebRTC)                                                                                               |
 | **Intercom**                              | **ISAPI TwoWayAudio** — ver ADR-01 en §4                                                                             |

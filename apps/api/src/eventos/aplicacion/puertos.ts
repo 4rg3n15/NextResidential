@@ -11,14 +11,10 @@ import type { MotivoAcceso, ResultadoAcceso } from '@ncr/domain-core';
 
 /**
  * Puertos del módulo de eventos. La aplicación los DEFINE; la infraestructura
- * los cumple (§2.2, DIP).
- *
- * **La frontera es definitiva aunque el adaptador no lo sea.** Este entorno no
- * tiene contraseña de PostgreSQL, así que la API arranca con el adaptador en
- * memoria; el adaptador PostgreSQL existe, implementa este mismo puerto y se
- * prueba contra una base real. Lo que no puede cambiar cuando llegue la
- * contraseña es esta interfaz: si cambiara, la etapa habría diseñado contra el
- * doble en vez de contra el contrato, que es justo lo que D-25 advierte.
+ * los cumple (§2.2, DIP). **La frontera es definitiva aunque el adaptador no lo
+ * sea**: el adaptador en memoria y el de PostgreSQL implementan este mismo
+ * puerto, y si la interfaz cambiara al pasar de uno a otro, la etapa habría
+ * diseñado contra el doble y no contra el contrato (D-25).
  */
 
 /**
@@ -115,13 +111,10 @@ export interface RepositorioAlertas {
 }
 
 /**
- * Canal de tiempo real hacia las consolas.
- *
- * `publicar` devuelve **a cuántos destinatarios llegó**, y eso no es un detalle
- * de telemetría: KPI-25 exige que la alerta llegue al operador en menos de 10 s,
- * y una publicación a cero suscriptores es un no-envío que un `Promise<void>`
- * dejaría indistinguible de un envío correcto. Es la diferencia entre medir el
- * indicador y suponerlo.
+ * Canal de tiempo real hacia las consolas. `publicar` devuelve **a cuántos
+ * destinatarios llegó**: KPI-25 exige que la alerta llegue al operador en menos
+ * de 10 s, y una publicación a cero suscriptores es un no-envío que un
+ * `Promise<void>` dejaría indistinguible de un envío correcto.
  *
  * El puerto no nombra ningún transporte. Esa es la salida de la contingencia
  * documentada en `docs/arquitectura/tiempo-real-y-contingencia.md`: si Supabase
@@ -131,13 +124,20 @@ export interface CanalTiempoReal {
   publicar(copropiedadId: string, tema: string, carga: unknown): Promise<number>;
 }
 
-/** HU-34 · aviso al residente. El transporte real (FCM) llega con la ETAPA 11. */
+/** Qué pantalla abre el residente al tocar el aviso. */
+export type DestinoDelAviso = 'notificaciones' | 'historial';
+
+/**
+ * HU-34 · aviso al residente, por Web Push (ADR-036). Devuelve a cuántos
+ * aparatos lo ACEPTÓ su servicio de push: cero es «no le llegó», no un éxito.
+ */
 export interface NotificadorPush {
   aVivienda(
     copropiedadId: string,
     viviendaId: string,
     titulo: string,
     cuerpo: string,
+    destino?: DestinoDelAviso,
   ): Promise<number>;
 }
 

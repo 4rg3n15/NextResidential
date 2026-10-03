@@ -4829,6 +4829,142 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/notificaciones/web-push": {
+      "get": {
+        "operationId": "MisAvisosWebController_estado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeAvisosWebDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "¿Hay avisos al teléfono? Y la llave pública VAPID para suscribirse",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MisAvisosWebController_suscribir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuscripcionWebPushDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuscripcionRegistradaDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El navegador es de otra cuenta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suscribe este navegador a los avisos de mi vivienda (HU-34)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/notificaciones/web-push/baja": {
+      "post": {
+        "operationId": "MisAvisosWebController_anular",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDeSuscripcionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuscripcionAnuladaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Quita los avisos de este navegador",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/ocupantes": {
       "get": {
         "operationId": "MiAltaController_ocupantes",
@@ -9597,6 +9733,18 @@
           "motivo"
         ]
       },
+      "BajaDeSuscripcionDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "endpoint"
+        ]
+      },
       "BajaDeZonaAplicadaDto": {
         "type": "object",
         "properties": {
@@ -11889,6 +12037,24 @@
           "motivo"
         ]
       },
+      "EstadoDeAvisosWebDto": {
+        "type": "object",
+        "properties": {
+          "disponible": {
+            "type": "boolean",
+            "description": "Falso si la API no tiene llaves VAPID: no hay avisos al teléfono"
+          },
+          "clavePublica": {
+            "type": "string",
+            "nullable": true,
+            "description": "Llave pública VAPID (base64url)"
+          }
+        },
+        "required": [
+          "disponible",
+          "clavePublica"
+        ]
+      },
       "EstadoDeCanalDto": {
         "type": "object",
         "properties": {
@@ -13598,6 +13764,23 @@
         "required": [
           "estado",
           "dependencias"
+        ]
+      },
+      "LlavesDeSuscripcionDto": {
+        "type": "object",
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "description": "Llave pública ECDH P-256 del navegador, base64url (65 bytes)"
+          },
+          "auth": {
+            "type": "string",
+            "description": "Secreto de autenticación del navegador, base64url (16 bytes)"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
         ]
       },
       "LoteDeReconciliacionDto": {
@@ -16310,6 +16493,46 @@
         },
         "required": [
           "dispositivoId"
+        ]
+      },
+      "SuscripcionAnuladaDto": {
+        "type": "object",
+        "properties": {
+          "anulada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anulada"
+        ]
+      },
+      "SuscripcionRegistradaDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "SuscripcionWebPushDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 4096,
+            "example": "https://fcm.googleapis.com/fcm/send/…"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/LlavesDeSuscripcionDto"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
         ]
       },
       "TextoDeLaCasillaDto": {

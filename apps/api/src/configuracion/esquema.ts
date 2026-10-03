@@ -2,7 +2,7 @@ import { isIP } from 'node:net';
 import { z } from 'zod';
 import { leerEquiposDeclarados } from '../comun/equipos-de-alarm-server';
 import { problemaDelPresupuesto } from './presupuesto-de-conexiones';
-import { ESQUEMA_DE_ICE, problemaDeIce } from './esquema-de-ice';
+import { ESQUEMAS_ADICIONALES, problemaAdicional } from './esquemas-adicionales';
 
 /**
  * Configuración tipada y validada (§2.7.1).
@@ -74,7 +74,7 @@ const secreto = (nombre: string, minimo: number) =>
     });
 
 export const esquemaConfiguracion = z.object({
-  ...ESQUEMA_DE_ICE,
+  ...ESQUEMAS_ADICIONALES,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
 
@@ -696,8 +696,8 @@ export const cargarConfiguracion = (entorno: NodeJS.ProcessEnv): Configuracion =
   }
   if (malFormados.length > 0) throw new ErrorDeConfiguracion(malFormados);
 
-  // 15-O · los pools caben en el pooler de Supabase. 15-Q2 · un TURN no va sin su secreto.
-  const presupuesto = problemaDelPresupuesto(resto) ?? problemaDeIce(resto);
+  // 15-O · los pools caben en el pooler. 15-Q2/15-R · ver `esquemas-adicionales.ts`.
+  const presupuesto = problemaDelPresupuesto(resto) ?? problemaAdicional(resto);
   if (presupuesto !== null) throw new ErrorDeConfiguracion([presupuesto]);
 
   return { ...resto, origenesPermitidos };

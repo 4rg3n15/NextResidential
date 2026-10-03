@@ -1331,6 +1331,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/notificaciones/web-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ¿Hay avisos al teléfono? Y la llave pública VAPID para suscribirse */
+        get: operations["MisAvisosWebController_estado"];
+        put?: never;
+        /** Suscribe este navegador a los avisos de mi vivienda (HU-34) */
+        post: operations["MisAvisosWebController_suscribir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/notificaciones/web-push/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quita los avisos de este navegador */
+        post: operations["MisAvisosWebController_anular"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/ocupantes": {
         parameters: {
             query?: never;
@@ -2809,6 +2844,9 @@ export interface components {
         BajaDeResidenteDto: {
             motivo: string;
         };
+        BajaDeSuscripcionDto: {
+            endpoint: string;
+        };
         BajaDeZonaAplicadaDto: {
             desactivada: boolean;
         };
@@ -3580,6 +3618,12 @@ export interface components {
             fila: number;
             motivo: string;
         };
+        EstadoDeAvisosWebDto: {
+            /** @description Falso si la API no tiene llaves VAPID: no hay avisos al teléfono */
+            disponible: boolean;
+            /** @description Llave pública VAPID (base64url) */
+            clavePublica: string | null;
+        };
         EstadoDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
@@ -4102,6 +4146,12 @@ export interface components {
             avisos?: {
                 [key: string]: string;
             };
+        };
+        LlavesDeSuscripcionDto: {
+            /** @description Llave pública ECDH P-256 del navegador, base64url (65 bytes) */
+            p256dh: string;
+            /** @description Secreto de autenticación del navegador, base64url (16 bytes) */
+            auth: string;
         };
         LoteDeReconciliacionDto: {
             eventos: components["schemas"]["EventoReconciliadoDto"][];
@@ -4907,6 +4957,18 @@ export interface components {
         SolicitudDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
+        };
+        SuscripcionAnuladaDto: {
+            anulada: boolean;
+        };
+        SuscripcionRegistradaDto: {
+            /** Format: uuid */
+            id: string;
+        };
+        SuscripcionWebPushDto: {
+            /** @example https://fcm.googleapis.com/fcm/send/… */
+            endpoint: string;
+            keys: components["schemas"]["LlavesDeSuscripcionDto"];
         };
         TextoDeLaCasillaDto: {
             /** @description Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el nombre escrito en el formulario */
@@ -7845,6 +7907,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AparatoRegistradoDto"];
+                };
+            };
+        };
+    };
+    MisAvisosWebController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeAvisosWebDto"];
+                };
+            };
+        };
+    };
+    MisAvisosWebController_suscribir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuscripcionWebPushDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuscripcionRegistradaDto"];
+                };
+            };
+            /** @description El navegador es de otra cuenta */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    MisAvisosWebController_anular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeSuscripcionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuscripcionAnuladaDto"];
                 };
             };
         };

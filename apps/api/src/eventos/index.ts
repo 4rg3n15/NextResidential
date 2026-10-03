@@ -18,6 +18,7 @@ export {
   CANAL_TIEMPO_REAL,
   TEMA_LLAMADAS,
   ESCALAMIENTO_DE_ALERTA,
+  NOTIFICADOR_PUSH,
   REPOSITORIO_ALERTAS,
   REPOSITORIO_DISPOSITIVOS,
   REPOSITORIO_EVENTOS,
@@ -57,8 +58,7 @@ export {
   LIMITADOR_DISPOSITIVO,
   limitadorPorDispositivo,
 } from './presentacion/limite-por-dispositivo';
-// `LatidoDto` cruza la frontera porque la ingesta (en `autorizaciones`) recibe el
-// latido por la misma puerta que los eventos: olor conocido y anotado (ETAPA 06).
+// `LatidoDto` cruza la frontera: la ingesta recibe el latido por la puerta de los eventos (06).
 export { LatidoDto } from './presentacion/dtos';
 // 15-Q · la bandeja del Edge: UNA regla para la ruta de la ingesta y la del Edge.
 export { ReconciliarDecisiones } from './aplicacion/reconciliar-decisiones';
