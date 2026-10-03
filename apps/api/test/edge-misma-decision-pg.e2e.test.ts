@@ -6,9 +6,9 @@ import type { INestApplication } from '@nestjs/common';
 import type { ResultadoAcceso } from '@ncr/domain-core';
 // `utilidades` PRIMERO: carga `AppModule` en su orden (ciclo eventos ↔ autorizaciones).
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
-import { MOTOR_DE_DECISION } from '../src/eventos/aplicacion/puertos';
-import type { MotorDeDecision } from '../src/eventos/aplicacion/puertos';
+import { MOTOR_DE_DECISION, type MotorDeDecision } from '../src/eventos/aplicacion/puertos';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { conVehiculoSinDueno } from './vehiculo-sin-dueno';
 import { cabecerasDelEdge } from './edge-de-prueba';
 import { DecidirLocalmente } from '../../edge/src/aplicacion/decidir-localmente';
 import type { InstantaneaDeReglas } from '../../edge/src/aplicacion/instantanea-de-reglas';
@@ -80,7 +80,7 @@ exigirBase('sin DATABASE_URL_PRUEBAS', () => disponible);
  * sincronizada: el camino del rostro RECONOCIBLE, que la semilla no garantiza.
  */
 const sembrarRostroReconocible = async (url: string): Promise<string> => {
-  const pool = new Pool({ connectionString: url, max: 1 });
+  const pool = await conVehiculoSinDueno(new Pool({ connectionString: url, max: 1 }));
   try {
     const { rows } = await pool.query<{ id: string }>(
       `WITH p AS (
