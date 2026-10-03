@@ -12,6 +12,8 @@
  * el micrófono (`getUserMedia`, en `lib/audio/puente.ts`): por eso en sitio se
  * ve la cámara por IP y se habla sólo por `https` o `localhost`.
  */
+import { iceDe } from './ice';
+import type { OpcionesDeIce } from './ice';
 export type CodigoDeVistaEnVivo =
   | 'sin_api' // 502 del proxy o 503 del arranque: la API no está para contestar
   | 'sin_puente' // 503 · la API no tiene GO2RTC_URL
@@ -38,7 +40,7 @@ export interface ConexionEnVivo {
   cerrar(): void;
 }
 
-export interface OpcionesDeNegociacion {
+export interface OpcionesDeNegociacion extends OpcionesDeIce {
   /** Se invoca cuando llega el flujo de video; el componente lo cuelga del `<video>`. */
   readonly alFlujo: (flujo: MediaStream) => void;
   /** Inyectable para las pruebas: por omisión, el `RTCPeerConnection` del navegador. */
@@ -143,9 +145,7 @@ export const negociarVistaEnVivo = async (
   enVuelo = propia;
   if (opciones.senal?.aborted === true) propia.abort();
   opciones.senal?.addEventListener('abort', () => propia.abort(), { once: true });
-  // Sin STUN a propósito: consola y puente están en la misma red del conjunto,
-  // y los candidatos del puente los pone go2rtc (`webrtc.candidates`).
-  const conexion = crear({ iceServers: [] });
+  const conexion = crear({ iceServers: await iceDe(url, opciones) });
   propia.signal.addEventListener('abort', () => conexion.close(), { once: true });
   const exigirVigente = (): void => {
     if (propia.signal.aborted) {

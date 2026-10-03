@@ -48,7 +48,6 @@ import { FijarBloqueoDeAcceso, REGISTRO_DE_BLOQUEOS } from './aplicacion/bloqueo
 import type { RegistroDeBloqueos } from './aplicacion/bloqueo-de-acceso';
 import { CANAL_DE_INTERCOM, PUENTE_DE_VIDEO } from './aplicacion/puertos';
 import type { PuenteDeVideo } from './aplicacion/puertos';
-import { NegociarVistaEnVivo } from './aplicacion/vista-en-vivo';
 import { PuenteGo2rtc } from './infraestructura/puente-go2rtc';
 import { CanalIntercomEnProceso } from './infraestructura/canal-intercom-en-proceso';
 import {
@@ -65,6 +64,9 @@ import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/con
 import { AudioController } from './presentacion/audio/audio.controller';
 import { BilletesDeAudio } from './presentacion/audio/billetes-de-audio';
 import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio';
+import { PROVEEDOR_DE_VISTA_EN_VIVO } from './infraestructura/puente-de-video-por-el-edge';
+import { PROVEEDOR_DE_SERVIDORES_ICE } from './infraestructura/servidores-ice-de-configuracion';
+import { IceController } from './presentacion/ice.controller';
 
 /**
  * Consolas operativas — ETAPA 10.
@@ -75,13 +77,10 @@ import { PuertaDeAudioPorWebSocket } from './presentacion/audio/puerta-de-audio'
  * decide qué ve el operador no puede ser la que envejece.
  *
  * Desde la 15-E los dos puertos de hardware de esta consola —accionar y
- * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura de cualquier
- * dispositivo resuelve por `AccessPointProvider` contra el registro y por
- * capacidades, y el canal de intercom abre el del aparato por
- * `IntercomProvider` cuando el turno se concede. Con `PROVEEDOR_DE_EQUIPOS=
- * simulado` el comportamiento observable es el de siempre (ADR-03); con el
- * real, las mismas líneas hablan con los equipos dados de alta en la consola.
- * La exclusividad sigue en la máquina de estados del dominio: lo que cambia es
+ * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura resuelve por
+ * `AccessPointProvider` y el intercom abre el del aparato por `IntercomProvider`
+ * cuando el turno se concede. Con el simulado, lo de siempre (ADR-03); con el
+ * real, los equipos de la consola. La exclusividad sigue en el dominio: cambia
  * el transporte, no las reglas.
  */
 @Module({})
@@ -91,7 +90,13 @@ export class GuardiaModule {
       module: GuardiaModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [GuardiaController, VideoController, AtencionController, AudioController],
+      controllers: [
+        GuardiaController,
+        VideoController,
+        IceController,
+        AtencionController,
+        AudioController,
+      ],
       providers: [
         /**
          * G1 · G2 (15-N) · la cola de atención (P-22) y las preferencias de la
@@ -245,12 +250,6 @@ export class GuardiaModule {
         },
         PuertaDeAudioPorWebSocket,
         {
-          /**
-           * A5 · el puente de video existe sólo si `GO2RTC_URL` está: sin él
-           * se inyecta `null` y la vista en vivo responde 503 con motivo. Se
-           * anuncia al arrancar SIN el valor —es una dirección interna— para
-           * que «no hay video» no se confunda con «el puente cayó».
-           */
           provide: PUENTE_DE_VIDEO,
           inject: [CONFIGURACION, BITACORA],
           useFactory: (configuracion: Configuracion, bitacora: Bitacora): PuenteDeVideo | null => {
@@ -265,16 +264,9 @@ export class GuardiaModule {
             return url === undefined ? null : new PuenteGo2rtc(url);
           },
         },
-        {
-          provide: NegociarVistaEnVivo,
-          inject: [PROVEEDOR_DE_EQUIPOS, PUENTE_DE_VIDEO, BITACORA, RELOJ],
-          useFactory: (
-            proveedor: ProveedorDeEquipos,
-            puente: PuenteDeVideo | null,
-            bitacora: Bitacora,
-            reloj: Reloj,
-          ) => new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj),
-        },
+        // 15-Q2 · E2 · STUN/TURN de la consola, y la vista en vivo POR COPROPIEDAD (R1).
+        PROVEEDOR_DE_SERVIDORES_ICE,
+        PROVEEDOR_DE_VISTA_EN_VIVO,
         {
           /**
            * 15-P · P3 · la puerta del punto elegido, resuelta por el módulo de

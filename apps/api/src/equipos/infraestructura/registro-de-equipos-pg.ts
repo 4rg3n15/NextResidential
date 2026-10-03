@@ -9,13 +9,9 @@ import { conCliente } from '../../persistencia/con-cliente';
  * ═════════════════════════════════════════════════════════════════════════════
  * EL REGISTRO QUE ALIMENTA AL PROVEEDOR DE HARDWARE · D5, ETAPA 15-D
  *
- * `HikvisionProvider` recibe un identificador de dispositivo —el del dominio—
- * y tiene que saber a qué dirección hablar y con qué credencial. El puerto
- * `RegistroDeEquipos` lo declara el paquete de proveedores; ESTO lo implementa
- * leyendo la base. Hasta la 15-D **no existía**: `ProveedoresModule` se
- * componía sin registro, y pedir el adaptador real hacía que la API no
- * arrancara —la fábrica lanza a propósito antes que caer al simulado—. Era el
- * defecto D5: el modo hardware estaba escrito y no se podía encender.
+ * El proveedor recibe el id del equipo y tiene que saber a qué dirección hablar
+ * y con qué credencial: el puerto `RegistroDeEquipos` es de proveedores, ESTO lo
+ * implementa con la base. Sin él (D5) el modo hardware no se podía encender.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * DOS LECTURAS, DOS JUEGOS DE CLAIMS, Y POR QUÉ
@@ -40,9 +36,8 @@ import { conCliente } from '../../persistencia/con-cliente';
  * ═════════════════════════════════════════════════════════════════════════════
  * LA CREDENCIAL VIAJA EN CLARO DESDE AQUÍ, Y NO PUEDE SER DE OTRA FORMA
  *
- * Para hablar con el equipo hay que presentarle la clave. Lo que se cumple:
- * no se registra, no se devuelve por ninguna ruta, y vive en memoria el tiempo
- * de una petición (RN-21).
+ * Para hablar con el equipo hay que presentarle la clave: no se registra, no se
+ * devuelve por ninguna ruta y vive en memoria el tiempo de una petición (RN-21).
  */
 
 interface FilaDeRegistro {
@@ -66,6 +61,27 @@ interface FilaDeRegistro {
   readonly firmware_atestado: string | null;
 }
 
+type EquipoSinClave = Omit<EquipoRegistrado, 'clave' | 'usuario'> & { usuario: string | null };
+
+const equipoSinClave = (fila: FilaDeRegistro): EquipoSinClave => ({
+  dispositivoId: fila.id,
+  tipo: fila.tipo,
+  host: fila.host,
+  puerto: Number(fila.puerto),
+  protocolo: fila.protocolo,
+  usuario: fila.usuario,
+  canalBarrera: fila.canal_barrera,
+  numeroDePuerta: fila.numero_de_puerta,
+  canalDeAudio: fila.canal_de_audio,
+  ...(fila.modo_de_terminal === null ? {} : { modoDeTerminal: fila.modo_de_terminal }),
+  canalDeAudioHabilitado: fila.canal_de_audio_habilitado,
+  canalDeVideo: fila.canal_de_video,
+  fabricante: fila.fabricante,
+  modelo: fila.modelo,
+  ...(fila.capacidades === null ? {} : { capacidades: capacidadesDesdeJson(fila.capacidades) }),
+  atestacion: fila.firmware_atestado === null ? null : { firmware: fila.firmware_atestado },
+});
+
 const CLAIMS_DE_LECTURA = JSON.stringify({
   rol: 'superadministrador',
   usuario_id: ACTOR_INGESTA,
@@ -82,32 +98,16 @@ export class RegistroDeEquiposPg implements RegistroDeEquipos {
   async buscar(dispositivoId: string): Promise<EquipoRegistrado | null> {
     const fila = await this.fila(dispositivoId);
     if (fila === null) return null;
-
     const clave = await leerSobre(this.pool, this.llaveMaestra, fila.copropiedad_id, fila.id);
-    // Sin credencial no hay a quién hablar: es un equipo dado de alta a
-    // medias, y el proveedor lo trata como no registrado en vez de intentar
-    // presentarse con una clave vacía y bloquear la cuenta del aparato.
+    // Sin credencial (un alta a medias) no se presenta una clave vacía: no registrado.
     if (clave === null || fila.usuario === null) return null;
+    return { ...equipoSinClave(fila), usuario: fila.usuario, clave };
+  }
 
-    return {
-      dispositivoId: fila.id,
-      tipo: fila.tipo,
-      host: fila.host,
-      puerto: Number(fila.puerto),
-      protocolo: fila.protocolo,
-      usuario: fila.usuario,
-      clave,
-      canalBarrera: fila.canal_barrera,
-      numeroDePuerta: fila.numero_de_puerta,
-      canalDeAudio: fila.canal_de_audio,
-      ...(fila.modo_de_terminal === null ? {} : { modoDeTerminal: fila.modo_de_terminal }),
-      canalDeAudioHabilitado: fila.canal_de_audio_habilitado,
-      canalDeVideo: fila.canal_de_video,
-      fabricante: fila.fabricante,
-      modelo: fila.modelo,
-      ...(fila.capacidades === null ? {} : { capacidades: capacidadesDesdeJson(fila.capacidades) }),
-      atestacion: fila.firmware_atestado === null ? null : { firmware: fila.firmware_atestado },
-    };
+  /** 15-Q2 · D2 · el equipo como lo tiene la base, SIN credencial: lo que viaja al Edge. */
+  async sinClave(dispositivoId: string): Promise<EquipoSinClave | null> {
+    const fila = await this.fila(dispositivoId);
+    return fila === null ? null : equipoSinClave(fila);
   }
 
   /**

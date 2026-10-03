@@ -3,7 +3,8 @@ import request from 'supertest';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
-import { FACE_TEMPLATE_PROVIDER, RELOJ } from '@ncr/domain-core';
+import { RELOJ } from '@ncr/domain-core';
+import { PROVEEDOR_DIRECTO } from '../src/proveedores/proveedores.module';
 import { capacidadesDescubiertas, sobreDeLectura } from '@ncr/providers';
 import type { MockProvider } from '@ncr/providers';
 import type { ContextoTenant } from '../src/autenticacion';
@@ -142,9 +143,8 @@ beforeAll(async () => {
     },
     { repositorio: equipos },
   );
-  mock = app.get(FACE_TEMPLATE_PROVIDER);
-  // El simulado sólo conoce sus dos equipos de fábrica: se le declaran los del
-  // ensayo, que es lo que en sitio hace el registro desde la consola.
+  // El simulado tras el enrutado (15-Q2): se le declaran los equipos del ensayo, como hace el alta.
+  mock = app.get(PROVEEDOR_DIRECTO);
   const conocidos = (mock as unknown as { dispositivos: Set<string> }).dispositivos;
   for (const d of [LPR, terminalId, INTERCOM]) conocidos.add(d);
   admin = await tokenDe(firmante, { rol: 'administrador', usuarioId: ADMIN });

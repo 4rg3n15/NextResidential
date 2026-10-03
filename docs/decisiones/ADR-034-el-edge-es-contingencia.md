@@ -2,9 +2,15 @@
 
 |              |                                                                                                                                                                                                                                     |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**   | Aceptada · ronda 15-Q (2026-10-02) · **decisión del cliente** (P-27 = B, elegida entre dos opciones)                                                                                                                                |
+| **Estado**   | **Sustituida en parte por [ADR-035](ADR-035-el-edge-es-el-puente-local-permanente.md)** (15-Q2, 2026-10-02) · aceptada en la 15-Q con P-27 = B, la opción que el agente marcó «Recomendado»; el cliente aclaró que su decisión es A |
 | **Completa** | ADR-017 (SQLite del Edge con `node:sqlite`) y la ETAPA 12, cuya DoD partía de «un gateway ya sincronizado» y de hechos que entraban por `POST /hechos`. No sustituye nada: añade lo que la 12 no construyó (S-24)                   |
 | **Afecta a** | `apps/edge/src/composicion.ts` · `aplicacion/contingencia-en-sitio.ts` · `aplicacion/descarga-de-reglas.ts` · `infraestructura/http/` · `apps/api/src/edge/` · migración 0049 · `docs/guias/DESPLIEGUE_EDGE.md` · `pnpm sitio:edge` |
+
+> **Sustituida en parte (15-Q2).** El papel del Edge con WAN que describe este
+> ADR —la nube habla con los equipos y el Edge sólo actúa sin ella— lo sustituye
+> [ADR-035](ADR-035-el-edge-es-el-puente-local-permanente.md): el Edge es el
+> puente local permanente. Se conserva como registro de lo construido en la 15-Q;
+> lo que sigue vigente está en «Qué se conserva» de ADR-035.
 
 ---
 

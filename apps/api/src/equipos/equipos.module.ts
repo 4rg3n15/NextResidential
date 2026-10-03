@@ -36,17 +36,10 @@ import {
   TERMINALES_DE_ROSTROS,
   TerminalesDeRostrosDesdeRegistro,
 } from './aplicacion/terminales-de-rostros';
-import { RepositorioDeEquiposPg } from './infraestructura/repositorio-equipos-pg';
-import { SondaPorProveedor } from './infraestructura/sonda-por-proveedor';
-import { CorrectorPorProveedor } from './infraestructura/corrector-por-proveedor';
 import { CopropiedadDeEquipoEnCache } from './infraestructura/copropiedad-de-equipo-en-cache';
 import { IpDelMacPorInterfaces, SecretosPropiosODeclarados } from './infraestructura/ip-del-mac';
-import {
-  SECRETOS_DE_ALARM_SERVER,
-  SecretosDeAlarmServerEnMemoria,
-} from './aplicacion/secretos-de-alarm-server';
+import { SECRETOS_DE_ALARM_SERVER } from './aplicacion/secretos-de-alarm-server';
 import type { SecretosDeAlarmServer } from './aplicacion/secretos-de-alarm-server';
-import { SecretosDeAlarmServerPg } from './infraestructura/secretos-de-alarm-server-pg';
 import {
   CambiarVerificacionRemota,
   DesactivarReceptorHuerfano,
@@ -71,6 +64,7 @@ import { RepositorioDePuntosEnMemoria } from './infraestructura/puntos-de-acceso
 import { LectorDeSalidasPorProveedor } from './infraestructura/lector-de-salidas-por-proveedor';
 import { SalidasController } from './presentacion/salidas.controller';
 import type { RegistroDeAuditoria } from '../comun/auditoria';
+import * as conEdge from './infraestructura/composicion-con-edge';
 
 /**
  * Raíz de composición del aprovisionamiento de equipos.
@@ -145,11 +139,8 @@ export class EquiposModule {
            * base (la suite), como las atestaciones.
            */
           provide: SECRETOS_DE_ALARM_SERVER,
-          inject: [Pool, CONFIGURACION],
-          useFactory: (pool: Pool, c: Configuracion): SecretosDeAlarmServer =>
-            c.PERSISTENCIA_DE_EVENTOS === 'postgres'
-              ? new SecretosDeAlarmServerPg(pool, c.EQUIPOS_LLAVE)
-              : new SecretosDeAlarmServerEnMemoria(),
+          inject: [Pool, CONFIGURACION, conEdge.CON_EDGE],
+          useFactory: conEdge.secretosDeAlarmServer,
         },
         {
           // E4 (15-M) · 7 · a dónde debería publicar un equipo: IP del Mac hacia él + PORT.
@@ -212,27 +203,13 @@ export class EquiposModule {
         },
         {
           provide: SONDA_DE_EQUIPO,
-          inject: [BITACORA, CONFIGURACION],
-          useFactory: (bitacora: Bitacora, c: Configuracion) =>
-            // D2 · C3 (15-L) · «Probar conexión» pregunta también el video (RTSP).
-            new SondaPorProveedor(
-              undefined,
-              bitacora,
-              c.VIDEO_PUERTO_RTSP,
-              c.EQUIPOS_DESVIO_DE_RELOJ_S,
-            ),
+          inject: [BITACORA, CONFIGURACION, conEdge.CON_EDGE],
+          useFactory: conEdge.sondaDeEquipo,
         },
         {
-          // 15-L · la apertura sin plataforma y el plazo, del `.env`: nunca del código.
           provide: CORRECTOR_DE_EQUIPO,
-          inject: [CONFIGURACION],
-          useFactory: (c: Configuracion) =>
-            new CorrectorPorProveedor(undefined, {
-              abrirSinPlataforma: c.TERMINAL_ABRE_SIN_PLATAFORMA,
-              ...(c.TERMINAL_PLAZO_DE_VERIFICACION_S === undefined
-                ? {}
-                : { plazoS: c.TERMINAL_PLAZO_DE_VERIFICACION_S }),
-            }),
+          inject: [CONFIGURACION, conEdge.CON_EDGE],
+          useFactory: conEdge.correctorDeEquipo,
         },
         // D-11 · atestaciones: PostgreSQL con base; sin ella, el doble de la suite.
         RepositorioDeAtestacionesEnMemoria,
@@ -259,9 +236,8 @@ export class EquiposModule {
         },
         {
           provide: REPOSITORIO_DE_EQUIPOS,
-          inject: [Pool, CONFIGURACION],
-          useFactory: (pool: Pool, c: Configuracion) =>
-            new RepositorioDeEquiposPg(pool, c.EQUIPOS_LLAVE, c.EQUIPOS_LLAVE_REF),
+          inject: [Pool, CONFIGURACION, conEdge.CON_EDGE],
+          useFactory: conEdge.repositorioDeEquipos,
         },
         {
           // A4 · lo que el receptor de equipos pregunta: a quién escuchar.

@@ -24,7 +24,7 @@ import { BiometriaModule } from './biometria';
 import { TableroModule } from './tablero';
 import { ResidenteModule } from './residente';
 import { VisitasModule } from './visitas';
-import { EdgeModule } from './edge';
+import { EdgeModule, TunelDelEdgeModule } from './edge';
 import { limitadorPorDispositivo } from './eventos';
 import { InterceptorDeCorrelacion } from './comun/interceptores/correlacion';
 import type { Configuracion } from './configuracion/esquema';
@@ -180,8 +180,7 @@ export class AppModule {
         AlarmServerModule.registrar(config.ALARM_SERVER_EQUIPOS),
         // Después de eventos: el tablero lee por los puertos que aquel publica.
         TableroModule.registrar(),
-        // ETAPA 15-B · el alta de equipos. Después del tablero, que los muestra:
-        // el panel lee el inventario y este módulo lo escribe.
+        // ETAPA 15-B · el alta de equipos: después del tablero, que los muestra.
         EquiposModule.registrar(),
         /**
          * F (15-L) · «Generar autorización» con foto y casilla. Después de
@@ -192,8 +191,9 @@ export class AppModule {
         // La superficie del residente, después del padrón: lee por su propio
         // puerto y no entra en el de administración (ver `mi.controller.ts`).
         ResidenteModule.registrar(),
-        // 15-Q · el Edge en sitio (S-24): consume eventos, zonas y multiempresa.
+        // 15-Q · el Edge en sitio (S-24); 15-Q2 · su túnel (ADR-035), detrás.
         EdgeModule.registrar(),
+        TunelDelEdgeModule.registrar(),
         /**
          * EL ÚLTIMO de los de negocio (ETAPA 14). Toma un caso de uso de
          * eventos, uno de zonas y uno de biometría por sus barriles, y un

@@ -55,7 +55,10 @@ import { readFileSync, existsSync } from 'node:fs';
 const SUPERFICIES = [
   {
     nombre: 'API',
-    esquema: 'apps/api/src/configuracion/esquema.ts',
+    esquema: [
+      'apps/api/src/configuracion/esquema.ts',
+      'apps/api/src/configuracion/esquema-de-ice.ts',
+    ],
     ejemplo: 'apps/api/.env.example',
   },
   {
@@ -63,6 +66,7 @@ const SUPERFICIES = [
     esquema: [
       'apps/edge/src/configuracion/esquema.ts',
       'apps/edge/src/configuracion/esquema-de-sitio.ts',
+      'apps/edge/src/configuracion/esquema-del-puente.ts',
     ],
     ejemplo: 'apps/edge/.env.example',
   },

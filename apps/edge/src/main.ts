@@ -2,12 +2,11 @@
  * El Edge Gateway en marcha. Aquí, y solo aquí, hay temporizadores y un servidor.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * QUÉ HACE AL ARRANCAR, EN ESTE ORDEN (15-Q, P-27 = B)
+ * QUÉ HACE AL ARRANCAR, EN ESTE ORDEN (15-Q; 15-Q2, ADR-035)
  *
- * 1. Carga y VALIDA la configuración, la de la ETAPA 12 y la de sitio. Si falta
- *    algo, no arranca (§2.7.1).
- * 2. Compone todo (`composicion.ts`): SQLite primero —la bandeja de un corte
- *    anterior sigue ahí—, luego la nube, los equipos y la contingencia.
+ * 1. Carga y VALIDA la configuración (ETAPA 12, sitio y puente): si falta algo, no arranca.
+ * 2. Compone todo (`composicion-puente.ts`): SQLite, la nube, los equipos, la
+ *    contingencia y, con `EDGE_TUNEL=activo`, el túnel saliente hacia la API.
  * 3. Escucha en UNA interfaz (`EDGE_ESCUCHA_HOST`): cámaras y entradas firmadas.
  * 4. Abre las escuchas de la terminal y el videoportero, y las rearma.
  * 5. Arranca el tic: sonda del enlace, reconciliación y descarga de reglas.
@@ -17,8 +16,8 @@
  * milisegundos (`apps/api/test/edge-en-sitio-pg.e2e.test.ts`).
  */
 import { createServer } from 'node:http';
-import { cargarConfiguracionDeSitio } from './configuracion/esquema-de-sitio';
-import { componerEdge } from './composicion';
+import { cargarConfiguracionDelPuente } from './configuracion/esquema-del-puente';
+import { componerPuente } from './composicion-puente';
 import type { Registrar } from './composicion';
 
 const registrar: Registrar = (nivel, mensaje, contexto) => {
@@ -30,8 +29,9 @@ const registrar: Registrar = (nivel, mensaje, contexto) => {
 };
 
 const arrancar = (): void => {
-  const config = cargarConfiguracionDeSitio();
-  const edge = componerEdge(config, { registrar });
+  const config = cargarConfiguracionDelPuente();
+  const { edge, tunel } = componerPuente(config, { registrar });
+  tunel?.iniciar();
 
   createServer((req, res) => void edge.manejador(req, res)).listen(
     config.EDGE_ESCUCHA_PUERTO,

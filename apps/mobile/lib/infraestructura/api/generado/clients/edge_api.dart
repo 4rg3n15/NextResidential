@@ -7,9 +7,12 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_edge_dto.dart';
 import '../models/credencial_del_edge_dto.dart';
+import '../models/ficha_de_edge_dto.dart';
 import '../models/get_copropiedades_id_reglas_instantanea_response_sealed.dart';
 import '../models/lote_del_edge_dto.dart';
 import '../models/lote_reconciliado_dto.dart';
+import '../models/marca_de_puente_dto.dart';
+import '../models/traslado_de_credencial_dto.dart';
 
 part 'edge_api.g.dart';
 
@@ -24,11 +27,34 @@ abstract class EdgeApi {
     @Body() required AltaDeEdgeDto body,
   });
 
+  /// Los Edge del conjunto, con su conexión y si son el puente
+  @GET('/copropiedades/{id}/edge-gateways')
+  Future<List<FichaDeEdgeDto>> puentesControllerListar({
+    @Path('id') required String id,
+  });
+
   /// Rota la credencial del Edge: la anterior deja de valer ya
   @POST('/copropiedades/{id}/edge-gateways/{edgeId}/credencial')
   Future<CredencialDelEdgeDto> gatewaysControllerRotar({
     @Path('id') required String id,
     @Path('edgeId') required String edgeId,
+  });
+
+  /// D3 · Muda al Edge puente las credenciales que siguen en la nube.
+  ///
+  /// Una por una: el Edge la guarda y confirma que el equipo autentica; SÓLO entonces se borra de la nube. Lo que no autentica se queda, con su motivo. Se puede repetir.
+  @POST('/copropiedades/{id}/edge-gateways/{edgeId}/migrar-credenciales')
+  Future<List<TrasladoDeCredencialDto>> puentesControllerMigrarCredenciales({
+    @Path('id') required String id,
+    @Path('edgeId') required String edgeId,
+  });
+
+  /// Marca (o desmarca) el Edge como puente de los equipos del conjunto
+  @POST('/copropiedades/{id}/edge-gateways/{edgeId}/puente')
+  Future<MarcaDePuenteDto> puentesControllerMarcar({
+    @Path('id') required String id,
+    @Path('edgeId') required String edgeId,
+    @Body() required MarcaDePuenteDto body,
   });
 
   /// La bandeja del Edge tras un corte de WAN, con lo que hizo con cada equipo.

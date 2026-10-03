@@ -22,6 +22,7 @@ import '../models/orden_de_bloqueo_dto.dart';
 import '../models/orden_ejecutada_dto.dart';
 import '../models/orden_manual_dto.dart';
 import '../models/preferencias_de_atencion_dto.dart';
+import '../models/servidores_ice_dto.dart';
 import '../models/solicitud_de_canal_dto.dart';
 
 part 'guardia_api.g.dart';
@@ -131,6 +132,12 @@ abstract class GuardiaApi {
   Future<PreferenciasDeAtencionDto> atencionControllerGuardar({
     @Path('id') required String id,
     @Body() required PreferenciasDeAtencionDto body,
+  });
+
+  /// Los servidores STUN/TURN para negociar la vista en vivo (TURN con credencial efímera)
+  @GET('/copropiedades/{id}/guardia/video/ice')
+  Future<ServidoresIceDto> iceControllerIce({
+    @Path('id') required String id,
   });
 
   /// Negocia la vista en vivo del equipo (WHEP): oferta SDP dentro, respuesta SDP fuera

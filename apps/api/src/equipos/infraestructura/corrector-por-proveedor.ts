@@ -19,10 +19,8 @@ import type {
  * ═════════════════════════════════════════════════════════════════════════════
  * LO QUE ESTA CAPA SÍ APORTA
  *
- * El texto del resultado para la pantalla, y **el valor anterior y el nuevo**
- * de vuelta: sin eso, la constancia en `auditoria_seguridad` diría que alguien
- * corrigió algo y no qué. Reconstruir después quién dejó el equipo como está
- * sería imposible, que es justo lo que una auditoría necesita poder hacer.
+ * El texto para la pantalla y **el valor anterior y el nuevo**: sin eso, la
+ * constancia en `auditoria_seguridad` diría que alguien corrigió algo y no qué.
  */
 /**
  * 15-L · lo que la verificación remota escribe en la terminal y NO decide el
@@ -38,10 +36,12 @@ export class CorrectorPorProveedor implements CorrectorDeEquipo {
   constructor(
     private readonly peticion?: typeof fetch,
     private readonly ajustes: AjustesDeVerificacionRemota = { abrirSinPlataforma: false },
+    /** 15-Q2 · C2 · con puente, la misma corrección se aplica desde el Edge. */
+    private readonly aplicar: typeof aplicarCorreccion = aplicarCorreccion,
   ) {}
 
   async corregir(datos: DatosDeCorreccion): Promise<ResultadoDeCorreccionDeEquipo> {
-    const resultado = await aplicarCorreccion({
+    const resultado = await this.aplicar({
       host: datos.host,
       puerto: datos.puerto,
       protocolo: datos.protocolo,

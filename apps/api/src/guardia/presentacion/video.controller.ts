@@ -64,7 +64,7 @@ export class VideoController {
   constructor(
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
     @Inject(ALCANCE_DE_EQUIPOS) private readonly equiposDeLaRuta: AlcanceDeEquipos,
-    @Inject(NegociarVistaEnVivo) private readonly negociar: NegociarVistaEnVivo,
+    @Inject(NegociarVistaEnVivo) private readonly negociar: Pick<NegociarVistaEnVivo, 'ejecutar'>,
   ) {}
 
   @Post(':dispositivoId/whep')

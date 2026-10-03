@@ -224,6 +224,8 @@ flowchart TB
 
 ### El Edge sin WAN
 
+> **Corregido en la 15-Q2:** P-27 = A, el Edge es el **puente local permanente** ([ADR-035](docs/decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md)); lo que sigue describe la 15-Q y se rehace en esa ronda.
+
 El Edge es **contingencia** (ADR-034, P-27 = B): la nube sigue hablando con los equipos y el Edge los escucha en paralelo. Por cada acceso pregunta si la nube puede decidir; sólo si no puede, decide con su caché, **acciona** la barrera o contesta a la terminal, y guarda el acceso. Mire la última flecha, la tachada: al reconectar, el Edge **no vuelve a decidir**. Envía lo que ya decidió, con la versión de reglas que usó.
 
 ```mermaid

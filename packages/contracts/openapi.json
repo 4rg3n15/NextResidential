@@ -1626,6 +1626,46 @@
         "tags": [
           "edge"
         ]
+      },
+      "get": {
+        "operationId": "PuentesController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FichaDeEdgeDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los Edge del conjunto, con su conexión y si son el puente",
+        "tags": [
+          "edge"
+        ]
       }
     },
     "/copropiedades/{id}/edge-gateways/{edgeId}/credencial": {
@@ -1673,6 +1713,120 @@
           }
         ],
         "summary": "Rota la credencial del Edge: la anterior deja de valer ya",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
+    "/copropiedades/{id}/edge-gateways/{edgeId}/migrar-credenciales": {
+      "post": {
+        "description": "Una por una: el Edge la guarda y confirma que el equipo autentica; SÓLO entonces se borra de la nube. Lo que no autentica se queda, con su motivo. Se puede repetir.",
+        "operationId": "PuentesController_migrarCredenciales",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "edgeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrasladoDeCredencialDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "D3 · Muda al Edge puente las credenciales que siguen en la nube",
+        "tags": [
+          "edge"
+        ]
+      }
+    },
+    "/copropiedades/{id}/edge-gateways/{edgeId}/puente": {
+      "post": {
+        "operationId": "PuentesController_marcar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "edgeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcaDePuenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarcaDePuenteDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": "Ya hay otro Edge puente en la copropiedad"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marca (o desmarca) el Edge como puente de los equipos del conjunto",
         "tags": [
           "edge"
         ]
@@ -3978,6 +4132,52 @@
           }
         ],
         "summary": "Cambia las preferencias de atención (G2)",
+        "tags": [
+          "guardia"
+        ]
+      }
+    },
+    "/copropiedades/{id}/guardia/video/ice": {
+      "get": {
+        "operationId": "IceController_ice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServidoresIceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Copropiedad fuera del alcance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los servidores STUN/TURN para negociar la vista en vivo (TURN con credencial efímera)",
         "tags": [
           "guardia"
         ]
@@ -12278,6 +12478,52 @@
           "cantidad"
         ]
       },
+      "FichaDeEdgeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "puente": {
+            "type": "boolean",
+            "description": "Los equipos del conjunto se operan por su túnel (ADR-035)"
+          },
+          "puenteDesde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "conectado": {
+            "type": "boolean",
+            "description": "A3 · el túnel está abierto ahora"
+          },
+          "conexionDesde": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Desde cuándo está conectado, o desde cuándo NO (null: no se ha visto)"
+          },
+          "ultimoLatido": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "versionDeReglas": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "puente",
+          "conectado",
+          "versionDeReglas"
+        ]
+      },
       "FichaDelEquipoDto": {
         "type": "object",
         "properties": {
@@ -13392,6 +13638,18 @@
         "required": [
           "aceptado",
           "resultados"
+        ]
+      },
+      "MarcaDePuenteDto": {
+        "type": "object",
+        "properties": {
+          "puente": {
+            "type": "boolean",
+            "description": "true: los equipos pasan a operarse por este Edge"
+          }
+        },
+        "required": [
+          "puente"
         ]
       },
       "MedidasDeFotoDto": {
@@ -15832,6 +16090,51 @@
           "momento"
         ]
       },
+      "ServidorIceDto": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "example": [
+              "stun:stun.ejemplo.invalid:3478"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "username": {
+            "type": "string",
+            "description": "Usuario EFÍMERO del TURN: `<expira>:<usuario>`"
+          },
+          "credential": {
+            "type": "string",
+            "description": "Credencial EFÍMERA del TURN (caduca sola)"
+          }
+        },
+        "required": [
+          "urls"
+        ]
+      },
+      "ServidoresIceDto": {
+        "type": "object",
+        "properties": {
+          "iceServers": {
+            "description": "Vacía sin STUN/TURN configurados",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServidorIceDto"
+            }
+          },
+          "ttlSegundos": {
+            "type": "number",
+            "description": "Vida de la credencial del TURN; pedir otra antes de que caduque"
+          }
+        },
+        "required": [
+          "iceServers",
+          "ttlSegundos"
+        ]
+      },
       "SesionAbiertaDto": {
         "type": "object",
         "properties": {
@@ -16059,6 +16362,27 @@
         "required": [
           "activas",
           "inactivas"
+        ]
+      },
+      "TrasladoDeCredencialDto": {
+        "type": "object",
+        "properties": {
+          "dispositivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trasladada": {
+            "type": "boolean",
+            "description": "En el Edge y borrada de la nube"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dispositivoId",
+          "trasladada",
+          "motivo"
         ]
       },
       "TurnoDto": {

@@ -1,12 +1,21 @@
 # Despliegue del Edge Gateway
 
-**ETAPA 12 · al día con la 15-Q (Edge en sitio).** Aprovisionamiento, identidad
-de servicio, equipos, rotación de credenciales, reloj, actualización remota y la
-prueba de corte de WAN con los equipos de verdad.
+**ETAPA 12 · al día con la 15-Q2 (el Edge como puente).** Aprovisionamiento,
+identidad de servicio, equipos, rotación de credenciales, reloj, actualización
+remota, la prueba de corte de WAN con los equipos de verdad y, en §10, el Edge
+como **puente permanente** entre la nube y los equipos.
 
 > **A quién va dirigida.** A quien instala y opera los equipos, no a quien
 > escribe el código. Cada paso dice qué hacer, qué tiene que pasar, y qué
 > significa si no pasa.
+
+> **15-Q2 · P-27 = A (ADR-035).** El cliente decidió que el Edge es el **puente
+> local permanente**: los equipos hablan **sólo** con el Edge y la nube les llega
+> a través de él, por un túnel que el Edge abre hacia la API. Es el modo de una
+> copropiedad cuyo Edge está **marcado como puente** (§10). Una copropiedad sin
+> Edge puente sigue como antes: la API habla directo con los equipos (el modo del
+> portátil en sitio, §0–§9). **Con puente, la cámara publica sólo al Edge**:
+> nunca configure dos destinos (§10.3).
 
 > **Regla de oro de esta guía.** IPs, usuarios y claves de los equipos van
 > **solo** en el `.env` del gateway (RN-21, KPI-11). Nunca en un documento, un
@@ -24,8 +33,12 @@ siempre. Si no puede, decide con las reglas que la nube le dio la última vez,
 **acciona la barrera o contesta a la terminal**, y guarda el acceso. Cuando
 vuelve la conexión, envía todo lo que pasó, exactamente una vez.
 
-Es la decisión P-27 = B (ADR-034): **el Edge es contingencia**. Con WAN, la
-instalación funciona igual que si el Edge no existiera.
+Así funciona el Edge **sin** marca de puente (P-27 = B, ADR-034, sustituida en
+parte por ADR-035): contingencia, y con WAN la instalación funciona igual que si
+el Edge no existiera. **Con la marca de puente** (§10) la nube no alcanza los
+equipos más que a través de él: con WAN decide la nube y **ejecuta el Edge**;
+sin WAN, o si la nube no contesta a tiempo, decide el Edge con su caché, como
+aquí.
 
 Lo que **no** es:
 
@@ -53,7 +66,7 @@ Lo que **no** es:
 | IP fija en la LAN     | la de la VLAN de los equipos                  | Las cámaras publican a esa IP (`EDGE_ESCUCHA_HOST`); si cambia, dejan de llegar los eventos |
 | Red hacia los equipos | TCP al puerto HTTP de cada equipo             | El Edge abre la barrera y contesta a la terminal él mismo durante un corte                  |
 | Red desde las cámaras | TCP a `EDGE_ESCUCHA_HOST:EDGE_ESCUCHA_PUERTO` | El Alarm Server de la cámara publica al Edge además de a la nube (§2.2)                     |
-| Salida a la API       | HTTPS                                         | No hace falta entrada desde internet: el Edge llama, nadie le llama desde fuera             |
+| Salida a la API       | HTTPS y WSS (el túnel del puente, §10)        | No hace falta entrada desde internet: el Edge llama, nadie le llama desde fuera             |
 | Alimentación          | SAI recomendado                               | SQLite se configura con `synchronous = FULL`, pero un corte a mitad de escritura es real    |
 
 **No hace falta compilar nada en el equipo.** Se compila en la máquina de
@@ -129,7 +142,10 @@ Recomendado: no reutilice el de la API. Un usuario bloqueado por intentos
 fallidos deja sin servicio a quien lo usa, y con uno por cliente el bloqueo de
 uno no tumba al otro; además la bitácora del equipo dice quién pidió qué.
 
-#### 2.2.2 · La cámara publica a los dos
+#### 2.2.2 · La cámara publica a los dos (sólo SIN puente)
+
+> **Con el Edge como puente esta sección NO aplica**: la cámara publica sólo al
+> Edge (§10.3), y [SUPUESTO] S-184 queda retirado.
 
 En la configuración del Alarm Server (escucha HTTP) de la cámara, **deje el
 destino de la API como está** y añada un segundo destino:
@@ -570,3 +586,186 @@ auditar.
 | Eventos en la nube                                | 20, una vez    |          |     |
 | Horas de los eventos                              | las del acceso |          |     |
 | Aperturas atribuidas al Edge                      | = permitidos   |          |     |
+
+---
+
+## 10 · El Edge como PUENTE (15-Q2, ADR-035)
+
+La API va en la nube (Cloud Run) y **no tiene ruta** hacia la red privada del
+conjunto. El único camino lo abre el Edge, **hacia fuera**: un WebSocket
+persistente a `wss://<API>/edge/tunel`, autenticado con su propia credencial
+(la de §2.1: HMAC con marca temporal y nonce de un solo uso). Por ese túnel van
+las órdenes de la consola (abrir por punto con motivo, plantillas de rostro,
+«Probar conexión», diagnóstico, salidas, reloj), las credenciales de los
+equipos, el audio de la guardia y la negociación del video. Los eventos de los
+equipos llegan **sólo** al Edge, que los reenvía.
+
+**Un solo actor por acceso.** Con la nube viva, la nube DECIDE y el Edge
+EJECUTA y confirma. Si la nube no contesta en `EDGE_PLAZO_NUBE_MS`, decide el
+Edge con su caché, acciona, sella la versión de reglas y lo guarda para
+reconciliar (§9). Nunca los dos.
+
+### 10.1 · Variables del Edge puente
+
+| Variable             | Valor                                          | Notas                                                        |
+| -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| `EDGE_TUNEL`         | `activo`                                       | `inactivo` (o vacía) = el Edge de §0–§9, sin túnel           |
+| `EDGE_EQUIPOS_LLAVE` | 32 bytes en base64 (`openssl rand -base64 32`) | Cifra las credenciales en el SQLite. **Fuera** de su carpeta |
+| `EDGE_PLAZO_NUBE_MS` | vacía = `2500`                                 | Cuánto espera la decisión de la nube por cada acceso         |
+| `EDGE_GO2RTC_URL`    | vacía = `http://127.0.0.1:1984`                | El go2rtc que corre **junto** al Edge (§10.7)                |
+| `EDGE_EQUIPOS`       | puede ir **vacía**                             | Con puente, los equipos llegan desde la consola por el túnel |
+
+`EDGE_EQUIPOS_LLAVE` va en el almacén de secretos del sistema o en el `.env`
+de la máquina, **nunca** en la misma carpeta que `SQLITE_PATH` ni en una copia
+de respaldo del SQLite. Si se pierde, las credenciales cifradas no se leen: el
+Edge no arranca y lo dice («no se abre con EDGE_EQUIPOS_LLAVE»). Restaure la
+llave o, con una nueva y un SQLite vacío, vuelva a dar las claves desde la
+consola (§10.5).
+
+### 10.2 · Registrar el Edge y marcarlo como puente
+
+1. Alta del Edge en la API: igual que §2.1 (superadministrador con MFA).
+2. Arranque el Edge con `EDGE_TUNEL=activo` (§2.5–§2.6). En su registro:
+   `túnel con la nube abierto`. **Si no aparece**, el registro dice por qué:
+   código `4401` (credencial), `4403` (no es el puente de la copropiedad),
+   `4404` (otra copropiedad), `4409` (ya hay otro Edge conectado).
+3. Consola → **Dispositivos** → panel **Edge del conjunto** → **Usar como
+   puente** (sólo superadministrador). Desde ese momento, todo lo que la consola
+   pida a un equipo de esta copropiedad va por el túnel.
+4. Compruebe: el panel dice **«Conectado desde …»** y **«Puente de los
+   equipos»**; `GET /ready` de la API dice `edge: 1 conectado(s)`.
+
+Un solo Edge puente por copropiedad (lo impone la base) y un solo túnel
+conectado: un segundo Edge que intente abrir túnel para la misma copropiedad se
+rechaza (`4409`) y queda en `auditoria_seguridad`.
+
+Si el túnel se cae más de 30 s, cada equipo del conjunto recibe una alerta
+«dispositivo caído» (RN-18). Es **persistente**: una por equipo mientras siga
+abierta, y **no se cierra sola** al volver el túnel; la resuelve o archiva un
+operador (el panel ya dirá «Conectado desde …»).
+
+### 10.3 · La cámara publica SÓLO al Edge
+
+En el Alarm Server (escucha HTTP) de la cámara, **un único destino**:
+
+```
+http://<EDGE_ESCUCHA_HOST>:<EDGE_ESCUCHA_PUERTO>/alarm-server/<secreto de la cámara>
+```
+
+El secreto de la cámara lo emite la consola al darla de alta y el Edge lo
+recibe por el túnel: **no** hace falta escribirlo en `EDGE_EQUIPOS`. Borre el
+destino de la API si existía: con puente, la API ya no se suscribe a los
+equipos de esta copropiedad (B3), y un segundo destino sólo produciría
+publicaciones que nadie atiende.
+
+Terminal y videoportero: el Edge se suscribe a su flujo de eventos; la API no.
+
+### 10.4 · Un usuario de servicio por equipo
+
+Cree en cada equipo un usuario propio del Edge, con el **mínimo privilegio**
+que su función exige (abrir puerta / relé, gestionar plantillas, audio), y dé
+de alta el equipo **desde la consola** con ese usuario y su clave. La clave:
+
+- viaja consola → API → túnel → Edge, **sin** guardarse en la nube ni aparecer
+  en registros, respuestas o errores;
+- el Edge la cifra con `EDGE_EQUIPOS_LLAVE` (AES-256-GCM) y contesta si, con
+  ella, el equipo autentica;
+- en la nube queda `edge:<gateway>` y una **huella** (HMAC) que dice si cambió,
+  nunca cuál es.
+
+Con el túnel caído, el alta falla **antes** de escribir nada («el Edge del
+conjunto no está conectado»); si el túnel cae **a mitad**, el alta se deshace
+con una baja lógica y se puede reintentar.
+
+### 10.5 · Mudar al Edge las credenciales que ya estaban en la nube
+
+Para un conjunto que funcionaba en modo directo (las claves estaban cifradas en
+la nube, H-15B-1, AR-05):
+
+1. Edge conectado y marcado como puente (§10.2).
+2. Panel **Edge del conjunto** → **Mudar credenciales al Edge**
+   (superadministrador).
+3. Por cada equipo, la API entrega la clave al Edge; el Edge la guarda y prueba
+   que el equipo autentica con ella; **sólo entonces** la nube borra sus bytes
+   (la fila queda, sin bytes, como historial: RN-19).
+4. El panel dice cuántas se mudaron y, de las que siguen en la nube, **por
+   qué** (equipo apagado, credencial rechazada…). Corrija y repita: lo ya mudado
+   no se toca.
+
+Comprobación en la base (no debe quedar ninguna con bytes):
+
+```sql
+SELECT d.nombre, c.trasladada_al_edge IS NOT NULL AS en_el_edge,
+       c.iv IS NULL AND c.cuerpo IS NULL AND c.etiqueta IS NULL AS sin_bytes
+  FROM public.credenciales_de_equipo c JOIN public.dispositivos d ON d.id = c.dispositivo_id
+ WHERE c.copropiedad_id = '<copropiedad>' AND c.trasladada_en IS NOT NULL;
+```
+
+### 10.6 · Volver al modo directo (reversión)
+
+1. Panel **Edge del conjunto** → **Quitar puente**. La API vuelve a hablar
+   directo con los equipos **de esta copropiedad** (sólo si tiene ruta hacia
+   ellos: el portátil en sitio, no Cloud Run).
+2. Edite **cada** equipo desde la consola y vuelva a escribir su clave. Se
+   cifra en la nube y su referencia vuelve a la bóveda (`vault:equipos/<id>`),
+   sin huella. Hasta que lo haga, ese equipo **no tiene credencial en la nube**:
+   la base no puede inventarla.
+3. Vuelva a configurar la cámara para publicar a la API (§2.2.2).
+
+`supabase/reversion/0050_revert.sql` revierte el **esquema**, no esto: se niega
+mientras quede una referencia `edge:`, y también si hubo algún traslado, porque
+las filas trasladadas se conservan sin bytes como historial. Sin puentes, la
+0050 aplicada ya se comporta como el modo directo.
+
+### 10.7 · go2rtc junto al Edge, y STUN/TURN
+
+El video de los equipos lo sirve un **go2rtc en la misma máquina que el Edge**
+(`EDGE_GO2RTC_URL`): la URL RTSP lleva la credencial del equipo y no sale del
+conjunto. La consola negocia contra la API (sesión, rol y copropiedad
+validados) y la oferta viaja por el túnel al go2rtc local, que contesta el SDP.
+El **medio** va entre el navegador y ese go2rtc por ICE:
+
+- En el `go2rtc.yaml` del Edge: `api: listen: "127.0.0.1:1984"` (sólo local) y
+  `webrtc: listen: ":8555"` con los mismos STUN/TURN que la API entrega a la
+  consola (`webrtc: ice_servers:`).
+- En la API: `WEBRTC_STUN_URLS`, `WEBRTC_TURN_URLS`, `WEBRTC_TURN_SECRETO`
+  (el `static-auth-secret` del TURN) y `WEBRTC_TURN_TTL_SEGUNDOS`. La consola
+  recibe una credencial TURN **efímera** por usuario; el secreto no sale de la
+  API.
+
+> **PENDIENTE DE DEFINICIÓN · dónde se aloja el TURN.** Un TURN con IP pública
+> (coturn) es lo que permite ver el video desde fuera del conjunto detrás de
+> NAT simétricos. Mientras no se decida, sin TURN el video funciona en la red
+> del conjunto (y por STUN en NAT sencillos) y **no** desde redes que lo
+> bloqueen. No se probó con un TURN real en esta ronda (§ informe 15-Q2).
+
+### 10.8 · El corte de WAN con puente
+
+La prueba de §9 vale igual, con una diferencia en lo que se ve:
+
+- **Con WAN:** cada acceso lo decide la nube: en el registro del Edge **no**
+  aparece `acceso resuelto por el Edge sin nube`, y la barrera abre por la
+  orden de la nube (una sola apertura por acceso).
+- **Al cortar:** el túnel se cierra; el panel de la consola pasa a
+  **«Desconectado desde …»**; las órdenes desde la consola fallan con «el Edge
+  del conjunto no está conectado» (503), y el Edge decide solo.
+- **Al volver:** el túnel se reabre solo (retroceso con dispersión) y la bandeja
+  se reconcilia exactamente una vez (§9.5).
+
+> **Antes de cortar, compruebe que el Edge tiene reglas.** Un Edge sin
+> instantánea niega todo por `FALLO_TECNICO`, como debe. **Deuda DT-15Q2-02:** > `pnpm sitio:edge` todavía no conoce el modo puente (exige `EDGE_EQUIPOS` y no
+> lee el registro cifrado); hasta que lo haga, compruebe las reglas en el
+> registro del Edge (la línea `reglas` con `estado: nueva` y su versión) y los equipos en el
+> panel de la consola.
+
+### 10.9 · Lista de comprobación del puente
+
+- [ ] `EDGE_TUNEL=activo` y `EDGE_EQUIPOS_LLAVE` fuera de la carpeta del SQLite.
+- [ ] `túnel con la nube abierto` en el registro; panel «Conectado desde …».
+- [ ] Marcado como puente; `/ready` de la API: `edge: 1 conectado(s)`.
+- [ ] Cámara con **un solo** destino: el Edge.
+- [ ] Cada equipo con su usuario de servicio, dado de alta desde la consola.
+- [ ] Credenciales heredadas mudadas; la consulta de §10.5 sin filas con bytes.
+- [ ] go2rtc local escuchando sólo en `127.0.0.1:1984`; STUN/TURN iguales en
+      go2rtc y en la API.
+- [ ] Corte de WAN de §9 / §10.8 superado.

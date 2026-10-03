@@ -1,5 +1,4 @@
-import type { IncomingMessage, Server } from 'node:http';
-import type { Duplex } from 'node:stream';
+import type { Server } from 'node:http';
 import { Inject, Injectable } from '@nestjs/common';
 import type { OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
@@ -9,6 +8,10 @@ import { WebSocketServer } from 'ws';
 import type { RawData, WebSocket } from 'ws';
 import { CONFIGURACION } from '../../../configuracion/configuracion.module';
 import type { Configuracion } from '../../../configuracion/esquema';
+import {
+  atenderActualizacion,
+  rechazarActualizacion as rechazar,
+} from '../../../comun/despachador-de-actualizaciones';
 import {
   ConversacionDeAudio,
   REGISTRO_DE_CONVERSACIONES,
@@ -49,14 +52,10 @@ const MOTIVO_DEL_NAVEGADOR: Readonly<Record<number, string>> = {
   1006: 'Se perdió la conexión con la consola',
 };
 
-const rechazar = (socket: Duplex, estado: string): void => {
-  socket.write(`HTTP/1.1 ${estado}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
-  socket.destroy();
-};
-
 @Injectable()
 export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModuleDestroy {
   private servidor: WebSocketServer | null = null;
+  private soltarRuta: () => void = () => undefined;
   private latido: ReturnType<typeof setInterval> | null = null;
   private readonly vivos = new WeakSet<WebSocket>();
 
@@ -84,27 +83,27 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
       perMessageDeflate: false,
     });
     this.servidor = servidor;
-    http.on('upgrade', (peticion: IncomingMessage, socket: Duplex, cabeza: Buffer) => {
-      const url = new URL(peticion.url ?? '/', 'http://api');
-      if (url.pathname !== RUTA_DEL_AUDIO) {
-        rechazar(socket, '404 Not Found');
-        return;
-      }
-      const datos = this.billetes.consumir(
-        url.searchParams.get('billete') ?? '',
-        ipDeLaActualizacion(peticion, confia),
-      );
-      if (datos === null) {
-        this.bitacora.registrar(
-          'aviso',
-          'WebSocket de audio rechazado: billete inválido, gastado, caducado o de otra IP',
-          {},
+    // 15-Q2 · las demás rutas (el túnel del Edge) las reparte el despachador.
+    this.soltarRuta = atenderActualizacion(
+      http,
+      RUTA_DEL_AUDIO,
+      (peticion, socket, cabeza, url) => {
+        const datos = this.billetes.consumir(
+          url.searchParams.get('billete') ?? '',
+          ipDeLaActualizacion(peticion, confia),
         );
-        rechazar(socket, '401 Unauthorized');
-        return;
-      }
-      servidor.handleUpgrade(peticion, socket, cabeza, (ws) => this.atender(ws, datos));
-    });
+        if (datos === null) {
+          this.bitacora.registrar(
+            'aviso',
+            'WebSocket de audio rechazado: billete inválido, gastado, caducado o de otra IP',
+            {},
+          );
+          rechazar(socket, '401 Unauthorized');
+          return;
+        }
+        servidor.handleUpgrade(peticion, socket, cabeza, (ws) => this.atender(ws, datos));
+      },
+    );
     this.latido = setInterval(() => {
       for (const ws of servidor.clients) {
         if (!this.vivos.has(ws)) {
@@ -116,16 +115,11 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
       }
     }, LATIDO_MS);
     this.latido.unref();
-    this.bitacora.registrar(
-      'info',
-      'audio de la guardia por WebSocket (GUARDIA_AUDIO_TRANSPORTE=websocket)',
-      {
-        ruta: RUTA_DEL_AUDIO,
-      },
-    );
+    this.bitacora.registrar('info', 'audio de la guardia por WebSocket', { ruta: RUTA_DEL_AUDIO });
   }
 
   onModuleDestroy(): void {
+    this.soltarRuta();
     if (this.latido !== null) clearInterval(this.latido);
     for (const ws of this.servidor?.clients ?? []) ws.close(1001, 'La API se está cerrando');
     this.servidor?.close();
