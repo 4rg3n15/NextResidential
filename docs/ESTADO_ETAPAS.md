@@ -892,7 +892,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Corrección `etapa-15m-alerta-archivada-aislada` — la alerta archivada, contada donde nadie más escribe (H-15M-C01) · **CERRADA** · 2026-10-03
 
-**Rama:** `etapa-15m-alerta-archivada-aislada` · **Base:** `develop` (`7b31083`, merge del PR #41) · **PR:** ninguno, no se pidió
+**Rama:** `etapa-15m-alerta-archivada-aislada` · **Base:** `develop` (`7b31083`, merge del PR #41) · **PR:** [4rg3n15/NextResidential#44](https://github.com/4rg3n15/NextResidential/pull/44), sin fusionar
 **Informe:** [`etapas/ETAPA-15M-alerta-archivada-aislada.md`](etapas/ETAPA-15M-alerta-archivada-aislada.md)
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -906,7 +906,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | Lo que cuesta                 | Una alta de copropiedad por corrida, no una por prueba: cada alta toca la secuencia de pools y la lista global que miran `porteros-por-identificador-pg` y `copropiedades-pg` (anotadas en DT-15M-C01)                                                                                         |
 | Deuda nueva                   | **DT-15M-C01**: once ficheros contra la base dependen del estado compartido de COP_A o de la historia de la base, con el detalle y los arreglos propuestos en el §8 del informe · **DT-15M-C02** y **DT-15M-C03**: dos fallos intermitentes ajenos, cada uno tumbó una corrida del verificador |
 
-**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `99669c8`, con la base preparada como en CI (`--con-pruebas`) → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe» (D-112). 31 de 31 pasos, 4974 pruebas de TypeScript y 367 de Dart, tres corridas idénticas; dominio 96,20 %, aplicación 97,10 %, global 87,22 % de líneas. Las dos corridas anteriores, sobre el mismo commit, salieron FALLIDAS por causas ajenas a esta corrección, y el informe dice cuáles (H-15R-C01 con la base recién sembrada; DT-15M-C02 y DT-15M-C03).
+**Verificación:** `./scripts/verificar-etapa.sh --con-base` sobre `99669c8`, con la base preparada como en CI (`--con-pruebas`) → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe» (D-112). 31 de 31 pasos, 4974 pruebas de TypeScript y 367 de Dart, tres corridas idénticas; dominio 96,20 %, aplicación 97,10 %, global 87,22 % de líneas. Las dos corridas anteriores, sobre el mismo commit, salieron FALLIDAS por causas ajenas a esta corrección, y el informe dice cuáles (H-15R-C01 con la base recién sembrada; DT-15M-C02 y DT-15M-C03). CI verde en `825a905`, con el verificador de macOS.
 
 ---
 

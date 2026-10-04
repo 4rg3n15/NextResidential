@@ -1,7 +1,7 @@
 # Corrección de la 15-M · La alerta archivada, contada donde nadie más escribe (H-15M-C01)
 
 **Rama:** `etapa-15m-alerta-archivada-aislada` · **Base:** `develop` (`7b31083`, merge del PR #41) ·
-**PR:** ninguno, no se pidió · **Fecha:** 2026-10-03 · **Corrige:** H-15M-C01 ·
+**PR:** [4rg3n15/NextResidential#44](https://github.com/4rg3n15/NextResidential/pull/44), sin fusionar · **Fecha:** 2026-10-03 · **Corrige:** H-15M-C01 ·
 **Corrige, fuera del encargo:** H-15M-C02 · **Abre:** DT-15M-C01 a DT-15M-C03
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -222,6 +222,9 @@ limpio (6886 blobs del historial).
 | Global (887 ficheros)                         | 87,22 %                     | 87,22 % | 70 %           |
 | App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
 
+Y el CI de GitHub, por su cuenta, sobre la cabeza del cierre (`825a905`): los cuatro
+trabajos en verde, también `verificar-etapa.sh --con-base (macos)`.
+
 ### Las dos corridas anteriores, sobre el mismo commit
 
 1. **FALLIDA, con la base recién sembrada** (`--con-semillas`, la del paso 1c).
@@ -347,4 +350,5 @@ rama con nombre de etapa (§2.5).
 | `7ecf1e1` | H-15M-C01 · la alerta archivada, contada en la copropiedad de la corrida: 0, 1, 0   |
 | `7fe1e5b` | H-15M-C02 · «aparece en Dispositivos» da de alta en esa misma copropiedad           |
 | `99669c8` | Este informe y la ficha de `ESTADO_ETAPAS.md`, a falta del veredicto                |
-| _este_    | Cierre: el veredicto del verificador, las dos corridas anteriores y DT-15M-C02, C03 |
+| `825a905` | Cierre: el veredicto del verificador, las dos corridas anteriores y DT-15M-C02, C03 |
+| _este_    | El PR #44 y el CI verde de `825a905`, en el informe y en la ficha                   |
