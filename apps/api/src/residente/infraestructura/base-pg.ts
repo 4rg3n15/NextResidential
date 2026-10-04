@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { conCliente } from '../../persistencia/con-cliente';
+import { claimsDeLaOperacion, SERVICIO_POR_COPROPIEDAD } from '../../comun/claims-por-operacion';
+import type { ClaimsDelAdaptador } from '../../comun/claims-por-operacion';
 
 /**
  * Lo único que comparten los adaptadores del residente: cómo abrir la conexión.
@@ -9,20 +11,18 @@ import { conCliente } from '../../persistencia/con-cliente';
  * los claims — y fijarlos es lo que mantiene a la RLS como segunda barrera
  * (§2.7.6). Un detalle de conexión repetido cuatro veces deja de ser un detalle.
  *
- * NO contiene ninguna consulta ni ninguna regla: la herencia aquí es de
- * mecánica, no de comportamiento, y por eso no viola la preferencia de §2.4 por
- * la composición — no hay dos adaptadores que se sustituyan entre sí.
+ * Sin consultas ni reglas: herencia de mecánica, no de comportamiento (§2.4).
  */
 export abstract class BaseDelResidentePg {
   constructor(
     protected readonly pool: Pool,
-    protected readonly claims: Record<string, unknown> = {},
+    protected readonly claims: ClaimsDelAdaptador = SERVICIO_POR_COPROPIEDAD,
   ) {}
 
-  protected async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  protected async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, cop)),
       ]);
       return await fn(cliente);
     });
@@ -36,8 +36,8 @@ export abstract class BaseDelResidentePg {
    * un visitante sin autorización y un acompañante sin nadie a quien acompañar:
    * basura que nadie limpia y que el portero ve.
    */
-  protected async enTransaccion<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
-    return this.conContexto(async (c) => {
+  protected async enTransaccion<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    return this.conContexto(cop, async (c) => {
       await c.query('BEGIN');
       try {
         const r = await fn(c);

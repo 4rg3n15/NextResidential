@@ -7,6 +7,7 @@ import { rutaInicialDe } from '@/lib/navegacion';
 import type { Rol } from '@ncr/contracts';
 import { FormularioDeAcceso } from './formulario-acceso';
 import { MarcoDeAcceso } from './marco';
+import { despliegue } from '@/lib/configuracion-de-despliegue';
 
 export const metadata: Metadata = { title: 'Acceso' };
 export const dynamic = 'force-dynamic';
@@ -22,12 +23,7 @@ const AVISOS: Readonly<Record<string, string>> = {
   sesion: 'Tu sesión de portería terminó. Vuelve a entrar.',
 };
 
-/**
- * Página de acceso.
- *
- * Con el cambio de contraseña pendiente (ADR-023) se abre directamente en ese
- * paso: la sesión existe, pero la API no admite nada más hasta cambiarla.
- */
+/** Página de acceso; con el cambio pendiente (ADR-023), directamente en ese paso. */
 const Acceso = async ({
   searchParams,
 }: {
@@ -55,7 +51,10 @@ const Acceso = async ({
           {aviso}
         </p>
       )}
-      <FormularioDeAcceso pasoInicial={cambioPendiente ? 'cambio' : 'credenciales'} />
+      <FormularioDeAcceso
+        pasoInicial={cambioPendiente ? 'cambio' : 'credenciales'}
+        recuperacionPorCorreo={despliegue().recuperacionPorCorreo}
+      />
     </MarcoDeAcceso>
   );
 };

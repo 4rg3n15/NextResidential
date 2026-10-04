@@ -9,15 +9,15 @@ import { formatoG711De } from '@/lib/audio/g711';
 import type { FormatoG711 } from '@/lib/audio/g711';
 import { CanalDeAudioPorWebSocket } from '@/lib/audio/canal-por-websocket';
 import type { EstadoDelCanalWs, OpcionesDelCanalWs } from '@/lib/audio/canal-por-websocket';
+import { urlDelAudio } from '@/lib/origen-directo';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-P · P2 · HABLAR Y OÍR POR EL CANAL ORDENADO (ADR-01, enmienda 15-P)
  *
  * Se monta con la palabra concedida y el canal del equipo abierto. Pide un
- * billete a la API (pasa por todos sus guardas) y abre el WebSocket por el
- * MISMO origen de la consola (`/api/ncr-audio`). Desde ese momento se oye, sin
- * pulsar nada.
+ * billete a la API (pasa por todos sus guardas) y abre el WebSocket por la
+ * consola (`/api/ncr-audio`) o, en Netlify, directo a la API (15-R, D1).
  *
  * «Pulsar para hablar»: mantener el botón con el ratón o el dedo, o la barra
  * espaciadora con el foco en este panel. El micrófono se abre al pulsar y se
@@ -40,11 +40,6 @@ export interface PropiedadesDeControlesWs {
   /** Inyectable para las pruebas: por omisión, el canal real. */
   readonly crearCanal?: (opciones: OpcionesDelCanalWs) => CanalDeAudio;
 }
-
-const urlDelAudio = (billete: string): string => {
-  const esquema = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${esquema}://${window.location.host}/api/ncr-audio?billete=${encodeURIComponent(billete)}`;
-};
 
 const usarCanal = (
   formato: FormatoG711 | null,

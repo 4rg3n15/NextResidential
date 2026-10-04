@@ -882,6 +882,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/eventos/billete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Billete de un solo uso para abrir el flujo en vivo directo (P-20) */
+        post: operations["FlujoDirectoController_billete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/eventos/exportacion": {
         parameters: {
             query?: never;
@@ -1325,6 +1342,41 @@ export interface paths {
         put?: never;
         /** Registro este aparato para recibir notificaciones (HU-34, M-7) */
         post: operations["MiController_registrarAparato"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/notificaciones/web-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ¿Hay avisos al teléfono? Y la llave pública VAPID para suscribirse */
+        get: operations["MisAvisosWebController_estado"];
+        put?: never;
+        /** Suscribe este navegador a los avisos de mi vivienda (HU-34) */
+        post: operations["MisAvisosWebController_suscribir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/notificaciones/web-push/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quita los avisos de este navegador */
+        post: operations["MisAvisosWebController_anular"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1867,6 +1919,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/puertas/ajustes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Duración máxima de una puerta libre o bloqueada */
+        get: operations["ModosDePuertaController_verAjustes"];
+        /** Fija la duración máxima (15 a 720 min) */
+        put: operations["ModosDePuertaController_fijarAjustes"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/puertas/modos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Puertas libres o bloqueadas ahora: quién, por qué, desde y hasta cuándo */
+        get: operations["ModosDePuertaController_vigentes"];
+        put?: never;
+        /** Deja una puerta libre o bloqueada, con motivo y plazo (P-25) */
+        post: operations["ModosDePuertaController_fijar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/puertas/modos/reversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revertir ahora: la puerta vuelve a su modo normal */
+        post: operations["ModosDePuertaController_revertir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/reglas/instantanea": {
         parameters: {
             query?: never;
@@ -2318,6 +2423,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flujo-directo/eventos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flujo en vivo (SSE) abierto con un billete, sin sesión (P-20) */
+        get: operations["FlujoDirectoController_flujo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -2571,6 +2693,9 @@ export interface components {
             personaId: string;
             nombre: string;
         };
+        AjustesDePuertasDto: {
+            duracionMaximaMinutos: number;
+        };
         AlcanceDeCopropiedadesDto: {
             /** @description Las copropiedades que el token alcanza, y solo esas. Para el superadministrador son todas las activas; para un administrador, la suya; para un operador de central, las de su turno. Un arreglo vacío es una respuesta legítima. */
             copropiedades: components["schemas"]["CopropiedadResumenDto"][];
@@ -2809,6 +2934,9 @@ export interface components {
         BajaDeResidenteDto: {
             motivo: string;
         };
+        BajaDeSuscripcionDto: {
+            endpoint: string;
+        };
         BajaDeZonaAplicadaDto: {
             desactivada: boolean;
         };
@@ -2824,6 +2952,20 @@ export interface components {
             /** @description Segundos que vale para abrir el WebSocket */
             caducaEnSegundos: number;
             /** @description Ruta del WebSocket en la API (la consola la expone en su origen) */
+            ruta: string;
+        };
+        BilleteDelFlujoDto: {
+            /** @description Billete de un solo uso; va en `?billete=` del flujo directo. */
+            billete: string;
+            /**
+             * Format: date-time
+             * @description Caduca a los 15 s si no se usa.
+             */
+            caducaEn: string;
+            /**
+             * @description Ruta en el origen de la API.
+             * @example /flujo-directo/eventos
+             */
             ruta: string;
         };
         BitacoraDePorteriaDto: {
@@ -3580,6 +3722,12 @@ export interface components {
             fila: number;
             motivo: string;
         };
+        EstadoDeAvisosWebDto: {
+            /** @description Falso si la API no tiene llaves VAPID: no hay avisos al teléfono */
+            disponible: boolean;
+            /** @description Llave pública VAPID (base64url) */
+            clavePublica: string | null;
+        };
         EstadoDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
@@ -4103,6 +4251,12 @@ export interface components {
                 [key: string]: string;
             };
         };
+        LlavesDeSuscripcionDto: {
+            /** @description Llave pública ECDH P-256 del navegador, base64url (65 bytes) */
+            p256dh: string;
+            /** @description Secreto de autenticación del navegador, base64url (16 bytes) */
+            auth: string;
+        };
         LoteDeReconciliacionDto: {
             eventos: components["schemas"]["EventoReconciliadoDto"][];
         };
@@ -4289,6 +4443,31 @@ export interface components {
             /** @description Con el modo pruebas activo, las restricciones de porteros se evalúan y se registran sin bloquear, no hay bloqueo por intentos fallidos y el límite de peticiones es más alto */
             activo: boolean;
         };
+        ModoVigenteDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            /** @enum {string} */
+            modo: "libre" | "bloqueada";
+            motivo: string;
+            /** Format: uuid */
+            operadorId: string;
+            operadorNombre: string | null;
+            rol: string;
+            /** Format: date-time */
+            desde: string;
+            /** Format: date-time */
+            revierteEn: string;
+            /** @enum {string|null} */
+            resultado: "aceptada" | "rechazada" | "inalcanzable" | null;
+            /** @description Reversiones automáticas que no llegaron al equipo */
+            reversionesFallidas: number;
+        };
+        ModosVigentesDto: {
+            modos: components["schemas"]["ModoVigenteDto"][];
+        };
         MotivoDeConfiguracionDto: {
             /** @description Por qué se cambia. Queda en la auditoría junto a quién y cuándo. */
             motivo: string;
@@ -4350,6 +4529,26 @@ export interface components {
              * @example Mantenimiento de la talanquera, coordinado con la administración
              */
             motivo: string;
+        };
+        OrdenDeModoCumplidaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            resultado: "aceptada" | "rechazada" | "inalcanzable";
+            detalle: string | null;
+            /** Format: date-time */
+            revierteEn: string | null;
+        };
+        OrdenDeModoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            /** @enum {string} */
+            modo: "libre" | "bloqueada";
+            /** @description Obligatorio (RN-08). Sin motivo la puerta no cambia de modo. */
+            motivo: string;
+            /** @description Minutos hasta la reversión; sin él, la duración máxima de la copropiedad. */
+            minutos?: number;
         };
         OrdenEjecutadaDto: {
             /** Format: uuid */
@@ -4821,6 +5020,12 @@ export interface components {
         RetiroDeTurnoDto: {
             motivo: string;
         };
+        ReversionDeModoDto: {
+            /** Format: uuid */
+            dispositivoId: string;
+            numeroDePuerta: number;
+            motivo?: string;
+        };
         RevocacionDto: {
             revocada: boolean;
         };
@@ -4907,6 +5112,18 @@ export interface components {
         SolicitudDeCanalDto: {
             /** Format: uuid */
             dispositivoId: string;
+        };
+        SuscripcionAnuladaDto: {
+            anulada: boolean;
+        };
+        SuscripcionRegistradaDto: {
+            /** Format: uuid */
+            id: string;
+        };
+        SuscripcionWebPushDto: {
+            /** @example https://fcm.googleapis.com/fcm/send/… */
+            endpoint: string;
+            keys: components["schemas"]["LlavesDeSuscripcionDto"];
         };
         TextoDeLaCasillaDto: {
             /** @description Texto de la casilla con el marcador {visitante}: el cliente lo sustituye por el nombre escrito en el formulario */
@@ -6829,6 +7046,36 @@ export interface operations {
             };
         };
     };
+    FlujoDirectoController_billete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilleteDelFlujoDto"];
+                };
+            };
+            /** @description Copropiedad fuera del alcance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
     EventosController_exportacion: {
         parameters: {
             query: {
@@ -7849,6 +8096,86 @@ export interface operations {
             };
         };
     };
+    MisAvisosWebController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeAvisosWebDto"];
+                };
+            };
+        };
+    };
+    MisAvisosWebController_suscribir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuscripcionWebPushDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuscripcionRegistradaDto"];
+                };
+            };
+            /** @description El navegador es de otra cuenta */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    MisAvisosWebController_anular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeSuscripcionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuscripcionAnuladaDto"];
+                };
+            };
+        };
+    };
     MiAltaController_ocupantes: {
         parameters: {
             query?: never;
@@ -8798,6 +9125,132 @@ export interface operations {
             };
         };
     };
+    ModosDePuertaController_verAjustes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AjustesDePuertasDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_fijarAjustes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AjustesDePuertasDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AjustesDePuertasDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_vigentes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModosVigentesDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_fijar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdenDeModoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdenDeModoCumplidaDto"];
+                };
+            };
+            /** @description Sólo la administración */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    ModosDePuertaController_revertir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReversionDeModoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdenDeModoCumplidaDto"];
+                };
+            };
+        };
+    };
     EdgeController_instantanea: {
         parameters: {
             query?: {
@@ -9577,6 +10030,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConteoDto"];
+                };
+            };
+        };
+    };
+    FlujoDirectoController_flujo: {
+        parameters: {
+            query?: {
+                /** @description El billete emitido por `…/eventos/billete`. */
+                billete?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El mismo flujo que `…/eventos/flujo`; se cierra a los 5 min. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Billete inválido o ya usado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["ErrorApiDto"];
                 };
             };
         };

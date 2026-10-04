@@ -2,7 +2,7 @@
 
 **Rama:** `etapa-15n-video-y-guardia` · **Base:** `develop` (`ec34e80`, merge del PR #35) ·
 **PR:** [#36](https://github.com/4rg3n15/NextResidential/pull/36), sin fusionar · **Fecha:** 2026-09-30 ·
-**Guía de la próxima visita:** [`guias/PROXIMA-VISITA-15N.md`](../guias/PROXIMA-VISITA-15N.md)
+**Guía de la próxima visita:** [`guias/archivo/PROXIMA-VISITA-15N.md`](../guias/archivo/PROXIMA-VISITA-15N.md)
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Todo lo que toca un equipo está probado contra go2rtc real (v1.9.14 oficial)
@@ -434,7 +434,7 @@ macOS («0 de ellos en linux»), con motivo y etapa de revisión.
 4. Permitir go2rtc en el cortafuegos del Mac (TCP y UDP) y fijar
    `VIDEO_IP_ANUNCIADA` si el operador ve el video desde otro equipo.
 5. Poner NTP en los tres equipos.
-6. Seguir la [guía de la próxima visita](../guias/PROXIMA-VISITA-15N.md) y la
+6. Seguir la [guía de la próxima visita](../guias/archivo/PROXIMA-VISITA-15N.md) y la
    lista de abajo.
 7. Decidir el canal del aviso al residente (DT-15N-02).
 

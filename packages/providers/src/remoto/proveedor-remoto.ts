@@ -2,20 +2,12 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-Q2 · C1 · EL PROVEEDOR «VÍA EDGE»: los mismos puertos, por el túnel
  *
- * Cada método del `ProveedorDeEquipos` se convierte en un pedido `equipo` por
- * el túnel; al otro lado, `ejecutor-remoto.ts` lo ejecuta con el proveedor real
- * del Edge, contra los equipos de su red. Lo que el equipo devuelve o lanza
- * vuelve con su forma y su clase: la suite de contrato corre contra esto sin
- * cambiar una aserción (LSP).
- *
- * Lo que el túnel añade se traduce al lenguaje del puerto y no se inventa:
- *  · `abrir` con el Edge desconectado o sin respuesta a tiempo NO lanza:
- *    devuelve «no aceptado», que es lo que el puerto dice para un equipo que no
- *    se alcanza, con el motivo en `rechazo` para la consola (C3);
- *  · `estado` en ese caso es `fuera_de_linea`;
- *  · el resto rechaza con `EdgeDesconectado` u `OrdenVencida`, tipados.
- *
- * El audio no viaja en pedidos: va por canales binarios (`audio-por-tunel.ts`).
+ * Cada método es un pedido `equipo` por el túnel que `ejecutor-remoto.ts`
+ * cumple con el proveedor real del Edge; lo devuelto o lanzado vuelve con su
+ * forma y su clase (contrato, LSP). Lo que el túnel añade se traduce: `abrir`
+ * sin Edge o sin respuesta NO lanza —«no aceptado», motivo en `rechazo` (C3)—;
+ * `estado`, `fuera_de_linea`; el resto rechaza con `EdgeDesconectado` u
+ * `OrdenVencida`, tipados. El audio va por canales binarios (`audio-por-tunel`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import type {
@@ -26,7 +18,7 @@ import type {
   Vigencia,
 } from '@ncr/domain-core';
 import type { FuenteDePlacas } from '../equipo/fuente-de-placas';
-import type { ProveedorDeEquipos } from '../nucleo/proveedor';
+import type { ModoDeSalida, ProveedorDeEquipos } from '../nucleo/proveedor';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import type { EscuchaActiva } from '../nucleo/escucha';
 import type { DiagnosticoDeVideo, OrigenDeVideo } from '../nucleo/video';
@@ -50,8 +42,7 @@ const PLAZO_POR_OMISION = 8_000;
 export interface OpcionesDelProveedorRemoto {
   /** La sesión VIGENTE del túnel de este Edge, o `null` si no está conectado. */
   readonly sesion: () => SesionDeTunel | null;
-  /** Donde se suscriben los observadores del puerto (las lecturas del Edge). */
-  readonly fuente: FuenteDePlacas;
+  readonly fuente: FuenteDePlacas; // donde se suscriben los observadores del puerto
   /** El pedido que originó esta orden (el hecho que la API está decidiendo). */
   readonly padre?: () => string | undefined;
   readonly plazos?: Readonly<Record<string, number>>;
@@ -193,6 +184,15 @@ export class ProveedorRemoto implements ProveedorDeEquipos {
     actorId: string,
   ): Promise<ResultadoAccionamiento> {
     return this.llamar('abrirSalida', [id, numeroDePuerta, actorId]);
+  }
+
+  fijarModoDeSalida(
+    id: string,
+    numeroDePuerta: number,
+    modo: ModoDeSalida,
+    actorId: string,
+  ): Promise<ResultadoAccionamiento> {
+    return this.llamar('fijarModoDeSalida', [id, numeroDePuerta, modo, actorId]);
   }
 
   // ── IntercomProvider (ADR-01): las órdenes por pedido, el audio por canal ──

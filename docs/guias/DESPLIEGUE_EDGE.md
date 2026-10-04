@@ -186,6 +186,12 @@ interfaz; `0.0.0.0` y `::` se rechazan) y `EDGE_LOCAL_SECRETO` (32+
 caracteres, distinto de `EDGE_INGESTA_SECRETO`). El resto tiene valor por
 omisión.
 
+Los **ajustes de equipos** —`EQUIPOS_DESVIO_DE_RELOJ_S`, `EQUIPOS_TIEMPO_LIMITE_MS`,
+`EQUIPOS_ZONA_HORARIA`, `TERMINAL_PLAN_DE_HORARIO`, `EQUIPOS_FOTO_KB_MAXIMOS`,
+`EQUIPOS_FOTO_LADO_MAXIMO` y `VIDEO_PUERTO_RTSP`— llevan el mismo nombre, valor
+por omisión y límites que en la API (DT-15R-09). Con puente, el Edge es quien los
+aplica a los equipos: déjelos **iguales** a los de la API (§10.1).
+
 ### 2.4 · Diagnóstico antes (y después) de arrancar: `pnpm sitio:edge`
 
 Desde el repositorio, con el `.env` del gateway:
@@ -214,6 +220,10 @@ fallos, `1` algún FALLO, `2` configuración incompleta.
 | `<tipo> <uuid>`    | el equipo contesta, con su clave, y en hora            | «no hay un equipo», «credencial rechazada» (**no reintente**: bloquea la cuenta), «la cámara decide por su cuenta» |
 | gateway en marcha  | el proceso contesta `/estado` firmado                  | AVISO si no está en marcha; FALLO si `EDGE_LOCAL_SECRETO` no es el suyo                                            |
 | base local         | reglas en caché, recientes, nada sin reconciliar       | AVISO sin reglas (en un corte se negaría todo); FALLO si la caché va por delante de la nube (§4.4)                 |
+
+«En hora» quiere decir un desvío de hasta `EQUIPOS_DESVIO_DE_RELOJ_S` (30 s por
+omisión), el mismo umbral con el que el Edge frena las altas con vigencia; si se
+pasa, la línea del equipo sale en AVISO, «reloj desviado» (§5).
 
 ### 2.5 · Primer arranque
 
@@ -409,6 +419,12 @@ toca**.
 - Las entradas locales (`/hechos`, `/estado`) admiten **60 s**.
 - Las vigencias se juzgan con la hora del Edge: un reloj desviado abre o niega
   fuera de horario.
+- **La de los equipos también cuenta.** Con puente, el Edge lee la hora de la
+  terminal o del videoportero antes de dar de alta a alguien con vigencia y, si
+  se desvía más de `EQUIPOS_DESVIO_DE_RELOJ_S` (30 s), no escribe nada —ni la
+  persona— y la consola recibe «el reloj del equipo va …» (DT-15R-09). Es un
+  freno, no un arreglo: el arreglo es NTP en el equipo
+  ([`ENTREGA_EN_SITIO.md`](ENTREGA_EN_SITIO.md) §8.2 y §8.3).
 
 Un gateway que pasa 24 horas sin WAN pasa 24 horas sin NTP, y su deriva puede
 sacarlo de la ventana **justo cuando intenta reconciliar**. El síntoma no se
@@ -422,7 +438,8 @@ timedatectl status | grep -E 'synchronized|NTP service'
 **Esperado:** `System clock synchronized: yes` y `NTP service: active`. Con la
 red del conjunto aislada, use un NTP interno (`/etc/systemd/timesyncd.conf`,
 `NTP=<servidor interno>`). `pnpm sitio:edge` mide el desvío frente a la nube
-(FALLO a partir de 60 s) y el de cada equipo.
+(FALLO a partir de 60 s) y el de cada equipo (AVISO a partir de
+`EQUIPOS_DESVIO_DE_RELOJ_S`, el mismo umbral que frena las altas).
 
 ---
 
@@ -482,6 +499,7 @@ Lo primero, siempre: `pnpm sitio:edge`.
 | Se pierden accesos al reiniciar             | `SQLITE_PATH` en `tmpfs`                    | Muévalo a disco persistente                                          |
 | Modo cambiando sin parar                    | Enlace intermitente                         | Suba `SONDAS_PARA_CAER` (3 por omisión)                              |
 | Todo marcado `cachePotencialmenteObsoleto`  | Lleva más de `CACHE_OBSOLETA_MINUTOS` solo  | Informativo: **sigue decidiendo** (KPI-30, KPI-31)                   |
+| Alta de rostro: «el reloj del equipo va …»  | Reloj del equipo desviado (DT-15R-09)       | NTP en el equipo (§5); no suba `EQUIPOS_DESVIO_DE_RELOJ_S`           |
 
 ---
 
@@ -615,6 +633,27 @@ reconciliar (§9). Nunca los dos.
 | `EDGE_GO2RTC_URL`    | vacía = `http://127.0.0.1:1984`                | El go2rtc que corre **junto** al Edge (§10.7)                |
 | `EDGE_EQUIPOS`       | puede ir **vacía**                             | Con puente, los equipos llegan desde la consola por el túnel |
 
+**Los ajustes de equipos, iguales que en la API.** Con puente, la API ya no
+habla con los equipos: las altas de rostros, las aperturas y el video los hace el
+Edge, con SU `.env`. Hasta la corrección de la 15-R (DT-15R-09) el Edge los
+ignoraba y, sobre todo, daba de alta sin mirar el reloj del equipo.
+
+| Variable                    | Por omisión      | Qué gobierna en el Edge                                                          |
+| --------------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `EQUIPOS_DESVIO_DE_RELOJ_S` | `30`             | Desvío del equipo a partir del cual no hay altas con vigencia; y `sitio:edge`    |
+| `EQUIPOS_TIEMPO_LIMITE_MS`  | `5000`           | Plazo de cada petición a un equipo. La nube espera 4 s una apertura (DT-15R-C03) |
+| `EQUIPOS_ZONA_HORARIA`      | `America/Bogota` | Zona en la que se escribe la vigencia de la persona                              |
+| `TERMINAL_PLAN_DE_HORARIO`  | `1`              | Plantilla horaria de la puerta en el alta (`65535` = 7×24 en otros modelos)      |
+| `EQUIPOS_FOTO_KB_MAXIMOS`   | `200`            | Peso máximo de la foto que se sube                                               |
+| `EQUIPOS_FOTO_LADO_MAXIMO`  | `1024`           | Lado mayor máximo de la foto                                                     |
+| `VIDEO_PUERTO_RTSP`         | `554`            | Puerto RTSP de donde el go2rtc local toma el video                               |
+
+La ficha de la consola y «Probar conexión» siguen usando los valores de la API
+(viajan con el diagnóstico): si difieren de los del Edge, la ficha puede decir
+«conforme» y el alta rechazarse. `apps/edge/test/proveedor-como-la-api.test.ts`
+comprueba que nombres, valores por omisión y límites coinciden con la API, y que
+ninguna opción nueva de la API se queda sin su pareja en el Edge.
+
 `EDGE_EQUIPOS_LLAVE` va en el almacén de secretos del sistema o en el `.env`
 de la máquina, **nunca** en la misma carpeta que `SQLITE_PATH` ni en una copia
 de respaldo del SQLite. Si se pierde, las credenciales cifradas no se leen: el
@@ -680,7 +719,7 @@ con una baja lógica y se puede reintentar.
 ### 10.5 · Mudar al Edge las credenciales que ya estaban en la nube
 
 Para un conjunto que funcionaba en modo directo (las claves estaban cifradas en
-la nube, H-15B-1, AR-05):
+la nube, H-15B-1 · `docs/seguridad/ACEPTACIONES_DE_RIESGO.md`):
 
 1. Edge conectado y marcado como puente (§10.2).
 2. Panel **Edge del conjunto** → **Mudar credenciales al Edge**
@@ -733,11 +772,12 @@ El **medio** va entre el navegador y ese go2rtc por ICE:
   recibe una credencial TURN **efímera** por usuario; el secreto no sale de la
   API.
 
-> **PENDIENTE DE DEFINICIÓN · dónde se aloja el TURN.** Un TURN con IP pública
-> (coturn) es lo que permite ver el video desde fuera del conjunto detrás de
-> NAT simétricos. Mientras no se decida, sin TURN el video funciona en la red
-> del conjunto (y por STUN en NAT sencillos) y **no** desde redes que lo
-> bloqueen. No se probó con un TURN real en esta ronda (§ informe 15-Q2).
+> **P-29 resuelta (15-R):** el TURN es un **coturn en Compute Engine**, con
+> credenciales efímeras que firma la API. Configuración, cortafuegos, secreto y
+> verificación: [`COTURN.md`](COTURN.md). Sin desplegar todavía: hasta que se
+> despliegue, el video funciona en la red del conjunto (y por STUN en NAT
+> sencillos) y **no** desde redes que lo bloqueen. Para el go2rtc de esta
+> máquina basta, en principio, **STUN** (S-15R-08, `COTURN.md` §7.4).
 
 ### 10.8 · El corte de WAN con puente
 
@@ -761,6 +801,8 @@ La prueba de §9 vale igual, con una diferencia en lo que se ve:
 ### 10.9 · Lista de comprobación del puente
 
 - [ ] `EDGE_TUNEL=activo` y `EDGE_EQUIPOS_LLAVE` fuera de la carpeta del SQLite.
+- [ ] Los siete ajustes de equipos iguales en el `.env` del Edge y en el de la API
+      (§10.1), en especial `EQUIPOS_DESVIO_DE_RELOJ_S` y `EQUIPOS_ZONA_HORARIA`.
 - [ ] `túnel con la nube abierto` en el registro; panel «Conectado desde …».
 - [ ] Marcado como puente; `/ready` de la API: `edge: 1 conectado(s)`.
 - [ ] Cámara con **un solo** destino: el Edge.

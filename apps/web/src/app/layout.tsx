@@ -4,6 +4,8 @@ import { cookies, headers } from 'next/headers';
 import Script from 'next/script';
 import './globals.css';
 import { GUION_DE_TEMA, NOMBRE_COOKIE, atributoDeTema, preferenciaValida } from '@/lib/tema';
+import { despliegue } from '@/lib/configuracion-de-despliegue';
+import { META_DEL_ORIGEN } from '@/lib/origen-directo';
 
 /**
  * Raíz de la consola.
@@ -44,19 +46,15 @@ const RootLayout = async ({ children }: { children: React.ReactNode }): Promise<
   /**
    * SIN DESTELLO DE TEMA INCORRECTO.
    *
-   * El atributo se decide **en el servidor**, con la cookie que escribe el
-   * conmutador, así que el HTML sale ya con el tema puesto y no hay una primera
-   * pintura que corregir. Con la preferencia en «sistema» —o sin cookie, que es
-   * la primera visita— no se escribe atributo ninguno y manda la consulta
-   * `@media (prefers-color-scheme: dark)` del preset, que el navegador aplica
-   * antes de pintar. Las dos vías son anteriores al primer fotograma.
+   * El atributo se decide **en el servidor** con la cookie del conmutador: el
+   * HTML sale con el tema puesto. Con «sistema» (o sin cookie) no se escribe y
+   * manda `@media (prefers-color-scheme: dark)`, antes de pintar.
    *
-   * El guion en línea de más abajo cubre el único caso que la cookie no puede:
-   * una página servida desde la caché del service worker, cuyo HTML se generó
-   * con otra preferencia.
+   * El guion en línea cubre lo que la cookie no puede: el HTML de la caché del SW.
    */
   const preferenciaDeTema = preferenciaValida((await cookies()).get(NOMBRE_COOKIE)?.value);
   const temaInicial = atributoDeTema(preferenciaDeTema);
+  const origenDeLaApi = despliegue().apiOrigenPublico; // 15-R · D1 · ver `origen-directo.ts`
 
   return (
     <html lang="es" data-tema={temaInicial} suppressHydrationWarning>
@@ -68,6 +66,7 @@ const RootLayout = async ({ children }: { children: React.ReactNode }): Promise<
           evita—, así que va como etiqueta normal con el nonce de la CSP.
         */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: GUION_DE_TEMA }} />
+        {origenDeLaApi && <meta name={META_DEL_ORIGEN} content={origenDeLaApi} />}
         <a href="#contenido" className="sr-only salto-al-contenido">
           Saltar al contenido
         </a>

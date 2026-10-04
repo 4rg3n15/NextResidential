@@ -227,7 +227,7 @@
 | 12.3 | Tasa de falsa alarma                                           | **< 5 %**                                                                                  | Clasificación manual de una semana de alertas           | KPI-27        |
 | 12.4 | Escalamiento automático                                        | Lista negra, sabotaje, dispositivo caído y **acceso dudoso** escalan sin intervención      | Prueba por cada tipo de evento crítico                  | RN-18         |
 | 12.5 | Definición de «acceso dudoso»                                  | `ResultadoAcceso` igual a `CONFIANZA_INSUFICIENTE` o `PLACA_DESCONOCIDA` `[SUPUESTO]` S-07 | Configuración del motor                                 | P-07          |
-| 12.6 | Notificación al residente                                      | Push por FCM al ingresar su visitante                                                      | HU-34                                                   |
+| 12.6 | Notificación al residente                                      | Push al ingresar su visitante · por Web Push (VAPID) desde la 15-R, no por FCM (ADR-036)   | HU-34                                                   |
 
 **Implementa:** 06. **Verifica:** 06 (DoD), 15 (12.2 exige hardware).
 

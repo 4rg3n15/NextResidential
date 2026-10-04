@@ -16,9 +16,8 @@ interface RespuestaDeToken {
 }
 
 /**
- * Instante de caducidad en segundos Unix. GoTrue manda `expires_at` y
- * `expires_in`; si sólo llega el segundo —versiones y dobles que lo omiten—, se
- * calcula. Sin ninguno de los dos, la respuesta no tiene forma.
+ * Caducidad en segundos Unix: `expires_at`, o se calcula con `expires_in`; sin
+ * ninguno de los dos, la respuesta no tiene forma.
  */
 const caducidadDe = (cuerpo: RespuestaDeToken, ahoraMs: number): number | null => {
   if (typeof cuerpo.expires_at === 'number') return cuerpo.expires_at;
@@ -34,9 +33,8 @@ const caducidadDe = (cuerpo: RespuestaDeToken, ahoraMs: number): number | null =
  * y cualquier llave. De la respuesta del proveedor se copian TRES campos y el
  * resto se descarta; de un error, sólo el estado HTTP va a la bitácora.
  *
- * Inicio y cierre de sesión usan la llave PUBLICABLE, como lo haría el
- * navegador: son operaciones del propio usuario. Alta, contraseña y baja usan
- * la SECRETA, y son las únicas de este fichero que la tocan.
+ * Inicio y cierre de sesión usan la llave PUBLICABLE (son del propio usuario);
+ * alta, contraseña y baja, la SECRETA: las únicas de este fichero que la tocan.
  */
 export class CuentasSupabase implements ProveedorDeIdentidad, AdministradorDeCuentas {
   private readonly base: string;
@@ -73,8 +71,10 @@ export class CuentasSupabase implements ProveedorDeIdentidad, AdministradorDeCue
     const r = await fetch(`${this.base}/logout?scope=local`, {
       method: 'POST',
       headers: { ...this.publicas(), Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(5_000),
     });
-    // 401/404: la sesión ya no existe, que es lo que se pedía.
+    // E4 (15-R) · mudo (5 s) o 5xx: se lanza y el cierre reintenta. 401/404: ya no existe.
+    if (r.status >= 500) throw new Error(`revocación no hecha (HTTP ${String(r.status)})`);
     if (!r.ok && r.status !== 401 && r.status !== 404) {
       this.bitacora.registrar('aviso', 'no se pudo revocar una sesión en el proveedor', {
         estado: r.status,

@@ -1,16 +1,15 @@
 import { construirClaveIdempotencia } from '@ncr/domain-core';
 import type { EventoDeEquipoNuevo } from '../../eventos';
 import type { GatewayRegistrado } from './puertos';
+import { referenciaDeLaConstancia } from './referencia-de-la-constancia';
 
 /**
  * 15-Q · Q4 · LO QUE EL EDGE HIZO CON EL EQUIPO, EN LA LÍNEA DE TIEMPO.
  *
- * Cuando la nube abre, deja una constancia «apertura ordenada» en
- * `eventos_de_equipo` (15-L, A1). Cuando abre el Edge sin WAN tiene que quedar
- * la misma constancia, o el histórico diría que la talanquera se abrió sin que
- * nadie lo ordenara. Llega al reconciliar, con el instante REAL del Edge, y con
- * su propia clave de idempotencia —la del acceso más un sufijo—: reenviar el
- * lote no la duplica (RN-17).
+ * Cuando abre el Edge sin WAN queda la misma constancia «apertura ordenada»
+ * que deja la nube (15-L, A1), o la talanquera se habría abierto sin que nadie
+ * lo ordenara. Llega al reconciliar, con el instante REAL y su propia clave
+ * (la del acceso más un sufijo): reenviar el lote no la duplica (RN-17).
  */
 
 export interface AccionamientoDelEdge {
@@ -44,10 +43,9 @@ export const constanciaDeAccionamiento = (
     copropiedadId: acceso.copropiedadId,
     dispositivoId: acceso.dispositivoId,
     origen: 'plataforma',
-    referenciaExterna: `${acceso.referenciaExterna}.edge-${a.tipo}`,
+    referenciaExterna: referenciaDeLaConstancia(acceso.referenciaExterna, a.tipo),
   });
-  // Sin clave admisible no se escribe: una constancia sin clave se duplicaría
-  // en cada reenvío del lote.
+  // Sin clave admisible no se escribe: se duplicaría en cada reenvío del lote.
   if (!clave.ok) return null;
   const que =
     a.tipo === 'apertura' ? 'Apertura ordenada por el Edge' : 'Veredicto del Edge a la terminal';

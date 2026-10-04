@@ -50,10 +50,11 @@ import { CANAL_DE_INTERCOM, PUENTE_DE_VIDEO } from './aplicacion/puertos';
 import type { PuenteDeVideo } from './aplicacion/puertos';
 import { PuenteGo2rtc } from './infraestructura/puente-go2rtc';
 import { CanalIntercomEnProceso } from './infraestructura/canal-intercom-en-proceso';
-import {
-  BitacoraDeOrdenesEnMemoria,
-  RegistroDeBloqueosEnMemoria,
-} from './infraestructura/adaptadores-en-memoria';
+import { BitacoraDeOrdenesEnMemoria } from './infraestructura/adaptadores-en-memoria';
+import { PROVEEDOR_DE_REGISTRO_DE_BLOQUEOS } from './infraestructura/composicion-de-bloqueos';
+import { PROVEEDOR_DE_AVISO_AL_RESIDENTE } from './infraestructura/composicion-del-aviso';
+import { PROVEEDORES_DE_MODOS_DE_PUERTA } from './infraestructura/composicion-de-modos';
+import { ModosDePuertaController } from './presentacion/modos-de-puerta.controller';
 import { AccionadorPorProveedor } from './infraestructura/accionador-por-proveedor';
 import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
 import { Pool } from 'pg';
@@ -69,18 +70,13 @@ import { PROVEEDOR_DE_SERVIDORES_ICE } from './infraestructura/servidores-ice-de
 import { IceController } from './presentacion/ice.controller';
 
 /**
- * Consolas operativas — ETAPA 10.
+ * Consolas operativas — ETAPA 10. **Va después de `EventosModule`** (`@Global`:
+ * repositorio de eventos, escalamiento y aviso al residente). La cola de
+ * atención lee de ahí: dos listas de lo mismo se separan.
  *
- * **Va después de `EventosModule`**, que es `@Global` y aporta el repositorio
- * de eventos y el escalamiento de alertas. La cola de atención lee de ahí en
- * vez de mantener su propia lista: dos listas de lo mismo se separan, y la que
- * decide qué ve el operador no puede ser la que envejece.
- *
- * Desde la 15-E los dos puertos de hardware de esta consola —accionar y
- * hablar— van por el PROVEEDOR DE EQUIPOS (A1): la apertura resuelve por
- * `AccessPointProvider` y el intercom abre el del aparato por `IntercomProvider`
- * cuando el turno se concede. Con el simulado, lo de siempre (ADR-03); con el
- * real, los equipos de la consola. La exclusividad sigue en el dominio.
+ * Desde la 15-E accionar y hablar van por el PROVEEDOR DE EQUIPOS (A1): la
+ * apertura por `AccessPointProvider` y el intercom por `IntercomProvider`. La
+ * exclusividad sigue en el dominio.
  */
 @Module({})
 export class GuardiaModule {
@@ -96,6 +92,7 @@ export class GuardiaModule {
         IceController,
         AtencionController,
         AudioController,
+        ModosDePuertaController, // 15-R · P-25
       ],
       providers: [
         /**
@@ -203,7 +200,9 @@ export class GuardiaModule {
             return enBase ? new BitacoraDeOrdenesPg(pool) : new BitacoraDeOrdenesEnMemoria();
           },
         },
-        { provide: REGISTRO_DE_BLOQUEOS, useClass: RegistroDeBloqueosEnMemoria },
+        PROVEEDOR_DE_REGISTRO_DE_BLOQUEOS,
+        PROVEEDOR_DE_AVISO_AL_RESIDENTE, // 15-R · DT-15N-02
+        ...PROVEEDORES_DE_MODOS_DE_PUERTA, // 15-R · P-25
         {
           provide: FijarBloqueoDeAcceso,
           inject: [BLOQUEO_DE_ACCESO, REGISTRO_DE_BLOQUEOS, RELOJ],

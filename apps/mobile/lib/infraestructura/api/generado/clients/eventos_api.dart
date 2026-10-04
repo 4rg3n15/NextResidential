@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/billete_del_flujo_dto.dart';
 import '../models/formato.dart';
 import '../models/linea_de_tiempo_dto.dart';
 import '../models/motivo.dart';
@@ -42,6 +43,12 @@ abstract class EventosApi {
     @Query('motivo') Motivo? motivo,
     @Query('tamanoPagina') num? tamanoPagina,
     @Query('cursor') String? cursor,
+  });
+
+  /// Billete de un solo uso para abrir el flujo en vivo directo (P-20)
+  @POST('/copropiedades/{id}/eventos/billete')
+  Future<BilleteDelFlujoDto> flujoDirectoControllerBillete({
+    @Path('id') required String id,
   });
 
   /// Exporta el historial en CSV, Excel o PDF (HU-32).
@@ -98,5 +105,14 @@ abstract class EventosApi {
   Future<UrlDeEvidenciaDto> eventosControllerUrlDeEvidencia({
     @Path('id') required String id,
     @Path('eventoId') required String eventoId,
+  });
+
+  /// Flujo en vivo (SSE) abierto con un billete, sin sesión (P-20).
+  ///
+  /// [billete] - El billete emitido por `…/eventos/billete`.
+  @GET('/flujo-directo/eventos')
+  @DioResponseType(ResponseType.stream)
+  Stream<String> flujoDirectoControllerFlujo({
+    @Query('billete') String? billete,
   });
 }

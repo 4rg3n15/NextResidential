@@ -6,6 +6,7 @@ import type { Configuracion } from './configuracion/esquema';
 import { SaneamientoMiddleware, conservarCuerpoCrudo } from './comun/saneamiento';
 import { RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
 import { RUTA_DE_WHEP_DE_VIDEO } from './comun/ruta-de-video';
+import { ipFirmada } from './comun/ip-firmada';
 
 /**
  * V1 (15-N) · las rutas cuyo cuerpo es un FORMATO (SDP, bytes de audio) y no
@@ -25,11 +26,9 @@ export const RUTAS_DE_CUERPO_CRUDO: readonly string[] = [
  */
 export const aplicarSeguridad = (app: INestApplication, config: Configuracion): void => {
   /**
-   * H6 (15-L) · la IP del cliente. Sin esto la API veía 127.0.0.1 en TODA
-   * petición de la consola: la lista blanca de porteros no serviría, «la
-   * misma IP que el superadministrador» sería siempre cierto y el límite de
-   * peticiones trataría a todos como uno. La `X-Forwarded-For` sólo se cree si
-   * la petición llega de un proxy declarado; la app móvil usa la IP de su socket.
+   * H6 (15-L) · la IP del cliente: sin ella la lista blanca de porteros y el
+   * límite de peticiones tratarían a todos como uno. La `X-Forwarded-For` sólo
+   * se cree si llega de un proxy declarado; la app móvil usa la de su socket.
    */
   const express = app.getHttpAdapter().getInstance() as { set(c: string, v: unknown): void };
   // 15-U · Express 5 pasó el parser de consulta a `simple`; se conserva `qs` (H-13-13).
@@ -38,6 +37,8 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
     'trust proxy',
     config.API_PROXIES_DE_CONFIANZA.split(',').map((x) => x.trim()),
   );
+  // 15-R · D4 · la consola en Netlify manda la IP del navegador FIRMADA.
+  app.use(ipFirmada(config.API_IP_FIRMA_SECRETO));
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -63,8 +64,7 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
   );
 
   // Lista blanca explícita: nunca se refleja el origen recibido. Un origen no
-  // permitido NO es un error de servidor: no se emiten cabeceras CORS y el
-  // navegador bloquea. Un 500 convertiría un rechazo correcto en ruido.
+  // permitido no lleva cabeceras CORS y el navegador bloquea (no es un 500).
   app.enableCors({
     origin: (origen, callback) =>
       callback(null, !origen || config.origenesPermitidos.includes(origen)),

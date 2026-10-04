@@ -88,3 +88,22 @@ cada puerto.
 **Dejar que cada módulo construya el suyo.** Es lo que había. Produce tantas
 instancias como módulos, y el defecto no se ve: cada prueba mira la suya y todas
 pasan.
+
+## Enmienda 1 · Corrección de la 15-R (2026-10-03) — dos raíces de composición, los mismos ajustes
+
+«`ProveedoresModule` en la API es el único que lo invoca» dejó de ser cierto en
+la 15-Q: el Edge compone su propio proveedor contra los equipos del conjunto, y
+desde la 15-Q2 (ADR-035) es el **único** que habla con ellos cuando hay puente.
+Había dos raíces de composición del mismo proveedor y nadie las comparaba: la del
+Edge se quedó sin los ajustes que la API lee de su `.env`, y el alta de rostros
+por el Edge no leía el reloj del equipo (DT-15R-09).
+
+**Lo que se mantiene:** la fábrica es una (`crearProveedorDeEquipos`) y cada
+proceso la invoca desde un único sitio —`ProveedoresModule` en la API,
+`apps/edge/src/composicion-del-proveedor.ts` en el Edge—.
+
+**Lo que se añade:** los dos le pasan los MISMOS ajustes, con los mismos nombres
+de variable, valores por omisión y límites, y
+`apps/edge/test/proveedor-como-la-api.test.ts` lo exige: toda variable que la API
+pasa a la fábrica tiene su pareja en el Edge, o una exención escrita con su motivo
+(hoy, el transporte del audio: DT-15R-C02).

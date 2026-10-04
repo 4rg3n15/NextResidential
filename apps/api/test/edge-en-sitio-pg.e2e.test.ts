@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createServer } from 'node:http';
-import type { Server } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
@@ -10,6 +9,7 @@ import type { INestApplication } from '@nestjs/common';
 import { COP_A, crearApp, crearFirmante, direccionDe, tokenDe } from './utilidades';
 import { aperturasFisicasPor, sobreDeLectura } from '@ncr/providers';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { conVehiculoSinDueno } from './vehiculo-sin-dueno';
 import { cargarConfiguracionDeSitio } from '../../edge/src/configuracion/esquema-de-sitio';
 import { componerEdge } from '../../edge/src/composicion';
 import type { EdgeCompuesto } from '../../edge/src/composicion';
@@ -61,7 +61,7 @@ const claves: string[] = [];
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
-  pool = new Pool({ connectionString: URL_BASE, max: 3 });
+  pool = await conVehiculoSinDueno(new Pool({ connectionString: URL_BASE, max: 3 }));
   const firmante = await crearFirmante();
   app = await crearApp(firmante, undefined, {
     PROVEEDOR_DE_EQUIPOS: 'simulado',

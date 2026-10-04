@@ -26,13 +26,15 @@ import { Publico, SinRecursoDeTenant } from '../../comun/decoradores';
 import { REGISTRO_AUDITORIA } from '../../comun/auditoria/registro';
 import type { RegistroDeAuditoria } from '../../comun/auditoria/registro';
 import {
+  ALERTAS_DE_EQUIPO,
   REGISTRO_DE_EVENTOS_DE_EQUIPO,
   ReconciliarDecisiones,
   RegistrarAcceso,
 } from '../../eventos';
-import type { RegistroDeEventosDeEquipo } from '../../eventos';
+import type { AlertasDeEquipo, RegistroDeEventosDeEquipo } from '../../eventos';
 import { LoteReconciliadoDto } from '../../autorizaciones';
 import { constanciaDeAccionamiento } from '../aplicacion/accionamiento-del-edge';
+import { alertarRechazosDelEdge } from '../aplicacion/alerta-de-rechazo';
 import { PublicarInstantanea } from '../aplicacion/publicar-instantanea';
 import type { InstantaneaParaElEdge } from '../aplicacion/instantanea';
 import type { GatewayRegistrado } from '../aplicacion/puertos';
@@ -45,11 +47,7 @@ import {
   LoteDelEdgeDto,
 } from './dtos-edge';
 
-/**
- * Topes por IP de las dos rutas del Edge (§2.7.5). Un gateway descarga cada
- * pocos minutos y reconcilia por lotes: estos números son holgados para él y
- * cortos para quien pruebe credenciales.
- */
+/** Topes por IP de las rutas del Edge (§2.7.5): holgados para él, cortos para un intruso. */
 const LIMITE_INSTANTANEA = 30;
 const LIMITE_RECONCILIACION = 300;
 
@@ -61,11 +59,9 @@ const LIMITE_RECONCILIACION = 300;
  *  · `POST copropiedades/:id/edge/reconciliacion`        — Q4: la bandeja, con
  *    lo que el Edge hizo con cada equipo.
  *
- * `@Publico()` porque el emisor es un equipo, no una persona; lo que sustituye
- * a la sesión es `GuardiaDelEdge`, que va en la misma clase para que leer una
- * sin la otra no dé una impresión falsa. `@SinRecursoDeTenant()` porque el
- * alcance lo decide la identidad del Edge, no un token de usuario: la suite de
- * aislamiento las prueba por su propio camino (`edge-aislamiento.e2e.test.ts`).
+ * `@Publico()` porque el emisor es un equipo; lo que sustituye a la sesión es
+ * `GuardiaDelEdge`. `@SinRecursoDeTenant()`: el alcance lo decide la identidad
+ * del Edge; la suite de aislamiento las prueba aparte (`edge-aislamiento`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 @ApiTags('edge')
@@ -80,6 +76,7 @@ export class EdgeController {
     @Inject(REGISTRO_DE_EVENTOS_DE_EQUIPO) private readonly constancias: RegistroDeEventosDeEquipo,
     @Inject(REGISTRO_AUDITORIA) private readonly auditoria: RegistroDeAuditoria,
     @Inject(BITACORA) private readonly bitacora: Bitacora,
+    @Inject(ALERTAS_DE_EQUIPO) private readonly alertas: AlertasDeEquipo,
   ) {}
 
   private static gatewayDe(peticion: PeticionDelEdge): GatewayRegistrado {
@@ -156,10 +153,8 @@ export class EdgeController {
       throw new NotFoundException('Recurso no encontrado');
     }
 
-    const resultados = await new ReconciliarDecisiones(
-      this.registrar,
-      gateway.usuarioServicioId,
-    ).ejecutar(dto.eventos);
+    const actor = gateway.usuarioServicioId;
+    const resultados = await new ReconciliarDecisiones(this.registrar, actor).ejecutar(dto.eventos);
 
     for (const [i, resultado] of resultados.entries()) {
       const evento = dto.eventos[i];
@@ -178,6 +173,8 @@ export class EdgeController {
       aceptados: resultados.filter((r) => r.aceptado).length,
       duplicados: resultados.filter((r) => r.duplicado).length,
       accionados: dto.eventos.filter((e) => e.accionamiento !== undefined).length,
+      // E6 (15-R) · P-31 · un rechazo abre una alerta persistente, una por evento.
+      alertados: await alertarRechazosDelEdge(this.alertas, dto.eventos, resultados, actor),
     });
     return {
       aceptado: true,

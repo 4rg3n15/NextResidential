@@ -1,12 +1,14 @@
+> **Archivada en la ronda 15-R (2026-10-03):** preparaba la visita siguiente a la 15-N, que ya se hizo, y no contempla el Edge como puente de la 15-Q2 (ADR-035). Lo vigente pasó a [ENTREGA_EN_SITIO.md](../ENTREGA_EN_SITIO.md#8--lo-que-sigue-valiendo-de-las-visitas-archivadas).
+
 # Próxima visita (tras la 15-N) · preparación, orden y comprobaciones
 
 > **ETAPA 15-N.** Complementa a [`VISITA-29-09.md`](VISITA-29-09.md) (los ajustes
 > en el panel web de cada equipo, que siguen valiendo) y a
-> [`ENTREGA_EN_SITIO.md`](ENTREGA_EN_SITIO.md) (el guion del día). Aquí va lo que
+> [`ENTREGA_EN_SITIO.md`](../ENTREGA_EN_SITIO.md) (el guion del día). Aquí va lo que
 > cambió con la 15-N: qué preparar antes de salir, cómo ver el video desde otro
 > equipo de la red y el orden de las comprobaciones. La lista de verificación
 > equipo por equipo, con el resultado esperado de cada paso, está en el informe:
-> [`ETAPA-15N.md` · Lista de verificación en sitio](../etapas/ETAPA-15N.md#lista-de-verificación-en-sitio).
+> [`ETAPA-15N.md` · Lista de verificación en sitio](../../etapas/ETAPA-15N.md#lista-de-verificación-en-sitio).
 >
 > **Ninguna dirección, usuario ni clave va en esta guía.** Donde hace falta una
 > dirección se escribe `<IP del Mac>`; la real está en su `.env` y en la ficha del

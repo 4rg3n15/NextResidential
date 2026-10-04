@@ -29,6 +29,8 @@ import type {
 } from '../aplicacion/puertos';
 import type { Placa, TipoDeDocumento, ViviendaProyectada } from '@ncr/domain-core';
 import { conCliente } from '../../persistencia/con-cliente';
+import { claimsDeLaOperacion } from '../../comun/claims-por-operacion';
+import type { ClaimsDelAdaptador } from '../../comun/claims-por-operacion';
 
 /** Violación de restricción única en PostgreSQL. */
 const VIOLACION_UNICA = '23505';
@@ -56,19 +58,19 @@ type Ejecutor = Pool | PoolClient;
 export class RepositorioPadronPg implements RepositorioPadron {
   constructor(
     private readonly pool: Pool,
-    private readonly claims: Record<string, unknown>,
+    private readonly claims: ClaimsDelAdaptador,
     private readonly ejecutor: Ejecutor = pool,
   ) {}
 
-  private async conContexto<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  private async conContexto<T>(cop: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    const claims = JSON.stringify(claimsDeLaOperacion(this.claims, cop));
     if ('release' in this.ejecutor) {
-      // Ya estamos dentro de una transacción con su contexto fijado.
+      // Dentro de la transacción: los claims de ESTA operación, locales a ella.
+      await this.ejecutor.query("SELECT set_config('request.jwt.claims', $1, true)", [claims]);
       return fn(this.ejecutor as PoolClient);
     }
     return conCliente(this.pool, async (cliente) => {
-      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
-      ]);
+      await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [claims]);
       return await fn(cliente);
     });
   }
@@ -79,7 +81,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
    * en el mismo viaje porque es lo único que el motor va a preguntar después.
    */
   async resolverPlaca(copropiedadId: string, placa: Placa): Promise<VehiculoResuelto | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         vehiculo_id: string;
         vivienda_id: string;
@@ -111,7 +113,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async registrarVehiculo(alta: AltaVehiculo): Promise<ResultadoRegistroVehiculo> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(alta.copropiedadId, async (c) => {
       try {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.vehiculos
@@ -146,7 +148,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async registrarVivienda(alta: AltaVivienda): Promise<ResultadoAltaVivienda> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(alta.copropiedadId, async (c) => {
       try {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.viviendas
@@ -192,7 +194,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     readonly totales: TotalesDePadron;
     readonly viviendas: readonly ViviendaEnLista[];
   }> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const busqueda = (filtro.busqueda ?? '').trim();
       const { rows } = await c.query<{
         id: string;
@@ -285,7 +287,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async listarVehiculos(copropiedadId: string): Promise<readonly VehiculoEnLista[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         placa: string;
@@ -336,7 +338,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     motivo: string,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       // Baja LÓGICA (RN-19). No existe `DELETE` en este adaptador, y no es un
       // olvido: la migración 0015 revoca `DELETE` a todos los roles, así que
       // escribirlo produciría un fallo de permisos en vez de un borrado.
@@ -371,7 +373,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     documentoNormalizado: string,
     limite: number,
   ): Promise<readonly PersonaEnLista[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         id: string;
         nombre_completo: string;
@@ -424,7 +426,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
    * la identidad (RN-06); duplicarla es justo la fuga que `personas` cerró.
    */
   async registrarPersona(alta: AltaPersona): Promise<ResultadoAltaPersona> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(alta.copropiedadId, async (c) => {
       const insertada = await c.query<{ id: string; nombre_completo: string }>(
         `INSERT INTO public.personas
            (copropiedad_id, tipo_documento, numero_documento, nombre_completo,
@@ -482,7 +484,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     agrupacion: string | null,
     identificador: string,
   ): Promise<{ readonly id: string } | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       // `coalesce` a los dos lados, igual que el índice: comparar contra NULL
       // con `=` no devuelve nunca verdadero, así que sin esto una parcelación
       // sin secciones no encontraría ninguna de sus casas.
@@ -509,7 +511,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     viviendas: readonly ViviendaProyectada[],
   ): Promise<readonly ViviendaProyectada[]> {
     if (viviendas.length === 0) return [];
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ agrupacion: string | null; identificador: string }>(
         `SELECT v.agrupacion, v.identificador
            FROM public.viviendas v
@@ -546,7 +548,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
 
     return conCliente(this.pool, async (cliente) => {
       await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-        JSON.stringify(this.claims),
+        JSON.stringify(claimsDeLaOperacion(this.claims, copropiedadId)),
       ]);
       await cliente.query('BEGIN');
       try {
@@ -633,7 +635,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
 
   // ═══════════════════════════ O3 · edición y borrado ═══════════════════════
   async editarVivienda(edicion: EdicionDeVivienda): Promise<ResultadoEdicionVivienda> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(edicion.copropiedadId, async (c) => {
       try {
         const { rowCount } = await c.query(
           `UPDATE public.viviendas
@@ -663,7 +665,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async editarVehiculo(edicion: EdicionDeVehiculo): Promise<ResultadoEdicionVehiculo> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(edicion.copropiedadId, async (c) => {
       try {
         const { rowCount } = await c.query(
           `UPDATE public.vehiculos
@@ -705,7 +707,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     copropiedadId: string,
     vehiculoId: string,
   ): Promise<HistorialDeVehiculo | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ placa: string; eventos: string; autorizaciones: string }>(
         `SELECT ve.placa,
                 (SELECT count(*) FROM public.eventos e
@@ -731,7 +733,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     vehiculoId: string,
     actorId: string,
   ): Promise<{ borrado: boolean; motivo?: string }> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       try {
         await c.query('SELECT app.borrar_vehiculo_definitivamente($1, $2, $3)', [
           copropiedadId,
@@ -756,7 +758,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
    * poblada.
    */
   async exportarPadron(copropiedadId: string): Promise<readonly FilaExportada[]> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         identificador: string;
         agrupacion: string | null;
@@ -820,7 +822,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async registrarResidente(alta: AltaResidente): Promise<{ id: string } | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(alta.copropiedadId, async (c) => {
       try {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.residentes
@@ -857,7 +859,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     motivo: string,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rowCount } = await c.query(
         `UPDATE public.viviendas
             SET estado='inactivo', desactivado_en=now(), desactivado_por=$4,
@@ -874,7 +876,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     viviendaId: string,
     actorId: string,
   ): Promise<boolean> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rowCount } = await c.query(
         `UPDATE public.viviendas
             SET estado='activo', desactivado_en=NULL, desactivado_por=NULL,
@@ -890,7 +892,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     copropiedadId: string,
     viviendaId: string,
   ): Promise<HistorialDeVivienda | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{
         identificador: string;
         residentes: string;
@@ -933,7 +935,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
     viviendaId: string,
     actorId: string,
   ): Promise<{ borrada: boolean; motivo?: string }> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       try {
         await c.query('SELECT app.borrar_vivienda_definitivamente($1, $2, $3)', [
           copropiedadId,
@@ -955,7 +957,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   }
 
   async contarVehiculosActivos(copropiedadId: string, placa: Placa): Promise<number> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(copropiedadId, async (c) => {
       const { rows } = await c.query<{ n: string }>(
         `SELECT count(*)::text AS n FROM public.vehiculos
           WHERE copropiedad_id=$1 AND placa=$2 AND estado='activo'`,
@@ -973,9 +975,7 @@ export class RepositorioPadronPg implements RepositorioPadron {
   async enTransaccion<T>(operacion: (repo: RepositorioPadron) => Promise<T>): Promise<T> {
     return conCliente(this.pool, async (cliente) => {
       try {
-        await cliente.query("SELECT set_config('request.jwt.claims', $1, false)", [
-          JSON.stringify(this.claims),
-        ]);
+        // Cada operación de dentro fija los claims de su copropiedad (E2, 15-R).
         await cliente.query('BEGIN');
         const resultado = await operacion(new RepositorioPadronPg(this.pool, this.claims, cliente));
         await cliente.query('COMMIT');

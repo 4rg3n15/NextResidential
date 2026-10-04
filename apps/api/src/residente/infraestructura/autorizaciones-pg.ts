@@ -7,10 +7,10 @@ import type {
   HechosDeLaBase,
   NuevaAutorizacion,
 } from '../aplicacion/puertos';
+import { escribirPatron } from './patron-de-la-visita-pg';
 
 /**
- * Escritura de la autorización del residente (M-4), y los hechos que la
- * gobiernan.
+ * Escritura de la autorización del residente (M-4) y los hechos que la gobiernan.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * LA REGLA DE ESTE FICHERO ES LA DEL DIRECTORIO
@@ -52,7 +52,7 @@ export class AutorizacionesDelResidentePg
     ambito: AmbitoDelResidente,
     consulta: { readonly documento: string | null; readonly placa: string | null },
   ): Promise<HechosDeLaBase> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{
         vetado: boolean;
         vivienda_activa: boolean;
@@ -100,13 +100,12 @@ export class AutorizacionesDelResidentePg
     | { readonly ok: true; readonly id: string; readonly repetida: boolean }
     | { readonly ok: false; readonly motivo: MotivoDeNoAutorizar }
   > {
-    // El reintento se resuelve ANTES de abrir la transacción: es el camino más
-    // frecuente del modo sin conexión y no tiene por qué pagar un BEGIN.
+    // El reintento se resuelve ANTES de abrir la transacción (no paga un BEGIN).
     const yaEstaba = await this.porClave(ambito, nueva.claveDeIdempotencia);
     if (yaEstaba !== null) return { ok: true, id: yaEstaba, repetida: true };
 
     try {
-      const id = await this.enTransaccion(async (c) => {
+      const id = await this.enTransaccion(ambito.copropiedadId, async (c) => {
         const visitanteId = await this.visitante(c, ambito, nueva, creadaPor.usuarioId);
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.autorizaciones
@@ -136,6 +135,7 @@ export class AutorizacionesDelResidentePg
 
         await this.acompanantes(c, ambito, autorizacionId, creadaPor.usuarioId, nueva.acompanantes);
         await this.zonas(c, ambito, autorizacionId, creadaPor.usuarioId, nueva.zonasPermitidas);
+        await escribirPatron(c, ambito, autorizacionId, creadaPor.usuarioId, nueva.patron);
         return autorizacionId;
       });
       return { ok: true, id, repetida: false };
@@ -161,7 +161,7 @@ export class AutorizacionesDelResidentePg
     ambito: AmbitoDelResidente,
     autorizacionId: string,
   ): Promise<{ readonly personaId: string; readonly nombre: string } | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{ persona_id: string; nombre: string }>(
         `SELECT p.id AS persona_id, p.nombre_completo AS nombre
            FROM public.autorizaciones a
@@ -178,7 +178,7 @@ export class AutorizacionesDelResidentePg
   }
 
   private async porClave(ambito: AmbitoDelResidente, clave: string): Promise<string | null> {
-    return this.conContexto(async (c) => {
+    return this.conContexto(ambito.copropiedadId, async (c) => {
       const { rows } = await c.query<{ id: string }>(
         `SELECT id FROM public.autorizaciones
           WHERE copropiedad_id = $1 AND vivienda_id = $2 AND clave_idempotencia = $3`,

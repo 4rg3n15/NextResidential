@@ -23,6 +23,7 @@ import type { CanalDeIntercom } from '../../aplicacion/puertos';
 import { BilletesDeAudio } from './billetes-de-audio';
 import type { DatosDelBillete } from './billetes-de-audio';
 import { ipDeLaActualizacion } from './ip-de-la-actualizacion';
+import { origenAdmitido } from '../../../comun/origen-de-la-actualizacion';
 import type { ConfianzaDeProxy } from './ip-de-la-actualizacion';
 
 /**
@@ -34,13 +35,9 @@ import type { ConfianzaDeProxy } from './ip-de-la-actualizacion';
  * CANJEA un billete que sí pasó por todos (`billetes-de-audio.ts`). Sin
  * billete válido desde esa IP, 401 y el socket se cierra.
  *
- *  · `maxPayload` de 4 KiB y sin compresión: nada de mensajes gigantes ni de
- *    bombas de descompresión; los límites por segundo los pone la conversación.
- *  · Latido cada 15 s: una consola que dejó de contestar (portátil cerrado,
- *    red caída) se da por colgada y su turno se suelta —con el `close` en el
- *    equipo— sin esperar a la caducidad.
- *  · El navegador nunca habla con el equipo: lo que entra aquí va a la
- *    conversación, y de ahí al proveedor (RN-12, RN-21).
+ *  · `maxPayload` de 4 KiB y sin compresión (ni mensajes gigantes ni bombas).
+ *  · Latido cada 15 s: una consola muda se da por colgada y su turno se suelta.
+ *  · El navegador nunca habla con el equipo: va a la conversación (RN-12/21).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const RUTA_DEL_AUDIO = '/guardia/audio';
@@ -88,6 +85,10 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
       http,
       RUTA_DEL_AUDIO,
       (peticion, socket, cabeza, url) => {
+        if (!origenAdmitido(peticion, this.configuracion.origenesPermitidos)) {
+          rechazar(socket, '403 Forbidden'); // 15-R · D2 · otra página
+          return;
+        }
         const datos = this.billetes.consumir(
           url.searchParams.get('billete') ?? '',
           ipDeLaActualizacion(peticion, confia),
@@ -159,8 +160,7 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
       if (binario) conversacion.alAudio(new Uint8Array(bytes));
       else conversacion.alTexto(bytes.toString('utf8'));
     });
-    // El texto de cierre que manda el navegador NO se guarda: es del cliente.
-    // Un corte del servidor ya terminó la conversación con su propio motivo.
+    // El texto de cierre del navegador NO se guarda; un corte del servidor ya puso el suyo.
     ws.on('close', (codigo: number) => {
       void conversacion.terminar(
         MOTIVO_DEL_NAVEGADOR[codigo] ?? `La consola cerró el canal (código ${String(codigo)})`,

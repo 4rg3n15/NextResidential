@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import type { Metadata } from 'next';
 import { MarcoDeAcceso } from '../marco';
-import { FormularioDeNuevaContrasena } from './formulario-nueva-contrasena';
+import { NuevaContrasenaSegunDespliegue } from '../segun-recuperacion';
 
 export const metadata: Metadata = { title: 'Nueva contraseña' };
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ const NuevaContrasena = async ({
           : 'Elige una contraseña nueva para tu cuenta.'
       }
     >
-      <FormularioDeNuevaContrasena tokenHash={tokenHash} />
+      <NuevaContrasenaSegunDespliegue tokenHash={tokenHash} />
     </MarcoDeAcceso>
   );
 };

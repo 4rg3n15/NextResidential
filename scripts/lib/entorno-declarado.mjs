@@ -39,35 +39,31 @@
  *
  *   node scripts/lib/entorno-declarado.mjs
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+
+/** 15-R · los `esquema*.ts` de la carpeta, no sus pruebas: un grupo nuevo no toca esta lista. */
+const ES_ESQUEMA = /^esquemas?(-[^.]+)?\.ts$/;
+const esquemasDe = (d) => readdirSync(d).flatMap((f) => (ES_ESQUEMA.test(f) ? [`${d}/${f}`] : []));
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
  * AMPLIADO EN LA ETAPA 12 · el Edge tiene su propio esquema y su propio ejemplo
- *
  * D-90 nació en la API y la causa no era de la API: era que **nadie comprobaba
  * que el ejemplo dijera la verdad**. El Edge estrena exactamente la misma
  * pareja —un esquema Zod que valida al arrancar y un `.env.example` que es su
- * única documentación—, así que hereda el mismo modo de fallar. Añadir una
- * superficie es añadir una entrada; 15-Q: una superficie puede tener varios.
+ * única documentación—, así que hereda el mismo modo de fallar.
  * ════════════════════════════════════════════════════════════════════════════
  */
 const SUPERFICIES = [
   {
     nombre: 'API',
-    esquema: [
-      'apps/api/src/configuracion/esquema.ts',
-      'apps/api/src/configuracion/esquema-de-ice.ts',
-    ],
+    esquema: esquemasDe('apps/api/src/configuracion'),
     ejemplo: 'apps/api/.env.example',
   },
   {
     nombre: 'Edge',
-    esquema: [
-      'apps/edge/src/configuracion/esquema.ts',
-      'apps/edge/src/configuracion/esquema-de-sitio.ts',
-      'apps/edge/src/configuracion/esquema-del-puente.ts',
-    ],
+    // DT-15R-09 · el Edge también por carpeta: con lista fija, `esquema-de-ajustes.ts` quedaba fuera.
+    esquema: esquemasDe('apps/edge/src/configuracion'),
     ejemplo: 'apps/edge/.env.example',
   },
 ];

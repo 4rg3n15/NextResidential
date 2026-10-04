@@ -5,8 +5,7 @@
  * Con el proveedor REAL del Edge —el mismo `packages/providers` que usaba la
  * nube— y contra los equipos de su red. Cuatro reglas que no se negocian:
  *
- *  1. Sólo los métodos de la lista (`PERMITIDOS`). Un nombre que no está no se
- *     «intenta»: es un pedido fuera de protocolo.
+ *  1. Sólo los métodos de `PERMITIDOS`: otro nombre es un pedido fuera de protocolo.
  *  2. Sólo equipos de ESTE Edge: un dispositivo que no conoce es
  *     `EquipoNoRegistrado` (RN-15, segunda barrera; la primera es la API, que
  *     sólo enruta al Edge de la copropiedad del equipo).
@@ -46,6 +45,7 @@ const PERMITIDOS = new Set([
   'decideSolo',
   'salidasDe',
   'abrirSalida',
+  'fijarModoDeSalida',
   'abrirSesion',
   'cerrarSesion',
   'estadoSesion',

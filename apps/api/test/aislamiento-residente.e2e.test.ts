@@ -130,16 +130,16 @@ const CUBIERTAS_APARTE = new Set([
   'POST /copropiedades/:id/mi/ocupantes',
   'PUT /copropiedades/:id/mi/perfil',
   'POST /copropiedades/:id/mi/vehiculos/:vehiculoId/desactivacion',
-  /**
-   * F (15-L) · las visitas con foto necesitan la base (persona por documento,
-   * evidencia, plantilla): las recorre `visitas-pg.test.ts` con las dos
-   * preguntas de este fichero — lo creado cae en SU vivienda, sus últimos
-   * visitantes son sólo los suyos, y volver a autorizar la visita del vecino
-   * responde 404.
-   */
+  // F (15-L) · con foto necesitan la base: `visitas-pg.test.ts` (lo creado cae en SU
+  // vivienda, sus últimos visitantes son suyos, la visita del vecino responde 404).
   'POST /copropiedades/:id/mi/visitas',
   'POST /copropiedades/:id/mi/visitas/:autorizacionId/repeticion',
   'GET /copropiedades/:id/mi/visitas/ultimas',
+  // 15-R (B3) · la vivienda la resuelve la API: `web-push-pg.e2e` (sólo SU vivienda
+  // recibe; otra copropiedad 404; quien ya no es residente no recibe).
+  'GET /copropiedades/:id/mi/notificaciones/web-push',
+  'POST /copropiedades/:id/mi/notificaciones/web-push',
+  'POST /copropiedades/:id/mi/notificaciones/web-push/baja',
 ]);
 
 /**

@@ -1,13 +1,12 @@
 /// M-7 · HU-34 · el registro del aparato para recibir avisos, como máquina.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
-/// 15-L · SIN FIREBASE EN ESTA COMPILACIÓN
+/// 15-L · 15-R · SIN SERVICIO DE PUSH EN LA APP, POR DECISIÓN (ADR-036)
 ///
 /// Con `SinServicioDeMensajeria` no hay token, así que el registro nunca se
 /// completa y NADA de esto se enseña: la pantalla de notificaciones lista las
-/// de la API y dice «Los avisos llegan mientras la app está abierta». La
-/// máquina sigue conectada al arranque para que el día que llegue el adaptador
-/// real el registro funcione sin tocar el armazón.
+/// de la API y dice «Los avisos llegan mientras la app está abierta». Los
+/// avisos al teléfono van por Web Push a la consola instalada como PWA.
 ///
 /// ═════════════════════════════════════════════════════════════════════════════
 /// POR QUÉ ESTO NO ES UN `bool`
@@ -48,8 +47,7 @@ import '../dominio/puertos.dart';
 /// Vivía en la pantalla de notificaciones, que lo pintaba. Esta compilación no
 /// lleva servicio de mensajería (15-L): la pantalla ya no enseña el registro
 /// —enseñarlo prometía avisos que no pueden llegar con la app cerrada— y el
-/// estado se queda aquí, junto a la máquina que lo mueve, listo para el día en
-/// que llegue Firebase.
+/// estado se queda aquí, junto a la máquina que lo mueve.
 enum EstadoDeAvisos {
   /// Todavía no se ha preguntado nada.
   sinDeterminar,

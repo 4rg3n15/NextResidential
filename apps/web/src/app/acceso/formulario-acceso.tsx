@@ -1,7 +1,6 @@
 'use client';
 
 import type { JSX } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Boton } from '@/componentes/ui/boton';
@@ -10,6 +9,7 @@ import { CodigosDeRecuperacion } from './codigos-recuperacion';
 import { InscripcionDeFactor } from './inscripcion-factor';
 import { CambioObligatorio } from './cambio-obligatorio';
 import type { ResultadoDeAcceso } from '@/app/api/sesion/route';
+import { EnlaceDeRecuperacion } from './enlace-de-recuperacion';
 
 type Paso = 'credenciales' | 'inscripcion' | 'segundo-factor' | 'codigos' | 'cambio';
 
@@ -66,10 +66,13 @@ export const formaDeAcceso = (valor: string): FormaDeAcceso | null => {
 export const FormularioDeAcceso = ({
   className,
   pasoInicial = 'credenciales',
+  recuperacionPorCorreo = true,
 }: {
   readonly className?: string;
   /** 15-H · la consola manda aquí a quien tiene el cambio de contraseña pendiente. */
   readonly pasoInicial?: 'credenciales' | 'cambio';
+  /** E8 (15-R) · AR-04 · sin ella, «contacta al administrador» en vez del enlace. */
+  readonly recuperacionPorCorreo?: boolean;
 }): JSX.Element => {
   const router = useRouter();
   const [paso, setPaso] = useState<Paso>(pasoInicial);
@@ -360,14 +363,7 @@ export const FormularioDeAcceso = ({
         >
           Iniciar sesión
         </Boton>
-        <p className="text-secundario text-texto-apagado">
-          <Link
-            href="/acceso/recuperacion"
-            className="font-medium text-marca-texto underline underline-offset-2"
-          >
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </p>
+        <EnlaceDeRecuperacion activa={recuperacionPorCorreo} />
       </div>
     </form>
   );
