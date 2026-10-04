@@ -17,13 +17,14 @@
 
 ## Índice
 
-- [0 · Antes de salir](#0--antes-de-salir)
+- [0 · La víspera](#0--la-víspera)
 - [1 · Arranque de API, consola y go2rtc](#1--arranque-de-api-consola-y-go2rtc)
 - [2 · Comprobaciones](#2--comprobaciones)
 - [2 bis · Al llegar: la cámara, a la IP de ahora del Mac](#2-bis--al-llegar-la-cámara-a-la-ip-de-ahora-del-mac)
 - [3 · `supabase db push` pendiente](#3--supabase-db-push-pendiente)
 - [3 bis · Porteros: número, IP y modo pruebas](#3-bis--porteros-número-ip-y-modo-pruebas)
 - [4 · Ensayo](#4--ensayo)
+- [4 bis · Mañana: el orden de las pruebas](#4-bis--mañana-el-orden-de-las-pruebas)
 - [5 · Demostración de los tres hitos del reto](#5--demostración-de-los-tres-hitos-del-reto)
 - [6 · Reversión](#6--reversión)
 - [7 · Plan B por equipo](#7--plan-b-por-equipo)
@@ -31,49 +32,65 @@
 
 ---
 
-## 0 · Antes de salir
+## 0 · La víspera
 
-Con Internet, en la oficina:
+> **15-S1.** La noche antes, con Internet, en este orden. Lo nuevo desde la
+> visita anterior: las migraciones **0047–0054**, variables nuevas en los dos
+> `.env` y el audio de la guardia por WebSocket.
 
-1. `git pull` de la rama entregada, `pnpm install --frozen-lockfile` y
+1. **Código:** `git pull` de `develop` y `pnpm install --frozen-lockfile`.
+2. **Compilación:**
    `pnpm turbo run build --filter=@ncr/api --filter=@ncr/web --filter=@ncr/providers`.
-2. `pnpm sitio:video -- --preparar`: descarga go2rtc para el Mac y deja
+3. **`pnpm entorno:diff`**, y lo que falte, copiado del `.env.example` de cada uno.
+   En sitio **pueden ir vacías** las de Web Push (`WEB_PUSH_*`) y TURN (`WEBRTC_*`), y
+   **deben** ir vacías las de Netlify (`API_IP_FIRMA_SECRETO`, `API_ORIGEN_PUBLICO`,
+   `CONSOLA_CABECERA_IP_DE_CONFIANZA`, `CONSOLA_IP_FIRMA_SECRETO`).
+   `GUARDIA_AUDIO_TRANSPORTE=websocket`. **`RECUPERACION_POR_CORREO`: `desactivada` o
+   sin la línea, nunca vacía**: vacía, la consola no arranca (H-15S1-01).
+4. **`supabase db push`**: **0047 a 0054** —conversaciones de guardia, salidas del
+   videoportero, Edge en sitio, Edge puente, estado que sobrevive al reinicio,
+   suscripciones Web Push, modo de puerta y lectura de usuarios por servicio—, y
+   reinicio de la API.
+5. **Contra la base real**, con la API y la consola arrancadas (§1):
+   `pnpm sitio:ensayo -- --solo-lectura`. Su bloque **«La víspera»** tiene que decir
+   «están las ocho», ningún ✗ en las variables y «contesta por el bucle local y
+   reenvía el audio a la API». Cada ✗ trae su remedio; ninguna línea lleva un valor.
+6. **Ensayo simulado:** `pnpm sitio:ensayo -- --simulado` → `VEREDICTO: SIN FALLOS`.
+   Si no, no salga.
+7. **La app del iPhone:** con Apple ID gratuito **caduca a los 7 días**. Si pasaron 7
+   días desde que se instaló, reinstálela hoy —en Release, con
+   `--dart-define=API_URL=http://<nombre>.local:3000`, una sola vez con cable— y ábrala
+   después desde el ícono, sin cable ni Mac ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md)
+   §1–§2, ADR-033). Apunte la fecha.
+8. `pnpm sitio:video -- --preparar`: descarga go2rtc para el Mac y deja
    `.sitio/go2rtc.yaml` escrito desde el `.env`. Anote el SHA-256 que imprime.
-3. `pnpm sitio:ensayo -- --simulado`: el ensayo entero contra los equipos
-   simulados. Tiene que terminar en `VEREDICTO: SIN FALLOS`. Si no, no salga.
-4. **Los equipos, en la consola** (Dispositivos → alta), N de cada tipo, con su
+9. **Los equipos, en la consola** (Dispositivos → alta), N de cada tipo, con su
    IP, usuario y credencial: el ensayo, la puesta en marcha y el respaldo los
    leen de ahí (15-M, C6). `BARRERA_*`, `TERMINAL_*` y `VIDEOPORTERO_*`
    (`HOST`, `PUERTO`, `USUARIO`, `CLAVE`, `CANAL`) en `apps/api/.env` quedan de
    respaldo, sólo si la base no está. Las credenciales, **sólo en la consola o en
    ese fichero**: ni en la hoja, ni en un documento, ni en una foto.
-5. La app en el iPhone, **compilada en Release** con el nombre `.local` del Mac
-   (`--dart-define=API_URL=http://<nombre>.local:3000`), instalada **una sola
-   vez** con cable y abierta después desde el ícono, sin cable ni Mac conectado
-   ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) §1–§2, ADR-033). Con Apple ID
-   gratuito **caduca a los 7 días**: instálela como mucho una semana antes y
-   apunte la fecha.
-6. Una carpeta de sitio **fuera del repositorio**: `mkdir -p $HOME/ncr-sitio`.
-   Ahí van el respaldo, los informes y la bitácora. El ensayo se niega a
-   escribir dentro del repositorio.
-7. **Ensayo en casa con IPv6 desactivado.** El host directo de Supabase
-   (`db.<ref>.supabase.co`) sólo tiene IPv6, y muchas redes de conjunto no lo
-   dan: pg-boss no arrancaría en sitio. Con la API parada:
-   ```
-   networksetup -setv6off Wi-Fi                 # como la red del conjunto
-   pnpm --filter @ncr/api start                 # debe llegar a «API arrancada»
-   pnpm sitio:ensayo -- --solo-lectura          # sin FALLO de pg-boss
-   networksetup -setv6automatic Wi-Fi           # al terminar, como estaba
-   ```
-   Si falla, `PGBOSS_DATABASE_URL` al pooler en modo sesión (puerto 5432).
-8. `TERMINAL_PLAZO_DE_VERIFICACION_S=8` en el `.env` (el valor por omisión): la
-   terminal espera 8 s el veredicto, no los 5 de fábrica.
-9. **HikCentral.** Los tres equipos están dados de alta también en HikCentral.
-   Pida a quien lo administra que los **deshabilite en HikCentral durante la
-   prueba**: una plataforma que ya tiene la conexión de eventos puede hacer que
-   el equipo rechace la nuestra, y su sincronización puede borrar los rostros
-   que cargue Next Control. El ensayo y la ficha lo dicen en palabras si pasa.
-10. Una foto JPEG de **su propia cara** (≤ 200 KB, ≤ 1024 px):
+10. Una carpeta de sitio **fuera del repositorio**: `mkdir -p $HOME/ncr-sitio`.
+    Ahí van el respaldo, los informes y la bitácora. El ensayo se niega a
+    escribir dentro del repositorio.
+11. **Ensayo en casa con IPv6 desactivado.** El host directo de Supabase
+    (`db.<ref>.supabase.co`) sólo tiene IPv6, y muchas redes de conjunto no lo
+    dan: pg-boss no arrancaría en sitio. Con la API parada:
+    ```
+    networksetup -setv6off Wi-Fi                 # como la red del conjunto
+    pnpm --filter @ncr/api start                 # debe llegar a «API arrancada»
+    pnpm sitio:ensayo -- --solo-lectura          # sin FALLO de pg-boss
+    networksetup -setv6automatic Wi-Fi           # al terminar, como estaba
+    ```
+    Si falla, `PGBOSS_DATABASE_URL` al pooler en modo sesión (puerto 5432).
+12. `TERMINAL_PLAZO_DE_VERIFICACION_S=8` en el `.env` (el valor por omisión): la
+    terminal espera 8 s el veredicto, no los 5 de fábrica.
+13. **HikCentral.** Los tres equipos están dados de alta también en HikCentral.
+    Pida a quien lo administra que los **deshabilite en HikCentral durante la
+    prueba**: una plataforma que ya tiene la conexión de eventos puede hacer que
+    el equipo rechace la nuestra, y su sincronización puede borrar los rostros
+    que cargue Next Control. El ensayo y la ficha lo dicen en palabras si pasa.
+14. Una foto JPEG de **su propia cara** (≤ 200 KB, ≤ 1024 px):
     `$HOME/ncr-sitio/cara.jpg`. Es para el paso 6 del ensayo; se da de alta y de
     baja en la terminal en el acto.
 
@@ -169,16 +186,17 @@ pnpm sitio:ensayo -- --solo-lectura
 
 Al principio imprime:
 
-| Línea                                       | Qué significa                              | Si falla                                                                                                    |
-| ------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| API en marcha (127.0.0.1)                   | La API contesta en el propio Mac           | Arránquela (paso 1)                                                                                         |
-| La API contesta por la IP del Mac           | La contestará el iPhone                    | Cortafuegos del Mac → permitir conexiones entrantes de `node`                                               |
-| ▶ iPhone: … abra `http://<IP>:3000/health` | La comprobación del iPhone                 | Si Safari no la abre, es la red: misma Wi-Fi y **datos móviles apagados**                                   |
-| Puente de video (go2rtc)                    | go2rtc contesta                            | `pnpm sitio:video`                                                                                          |
-| Migraciones                                 | La base tiene las del repositorio          | Paso 3                                                                                                      |
-| pg-boss no usa el host directo de Supabase  | Los trabajos programados arrancan          | `PGBOSS_DATABASE_URL` al **pooler en modo sesión (:5432)**, no a `db.<ref>.supabase.co` (sólo IPv6)         |
-| Proveedor de equipos                        | Las órdenes llegan a equipos reales        | `PROVEEDOR_DE_EQUIPOS=hikvision` y reinicio de la API; con `simulado` la consola lo dice en una franja roja |
-| Servidor de alarmas de la cámara            | La cámara publica a la IP de ahora del Mac | En la ficha de la cámara, **«Enviar eventos a este Mac»** (§2 bis)                                          |
+| Línea                                       | Qué significa                                                                   | Si falla                                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| API en marcha (127.0.0.1)                   | La API contesta en el propio Mac                                                | Arránquela (paso 1)                                                                                         |
+| La API contesta por la IP del Mac           | La contestará el iPhone                                                         | Cortafuegos del Mac → permitir conexiones entrantes de `node`                                               |
+| ▶ iPhone: … abra `http://<IP>:3000/health` | La comprobación del iPhone                                                      | Si Safari no la abre, es la red: misma Wi-Fi y **datos móviles apagados**                                   |
+| Puente de video (go2rtc)                    | go2rtc contesta                                                                 | `pnpm sitio:video`                                                                                          |
+| Migraciones                                 | La base tiene las del repositorio                                               | Paso 3                                                                                                      |
+| La víspera (15-S1)                          | 0047–0054 una a una; variables nuevas desde la 15-N; consola por el bucle local | Cada ✗ trae su remedio (§0, paso 5)                                                                         |
+| pg-boss no usa el host directo de Supabase  | Los trabajos programados arrancan                                               | `PGBOSS_DATABASE_URL` al **pooler en modo sesión (:5432)**, no a `db.<ref>.supabase.co` (sólo IPv6)         |
+| Proveedor de equipos                        | Las órdenes llegan a equipos reales                                             | `PROVEEDOR_DE_EQUIPOS=hikvision` y reinicio de la API; con `simulado` la consola lo dice en una franja roja |
+| Servidor de alarmas de la cámara            | La cámara publica a la IP de ahora del Mac                                      | En la ficha de la cámara, **«Enviar eventos a este Mac»** (§2 bis)                                          |
 
 **Después, el iPhone** ([`APP_EN_IPHONE.md`](APP_EN_IPHONE.md) §3):
 
@@ -309,6 +327,36 @@ Cada FALLO trae su causa y **→ la acción**. Corríjala y repita sólo ese equ
 Después, la batería de los 16 escenarios de
 [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md), fila a
 fila en la hoja.
+
+## 4 bis · Mañana: el orden de las pruebas
+
+> **15-S1.** Lo que esta visita tiene que dejar medido, en este orden. Los «§V» y
+> «§8.4…» son de [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md).
+
+1. **Capacidades del videoportero DS-KD9633:** Dispositivos → su ficha → «Probar
+   conexión». Anote canal de audio, códec, muestreo y si está habilitado (§8.4.1, fila 1).
+2. **TwoWayAudio** (§8.4): si sale «canal no habilitado», habilítelo en su panel y
+   vuelva a leer; anote el códec y si es semiduplex.
+3. **Los 16 escenarios, en sus 26 filas** escenario × canal, con la hoja delante
+   (`node scripts/puesta-en-marcha-equipos.mjs --simulado --hoja=$HOME/ncr-sitio/hoja.md`):
+   L1–L5, T1–T5 y V1–V6, y después L6, L7 y T6 (§V.2, paso 11).
+4. **Audio < 2 s** (§8.4.1, filas 3 a 6) **desde el navegador del propio Mac**, por
+   `http://127.0.0.1:3100`: por la IP del Mac el navegador no da el micrófono. Además
+   de colgar, cambiar de equipo y cerrar la pestaña (fila 6), **colgar y volver a
+   llamar enseguida**: la llamada nueva conserva la palabra y el audio (15-S1, A1).
+   La fila 7 es la vuelta atrás si algo falla.
+5. **Las salidas del videoportero** (§8.4.2): descubrir, nombrar y abrir cada una, < 3 s.
+6. **Puerta libre y bloqueada** (§8.4.3), con el administrador del conjunto delante.
+7. **Opcional:** el corte de WAN del Edge, si hay Edge y queda tiempo
+   ([`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §9).
+
+**Lo que no se puede probar en sitio, y por qué:**
+
+| Qué                                  | Por qué no                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Avisos Web Push al residente         | Exigen HTTPS (contexto seguro y service worker) en el aparato que los recibe; en sitio todo va por `http://`                       |
+| TURN (coturn)                        | Sólo sirve para el video desde fuera de la red del conjunto; en sitio todo está en la misma red y coturn no está desplegado (P-29) |
+| Consola en Netlify, API en Cloud Run | No están desplegadas (DT-15R-01): en sitio la consola y la API corren en el Mac                                                    |
 
 ## 5 · Demostración de los tres hitos del reto
 
