@@ -321,13 +321,15 @@ El resto de la corrida 2 —estabilidad incluida— ya estaba verde.
   descubiertas.
 - **DT-15R-08 · el aviso de acceso** lleva el identificador crudo del equipo en
   el texto («… en <id>»): cosmético, sin dato personal.
-- **DT-15R-09 · en modo puente, el Edge inscribe rostros sin comprobar el reloj
-  del equipo.** `apps/edge/src/composicion.ts` construye el proveedor sin
-  `desvioDeRelojMaximoS`, así que `exigirRelojEnHora` sale antes de mirar
-  (`packages/providers/src/terminal/terminal-facial.ts`); la API sí lo hace en
-  modo directo. Viene de la 15-Q2 (`2303350`), no de esta ronda; mientras tanto,
-  el NTP del equipo es la única protección (`ENTREGA_EN_SITIO.md` §8.3). Lo
-  encontró la revisión de las guías de visita.
+- **DT-15R-09 · CERRADO por la corrección de la 15-R**
+  ([`ETAPA-15R-proveedor-del-edge.md`](ETAPA-15R-proveedor-del-edge.md)). Era: en
+  modo puente, el Edge inscribía rostros sin comprobar el reloj del equipo,
+  porque `apps/edge/src/composicion.ts` construía el proveedor sin
+  `desvioDeRelojMaximoS` y `exigirRelojEnHora` salía antes de mirar; venía de la
+  15-Q2 (`2303350`) y lo encontró la revisión de las guías de visita. Ahora el
+  Edge compone su proveedor con los siete ajustes de la API, leídos de su propio
+  `.env`, y el alta con el reloj del equipo desviado vuelve a la nube como
+  `RelojDelEquipoDesviado` sin escribir nada en el equipo.
 - **P-32 · PENDIENTE DE DEFINICIÓN · a quién llega el respaldo de una alerta sin
   operador** (CU-03 alterno). Desde la ETAPA 06 se dirige a una «vivienda»
   `guardia` que no existe; desde la 15-R el notificador real lo reconoce y no

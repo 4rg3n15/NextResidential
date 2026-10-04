@@ -1,16 +1,14 @@
 /**
- * 15-Q · Q5/Q7 · LA CONFIGURACIÓN DEL EDGE EN SITIO
- *
- * Lo que el gateway necesita para hablar con los equipos y para escuchar en la
- * red del conjunto. Se valida al arrancar como el resto (§2.7.1): si falta algo,
- * el gateway NO arranca. Nombres y descripciones en `apps/edge/.env.example`;
- * los VALORES —IPs, usuarios y claves de los equipos— sólo en el `.env` del
- * equipo (RN-21, KPI-11), nunca en el repositorio.
+ * 15-Q · Q5/Q7 · LA CONFIGURACIÓN DEL EDGE EN SITIO: hablar con los equipos —desde
+ * DT-15R-09, con los mismos ajustes que la API (`esquema-de-ajustes.ts`)— y escuchar
+ * en la red del conjunto. Se valida al arrancar (§2.7.1): si falta algo, el gateway
+ * NO arranca. Nombres y descripciones en `apps/edge/.env.example`; los VALORES —IPs,
+ * usuarios y claves de los equipos— sólo en el `.env` del equipo (RN-21, KPI-11).
  */
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { ConfiguracionInvalida, cargarConfiguracion } from './esquema';
-import type { ConfiguracionDelEdge } from './esquema';
+import { ConfiguracionInvalida, cargarConfiguracion, type ConfiguracionDelEdge } from './esquema';
+import { esquemaDeAjustes } from './esquema-de-ajustes';
 
 /** Lo que admite el receptor de una cámara, y cada equipo con su credencial. */
 export const esquemaDeEquipo = z
@@ -66,6 +64,7 @@ export const esquemaDeSitio = z.object({
   REGLAS_DESCARGA_SEGUNDOS: z.coerce.number().int().min(30).max(86_400).default(300),
   SONDA_POR_EVENTO_MS: z.coerce.number().int().min(200).max(10_000).default(1500),
   ESCUCHAS_REARME_SEGUNDOS: z.coerce.number().int().min(5).max(600).default(30),
+  ...esquemaDeAjustes.shape,
 });
 
 export type ConfiguracionDeSitio = ConfiguracionDelEdge & z.infer<typeof esquemaDeSitio>;

@@ -1,15 +1,11 @@
 /**
  * 15-Q · RAÍZ DE COMPOSICIÓN DEL EDGE EN SITIO; la DoD compone el MISMO Edge con su tiempo
  * y su red. 15-Q2 · con puente, `ExtrasDelPuente` cambia el registro, la sonda y el ingestor.
+ * DT-15R-09 · el proveedor de equipos, con los ajustes de la API: `composicion-del-proveedor.ts`.
  */
 import type { Reloj } from '@ncr/domain-core';
-import {
-  FuenteDePlacas,
-  RegistroEnMemoria,
-  crearProveedorDeEquipos,
-  hechoDeAccesoDe,
-} from '@ncr/providers';
-import type { EquipoRegistrado, ProveedorDeEquipos } from '@ncr/providers';
+import { FuenteDePlacas, RegistroEnMemoria, hechoDeAccesoDe } from '@ncr/providers';
+import type { EquipoRegistrado } from '@ncr/providers';
 import type { ConfiguracionDeSitio, EquipoDelEdge } from './configuracion/esquema-de-sitio';
 import { ContingenciaEnSitio } from './aplicacion/contingencia-en-sitio';
 import { DecidirLocalmente } from './aplicacion/decidir-localmente';
@@ -26,6 +22,7 @@ import { FeDeVidaSqlite } from './infraestructura/sqlite/fe-de-vida';
 import { MemoriaDeAccesosSqlite } from './infraestructura/sqlite/memoria-de-accesos';
 import type { ExtrasDelPuente } from './extras-del-puente';
 import { cuarentenaConConstancia } from './infraestructura/sqlite/cuarentena-sqlite';
+import { proveedorDelEdge } from './composicion-del-proveedor';
 
 export type Registrar = (
   nivel: 'info' | 'aviso' | 'error',
@@ -93,8 +90,7 @@ export const componerEdge = (config: ConfiguracionDeSitio, extras: ExtrasDeCompo
   );
 
   const fuente = new FuenteDePlacas();
-  const proveedor: ProveedorDeEquipos = crearProveedorDeEquipos({
-    clase: 'hikvision', // kpi-11-exento: en sitio, los equipos reales; las pruebas inyectan `peticion`
+  const proveedor = proveedorDelEdge(config, {
     reloj,
     registro: extras.registro?.(db) ?? new RegistroEnMemoria(config.EDGE_EQUIPOS.map(aRegistrado)),
     fuente,
