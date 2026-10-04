@@ -2,7 +2,7 @@
 
 **Rama:** `etapa-15m-alerta-archivada-aislada` · **Base:** `develop` (`7b31083`, merge del PR #41) ·
 **PR:** [4rg3n15/NextResidential#44](https://github.com/4rg3n15/NextResidential/pull/44), sin fusionar · **Fecha:** 2026-10-03 · **Corrige:** H-15M-C01 ·
-**Corrige, fuera del encargo:** H-15M-C02 · **Abre:** DT-15M-C01 a DT-15M-C03
+**Corrige, fuera del encargo:** H-15M-C02 · **Abre:** DT-15M-C01 a DT-15M-C04
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Sólo toca pruebas: ni una línea de producto, ni de migraciones, ni de guiones.
@@ -223,7 +223,9 @@ limpio (6886 blobs del historial).
 | App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
 
 Y el CI de GitHub, por su cuenta, sobre la cabeza del cierre (`825a905`): los cuatro
-trabajos en verde, también `verificar-etapa.sh --con-base (macos)`.
+trabajos en verde, también `verificar-etapa.sh --con-base (macos)`. Sobre `5db26dd`, que
+sólo cambia documentación, ese trabajo cayó una vez en el paso 5 por una prueba ajena
+que pasó en los pasos 7 y 14 del mismo trabajo (DT-15M-C04).
 
 ### Las dos corridas anteriores, sobre el mismo commit
 
@@ -316,6 +318,14 @@ trabajos en verde, también `verificar-etapa.sh --con-base (macos)`.
   el billete puede no salir y el socket se abre con `billete=undefined` → 401.
   Arreglo propuesto: esperar `!equipo.estado().sesionAbierta` al final de la
   anterior y exigir 201 al billete.
+- **DT-15M-C04 · `packages/providers/src/remoto/ejecutor-remoto.test.ts` «el audio
+  sube EN ORDEN…» falla a veces en CI** con «promise resolved "undefined" instead of
+  rejecting». Mecanismo, demostrado: el fallo del equipo vuelve como aviso
+  asíncrono `audio.fallo` (`audio-por-tunel.ts`) y la prueba espera 15 ms fijos antes
+  de exigir el rechazo del envío siguiente; sin esa espera falla tres de tres con el
+  mismo mensaje, así que en un equipo cargado basta con que el aviso tarde más.
+  Arreglo propuesto: esperar con plazo a que el aviso llegue, no un tiempo fijo, sin
+  relajar la aserción.
 - **Riesgo residual de esta corrección.** La copropiedad propia vale mientras sólo
   la suite escriba en la base de pruebas. Una API de desarrollo conectada a esa
   misma base con el planificador encendido abriría «equipo caído» en ella; el 0
@@ -328,10 +338,10 @@ trabajos en verde, también `verificar-etapa.sh --con-base (macos)`.
    corridas sin recrearse, `./supabase/verificar.sh --con-semillas --modo-supabase`
    la deja limpia: reinicia las ventanas acumulativas de DT-15M-C01 y se lleva los
    equipos y alertas que la prueba original dejó en COP_A.
-2. **Decidir DT-15M-C01 a DT-15M-C03.** Las once de DT-15M-C01 quedan anotadas; la
+2. **Decidir DT-15M-C01 a DT-15M-C04.** Las once de DT-15M-C01 quedan anotadas; la
    más urgente es `persistencia-operativa-pg` L261, que falla siempre tras veinte
-   corridas sin recrear la base. DT-15M-C02 y DT-15M-C03 son intermitentes y ya
-   tumbaron una corrida del verificador cada una.
+   corridas sin recrear la base. DT-15M-C02 a DT-15M-C04 son intermitentes y ya
+   tumbaron una corrida del verificador cada una (la de C04, en el CI del PR #44).
 3. **Para verificar en local con la base recién sembrada** (`--con-semillas`),
    H-15R-C01 hará fallar los pasos 5 y 7 hasta que se fusione la corrección de la
    15-R; con `--con-pruebas`, como el CI, no.
@@ -351,4 +361,5 @@ rama con nombre de etapa (§2.5).
 | `7fe1e5b` | H-15M-C02 · «aparece en Dispositivos» da de alta en esa misma copropiedad           |
 | `99669c8` | Este informe y la ficha de `ESTADO_ETAPAS.md`, a falta del veredicto                |
 | `825a905` | Cierre: el veredicto del verificador, las dos corridas anteriores y DT-15M-C02, C03 |
-| _este_    | El PR #44 y el CI verde de `825a905`, en el informe y en la ficha                   |
+| `5db26dd` | El PR #44 y el CI verde de `825a905`, en el informe y en la ficha                   |
+| _este_    | DT-15M-C04: la roja ajena del CI de `5db26dd`, con su mecanismo                     |
