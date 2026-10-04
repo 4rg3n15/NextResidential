@@ -81,6 +81,19 @@ describe('CanalConSesiones · la conversación suelta SU sesión', () => {
     );
   });
 
+  it('cambiar de equipo y volver sin colgar: la conversación nueva toma el turno y la vieja ya no lo suelta', async () => {
+    const m = montar();
+    await m.canal.pedir(COP, VP, OP);
+    const vieja = m.canal.deLaConversacion(P);
+    // La consola vuelve al equipo: el turno sigue siendo suyo y reabre el audio.
+    const nueva = m.canal.deLaConversacion(P);
+    await vieja.soltar(COP, VP, OP); // el cierre del socket viejo llega ahora
+    expect(m.sueltas).toEqual([]);
+    expect(await m.canal.estado(COP, VP, OP)).toMatchObject({ estado: 'abierta' });
+    await nueva.soltar(COP, VP, OP); // y la nueva sí lo suelta al colgar
+    expect(m.sueltas).toEqual([`${VP}|${OP}`]);
+  });
+
   it('sin carrera, la conversación suelta su sesión: cerrar la pestaña libera el equipo', async () => {
     const m = montar();
     await m.canal.pedir(COP, VP, OP);

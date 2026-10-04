@@ -15,9 +15,11 @@ import type { CanalDeIntercom, EstadoDeCanal } from './puertos';
  * Una SESIÓN es cada concesión del canal del equipo a un operador: nace cuando
  * `pedir` le deja la palabra con el canal del equipo abierto, y acaba cuando se
  * suelta o cuando el estado dice que ya no la tiene (caducidad, relevo). Cada
- * conversación se ata a la sesión vigente al aceptarse su WebSocket, y su
- * `soltar` suelta ESA o nada. Lo demás pasa tal cual: la exclusividad sigue en
- * la máquina del dominio y el transporte en `CanalIntercomConTransporte`.
+ * conversación TOMA la sesión vigente al aceptarse su WebSocket —la anterior
+ * sobre el mismo turno, la de quien cambió de equipo y volvió, deja de ser su
+ * dueña— y su `soltar` suelta ESA o nada. Lo demás pasa tal cual: la
+ * exclusividad sigue en la máquina del dominio y el transporte en
+ * `CanalIntercomConTransporte`.
  *
  * En el proceso, como los turnos (D-69): con varias instancias, las sesiones
  * tendrían que vivir donde vivan ellos.
@@ -98,11 +100,13 @@ export class CanalConSesiones implements CanalDeIntercom {
 
   /**
    * El canal que ve UNA conversación: el mismo, salvo `soltar`, que suelta la
-   * sesión vigente cuando se creó —la de su WebSocket— o, si ya acabó, nada.
+   * sesión que ella tomó al crearse o, si ya acabó o la tomó otra, nada. Sin
+   * sesión vigente (sin la palabra), no toma ninguna.
    */
   deLaConversacion(p: ParticipantesDeConversacion): CanalDeIntercom {
     const clave = claveDe(p.copropiedadId, p.dispositivoId, p.operadorId);
-    const suya = this.vigentes.get(clave);
+    const suya = this.vigentes.has(clave) ? (this.ultima += 1) : undefined;
+    if (suya !== undefined) this.vigentes.set(clave, suya);
     return {
       pedir: (c, d, o) => this.pedir(c, d, o),
       estado: (c, d, o) => this.estado(c, d, o),
