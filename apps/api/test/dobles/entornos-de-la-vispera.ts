@@ -9,7 +9,7 @@ import { join } from 'node:path';
  * deben salir por pantalla, y la comprobación de que no salen.
  */
 export const SECRETO = 'secreto-simulado-que-no-debe-salir-0123456789abcdef';
-export const IP_DE_LA_RED = '192.168.50.23';
+export const IP_DE_LA_RED = '203.0.113.23';
 
 const temporales: string[] = [];
 /** Borra los repositorios de mentira: en el `afterEach` de quien los use. */
