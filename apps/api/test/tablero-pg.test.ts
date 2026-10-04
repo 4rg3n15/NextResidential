@@ -16,6 +16,7 @@ import {
   ConsultarIndicadores,
 } from '../src/tablero/aplicacion/casos-de-uso';
 import { URL_BASE, exigirBase as guardianDeLaBase } from './base-exigida';
+import { copropiedadDeLaCorrida, equipoPropio } from './copropiedad-propia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -37,12 +38,6 @@ const COP_A = '10000000-0000-4000-8000-000000000001';
 const COP_B = '10000000-0000-4000-8000-000000000002';
 const LLAVE = 'llave-de-equipos-solo-para-pruebas-32+';
 const CORRIDA = randomBytes(3).toString('hex');
-/**
- * El puerto varía por corrida: `dispositivos_endpoint_uk` es único por
- * (copropiedad, host, puerto) entre los activos y la base de pruebas conserva
- * los equipos de corridas anteriores (la de registro-de-equipos-pg chocó así).
- */
-const PUERTO = 1024 + (parseInt(CORRIDA, 16) % 60_000);
 
 /**
  * El rol con el que se conecta la API en Supabase: dueño de las tablas y NO
@@ -91,7 +86,7 @@ const alta = (nombre: string, tipo: 'intercom' | 'camara_lpr', octeto: number) =
   nombre,
   tipo,
   host: `198.51.100.${String(octeto)}`,
-  puerto: PUERTO,
+  puerto: 80,
   protocolo: 'http' as const,
   usuario: 'servicio',
   secreto: `clave-${CORRIDA}`,
@@ -181,23 +176,24 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
   it('un equipo dado de alta —verificado o «decide solo»— aparece en Dispositivos', async () => {
     const p = exigirBase();
     const equipos = new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE');
-    const octeto = 10 + (parseInt(CORRIDA, 16) % 200);
+    // H-15M-C02 · en COP_A chocaban con los equipos de corridas anteriores.
+    const propia = await copropiedadDeLaCorrida(semillas as Pool, CORRIDA);
     const bueno = await equipos.crear(
-      ctxAdmin(COP_A),
-      COP_A,
-      alta(`Portero ${CORRIDA}`, 'intercom', octeto),
+      propia.ctx,
+      propia.id,
+      alta(`Portero ${CORRIDA}`, 'intercom', 10),
       VERIFICADO,
     );
     const camara = await equipos.crear(
-      ctxAdmin(COP_A),
-      COP_A,
-      alta(`Cámara que decide sola ${CORRIDA}`, 'camara_lpr', octeto + 1),
+      propia.ctx,
+      propia.id,
+      alta(`Cámara que decide sola ${CORRIDA}`, 'camara_lpr', 11),
       DECIDE_SOLO,
     );
     expect(camara.verificacion).toBe('rechazado');
 
     const consulta = new ConsultarDispositivos(new RepositorioTableroPg(p), reloj);
-    const { dispositivos } = await consulta.ejecutar(COP_A);
+    const { dispositivos } = await consulta.ejecutar(propia.id);
     const ids = dispositivos.map((d) => d.id);
     expect(ids).toContain(bueno.id);
     expect(ids).toContain(camara.id);
@@ -208,7 +204,7 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     // Sin latido todavía: el tablero no lo inventa.
     expect(fila?.ultimoLatido).toBeNull();
     // Y la ficha, la edición y las correcciones lo encuentran por el mismo id.
-    const inventario = await equipos.listar(ctxAdmin(COP_A), COP_A);
+    const inventario = await equipos.listar(propia.ctx, propia.id);
     expect(inventario.find((e) => e.id === camara.id)?.verificacion).toBe('rechazado');
   });
 
@@ -263,17 +259,16 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     const p = exigirBase();
     const tablero = new RepositorioTableroPg(p);
     const alertas = new RepositorioAlertasPg(p, { registrar: () => undefined });
-    // Una alerta de equipo necesita su equipo: el primero del inventario de COP_A.
-    const inventario = await new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE').listar(
-      ctxAdmin(COP_A),
-      COP_A,
-    );
-    const dispositivoId = inventario[0]?.id;
-    if (dispositivoId === undefined) throw new Error('COP_A no tiene ningún equipo');
-    const antes = (await tablero.conteosDeAlertas(COP_A)).pendientes;
+    // H-15M-C01 · copropiedad PROPIA: en COP_A otras suites abren y resuelven
+    // alertas en paralelo, y el conteo exacto sólo vale donde nadie más las abre.
+    const propia = await copropiedadDeLaCorrida(semillas as Pool, CORRIDA);
+    const equipos = new RepositorioDeEquiposPg(p, LLAVE, 'env:EQUIPOS_LLAVE');
+    const dispositivoId = await equipoPropio(equipos, propia, CORRIDA);
+    const copropiedadId = propia.id;
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(0);
     const alerta = Alerta.abrir({
       id: randomUUID(),
-      copropiedadId: COP_A,
+      copropiedadId,
       tipo: 'acceso_dudoso',
       severidad: 'informativa',
       generadaEn: new Date(),
@@ -282,16 +277,16 @@ describe.skipIf(URL_BASE === undefined)('H-SITIO-02 · tablero contra base real'
     });
     if (!esExito(alerta)) throw new Error(alerta.error.detalle);
     await alertas.guardar(alerta.valor, ACTOR_INGESTA);
-    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes + 1);
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(1);
     const archivadas = await alertas.archivar(
-      COP_A,
+      copropiedadId,
       [alerta.valor.id],
       'ruido de prueba',
       ACTOR_INGESTA,
       new Date(),
     );
     expect(archivadas).toBe(1);
-    expect((await tablero.conteosDeAlertas(COP_A)).pendientes).toBe(antes);
+    expect((await tablero.conteosDeAlertas(copropiedadId)).pendientes).toBe(0);
   });
 
   it('los accesos por hora cuentan los eventos del día en la hora LOCAL del conjunto', async () => {
