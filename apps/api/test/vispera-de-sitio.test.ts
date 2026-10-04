@@ -1,40 +1,42 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   comprobacionesDeLaVispera,
-  leerEntornos,
   lineasDeLaConsola,
   lineasDeMigraciones,
-  lineasDeVariables,
   migracionesDeLaVispera,
 } from '../../../scripts/lib/vispera-de-sitio.mjs';
+import {
+  API_COMPLETA,
+  CONSOLA_DE_SITIO,
+  IP_DE_LA_RED,
+  borrarRepositorios,
+  repositorio,
+  sinValoresNiIps,
+} from './dobles/entornos-de-la-vispera';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
  * 15-S1 · A2 · LO QUE `pnpm sitio:ensayo` AÑADE PARA LA VÍSPERA
  *
  * Cada aviso nuevo, provocado con lo que lo dispara —una base que no tiene
- * migraciones o no deja leer el registro de la CLI, un .env con huecos o con
- * una combinación que no arranca, una consola que no contesta o no reenvía el
- * audio— y sin hardware ni base real. Y en todos, lo mismo: ninguna línea lleva
- * un valor de los .env ni una IP de la red.
+ * migraciones o no deja leer el registro de la CLI, una consola que no contesta
+ * o no reenvía el audio— y sin hardware ni base real; las variables, en
+ * `vispera-variables.test.ts`. Y en todos, lo mismo: ninguna línea lleva un
+ * valor de los .env ni una IP de la red.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const MIGRACIONES = resolve(__dirname, '../../../supabase/migrations');
-const SECRETO = 'secreto-simulado-que-no-debe-salir-0123456789abcdef';
-const IP_DE_LA_RED = '192.168.50.23';
 
-const temporales: string[] = [];
 const servidores: Server[] = [];
 const sockets: Duplex[] = [];
 afterEach(async () => {
-  for (const d of temporales.splice(0)) rmSync(d, { recursive: true, force: true });
+  borrarRepositorios();
   for (const s of sockets.splice(0)) s.destroy();
   await Promise.all(
     servidores.splice(0).map((s) => {
@@ -43,53 +45,6 @@ afterEach(async () => {
     }),
   );
 });
-
-/** Un repositorio de mentira con el .env de la API y los de la consola que se pidan. */
-const repositorio = (api: string | null, consola: Readonly<Record<string, string>>) => {
-  const raiz = mkdtempSync(join(tmpdir(), 'vispera-'));
-  temporales.push(raiz);
-  mkdirSync(join(raiz, 'apps/api'), { recursive: true });
-  mkdirSync(join(raiz, 'apps/web'), { recursive: true });
-  if (api !== null) writeFileSync(join(raiz, 'apps/api/.env'), api);
-  for (const [fichero, contenido] of Object.entries(consola))
-    writeFileSync(join(raiz, 'apps/web', fichero), contenido);
-  return { raiz, rutaEnv: join(raiz, 'apps/api/.env') };
-};
-
-const API_COMPLETA = [
-  'GUARDIA_AUDIO_TRANSPORTE=websocket',
-  'GUARDIA_VIGENCIA_EN_COLA_S=300',
-  'EVENTOS_HISTORICOS_LOTE=500',
-  'EVENTOS_HISTORICOS_POR_SEGUNDO=500',
-  'PGBOSS_POOL_MAX=2',
-  'SUPABASE_POOLER_MAX_CLIENTES=15',
-  `WEB_PUSH_VAPID_PUBLICA="${SECRETO}"`,
-  `WEB_PUSH_VAPID_PRIVADA=${SECRETO}`,
-  'WEB_PUSH_SUJETO=mailto:guardia@ejemplo.invalid',
-  'WEB_PUSH_SERVICIOS_PERMITIDOS=',
-  'WEB_PUSH_TTL_SEGUNDOS=',
-  'WEBRTC_STUN_URLS=',
-  `WEBRTC_TURN_URLS=turn:${IP_DE_LA_RED}:3478`,
-  `WEBRTC_TURN_SECRETO=${SECRETO}`,
-  'WEBRTC_TURN_TTL_SEGUNDOS=',
-  'API_IP_FIRMA_SECRETO=',
-].join('\n');
-const CONSOLA_DE_SITIO = [
-  'API_ORIGEN_PUBLICO=',
-  'CONSOLA_CABECERA_IP_DE_CONFIANZA=',
-  'CONSOLA_IP_FIRMA_SECRETO=',
-  'RECUPERACION_POR_CORREO=desactivada',
-].join('\n');
-
-const sinValoresNiIps = (lineas: readonly string[]) => {
-  const todo = lineas.join('\n');
-  expect(todo).not.toContain(SECRETO);
-  expect(todo).not.toContain(IP_DE_LA_RED);
-  expect(todo).not.toContain('ejemplo.invalid');
-  // La única dirección que puede salir es el bucle local, que es la instrucción.
-  const ips = todo.match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g) ?? [];
-  expect(ips.filter((ip) => ip !== '127.0.0.1')).toEqual([]);
-};
 
 /** Una base de mentira: registro de la CLI con estas versiones, o que no se deja leer. */
 const base = (registro: readonly string[] | null, huellas: readonly string[] = []) => ({
@@ -140,96 +95,6 @@ describe('15-S1 · A2 · migraciones 0047–0054 contra la base, una a una y con
     todas.push('20261004120000', '20261004130000', '20261004140000', '20261004150000');
     expect(lineasDeMigraciones(await migracionesDeLaVispera(base(todas), MIGRACIONES)).at(-1)).toBe(
       '  ✓ están las ocho',
-    );
-  });
-});
-
-describe('15-S1 · A2 · variables nuevas desde la 15-N en los .env de la API y de la consola', () => {
-  it('todas declaradas y en su sitio: ningún ✗, y ningún valor en la salida', () => {
-    const r = repositorio(API_COMPLETA, { '.env': CONSOLA_DE_SITIO });
-    const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
-    expect(lineas).toContain('    ✓ las 16 nuevas están declaradas');
-    expect(lineas).toContain('    ✓ las 4 nuevas están declaradas');
-    expect(lineas.filter((l) => l.includes('✗'))).toEqual([]);
-    sinValoresNiIps(lineas);
-  });
-
-  it('las que faltan, por clase: obligatorias, vacías en sitio, de Netlify y «nunca vacía»', () => {
-    const api = API_COMPLETA.split('\n')
-      .filter((l) => !/^(PGBOSS_POOL_MAX|WEB_PUSH_TTL_SEGUNDOS|API_IP_FIRMA_SECRETO)=/.test(l))
-      .concat('SUPABASE_POOLER_MAX_CLIENTES=')
-      .join('\n');
-    const r = repositorio(api, { '.env': 'RECUPERACION_POR_CORREO=desactivada\n' });
-    const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
-    expect(lineas).toContainEqual(
-      expect.stringMatching(
-        /✗ obligatorias, sin valor: PGBOSS_POOL_MAX, SUPABASE_POOLER_MAX_CLIENTES → cópielas/,
-      ),
-    );
-    expect(lineas).toContainEqual(
-      expect.stringMatching(
-        /· pueden ir vacías en sitio y no están: WEB_PUSH_TTL_SEGUNDOS → basta la línea vacía/,
-      ),
-    );
-    expect(lineas).toContainEqual(
-      expect.stringMatching(
-        /· de Netlify, no están: API_IP_FIRMA_SECRETO → en sitio, la línea vacía/,
-      ),
-    );
-    expect(lineas).toContainEqual(
-      expect.stringMatching(
-        /· de Netlify, no están: API_ORIGEN_PUBLICO, CONSOLA_CABECERA_IP_DE_CONFIANZA, CONSOLA_IP_FIRMA_SECRETO/,
-      ),
-    );
-    sinValoresNiIps(lineas);
-  });
-
-  it('lo que no arranca o estropea la prueba de mañana, sin decir el valor', () => {
-    const api = API_COMPLETA.replace(
-      'GUARDIA_AUDIO_TRANSPORTE=websocket',
-      'GUARDIA_AUDIO_TRANSPORTE=http',
-    )
-      .replace(`WEB_PUSH_VAPID_PRIVADA=${SECRETO}`, 'WEB_PUSH_VAPID_PRIVADA=')
-      .replace(`WEBRTC_TURN_SECRETO=${SECRETO}`, 'WEBRTC_TURN_SECRETO=');
-    const consola = [
-      'API_ORIGEN_PUBLICO=https://api.ejemplo.invalid',
-      'CONSOLA_CABECERA_IP_DE_CONFIANZA=x-nf-client-connection-ip',
-      `CONSOLA_IP_FIRMA_SECRETO=${SECRETO}`,
-      'RECUPERACION_POR_CORREO=',
-    ].join('\n');
-    const r = repositorio(api, { '.env': consola });
-    const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
-    const fallos = lineas.filter((l) => l.includes('✗')).join('\n');
-    expect(fallos).toMatch(/Web Push: .* las tres o ninguna → la API NO arranca/);
-    expect(fallos).toMatch(/TURN: .* van juntas → la API NO arranca/);
-    expect(fallos).toMatch(/GUARDIA_AUDIO_TRANSPORTE no es websocket/);
-    expect(fallos).toMatch(
-      /RECUPERACION_POR_CORREO vacía: la consola NO arranca → «desactivada» o sin la línea/,
-    );
-    expect(fallos).toMatch(/API_ORIGEN_PUBLICO con valor: en sitio va vacía/);
-    expect(fallos).toMatch(/CONSOLA_CABECERA_IP_DE_CONFIANZA con valor/);
-    expect(fallos).toMatch(/CONSOLA_IP_FIRMA_SECRETO con valor/);
-    expect(fallos).not.toMatch(/\bhttp\b|x-nf-client-connection-ip/);
-    sinValoresNiIps(lineas);
-  });
-
-  it('la consola lee .env y .env.local, y manda el último: como Next en producción', () => {
-    const r = repositorio(API_COMPLETA, {
-      '.env': `${CONSOLA_DE_SITIO.replace('RECUPERACION_POR_CORREO=desactivada', 'RECUPERACION_POR_CORREO=')}\n`,
-      '.env.local': 'RECUPERACION_POR_CORREO=desactivada\n',
-    });
-    const entornos = leerEntornos(r.raiz, r.rutaEnv);
-    expect(entornos.rotulos.consola).toBe('apps/web/.env + apps/web/.env.local');
-    expect(lineasDeVariables(entornos).filter((l) => l.includes('✗'))).toEqual([]);
-    expect(
-      lineasDeVariables(leerEntornos(r.raiz, join(r.raiz, 'no-existe.env'))).join('\n'),
-    ).toMatch(/✗ no existe: copie apps\/api\/\.env\.example/);
-  });
-
-  it('sin ningún .env de la consola, lo dice', () => {
-    const r = repositorio(API_COMPLETA, {});
-    expect(lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv)).join('\n')).toMatch(
-      /apps\/web\/\.env\n {4}✗ no existe: copie apps\/web\/\.env\.example/,
     );
   });
 });
