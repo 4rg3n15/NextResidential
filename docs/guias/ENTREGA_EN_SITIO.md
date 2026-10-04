@@ -342,8 +342,8 @@ fila en la hoja.
    L1–L5, T1–T5 y V1–V6, y después L6, L7 y T6 (§V.2, paso 11).
 4. **Audio < 2 s** (§8.4.1, filas 3 a 6) **desde el navegador del propio Mac**, por
    `http://127.0.0.1:3100`: por la IP del Mac el navegador no da el micrófono. Además
-   de colgar, cambiar de equipo y cerrar la pestaña (fila 6), **colgar y volver a
-   llamar enseguida**: la llamada nueva conserva la palabra y el audio (15-S1, A1).
+   de colgar, cambiar de equipo y cerrar la pestaña (fila 6), **colgar —o cambiar de
+   equipo— y volver enseguida**: la llamada nueva conserva la palabra y el audio (A1).
    La fila 7 es la vuelta atrás si algo falla.
 5. **Las salidas del videoportero** (§8.4.2): descubrir, nombrar y abrir cada una, < 3 s.
 6. **Puerta libre y bloqueada** (§8.4.3), con el administrador del conjunto delante.
