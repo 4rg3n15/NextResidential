@@ -59,6 +59,7 @@ import { AccionadorPorProveedor } from './infraestructura/accionador-por-proveed
 import { BitacoraDeOrdenesPg } from './infraestructura/bitacora-de-ordenes-pg';
 import { Pool } from 'pg';
 import { CanalIntercomConTransporte } from './infraestructura/canal-intercom-con-transporte';
+import { CanalConSesiones } from './aplicacion/sesiones-de-audio';
 import { anunciarAccionador } from './infraestructura/aviso-de-arranque-del-accionador';
 import { REGISTRO_DE_CONVERSACIONES } from './aplicacion/conversacion-de-audio';
 import { ConversacionesEnMemoria, ConversacionesPg } from './infraestructura/conversaciones-pg';
@@ -211,12 +212,8 @@ export class GuardiaModule {
         },
         {
           /**
-           * A1 · el canal de intercom reparte turnos EN PROCESO (la máquina de
-           * estados del dominio) y, cuando concede uno, abre el canal del
-           * aparato por `INTERCOM_PROVIDER`. El transporte lo decide la
-           * capacidad `audioBidireccional` del equipo, no la clase del
-           * proveedor (ADR-019): el simulado con un identificador que no
-           * conoce sigue repartiendo turnos sin audio, y lo dice.
+           * A1 · turnos EN PROCESO y, al conceder uno, el canal del aparato si su capacidad lo
+           * declara (ADR-019). 15-S1 · por fuera, las sesiones: cada conversación suelta la suya.
            */
           provide: CANAL_DE_INTERCOM,
           inject: [RELOJ, PROVEEDOR_DE_EQUIPOS, BITACORA, CONFIGURACION],
@@ -226,11 +223,14 @@ export class GuardiaModule {
             bitacora: Bitacora,
             configuracion: Configuracion,
           ) =>
-            new CanalIntercomConTransporte(
-              new CanalIntercomEnProceso(reloj),
-              proveedor,
+            new CanalConSesiones(
+              new CanalIntercomConTransporte(
+                new CanalIntercomEnProceso(reloj),
+                proveedor,
+                bitacora,
+                configuracion.GUARDIA_AUDIO_TRANSPORTE,
+              ),
               bitacora,
-              configuracion.GUARDIA_AUDIO_TRANSPORTE,
             ),
         },
         /**
