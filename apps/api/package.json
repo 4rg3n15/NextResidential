@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "typecheck": "tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.pruebas.json",
     "lint": "eslint src test --max-warnings=0",
     "start": "node dist/main.js",
     "start:dev": "tsc -b tsconfig.json && node --watch --enable-source-maps dist/main.js",
