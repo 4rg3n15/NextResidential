@@ -15,8 +15,8 @@ import { join, relative } from 'node:path';
  * Las variables nuevas desde la 15-N y lo que piden EN SITIO (Mac directo):
  * `valor`, obligatoria con valor (el `.env.example` la trae así; sin ella la
  * API usa su omisión); `vacia`, puede ir vacía (Web Push y TURN no se prueban
- * en sitio); `netlify`, vacía en sitio; `nunca-vacia`, puede faltar, pero
- * vacía la consola no arranca.
+ * en sitio; la recuperación vacía es «sin la línea», DT-15S1-02); `netlify`,
+ * vacía en sitio.
  */
 export const VARIABLES_DESDE_LA_15N = {
   api: {
@@ -41,7 +41,7 @@ export const VARIABLES_DESDE_LA_15N = {
     API_ORIGEN_PUBLICO: 'netlify',
     CONSOLA_CABECERA_IP_DE_CONFIANZA: 'netlify',
     CONSOLA_IP_FIRMA_SECRETO: 'netlify',
-    RECUPERACION_POR_CORREO: 'nunca-vacia',
+    RECUPERACION_POR_CORREO: 'vacia',
   },
 };
 
@@ -58,11 +58,6 @@ const SI_FALTAN = {
     'basta la línea vacía (entorno:diff la reclama)',
   ],
   netlify: ['·', 'de Netlify, no están', 'en sitio, la línea vacía'],
-  'nunca-vacia': [
-    '·',
-    'pueden faltar, NUNCA vacías',
-    'sin la línea vale; si la pone, «desactivada»',
-  ],
 };
 
 /** Nombre → valor ya sin comillas ni comentario. El valor NUNCA sale de aquí. */
@@ -118,10 +113,11 @@ const bloqueos = (cual, e) => {
         'GUARDIA_AUDIO_TRANSPORTE no es websocket: mañana se prueba el audio por WebSocket (§8.4.1)',
       );
   } else {
-    const r = e.get('RECUPERACION_POR_CORREO');
-    if (r !== undefined && r !== 'activa' && r !== 'desactivada')
+    // Vacía es «sin la línea» (DT-15S1-02); otro valor que no sea de los dos, no.
+    const r = e.get('RECUPERACION_POR_CORREO') ?? '';
+    if (r !== '' && r !== 'activa' && r !== 'desactivada')
       b.push(
-        `RECUPERACION_POR_CORREO ${r === '' ? 'vacía' : 'con un valor no admitido'}: la consola NO arranca → «desactivada» o sin la línea`,
+        'RECUPERACION_POR_CORREO con un valor no admitido: la consola NO arranca → «desactivada», vacía o sin la línea',
       );
     const motivos = {
       API_ORIGEN_PUBLICO: 'el flujo y el audio irían directos a ese origen, no por la consola',
