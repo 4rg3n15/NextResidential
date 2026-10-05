@@ -521,11 +521,9 @@ describe('BovedaAesGcm · el vector no sale de la bóveda', () => {
     // Se altera un byte del cuerpo cifrado: sin GCM, la terminal habría
     // aceptado una plantilla que ya no es la del titular.
     const manipulado = Buffer.from(sobre);
-    manipulado[manipulado.length - 1] ^= 0xff;
-    await almacen.poner(COP, r.plantillaId, manipulado, {
-      llaveRef: 'env:BIOMETRIA_LLAVE',
-      algoritmo: 'AES-256-GCM',
-    });
+    const ultimo = manipulado.length - 1;
+    manipulado.writeUInt8(manipulado.readUInt8(ultimo) ^ 0xff, ultimo);
+    await almacen.poner(COP, r.plantillaId, manipulado);
 
     await expect(boveda.empujarATerminal(COP, r.plantillaId, 'disp-1')).rejects.toThrow();
     expect(terminal.recibidas).toEqual([]);
@@ -623,7 +621,10 @@ describe('H-13-02 · la bóveda deriva una llave por copropiedad', () => {
 
     // El mismo sobre, colocado bajo la otra copropiedad: es el escenario de un
     // almacén comprometido o de un error de enrutado entre tenants.
-    await almacenPropio.poner(`${COP_B}/p-1`, sobre as Buffer);
+    // DT-15S1-03 · antes `poner` recibía DOS argumentos para tres: el sobre nunca
+    // llegaba a B y el empuje fallaba por ausente, no por la llave. Con UNA sola
+    // llave para todas las copropiedades, esta prueba seguía en verde.
+    await almacenPropio.poner(COP_B, 'p-1', sobre as Buffer);
 
     await expect(bovedaPropia.empujarATerminal(COP_B, 'p-1', 'disp-1')).rejects.toThrow();
     expect(terminalPropia.recibidas).toHaveLength(0);
