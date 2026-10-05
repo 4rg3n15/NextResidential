@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": "../..",
+    "paths": {
+      "@ncr/domain-core": ["../../packages/domain-core/src/index.ts"],
+      "@ncr/providers": ["../../packages/providers/src/index.ts"],
+      "@ncr/contracts": ["../../packages/contracts/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.test.ts", "test/**/*.ts"],
+  "exclude": []
+}

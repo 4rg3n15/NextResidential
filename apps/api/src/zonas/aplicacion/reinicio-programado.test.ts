@@ -27,9 +27,12 @@ const repositorio = (zonas: readonly ZonaFalsa[]) => {
     porId: async () => null,
     listar: async () => zonas as unknown as readonly Zona[],
     guardar: async () => undefined,
-    ocupar: async () => ({ tipo: 'fallo' }) as ResultadoOcupacion,
+    ocupar: async (): Promise<ResultadoOcupacion> => ({ tipo: 'zona_no_encontrada' }),
     liberar: async () => 0,
     reiniciar: async (_c, zonaId, ahora) => void reinicios.push({ zonaId, ahora }),
+    desactivar: async () => false,
+    presentacionDe: async () => new Map(),
+    fijarIcono: async () => undefined,
   };
   return { repo, reinicios };
 };

@@ -231,7 +231,7 @@ describe('D-25 · el motor decide con el contexto de la base (tabla 9.1)', () =>
     if (!disponible) return;
     const dudosa = await decidir(COP_A, PLACA_RESIDENTE, 0.5);
     expect(dudosa.permitido).toBe(true);
-    expect(dudosa.requiereConfirmacionHumana).toBe(true);
+    expect(dudosa.permitido && dudosa.requiereConfirmacionHumana).toBe(true);
     const inservible = await decidir(COP_A, PLACA_RESIDENTE, 0.2);
     expect(motivoDe(inservible)).toBe('CONFIANZA_INSUFICIENTE');
   });

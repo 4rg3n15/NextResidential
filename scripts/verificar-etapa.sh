@@ -200,7 +200,17 @@ fi
 
 paso "4 · lint y typecheck"
 con_limite "$LIMITE_MEDIO" pnpm lint      >/dev/null 2>&1 && ok "pnpm lint"      || mal "pnpm lint"
-con_limite "$LIMITE_MEDIO" pnpm typecheck >/dev/null 2>&1 && ok "pnpm typecheck" || mal "pnpm typecheck"
+# DT-15S1-03 · `typecheck` de `@ncr/api` compila también sus PRUEBAS
+# (`apps/api/tsconfig.pruebas.json`). Hasta la 15-S1 sólo las veía SWC, que no
+# comprueba tipos: un doble que no cumplía su puerto, o una prueba que llamaba
+# con dos argumentos a un método de tres, pasaba en verde —y la de H-13-02 lo
+# hizo desde la 15-E sin probar nada—. Si falla, se dice dónde (D-100).
+if salida_tipos=$(con_limite "$LIMITE_MEDIO" pnpm typecheck 2>&1); then
+  ok "pnpm typecheck (con las pruebas de la API)"
+else
+  mal "pnpm typecheck"
+  echo "$salida_tipos" | grep -E "error TS[0-9]+" | head -12 | sed 's/^/     /'
+fi
 
 paso "5 · suite completa"
 salida_pruebas="$(mktemp)"

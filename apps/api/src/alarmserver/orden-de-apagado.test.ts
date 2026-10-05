@@ -50,6 +50,7 @@ const montarYApagar = async () => {
     arrancar: async () => undefined,
     detener: detenerPlanificador,
     programados: [],
+    estado: () => ({ fase: 'inerte' }),
   };
 
   @Global()

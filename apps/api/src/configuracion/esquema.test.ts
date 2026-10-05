@@ -104,7 +104,7 @@ describe('configuración (DoD ETAPA 02: sin .env completo no arranca)', () => {
 
 describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)', () => {
   it('sin BIOMETRIA_LLAVE la aplicación no arranca', () => {
-    const sinLlave: Record<string, unknown> = { ...completo };
+    const sinLlave: NodeJS.ProcessEnv = { ...completo };
     delete sinLlave.BIOMETRIA_LLAVE;
     expect(() => cargarConfiguracion(sinLlave)).toThrow();
   });
@@ -114,7 +114,7 @@ describe('biometría · la llave de cifrado es requisito de arranque (ETAPA 08)'
   });
 
   it('sin EQUIPOS_LLAVE la aplicación tampoco arranca (A.1)', () => {
-    const sinLlave = { ...completo };
+    const sinLlave: NodeJS.ProcessEnv = { ...completo };
     delete sinLlave.EQUIPOS_LLAVE;
     expect(() => cargarConfiguracion(sinLlave)).toThrow();
     // Y corta no vale: una llave de 12 caracteres es una llave de mentira.

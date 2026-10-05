@@ -71,7 +71,7 @@ describe('AccionadorPorProveedor · salida elegida', () => {
   it('un error del proveedor baja como rechazada; uno no aceptado, como sin respuesta', async () => {
     const falla = proveedor({
       abrirSalida: vi.fn(async () => {
-        throw new EquipoInalcanzable(DISPOSITIVO, 'red', 3000);
+        throw new EquipoInalcanzable('red', 3000);
       }),
     });
     const r1 = await new AccionadorPorProveedor(falla, 'h', bitacora(), null).accionar(

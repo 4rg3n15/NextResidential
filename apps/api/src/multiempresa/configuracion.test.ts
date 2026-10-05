@@ -14,7 +14,17 @@ import type { ConfiguracionDeCopropiedad } from './configuracion';
 
 const ACTUAL: ConfiguracionDeCopropiedad = {
   nombre: 'Villas del Bosque',
+  direccion: 'Calle 1 # 2-3',
+  tipo: 'casas',
+  etiquetaVivienda: 'Casa',
+  etiquetaAgrupacion: 'Manzana',
   zonaHoraria: 'America/Bogota',
+  codigoCorto: null,
+  telefonoPorteria: null,
+  topeVehiculosPropios: 2,
+  ipsPorteria: [],
+  ipsGuardiaRemota: [],
+  aprobacionDeTerceros: 'automatica',
   umbralConfianzaPlaca: 0.85,
   politicaContingenciaEdge: 'denegar',
   umbralLatidoMinutos: 5,

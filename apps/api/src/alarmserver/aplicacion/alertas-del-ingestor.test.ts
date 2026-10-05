@@ -26,8 +26,13 @@ const base: EventoDeEquipo = {
   referenciaDelEquipo: 'ref-1',
   quienAbrio: null,
   tipoDePlaca: null,
+  colorDePlaca: null,
   pais: null,
   carril: null,
+  sentido: null,
+  tipoDeVehiculo: null,
+  tipoDeDeteccion: null,
+  recuadro: null,
   personaId: null,
   serieDelEquipo: null,
   esperaVeredicto: false,
@@ -37,7 +42,7 @@ const base: EventoDeEquipo = {
   origenDeLlamada: null,
   unidadDeLlamada: null,
   edificioDeLlamada: null,
-  tipo: 'placa',
+  tipo: 'lectura_de_placa',
   titulo: 'Placa leída',
   codigo: null,
   horaDelEquipo: null,
@@ -48,7 +53,8 @@ const publicacion = (extra: Partial<EventoDeEquipo> = {}): PublicacionDeEquipo =
   evento: { ...base, ...extra },
   foto: null,
   recorte: null,
-  transporte: 'alarm-server',
+  // El Alarm Server publica como `escucha` (`recepcion.ts`), no con su nombre.
+  transporte: 'escucha',
 });
 
 const montar = (opciones: { decideSolo?: boolean; conAlertas?: boolean } = {}) => {

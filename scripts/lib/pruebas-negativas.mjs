@@ -27,6 +27,7 @@ import {
   chmodSync,
   rmSync,
   readFileSync,
+  readdirSync,
   cpSync,
   symlinkSync,
 } from 'node:fs';
@@ -3418,6 +3419,146 @@ try {
     }
   }
 
+  console.log(
+    '\n▸ 41 · un error de tipos en una prueba de la API rompe `pnpm typecheck` (DT-15S1-03)',
+  );
+  {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * DT-15S1-03 · LAS PRUEBAS DE LA API NO SE COMPILABAN
+     *
+     * `apps/api/tsconfig.json` excluye `src/**\/*.test.ts` y no alcanza `test/`:
+     * las pruebas sólo pasaban por SWC, que transpila sin comprobar tipos. Al
+     * compilarlas salieron 52 errores, y dos pruebas huecas entre ellos: la de
+     * H-13-02, que desde la 15-E dejaba el sobre en una clave inexistente y
+     * seguía en verde con UNA llave para todas las copropiedades, y la de «el
+     * motivo no lleva la dirección», cuyo mensaje nunca la llevó.
+     *
+     * Ahora el `typecheck` de `@ncr/api` compila también `tsconfig.pruebas.json`.
+     * Aquí se le ve fallar: se devuelve el defecto que abrió la deuda —el doble
+     * `HogarEnMemoria` sin `darDeBaja`— y se mete un error en una prueba de
+     * `src/`. Y se vigila lo que lo dejaría ciego sin ponerse rojo: un
+     * `typecheck` que ya no las compila, una configuración menos estricta, o
+     * turbo sirviendo de su caché un verde viejo (H-15S1-C05).
+     *
+     * Por qué en un espejo y con `tsc -p`: el banco no tiene `node_modules`, y
+     * `tsc -b` necesitaría los `dist/` de los paquetes internos.
+     * `tsconfig.pruebas.json` los resuelve al FUENTE (`paths`), así que basta
+     * enlazar `node_modules`. Y con el `tsc` del repositorio, no el del PATH: en
+     * el contenedor de la nube hay un TypeScript 6 global que rechaza la
+     * configuración por otra razón, y la sonda concluiría sobre él.
+     * ════════════════════════════════════════════════════════════════════════
+     */
+    if (exigeControl('apps/api/tsconfig.pruebas.json')) {
+      const espejo = join(banco, 'tipos-de-las-pruebas');
+      cpSync(clon, espejo, { recursive: true, filter: (o) => o !== join(clon, '.git') });
+      const enlazar = (relativo) => {
+        const modulos = join(raiz, relativo, 'node_modules');
+        if (existsSync(modulos) && existsSync(join(espejo, relativo))) {
+          symlinkSync(modulos, join(espejo, relativo, 'node_modules'), 'dir');
+        }
+      };
+      enlazar('.');
+      for (const carpeta of ['apps', 'packages']) {
+        for (const paquete of readdirSync(join(raiz, carpeta))) enlazar(join(carpeta, paquete));
+      }
+      const TSC = join(raiz, 'node_modules', 'typescript', 'bin', 'tsc');
+      const tsc = (...args) =>
+        correr(process.execPath, [TSC, ...args], { cwd: espejo, timeout: 300_000 });
+      const compilar = () => tsc('-p', 'apps/api/tsconfig.pruebas.json');
+
+      const base = compilar();
+      base.codigo === 0
+        ? ok('la línea base compila: las pruebas de la API, sin un error de tipos')
+        : mal(`la línea base NO compila (codigo ${base.codigo}): ${base.salida.slice(0, 400)}`);
+
+      const guion =
+        JSON.parse(readFileSync(join(espejo, 'apps/api/package.json'), 'utf8')).scripts
+          ?.typecheck ?? '';
+      /\btsc -p tsconfig\.pruebas\.json\b/.test(guion)
+        ? ok('`typecheck` de @ncr/api compila las pruebas: `pnpm typecheck` (paso 4) las ve')
+        : mal(`\`typecheck\` de @ncr/api ya no compila las pruebas: «${guion}»`);
+
+      // Las opciones EFECTIVAS (`--showConfig` resuelve el `extends`).
+      const ESTRICTAS = [
+        'strict',
+        'noUncheckedIndexedAccess',
+        'exactOptionalPropertyTypes',
+        'noImplicitOverride',
+        'noFallthroughCasesInSwitch',
+        'noUnusedLocals',
+        'noUnusedParameters',
+      ];
+      const opciones = (tsconfig) => {
+        const r = tsc('-p', tsconfig, '--showConfig');
+        return r.codigo === 0 ? (JSON.parse(r.salida).compilerOptions ?? {}) : {};
+      };
+      const deLaApi = opciones('apps/api/tsconfig.json');
+      const relajadas = () => {
+        const deLasPruebas = opciones('apps/api/tsconfig.pruebas.json');
+        const menos = ESTRICTAS.filter((o) => deLaApi[o] !== true || deLasPruebas[o] !== true);
+        return deLasPruebas.noEmit === true ? menos : [...menos, 'noEmit'];
+      };
+      relajadas().length === 0
+        ? ok('con las mismas opciones estrictas que la API, y sin emitir')
+        : mal(`las pruebas se compilan con menos rigor: ${relajadas().join(', ')}`);
+      // Y esa comprobación, vista fallar: un `false` heredado no pasa.
+      const rutaConfig = join(espejo, 'apps/api/tsconfig.pruebas.json');
+      const config = readFileSync(rutaConfig, 'utf8');
+      const floja = JSON.parse(config);
+      floja.compilerOptions.exactOptionalPropertyTypes = false;
+      writeFileSync(rutaConfig, JSON.stringify(floja));
+      relajadas().includes('exactOptionalPropertyTypes')
+        ? ok('una configuración de pruebas relajada se nombra')
+        : mal('relajar `exactOptionalPropertyTypes` en las pruebas pasa inadvertido');
+      writeFileSync(rutaConfig, config);
+
+      // H-15S1-C05 · turbo calcula la caché con las entradas DEL PAQUETE, y estas
+      // pruebas leen también el Edge, la consola y los contratos: con caché, un
+      // error en `apps/edge/test` devolvía el verde de la corrida anterior.
+      const rutaTurbo = join(espejo, 'turbo.json');
+      const turbo = readFileSync(rutaTurbo, 'utf8');
+      const sinCache = () =>
+        JSON.parse(readFileSync(rutaTurbo, 'utf8')).tasks?.['@ncr/api#typecheck']?.cache === false;
+      sinCache()
+        ? ok('`typecheck` de @ncr/api no se sirve de la caché de turbo')
+        : mal(
+            '`typecheck` de @ncr/api se sirve de la caché de turbo: un verde viejo pasa por nuevo',
+          );
+      const conCache = JSON.parse(turbo);
+      delete conCache.tasks['@ncr/api#typecheck'];
+      writeFileSync(rutaTurbo, JSON.stringify(conCache));
+      sinCache()
+        ? mal('quitarle `cache: false` en turbo.json pasa inadvertido')
+        : ok('y quitarle `cache: false` se nombra');
+      writeFileSync(rutaTurbo, turbo);
+
+      const hogar = join(espejo, 'apps/api/test/dobles/hogar-en-memoria.ts');
+      const doble = readFileSync(hogar, 'utf8');
+      const sinBaja = doble.replace(/\n {2}async darDeBaja\([\s\S]*?\n {2}}\n/, '\n');
+      if (sinBaja === doble) {
+        mal('la sonda no encontró `darDeBaja` en el doble: no puede devolver el defecto');
+      } else {
+        writeFileSync(hogar, sinBaja);
+        const a = compilar();
+        a.codigo !== 0 && /hogar-en-memoria\.ts\(\d+,\d+\): error TS2420/.test(a.salida)
+          ? ok('el doble sin `darDeBaja` —el defecto de DT-15S1-03— rompe la compilación')
+          : mal(`el doble sin \`darDeBaja\` NO se detecta (codigo ${a.codigo})`);
+        writeFileSync(hogar, doble);
+      }
+
+      writeFileSync(
+        join(espejo, 'apps/api/src/sonda-de-tipos.test.ts'),
+        "export const n: number = 'no es un número';\n",
+      );
+      const b = compilar();
+      b.codigo !== 0 && /sonda-de-tipos\.test\.ts\(1,\d+\): error TS2322/.test(b.salida)
+        ? ok('un error de tipos en una prueba de `src/` se detecta, con su fichero')
+        : mal(`un error de tipos en \`src/**/*.test.ts\` NO se detecta (codigo ${b.codigo})`);
+      rmSync(espejo, { recursive: true, force: true });
+    }
+  }
+
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
   {
     // (a) EL ÍNDICE, no el árbol · H-13-20.
@@ -3616,6 +3757,6 @@ if (fallos > 0) {
   process.exit(1);
 }
 console.log(
-  '\nPRUEBAS NEGATIVAS: los 34 controles detectan su violación y aceptan el caso legítimo, ' +
+  '\nPRUEBAS NEGATIVAS: los 35 controles detectan su violación y aceptan el caso legítimo, ' +
     'sin tocar el árbol',
 );

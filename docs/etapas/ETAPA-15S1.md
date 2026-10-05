@@ -286,10 +286,11 @@ Antes de la corrida buena se volvió a preparar la base como en CI.
   consola rechazaba `RECUPERACION_POR_CORREO` vacía y salía con 78. Ahora vacía es
   «sin la línea», como las otras tres de Netlify —desactivada en producción, activa
   fuera—, y el ensayo de la víspera ya no la marca como «la consola NO arranca».
-- **DT-15S1-03 · `HogarEnMemoria` no cumple `CuentasDeResidentes`** (le falta
-  `darDeBaja`). Previa: sólo se ve compilando las pruebas, y las pruebas no se
-  compilan (`apps/api/tsconfig.json` las excluye). Vista al comprobar los tipos de las
-  pruebas nuevas; propuesta como tarea aparte.
+- **DT-15S1-03 · CERRADO por la corrección de la 15-S1**
+  ([`ETAPA-15S1-tipos-de-las-pruebas.md`](ETAPA-15S1-tipos-de-las-pruebas.md)). Era:
+  `HogarEnMemoria` no cumplía `CuentasDeResidentes` (le faltaba `darDeBaja`), oculto
+  porque las pruebas de la API no se compilaban. Ahora `typecheck` las compila con
+  las opciones estrictas del proyecto, y salieron 50 errores previos, no dos.
 - **DT-15M-C03 y DT-15M-C04 · CERRADAS** (`4e816ab`), con autorización expresa:
   ver «Lo incómodo», 6.
 - **H-15S1-02 · CORREGIDO** (`4e816ab`). «TODA ruta autenticada responde 403…»

@@ -180,6 +180,20 @@ artificial que se pagaría en cada descifrado.
 copropiedad ajena falla; con la propia llega a la terminal; el mismo vector
 produce cuerpos cifrados distintos en dos copropiedades.
 
+**Nota de la corrección DT-15S1-03 (2026-10-05) · la verificación estuvo
+hueca.** Entre la 15-E (`91fc03e`, 2026-09-25) y esa corrección, la primera de
+las tres pruebas no verificaba nada: llamaba al almacén en memoria con la firma
+de la ETAPA 13 —dos argumentos para tres—, el sobre nunca llegaba a la
+copropiedad ajena y el empuje fallaba porque no había sobre, no por la llave
+(H-15S1-C02). La tercera nunca distinguió las llaves: el vector de inicio es
+aleatorio y dos sobres del mismo vector difieren también con una sola
+(DT-15S1-C03). Comprobado por mutación: con UNA llave para todas las
+copropiedades, las tres seguían en verde; corregida la primera, cae con esa
+mutación. La derivación por copropiedad estuvo en su sitio en todas las
+versiones de esas fechas —revisadas una a una (`boveda-cifrada.ts` y
+`comun/cripto/sobre-aes-gcm.ts`)—: lo que faltó fue la prueba que la vigila, no
+el remedio. Detalle: `etapas/ETAPA-15S1-tipos-de-las-pruebas.md`.
+
 ---
 
 ### H-13-03 · Media · La aserción de ADR-005 no verificaba la capa que de verdad detiene al dueño · cierra D-08

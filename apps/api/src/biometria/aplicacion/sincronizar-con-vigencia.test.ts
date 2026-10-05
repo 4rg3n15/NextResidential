@@ -70,7 +70,8 @@ const montar = async (
   });
   const r = await capturar.ejecutar(ctx, {
     titularId: TITULAR,
-    autorizacionId,
+    // Sin autorización, el campo no va: la solicitud no admite `null`.
+    ...(autorizacionId === null ? {} : { autorizacionId }),
     medidas: { rostrosDetectados: 1, nitidez: 0.85, iluminacion: 0.6, proporcionRostro: 0.4 },
     vector: new Uint8Array([1, 2, 3, 4]),
     versionPolitica: 'v1.0',
@@ -78,6 +79,7 @@ const montar = async (
     suprimirEn: new Date(AHORA.getTime() + 8 * HORA),
   });
   if (!esExito(r) || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+  const { plantillaId } = r.valor;
   await new RespuestaDelTitular(consentimientos, plantillas, reloj).ejecutar(ctx, {
     consentimientoId: r.valor.consentimientoId,
     quienResponde: TITULAR,
@@ -90,8 +92,7 @@ const montar = async (
     reloj,
     vigencias,
   );
-  const ejecutar = () =>
-    sincronizar.ejecutar(ctx, { plantillaId: r.valor.plantillaId, dispositivoId: 'disp-1' });
+  const ejecutar = () => sincronizar.ejecutar(ctx, { plantillaId, dispositivoId: 'disp-1' });
   return { ejecutar, terminal };
 };
 

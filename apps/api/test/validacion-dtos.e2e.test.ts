@@ -34,7 +34,7 @@ describe('validación de DTOs activa en toda superficie con @Body()', () => {
     await app.close();
   });
 
-  const post = (ruta: string, cuerpo: unknown) =>
+  const post = (ruta: string, cuerpo: object) =>
     request(app.getHttpServer()).post(ruta).set('authorization', `Bearer ${admin}`).send(cuerpo);
 
   /**

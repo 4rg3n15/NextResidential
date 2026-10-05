@@ -46,7 +46,9 @@ describe('LectorDeSalidasPorProveedor', () => {
   it('el equipo no contesta: sin lectura, con un motivo sin dirección ni clave', async () => {
     const r = await new LectorDeSalidasPorProveedor({
       salidasDe: async () => {
-        throw new EquipoInalcanzable('vp', 'connect ECONNREFUSED portero.invalid:80', 3000);
+        // DT-15S1-03 · antes con TRES argumentos para dos: el mensaje era 'vp', no
+        // llevaba la dirección, y la aserción de abajo no podía fallar.
+        throw new EquipoInalcanzable('connect ECONNREFUSED portero.invalid:80', 3000);
       },
     }).leer('vp');
     expect(r.estado).toBe('sin_lectura');

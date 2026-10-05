@@ -104,7 +104,8 @@ const montar = (opciones: {
 }): Montaje => {
   const ejecutar = vi.fn(async () =>
     opciones.registroFalla === true
-      ? fallo(errorDominio('REFERENCIA_INVALIDA', 'referencia externa inadmisible'))
+      ? // El fallo tipado de `RegistrarAcceso` (`noSePudoRegistrar`): no hay otro código.
+        fallo(errorDominio('INVARIANTE_VIOLADA', 'referencia externa inadmisible', 'RN-02'))
       : exito({
           eventoId: 'ev-guardado',
           claveIdempotencia: 'clave',

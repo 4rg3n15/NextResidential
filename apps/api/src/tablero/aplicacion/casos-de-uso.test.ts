@@ -67,6 +67,8 @@ const equipo = (nombre: string, ultimoLatido: Date | null): DispositivoDelTabler
   firmware: 'v0.0.0-prueba',
   ultimoLatido,
   ultimaSincronizacion: null,
+  ultimoResultadoDeSincronizacion: null,
+  sincronizacionesFallidas: 0,
 });
 
 let repo: RepositorioDoble;

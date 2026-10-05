@@ -52,7 +52,12 @@ beforeAll(async () => {
   // El `MockProvider` rechaza un equipo que no conoce, que es exactamente lo
   // que hace un lector real. Se da de alta el que la suite usa como terminal
   // buena, y se deja otro sin dar de alta para probar el camino de fallo.
-  (app.get(FACE_TEMPLATE_PROVIDER) as MockProvider).dispositivos.add(TERMINAL);
+  // El simulado no tiene alta pública de equipos: se entra en su lista PRIVADA a
+  // propósito, y la conversión lo deja escrito en vez de esconderlo.
+  const simulado = app.get<MockProvider>(FACE_TEMPLATE_PROVIDER) as unknown as {
+    readonly dispositivos: Set<string>;
+  };
+  simulado.dispositivos.add(TERMINAL);
 });
 afterAll(async () => {
   await app?.close();

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AmbitoDelResidente, PerfilValido, VehiculoPropioValido } from '@ncr/domain-core';
 import { COP_A, COP_B } from '../constantes';
 import {
+  PERSONA_R1,
   USUARIO_R1,
   USUARIO_R2,
   USUARIO_RB,
@@ -13,6 +14,7 @@ import type {
   AltaDeVehiculo,
   AltaDelResidente,
   BitacoraDeResidentes,
+  CuentaDadaDeBaja,
   CuentaDeResidente,
   CuentasDeResidentes,
   EstadoDeAltaGuardado,
@@ -70,6 +72,9 @@ const VIVIENDA_DE: ReadonlyMap<string, string> = new Map([
   [USUARIO_R2, VIVIENDA_2],
   [USUARIO_RB, VIVIENDA_B],
 ]);
+
+/** La persona de cada cuenta, la misma que su vínculo en el directorio. */
+const PERSONA_DE: ReadonlyMap<string, string> = new Map([[USUARIO_R1, PERSONA_R1]]);
 
 export class HogarEnMemoria
   implements
@@ -240,22 +245,43 @@ export class HogarEnMemoria
   }
 
   // ── Bitácora y cuentas ────────────────────────────────────────────────────
+  private readonly cuentas = new Map<string, CuentaDeResidente[]>([
+    [
+      COP_A,
+      [
+        {
+          usuarioId: USUARIO_R1,
+          usuario: 'titular.uno',
+          nombre: 'Titular Uno',
+          vivienda: 'B · 42',
+          activa: true,
+          debeCambiarContrasena: false,
+          creadaEn: new Date(0).toISOString(),
+        },
+      ],
+    ],
+  ]);
+
   async anotar(h: HechoDeResidente): Promise<void> {
     this.bitacora.push(h);
   }
   async listar(copropiedadId: string): Promise<readonly CuentaDeResidente[]> {
-    return copropiedadId === COP_A
-      ? [
-          {
-            usuarioId: USUARIO_R1,
-            usuario: 'titular.uno',
-            nombre: 'Titular Uno',
-            vivienda: 'B · 42',
-            activa: true,
-            debeCambiarContrasena: false,
-            creadaEn: new Date(0).toISOString(),
-          },
-        ]
-      : [];
+    return this.cuentas.get(copropiedadId) ?? [];
+  }
+  /**
+   * C9 (15-M) · la baja con el contrato del adaptador: sólo una cuenta ACTIVA de
+   * ESA copropiedad (`null` si no la hay), que sigue en la lista «De baja»
+   * (RN-19). Lo que la base hace además —rol y vínculos inactivos en una
+   * transacción, constancia en `auditoria_seguridad`— lo prueba
+   * `baja-de-residente-pg.test.ts`. Faltaba (DT-15S1-03): quien llegara a la
+   * ruta por este doble se encontraba un `TypeError` y un 500, no la baja.
+   */
+  async darDeBaja(copropiedadId: string, usuarioId: string): Promise<CuentaDadaDeBaja | null> {
+    const cuentas = this.cuentas.get(copropiedadId) ?? [];
+    const i = cuentas.findIndex((c) => c.usuarioId === usuarioId && c.activa);
+    const cuenta = cuentas[i];
+    if (cuenta === undefined) return null;
+    cuentas[i] = { ...cuenta, activa: false };
+    return { usuarioId, personaId: PERSONA_DE.get(usuarioId) ?? null };
   }
 }

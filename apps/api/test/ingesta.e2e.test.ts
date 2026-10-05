@@ -28,7 +28,7 @@ describe('ingesta de eventos de hardware', () => {
     referenciaExterna: 'ev-000123',
   };
 
-  const enviar = (cuerpo: unknown, cabeceras: Record<string, string> = {}) =>
+  const enviar = (cuerpo: object, cabeceras: Record<string, string> = {}) =>
     request(app.getHttpServer()).post('/ingesta/eventos').set(cabeceras).send(cuerpo);
 
   const firmado = (cuerpo: object): Record<string, string> => {

@@ -344,24 +344,26 @@ describe('RechazarVisita · F2', () => {
       ejecutar: vi.fn(async () => exito({ suprimidas: 1, retiradas: 1, retiradasPendientes: 0 })),
     };
     const c = consulta({
-      fotoEnEquipos: vi.fn(async () => [
-        {
-          dispositivoId: 'd-1',
-          equipo: 'Terminal',
-          estado: 'suprimida',
-          detalle: null,
-          intentos: 1,
-          actualizadoEn: AHORA,
-        },
-        {
-          dispositivoId: 'd-2',
-          equipo: 'Portero',
-          estado: 'sincronizada',
-          detalle: null,
-          intentos: 1,
-          actualizadoEn: AHORA,
-        },
-      ]),
+      fotoEnEquipos: vi.fn(
+        async (): Promise<readonly FotoEnEquipo[]> => [
+          {
+            dispositivoId: 'd-1',
+            equipo: 'Terminal',
+            estado: 'suprimida',
+            detalle: null,
+            intentos: 1,
+            actualizadoEn: AHORA,
+          },
+          {
+            dispositivoId: 'd-2',
+            equipo: 'Portero',
+            estado: 'sincronizada',
+            detalle: null,
+            intentos: 1,
+            actualizadoEn: AHORA,
+          },
+        ],
+      ),
     });
     const aviso = { anulada: vi.fn(async () => 1) };
     const caso = new RechazarVisita(

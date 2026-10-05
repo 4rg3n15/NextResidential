@@ -73,6 +73,8 @@ const montar = (mundo: {
     porId: async () => null,
     vigentesDePersona: async () => [],
     activasParaLectura: async () => mundo.autorizaciones ?? [],
+    adjuntarFotografia: async () => false,
+    fotografiaDe: async () => null,
   };
   const listaNegra: RepositorioListaNegra = {
     crear: async () => undefined,
@@ -182,7 +184,7 @@ describe('el umbral y la confianza', () => {
     );
     const r = evaluarAcceso(contexto);
     expect(r.permitido).toBe(true);
-    expect(r.requiereConfirmacionHumana).toBe(true);
+    expect(r.permitido && r.requiereConfirmacionHumana).toBe(true);
   });
 
   it('y por debajo de la mitad del umbral es INSUFICIENTE', async () => {
