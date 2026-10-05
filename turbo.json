@@ -11,6 +11,7 @@
       "outputs": []
     },
     "typecheck": { "dependsOn": ["^build"] },
+    "@ncr/api#typecheck": { "dependsOn": ["^build"], "cache": false },
     "lint": {},
     "test": {
       "dependsOn": ["^build"],

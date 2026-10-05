@@ -3438,7 +3438,8 @@ try {
      * Aquí se le ve fallar: se devuelve el defecto que abrió la deuda —el doble
      * `HogarEnMemoria` sin `darDeBaja`— y se mete un error en una prueba de
      * `src/`. Y se vigila lo que lo dejaría ciego sin ponerse rojo: un
-     * `typecheck` que ya no las compila, o una configuración menos estricta.
+     * `typecheck` que ya no las compila, una configuración menos estricta, o
+     * turbo sirviendo de su caché un verde viejo (H-15S1-C04).
      *
      * Por qué en un espejo y con `tsc -p`: el banco no tiene `node_modules`, y
      * `tsc -b` necesitaría los `dist/` de los paquetes internos.
@@ -3511,6 +3512,26 @@ try {
         ? ok('una configuración de pruebas relajada se nombra')
         : mal('relajar `exactOptionalPropertyTypes` en las pruebas pasa inadvertido');
       writeFileSync(rutaConfig, config);
+
+      // H-15S1-C04 · turbo calcula la caché con las entradas DEL PAQUETE, y estas
+      // pruebas leen también el Edge, la consola y los contratos: con caché, un
+      // error en `apps/edge/test` devolvía el verde de la corrida anterior.
+      const rutaTurbo = join(espejo, 'turbo.json');
+      const turbo = readFileSync(rutaTurbo, 'utf8');
+      const sinCache = () =>
+        JSON.parse(readFileSync(rutaTurbo, 'utf8')).tasks?.['@ncr/api#typecheck']?.cache === false;
+      sinCache()
+        ? ok('`typecheck` de @ncr/api no se sirve de la caché de turbo')
+        : mal(
+            '`typecheck` de @ncr/api se sirve de la caché de turbo: un verde viejo pasa por nuevo',
+          );
+      const conCache = JSON.parse(turbo);
+      delete conCache.tasks['@ncr/api#typecheck'];
+      writeFileSync(rutaTurbo, JSON.stringify(conCache));
+      sinCache()
+        ? mal('quitarle `cache: false` en turbo.json pasa inadvertido')
+        : ok('y quitarle `cache: false` se nombra');
+      writeFileSync(rutaTurbo, turbo);
 
       const hogar = join(espejo, 'apps/api/test/dobles/hogar-en-memoria.ts');
       const doble = readFileSync(hogar, 'utf8');
