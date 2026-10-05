@@ -892,7 +892,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 ## Corrección `etapa-15s1-tipos-de-las-pruebas` — las pruebas de la API, compiladas (DT-15S1-03) · **CERRADA** · 2026-10-05
 
-**Rama:** `etapa-15s1-tipos-de-las-pruebas` · **Base:** `develop` (`369df17`, merge del PR #45), no la rama de la 15-S1: el defecto es previo y vive en `develop` · **PR:** sin abrir
+**Rama:** `etapa-15s1-tipos-de-las-pruebas` · **Base:** `develop` (`369df17`, merge del PR #45), no la rama de la 15-S1: el defecto es previo y vive en `develop` · **PR:** [4rg3n15/NextResidential#48](https://github.com/4rg3n15/NextResidential/pull/48), sin fusionar (abierto desde la interfaz contra `main`; redirigido a `develop`)
 **Informe:** [`etapas/ETAPA-15S1-tipos-de-las-pruebas.md`](etapas/ETAPA-15S1-tipos-de-las-pruebas.md)
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**

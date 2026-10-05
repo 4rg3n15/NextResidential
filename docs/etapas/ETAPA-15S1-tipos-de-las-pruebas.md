@@ -1,7 +1,7 @@
 # Corrección de la 15-S1 · Las pruebas de la API, compiladas (DT-15S1-03)
 
 **Rama:** `etapa-15s1-tipos-de-las-pruebas` · **Base:** `develop` (`369df17`, merge del PR #45), no la
-rama de la 15-S1: el defecto es previo y vive en `develop` · **PR:** sin abrir (el encargo no lo pide) ·
+rama de la 15-S1: el defecto es previo y vive en `develop` · **PR:** [4rg3n15/NextResidential#48](https://github.com/4rg3n15/NextResidential/pull/48), sin fusionar: la interfaz lo abrió contra `main` y se redirigió a `develop` (§2.5) ·
 **Fecha:** 2026-10-05 · **Cierra:** DT-15S1-03 · **Corrige, fuera del encargo:** H-15S1-C02 a
 H-15S1-C05 · **Abre:** DT-15S1-C02 a DT-15S1-C04
 
@@ -389,8 +389,9 @@ las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa y su arreglo propuest
 
 ## 9 · Qué debe hacer el usuario manualmente
 
-1. **Decidir si abro el PR** de `etapa-15s1-tipos-de-las-pruebas` hacia `develop`: el encargo no lo
-   pedía y no lo he abierto.
+1. **Revisar y fusionar el PR #48 contra `develop`, nunca contra `main`.** La interfaz lo abrió
+   contra `main`, con un título y una descripción autogenerados —501 commits y 2829 ficheros—; se
+   redirigió a `develop` (7 commits, 40 ficheros) y se reescribió.
 2. **Fusionar con la 15-S1 (PR #46) y con la corrección DT-15S1-02 (PR #47) en cualquier orden.**
    El código no choca y sus pruebas compilan con este control. `ESTADO_ETAPAS.md` chocará en la
    cabecera, en la fila de defectos abiertos y en el sitio donde entra cada ficha: se conservan todas
@@ -409,7 +410,7 @@ las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa y su arreglo propuest
 
 ## 10 · Rama y commits
 
-Rama `etapa-15s1-tipos-de-las-pruebas`, desde `develop` (`369df17`). El entorno proponía
+Rama `etapa-15s1-tipos-de-las-pruebas`, desde `develop` (`369df17`); PR [4rg3n15/NextResidential#48](https://github.com/4rg3n15/NextResidential/pull/48), contra `develop`. El entorno proponía
 `claude/dazzling-shannon-m48v3n`; desde el primer commit se trabajó en la rama con nombre de etapa
 (§2.5), como pidió el encargo.
 
