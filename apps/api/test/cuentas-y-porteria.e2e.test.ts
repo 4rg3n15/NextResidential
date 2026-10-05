@@ -546,7 +546,7 @@ describe('primer ingreso · cambio obligatorio impuesto en el servidor (ADR-023)
       if (res.status !== 403) abiertas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
     }
     expect(abiertas).toEqual([]);
-  });
+  }, 30_000); // 15-S1: una petición por ruta; 5 s no alcanzan con el runner de macOS cargado
 
   it('el cierre de sesión sí se admite con el cambio pendiente', async () => {
     const otro = await acceso(b, 'relevo.dia', INICIAL);
