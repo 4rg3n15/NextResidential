@@ -3439,7 +3439,7 @@ try {
      * `HogarEnMemoria` sin `darDeBaja`— y se mete un error en una prueba de
      * `src/`. Y se vigila lo que lo dejaría ciego sin ponerse rojo: un
      * `typecheck` que ya no las compila, una configuración menos estricta, o
-     * turbo sirviendo de su caché un verde viejo (H-15S1-C04).
+     * turbo sirviendo de su caché un verde viejo (H-15S1-C05).
      *
      * Por qué en un espejo y con `tsc -p`: el banco no tiene `node_modules`, y
      * `tsc -b` necesitaría los `dist/` de los paquetes internos.
@@ -3513,7 +3513,7 @@ try {
         : mal('relajar `exactOptionalPropertyTypes` en las pruebas pasa inadvertido');
       writeFileSync(rutaConfig, config);
 
-      // H-15S1-C04 · turbo calcula la caché con las entradas DEL PAQUETE, y estas
+      // H-15S1-C05 · turbo calcula la caché con las entradas DEL PAQUETE, y estas
       // pruebas leen también el Edge, la consola y los contratos: con caché, un
       // error en `apps/edge/test` devolvía el verde de la corrida anterior.
       const rutaTurbo = join(espejo, 'turbo.json');
