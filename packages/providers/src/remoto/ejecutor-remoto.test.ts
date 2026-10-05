@@ -146,7 +146,7 @@ describe('ejecutor del Edge y proveedor remoto (15-Q2)', () => {
     expect(m.enviados).toEqual([1, 2, 3]);
     m.fallar();
     await m.remoto.enviarAudioA('portero', new Uint8Array([4]));
-    await esperar();
+    await new Promise((r) => m.a.alRecibir((d) => String(d).includes('audio.fallo') && r(0))); // DT-15M-C04
     await expect(m.remoto.enviarAudioA('portero', new Uint8Array([5]))).rejects.toThrow(
       'rechazó el audio',
     );
