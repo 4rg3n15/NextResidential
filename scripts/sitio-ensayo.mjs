@@ -14,7 +14,9 @@
  * y dice OK/FALLO por paso, con la causa y la acción. Antes, las comprobaciones
  * del Mac —la API por el bucle local y POR LA IP DEL MAC (la del iPhone), el
  * puente de video, las migraciones— y las de la PLATAFORMA, que cuentan en el
- * veredicto: el proveedor de equipos (F3) y la conexión de pg-boss (C1).
+ * veredicto: el proveedor de equipos (F3) y la conexión de pg-boss (C1). 15-S1 ·
+ * y las de la víspera (`lib/vispera-de-sitio.mjs`): 0047–0054 una a una, las
+ * variables nuevas desde la 15-N y la consola de la guardia (micrófono).
  *
  *   pnpm sitio:ensayo                               # los equipos del .env
  *   pnpm sitio:ensayo -- --solo-lectura             # nada que mueva o escriba
@@ -56,10 +58,8 @@ import {
   verificacionesDeLaPlataforma,
 } from './lib/ensayo-plataforma.mjs';
 import { elegirEquipos, numero } from './lib/equipos-del-ensayo.mjs';
-import {
-  comprobacionesDeLaPlataforma,
-  comprobacionesDelMac,
-} from './lib/comprobaciones-del-mac.mjs';
+import { comprobacionesDeLaPlataforma } from './lib/comprobaciones-del-mac.mjs';
+import { comprobacionesDeLaVispera } from './lib/vispera-de-sitio.mjs';
 import { respaldar, restaurar } from './lib/respaldo-en-sitio.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -197,7 +197,7 @@ const principal = async () => {
     process.exit(fallos > 0 ? 1 : 0);
   }
 
-  if (!simulado) await comprobacionesDelMac({ pool, decir, raiz: RAIZ });
+  if (!simulado) await comprobacionesDeLaVispera({ pool, decir, raiz: RAIZ, rutaEnv });
   // F3 y C1 · cuentan en el veredicto, también en `--simulado` (su API simulada).
   const comprobaciones =
     sim === null

@@ -19,7 +19,7 @@ import {
 } from '../../aplicacion/conversacion-de-audio';
 import type { RegistroDeConversaciones } from '../../aplicacion/conversacion-de-audio';
 import { CANAL_DE_INTERCOM } from '../../aplicacion/puertos';
-import type { CanalDeIntercom } from '../../aplicacion/puertos';
+import type { CanalConSesiones } from '../../aplicacion/sesiones-de-audio';
 import { BilletesDeAudio } from './billetes-de-audio';
 import type { DatosDelBillete } from './billetes-de-audio';
 import { ipDeLaActualizacion } from './ip-de-la-actualizacion';
@@ -59,7 +59,7 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
   constructor(
     @Inject(HttpAdapterHost) private readonly anfitrion: HttpAdapterHost,
     @Inject(BilletesDeAudio) private readonly billetes: BilletesDeAudio,
-    @Inject(CANAL_DE_INTERCOM) private readonly canal: CanalDeIntercom,
+    @Inject(CANAL_DE_INTERCOM) private readonly canal: CanalConSesiones,
     @Inject(REGISTRO_DE_CONVERSACIONES) private readonly registro: RegistroDeConversaciones,
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(GENERADOR_DE_ID) private readonly ids: GeneradorDeId,
@@ -131,7 +131,7 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
     ws.on('pong', () => this.vivos.add(ws));
     const conversacion = new ConversacionDeAudio(
       {
-        canal: this.canal,
+        canal: this.canal.deLaConversacion(datos), // 15-S1 · A1: suelta sólo SU sesión
         registro: this.registro,
         reloj: this.reloj,
         ids: this.ids,
