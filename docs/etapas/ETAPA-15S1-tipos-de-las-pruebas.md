@@ -77,8 +77,8 @@ H-15S1-C05 · **Abre:** DT-15S1-C02 a DT-15S1-C04
    esta rama**: DT-15M-C03 (el audio de la guardia por WebSocket) en la primera y DT-15M-C01 (la
    instantánea del Edge) en la segunda, las dos intermitentes y registradas en la corrección de la
    15-M. La tercera, sobre el cierre, salió entera en verde. El verificador local que pide §2.8.0
-   salió correcto; el del CI no estará en verde de forma fiable hasta que se corrijan esas dos
-   deudas.
+   salió correcto. DT-15M-C03 la cerró después la 15-S1 (`4e816ab`, ya en `develop`); mientras no se
+   corrija DT-15M-C01, el verificador de macOS del CI no estará en verde de forma fiable.
 
 ---
 
@@ -342,7 +342,7 @@ repitieron la batería negativa, la coherencia de `ESTADO_ETAPAS.md` (paso 1b) y
 **Tres corridas del CI: dos rojas en macOS, cada una por una intermitente distinta y anterior, y una
 entera en verde sobre el cierre, que sólo añade documentación y dos comentarios.** No las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa
 y su arreglo propuesto en el informe de la 15-M, y mientras no se corrijan cualquier rama puede caer
-en ellas. Corregirlas no es de este encargo (§9).
+en ellas. Corregirlas no es de este encargo (§9); DT-15M-C03 la cerró después la 15-S1 (`4e816ab`).
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -394,20 +394,20 @@ en ellas. Corregirlas no es de este encargo (§9).
 1. **Revisar y fusionar el PR #48 contra `develop`, nunca contra `main`.** La interfaz lo abrió
    contra `main`, con un título y una descripción autogenerados —501 commits y 2829 ficheros—; se
    redirigió a `develop` (7 commits, 40 ficheros) y se reescribió.
-2. **Fusionar con la 15-S1 (PR #46) y con la corrección DT-15S1-02 (PR #47) en cualquier orden.**
-   El código no choca y sus pruebas compilan con este control. `ESTADO_ETAPAS.md` chocará en la
-   cabecera, en la fila de defectos abiertos y en el sitio donde entra cada ficha: se conservan todas
-   las fichas, la más reciente primero, y en la fila de defectos DT-15S1-03 queda **cerrado** —la de
-   la #47 la da por abierta—. El informe de la 15-S1 dejará DT-15S1-03 como abierta; la ficha de esta
-   corrección dice que se cerró aquí.
+2. **Las fusiones con la 15-S1 (PR #46) y con la corrección DT-15S1-02 (PR #47) ya están hechas.**
+   Las dos entraron en `develop`, y `develop` se fusionó en esta rama (`d12a7c7` y `ea727ff`). Sólo
+   chocó `ESTADO_ETAPAS.md`: se conservan todas las fichas, la más reciente primero, y en la fila de
+   defectos DT-15S1-03 queda **cerrado**. La segunda fusión, resuelta en la web, había conservado los
+   dos lados del choque —dos cabeceras—; `eb5a8d7` deja una. El informe de la 15-S1 lo marca cerrado, con enlace aquí,
+   y sus pruebas compilan con este control.
 3. **Decidir DT-15S1-C02 a C04.** La más barata y útil es C02: la misma receta en proveedores, con
    tres arreglos de tipos.
 4. **Saber que `pnpm typecheck` tarda unos 20 s más en local:** es el precio de H-15S1-C05, y es
    deliberado.
 5. **Saber que el verificador de macOS del CI cayó en dos de las tres corridas de esta rama**, por
-   DT-15M-C03 y DT-15M-C01, previas y ajenas; sobre el cierre salió en verde. Si hace falta el CI en
-   verde para fusionar, la salida es corregir esas dos deudas en su propia corrección —sus arreglos
-   están propuestos en el §8 de la 15-M—, no reintentar hasta que pase.
+   DT-15M-C03 y DT-15M-C01, previas y ajenas; sobre el cierre salió en verde. DT-15M-C03 ya la cerró
+   la 15-S1 (`4e816ab`). Para un CI de macOS fiable falta DT-15M-C01, en su propia corrección —su
+   arreglo está propuesto en el §8 de la 15-M—, no reintentar hasta que pase.
 6. **Nada más para que esto funcione:** ni variables nuevas, ni migraciones, ni dependencias.
 
 ## 10 · Rama y commits
