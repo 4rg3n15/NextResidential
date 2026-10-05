@@ -42,6 +42,9 @@ export const USUARIO_R2 = '30000000-0000-4000-8000-000000000002';
 export const USUARIO_RB = '30000000-0000-4000-8000-0000000000b1';
 export const USUARIO_SIN_VIVIENDA = '30000000-0000-4000-8000-00000000ffff';
 
+/** La persona de R1: la de su vínculo aquí y la que devuelve su baja en `HogarEnMemoria`. */
+export const PERSONA_R1 = '80000000-0000-4000-8000-000000000001';
+
 /**
  * Marcas que NUNCA deben aparecer en la respuesta del vecino.
  *
@@ -225,7 +228,7 @@ const VINCULOS: ReadonlyMap<string, VinculoDeResidente> = new Map([
       copropiedadId: COP_A,
       viviendaId: VIVIENDA_1,
       residenteId: '40000000-0000-4000-8000-000000000001',
-      personaId: '80000000-0000-4000-8000-000000000001',
+      personaId: PERSONA_R1,
       esTitular: true,
       nivelAcceso: 'completo',
       permiteAutorizar: true,
