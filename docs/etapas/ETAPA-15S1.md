@@ -248,9 +248,11 @@ Antes de la corrida buena se volvió a preparar la base como en CI.
   volviera a llamar, la conversación del billete viejo tomaría la sesión nueva.
   Exige dos órdenes HTTP completas dentro de un viaje de red: no se alcanza a mano.
   Atarla al billete toca `billetes-de-audio.ts` y `audio.controller.ts`.
-- **DT-15S1-02 · la consola rechaza `RECUPERACION_POR_CORREO` vacía.** El arreglo de
-  raíz —vacía = ausente, como las otras tres de Netlify— es una línea en
-  `configuracion-de-despliegue.ts`, con su prueba: para la 15-S.
+- **DT-15S1-02 · CERRADO por la corrección de la 15-S1**
+  ([`ETAPA-15S1-recuperacion-vacia.md`](ETAPA-15S1-recuperacion-vacia.md)). Era: la
+  consola rechazaba `RECUPERACION_POR_CORREO` vacía y salía con 78. Ahora vacía es
+  «sin la línea», como las otras tres de Netlify —desactivada en producción, activa
+  fuera—, y el ensayo de la víspera ya no la marca como «la consola NO arranca».
 - **DT-15S1-03 · `HogarEnMemoria` no cumple `CuentasDeResidentes`** (le falta
   `darDeBaja`). Previa: sólo se ve compilando las pruebas, y las pruebas no se
   compilan (`apps/api/tsconfig.json` las excluye). Vista al comprobar los tipos de las

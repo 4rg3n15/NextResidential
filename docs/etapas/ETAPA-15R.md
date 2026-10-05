@@ -365,6 +365,13 @@ El resto de la corrida 2 —estabilidad incluida— ya estaba verde.
 6. **`RECUPERACION_POR_CORREO` vacía en producción** (AR-04): el
    restablecimiento lo hace una persona —el superadministrador desde la consola;
    el administrador, sólo a residentes y sólo por la API (DT-15R-06)—.
+
+   > **Corrección DT-15S1-02 · 2026-10-05.** Hasta esa corrección, este paso al
+   > pie de la letra dejaba sin consola el despliegue: la consola rechazaba la
+   > línea vacía y salía con código 78 (H-15S1-01). Desde
+   > [`ETAPA-15S1-recuperacion-vacia.md`](ETAPA-15S1-recuperacion-vacia.md), vacía
+   > es «sin la línea» —desactivada en producción— y el paso es cierto tal cual.
+
 7. **Cuando quiera video desde fuera del conjunto**, desplegar coturn según
    `COTURN.md` y llenar las variables `WEBRTC_*`.
 8. **En la próxima visita**: la prueba §8.4.3 de la puerta libre y bloqueada.
