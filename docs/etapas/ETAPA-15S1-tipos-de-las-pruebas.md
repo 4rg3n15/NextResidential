@@ -73,11 +73,12 @@ H-15S1-C05 · **Abre:** DT-15S1-C02 a DT-15S1-C04
    conecta como superusuario, que omite la RLS. Ahora lleva `SERVICIO_POR_COPROPIEDAD`, como
    `padron.module.ts`.
 
-9. **El CI de macOS salió rojo en las dos corridas de esta rama, y no por esta rama**: DT-15M-C03
-   (el audio de la guardia por WebSocket) en la primera y DT-15M-C01 (la instantánea del Edge) en
-   la segunda, las dos intermitentes y registradas en la corrección de la 15-M. El verificador
-   local que pide §2.8.0 salió correcto; el del CI no estará en verde de forma fiable hasta que se
-   corrijan esas dos deudas.
+9. **El verificador de macOS del CI salió rojo en dos de las tres corridas de esta rama, y no por
+   esta rama**: DT-15M-C03 (el audio de la guardia por WebSocket) en la primera y DT-15M-C01 (la
+   instantánea del Edge) en la segunda, las dos intermitentes y registradas en la corrección de la
+   15-M. La tercera, sobre el cierre, salió entera en verde. El verificador local que pide §2.8.0
+   salió correcto; el del CI no estará en verde de forma fiable hasta que se corrijan esas dos
+   deudas.
 
 ---
 
@@ -336,11 +337,12 @@ repitieron la batería negativa, la coherencia de `ESTADO_ETAPAS.md` (paso 1b) y
   COP_A: la prueba nueva de la baja corre sin base, y de las suites contra la base sólo cambia en
   ejecución `padron-superadmin`, que escribe viviendas y residentes —no reglas— igual que antes,
   ahora con los claims de producción.
+- **`e4d3262` (corrida 479, el cierre):** todo en verde, el verificador de macOS incluido.
 
-**Dos corridas del CI, dos rojas en macOS, cada una por una intermitente distinta y anterior.** No
-las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa y su arreglo propuesto en el informe de la
-15-M, y mientras no se corrijan cualquier rama puede caer en ellas. Corregirlas no es de este encargo
-(§9).
+**Tres corridas del CI: dos rojas en macOS, cada una por una intermitente distinta y anterior, y una
+entera en verde sobre el cierre, que sólo añade documentación y dos comentarios.** No las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa
+y su arreglo propuesto en el informe de la 15-M, y mientras no se corrijan cualquier rama puede caer
+en ellas. Corregirlas no es de este encargo (§9).
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -402,8 +404,8 @@ las llamo ruido: son DT-15M-C03 y DT-15M-C01, con su causa y su arreglo propuest
    tres arreglos de tipos.
 4. **Saber que `pnpm typecheck` tarda unos 20 s más en local:** es el precio de H-15S1-C05, y es
    deliberado.
-5. **Saber que el verificador de macOS del CI cayó en las dos corridas de esta rama**, por
-   DT-15M-C03 y DT-15M-C01, previas y ajenas; el commit de cierre lanza otra. Si hace falta el CI en
+5. **Saber que el verificador de macOS del CI cayó en dos de las tres corridas de esta rama**, por
+   DT-15M-C03 y DT-15M-C01, previas y ajenas; sobre el cierre salió en verde. Si hace falta el CI en
    verde para fusionar, la salida es corregir esas dos deudas en su propia corrección —sus arreglos
    están propuestos en el §8 de la 15-M—, no reintentar hasta que pase.
 6. **Nada más para que esto funcione:** ni variables nuevas, ni migraciones, ni dependencias.
