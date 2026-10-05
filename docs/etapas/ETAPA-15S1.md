@@ -1,9 +1,10 @@
 # Ronda 15-S1 · Víspera de sitio: el turno de audio por sesión, la víspera en el ensayo y la guía de mañana
 
 **Rama:** `etapa-15s1-vispera-de-sitio` · **Base:** `develop` (`369df17`, merge del PR #45) ·
-**PR:** [4rg3n15/NextResidential#46](https://github.com/4rg3n15/NextResidential/pull/46), hacia `develop`, sin fusionar · **Fecha:** 2026-10-04 ·
+**PR:** [4rg3n15/NextResidential#46](https://github.com/4rg3n15/NextResidential/pull/46), hacia `develop`, sin fusionar · **Fecha:** 2026-10-04 (los arreglos del CI, 2026-10-05) ·
 **Cierra:** A1 (la carrera del turno de audio de la 15-P) · **Corrige, fuera del encargo:**
-H-15S1-01 · **Abre:** DT-15S1-01 a DT-15S1-03
+H-15S1-01 y, con autorización expresa del usuario, las tres intermitentes que tumbaron el CI
+del PR: DT-15M-C03, DT-15M-C04 y H-15S1-02 · **Abre:** DT-15S1-01 a DT-15S1-04
 
 > **Esta ronda NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Nada de lo nuevo se ha ejercido contra el DS-KD9633: A1 se prueba contra el
@@ -49,6 +50,18 @@ H-15S1-01 · **Abre:** DT-15S1-01 a DT-15S1-03
    `c419d3a`, antes de empujar). Y la prueba de A2 usaba una IP privada, que el
    control KPI-11 prohíbe fuera de `packages/providers`: lo cazó CI en las pruebas
    negativas (`4896908`, ahora de documentación, RFC 5737).
+6. **El CI del PR cayó dos veces en el verificador de macOS, por tres pruebas
+   intermitentes previas a esta ronda**, y se arreglaron aquí con autorización
+   expresa del usuario, como excepción a dos reglas de la ronda (las
+   intermitentes, después de la visita; ningún fichero existente crece). Sobre
+   `acebd40`, DT-15M-C03 (paso 5) y DT-15M-C04 (paso 14, corrida 1 de 3); en el
+   relanzamiento, una tercera, H-15S1-02: «TODA ruta autenticada responde 403…»
+   pasó de los 5 s por omisión (5206 ms). Causa común: el paso 5 satura el runner
+   de macOS y caen las pruebas con un presupuesto de tiempo fijo. `4e816ab` toca
+   tres ficheros de prueba, **+2 líneas y ninguna aserción**, y cada arreglo se vio
+   fallar antes con su mecanismo. Se anunció +1: la espera de C03 hacía falta
+   también al final de «segundo operador», y el videoportero simulado lento lo
+   demostró. Quedan pruebas cerca del límite (DT-15S1-04).
 
 ## 1 · Qué se construyó
 
@@ -133,6 +146,9 @@ orden de las pruebas de mañana y lo que no se puede probar en sitio, y por qué
 | `scripts/sitio-ensayo.mjs`                                   | Llama a la víspera; su cabecera lo dice (300 → 300)                          |
 | `apps/web/.env.example`                                      | H-15S1-01: `RECUPERACION_POR_CORREO=desactivada` (52 → 52)                   |
 | `docs/guias/ENTREGA_EN_SITIO.md`                             | §0 la víspera, §2 la fila nueva, §4 bis el orden de mañana (539 → 587)       |
+| `apps/api/test/audio-guardia-ws.e2e.test.ts`                 | DT-15M-C03: dos pruebas esperan a que el equipo suelte la sesión (+2)        |
+| `packages/providers/src/remoto/ejecutor-remoto.test.ts`      | DT-15M-C04: espera el aviso `audio.fallo`, no 15 ms fijos (+0)               |
+| `apps/api/test/cuentas-y-porteria.e2e.test.ts`               | H-15S1-02: plazo propio de 30 s para «TODA ruta autenticada» (+0)            |
 | `docs/etapas/ETAPA-15S1.md`, `docs/ESTADO_ETAPAS.md`         | Este informe y su ficha                                                      |
 
 ## 4 · Tabla SOLID
@@ -184,15 +200,24 @@ seis del puerto, como todo adaptador de `CanalDeIntercom` (S-190), y
   las ocho presentes, inventadas ausentes y una tabla con una columna inexistente.
 - **Corrida de humo** de `pnpm sitio:ensayo -- --solo-lectura` con un `.env`
   desechable fuera del repositorio: el bloque «La víspera» con sus ✗ y ningún valor.
+- **Las tres intermitentes, cada una vista fallar antes de arreglarla.**
+  DT-15M-C04 sin espera falla 3 de 3 con «promise resolved "undefined" instead of
+  rejecting», como en CI; arreglada, 15 de 15 con los cuatro núcleos al 100 %.
+  DT-15M-C03, con el videoportero simulado cerrando 300 ms tarde (cambio temporal,
+  no se sube): la prueba anterior falla 3 de 3 con «el WebSocket no abrió», como en
+  CI, y la arreglada pasa 3 de 3; las dos de audio por WebSocket, 5 veces con
+  carga, 30 de 30. H-15S1-02 tarda 0,73 s con los núcleos al 100 %, frente a los
+  5,2 s del paso 5 de macOS: los 30 s de plazo dejan casi seis veces la peor cifra.
 
 Cómo ejecutarlas: `pnpm --filter @ncr/api exec vitest run test/audio-guardia-sesion.e2e.test.ts test/vispera-de-sitio.test.ts test/vispera-variables.test.ts src/guardia`;
 todo, con `./scripts/verificar-etapa.sh --con-base`.
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-Corrida sobre `7e4a6df`, desde un árbol limpio de artefactos, con la base
-preparada como en CI (`./supabase/verificar.sh --con-pruebas --modo-supabase`),
-Flutter 3.47.4 y el Chromium del entorno (`NCR_CHROMIUM`):
+Corrida sobre `4e816ab` —la cabeza con los arreglos de las tres intermitentes—,
+desde un árbol limpio de artefactos, con la base preparada como en CI
+(`./supabase/verificar.sh --con-pruebas --modo-supabase`), Flutter 3.47.4 y el
+Chromium del entorno (`NCR_CHROMIUM`):
 
 ```
 VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
@@ -204,8 +229,10 @@ proveedores 1231, consola 783, dominio 438, Edge 325, configuración 144) —21 
 que `develop`, todas de esta ronda— y **367 de Dart**, tres corridas forzadas
 idénticas; ninguna omisión por falta de base (44 ficheros con su guardián); el
 ensayo de sitio contra los equipos simulados, «SIN FALLOS · 47 OK»; los 34
-controles detectan su violación; escaneo de secretos limpio (6832 blobs del
-historial).
+controles detectan su violación; escaneo de secretos limpio (6838 blobs del
+historial). Cifras y cobertura, las mismas que sobre `7e4a6df`: los arreglos
+sólo cambian cuándo esperan tres pruebas. Sobre `4e816ab`, los cuatro trabajos
+del CI en verde, también el verificador de macOS.
 
 ### Cobertura por capa
 
@@ -223,6 +250,12 @@ historial).
    habría salido FALLIDA en el paso 9. Corregido en `4896908`.
 2. **Sobre `4896908`, interrumpida en el paso 5** a propósito, para cerrar la
    segunda entrada de la carrera de A1 (`7e4a6df`).
+3. **Sobre `7e4a6df`, correcta**, con las mismas cifras: el veredicto del primer
+   cierre (`acebd40`).
+4. **El CI sobre `acebd40`, FALLIDO dos veces** en el verificador de macOS
+   (`verificar-etapa.sh --con-base (macos)`): DT-15M-C03 y DT-15M-C04 en el
+   primer intento, H-15S1-02 en el relanzamiento; los otros tres trabajos, en
+   verde («Lo incómodo», 6).
 
 Antes de la corrida buena se volvió a preparar la base como en CI.
 
@@ -257,6 +290,16 @@ Antes de la corrida buena se volvió a preparar la base como en CI.
   `darDeBaja`). Previa: sólo se ve compilando las pruebas, y las pruebas no se
   compilan (`apps/api/tsconfig.json` las excluye). Vista al comprobar los tipos de las
   pruebas nuevas; propuesta como tarea aparte.
+- **DT-15M-C03 y DT-15M-C04 · CERRADAS** (`4e816ab`), con autorización expresa:
+  ver «Lo incómodo», 6.
+- **H-15S1-02 · CORREGIDO** (`4e816ab`). «TODA ruta autenticada responde 403…»
+  hace una petición por ruta —unas 180— con el plazo por omisión de 5 s: 0,4 s
+  aislada en local, 5,2 s en el paso 5 de macOS. Tiene ahora el suyo, 30 s.
+- **DT-15S1-04 · el paso 5 satura el runner de macOS.** Las pruebas con un
+  presupuesto de tiempo fijo caen de vez en cuando: se arreglaron las tres que
+  cayeron, no las que aún no. `[Probable]` hay más cerca del límite: varias de la
+  consola pasan de 1 s en local con carga. Para después de la visita: limitar la
+  concurrencia del paso 5 en macOS, o revisar los presupuestos fijos.
 - **Las sesiones viven en el proceso**, como los turnos (D-69).
 - **Supuestos y contradicciones:** ninguno nuevo.
 
@@ -278,12 +321,14 @@ Antes de la corrida buena se volvió a preparar la base como en CI.
 
 Rama `etapa-15s1-vispera-de-sitio`, desde `develop` (`369df17`).
 
-| Commit    | Qué                                                                                     |
-| --------- | --------------------------------------------------------------------------------------- |
-| `7260b49` | A1 · el turno de audio se suelta por sesión; la prueba de la carrera                    |
-| `c6bbca7` | A2 · la víspera en `sitio:ensayo`; H-15S1-01 en el `.env.example`                       |
-| `c419d3a` | A2 · partida en dos módulos de menos de 300 líneas                                      |
-| `9e7c8e5` | A3 · `ENTREGA_EN_SITIO.md` al día para mañana                                           |
-| `4896908` | La IP de mentira de las pruebas de A2, de documentación (KPI-11, cazado en CI)          |
-| `7e4a6df` | A1 · la conversación TOMA la sesión: cambiar de equipo y volver tampoco pierde el turno |
-| _cierre_  | Este informe y la ficha de `ESTADO_ETAPAS.md`, con el veredicto                         |
+| Commit     | Qué                                                                                     |
+| ---------- | --------------------------------------------------------------------------------------- |
+| `7260b49`  | A1 · el turno de audio se suelta por sesión; la prueba de la carrera                    |
+| `c6bbca7`  | A2 · la víspera en `sitio:ensayo`; H-15S1-01 en el `.env.example`                       |
+| `c419d3a`  | A2 · partida en dos módulos de menos de 300 líneas                                      |
+| `9e7c8e5`  | A3 · `ENTREGA_EN_SITIO.md` al día para mañana                                           |
+| `4896908`  | La IP de mentira de las pruebas de A2, de documentación (KPI-11, cazado en CI)          |
+| `7e4a6df`  | A1 · la conversación TOMA la sesión: cambiar de equipo y volver tampoco pierde el turno |
+| `acebd40`  | Este informe y la ficha de `ESTADO_ETAPAS.md`, con el veredicto                         |
+| `4e816ab`  | Las tres intermitentes del CI: DT-15M-C03, DT-15M-C04 y H-15S1-02 (autorizado)          |
+| _cierre 2_ | Este informe y la ficha, con el veredicto sobre `4e816ab`                               |

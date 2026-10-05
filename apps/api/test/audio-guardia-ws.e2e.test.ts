@@ -218,6 +218,7 @@ describe('15-P · audio de la guardia por WebSocket, contra el videoportero simu
     await expect(conectar(`?billete=${encodeURIComponent(ajeno)}`).abierto).rejects.toThrow();
     primero.ws.close(1000);
     await primero.cerrado;
+    await hasta(() => !equipo.estado().sesionAbierta); // DT-15M-C03: que la siguiente no lo halle ocupado
   });
 
   it('segundo operador: queda en cola, sin billete; al colgar el primero, abre el suyo', async () => {
@@ -239,6 +240,7 @@ describe('15-P · audio de la guardia por WebSocket, contra el videoportero simu
     await s2.abierto;
     s2.ws.close(1000);
     await s2.cerrado;
+    await hasta(() => !equipo.estado().sesionAbierta); // DT-15M-C03, igual que arriba
   });
 
   it('KPI-35: ni la ruta de otra copropiedad ni un operador de otra copropiedad sacan billete', async () => {
