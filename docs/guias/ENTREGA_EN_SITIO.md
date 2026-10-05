@@ -45,8 +45,8 @@
    En sitio **pueden ir vacías** las de Web Push (`WEB_PUSH_*`) y TURN (`WEBRTC_*`), y
    **deben** ir vacías las de Netlify (`API_IP_FIRMA_SECRETO`, `API_ORIGEN_PUBLICO`,
    `CONSOLA_CABECERA_IP_DE_CONFIANZA`, `CONSOLA_IP_FIRMA_SECRETO`).
-   `GUARDIA_AUDIO_TRANSPORTE=websocket`. **`RECUPERACION_POR_CORREO`: `desactivada` o
-   sin la línea, nunca vacía**: vacía, la consola no arranca (H-15S1-01).
+   `GUARDIA_AUDIO_TRANSPORTE=websocket`. **`RECUPERACION_POR_CORREO`: `desactivada`,
+   vacía o sin la línea**: las tres la dejan desactivada con `pnpm start` (DT-15S1-02).
 4. **`supabase db push`**: **0047 a 0054** —conversaciones de guardia, salidas del
    videoportero, Edge en sitio, Edge puente, estado que sobrevive al reinicio,
    suscripciones Web Push, modo de puerta y lectura de usuarios por servicio—, y
