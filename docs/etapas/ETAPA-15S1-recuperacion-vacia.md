@@ -2,7 +2,7 @@
 
 **Rama:** `etapa-15s1-recuperacion-vacia` · **Base:** `develop` (`369df17`, merge del PR #45) más la
 15-S1 por avance rápido (`acebd40`, [4rg3n15/NextResidential#46](https://github.com/4rg3n15/NextResidential/pull/46), sin fusionar) ·
-**PR:** ninguno (no se pidió) · **Fecha:** 2026-10-05 · **Corrige:** DT-15S1-02 y, de raíz, H-15S1-01 ·
+**PR:** [4rg3n15/NextResidential#47](https://github.com/4rg3n15/NextResidential/pull/47), hacia `develop`, sin fusionar · **Fecha:** 2026-10-05 · **Corrige:** DT-15S1-02 y, de raíz, H-15S1-01 ·
 **Abre:** DT-15S1-C01 y H-15S1-C01
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
@@ -44,6 +44,11 @@
    al prepararla si no viene puesto (`router-server.js`, `initialize`, Next
    15.5.25): vacía o sin la línea, la recuperación queda desactivada. Lo confirmó
    la consola compilada, arrancada sin `NODE_ENV` (§6).
+6. **El PR lo abrió la interfaz contra `main`**, con un título y una descripción
+   autogenerados («ETAPA 01: Arquitectura hexagonal…», 504 commits), como el PR
+   #44, que acabó fusionado por error en `main`. Se redirigió a `develop`
+   (§2.5) y se le puso la descripción de esta corrección: enseña los siete commits
+   de la 15-S1 y los de aquí.
 
 ---
 
@@ -172,7 +177,38 @@ con `./scripts/verificar-etapa.sh --con-base`.
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-«PENDIENTE: veredicto del verificador.»
+Corrida sobre `7c769a4`, desde un árbol limpio de artefactos, con la base
+preparada como en CI (`./supabase/verificar.sh --con-pruebas --modo-supabase`),
+Flutter 3.47.4 y el Chromium del entorno (`NCR_CHROMIUM`):
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El declarado es **D-112**: las cinco pruebas saltadas del arranque en frío, que
+ejerce el paso 12b. **31 de 31 pasos**, a la primera; **5207 pruebas de
+TypeScript** (API 2284, proveedores 1231, consola 785, dominio 438, Edge 325,
+configuración 144) —tres más que la 15-S1, las de esta corrección— y **367 de
+Dart**, tres corridas forzadas idénticas; ninguna omisión por falta de base (44
+ficheros con su guardián); el ensayo de sitio contra los equipos simulados, «SIN
+FALLOS · 47 OK»; los 34 controles detectan su violación; escaneo de secretos
+limpio (6930 blobs del historial).
+
+### Cobertura por capa
+
+Idéntica a la de la 15-S1: esta corrección no toca dominio ni aplicación.
+
+| Capa                                          | Líneas                      | Ramas   | Umbral         |
+| --------------------------------------------- | --------------------------- | ------- | -------------- |
+| Dominio (`packages/domain-core`)              | 96,20 %                     | 96,91 % | 90 %           |
+| Aplicación (`**/aplicacion/**`, 153 ficheros) | 97,14 %                     | 90,77 % | 90 %           |
+| Global (952 ficheros)                         | 87,78 %                     | 87,35 % | 70 %           |
+| App · dominio / aplicación / global           | 98,05 % / 96,89 % / 89,68 % | —       | 90 / 90 / 70 % |
+
+Y el CI de GitHub sobre `7c769a4` (run 473, por el empuje): los seis entregables y
+los controles en Ubuntu y macOS, en verde; el verificador en macOS quedó
+**cancelado** —no rojo— al abrirse el PR #47, cuyo run entra en el mismo grupo de
+concurrencia. El del cierre vuelve a correr entero.
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -214,9 +250,11 @@ con `./scripts/verificar-etapa.sh --con-base`.
 
 1. **Fusionar en orden:** primero la 15-S1
    ([4rg3n15/NextResidential#46](https://github.com/4rg3n15/NextResidential/pull/46))
-   en `develop`; después esta rama, con un PR contra `develop` que entonces sólo
-   enseña sus commits. Fusionar ésta sola también vale: lleva la 15-S1 dentro. No
-   se abrió PR.
+   en `develop`; después ésta
+   ([4rg3n15/NextResidential#47](https://github.com/4rg3n15/NextResidential/pull/47)),
+   que entonces sólo enseña sus commits. Fusionar el #47 solo también vale: lleva
+   la 15-S1 dentro. **Nunca contra `main`** (§2.5): compruebe la base antes de
+   fusionar.
 2. **Mañana, en sitio:** nada cambia si `apps/web/.env` dice `desactivada`; vacía o
    sin la línea también arranca y la deja desactivada (`pnpm start` es producción).
 3. **Netlify:** `RECUPERACION_POR_CORREO` puede ir vacía o faltar; AR-04 sigue
@@ -235,4 +273,5 @@ desde el primer commit se trabajó en la rama con nombre de etapa (§2.5).
 | --------- | ----------------------------------------------------------------------------------------------------- |
 | `9550556` | DT-15S1-02 · la consola trata la vacía como ausente; sus dos pruebas                                  |
 | `e1903d7` | La víspera deja de marcarla; su prueba, el ejemplo y la guía de mañana                                |
-| _este_    | Este informe, la ficha de `ESTADO_ETAPAS.md` y las notas en la 15-R y la 15-S1, a falta del veredicto |
+| `7c769a4` | Este informe, la ficha de `ESTADO_ETAPAS.md` y las notas en la 15-R y la 15-S1, a falta del veredicto |
+| _cierre_  | El veredicto del verificador y el PR #47, en el informe y en la ficha                                 |
