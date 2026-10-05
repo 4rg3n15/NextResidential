@@ -72,6 +72,14 @@ describe('el arranque de la consola valida su entorno', () => {
     expect(salidas).toEqual([78]);
   });
 
+  it('con RECUPERACION_POR_CORREO VACÍA arranca: la línea sin valor es «sin declarar» (DT-15S1-02)', async () => {
+    // `RECUPERACION_POR_CORREO=` llega como `''`. Antes salía con 78, «Invalid
+    // enum value … received ''», y el despliegue de Netlify se quedaba sin consola.
+    await arrancar({ ...COMPLETO, RECUPERACION_POR_CORREO: '' });
+    expect(salidas).toEqual([]);
+    expect(registros.join(' ')).toContain('configuracion validada');
+  });
+
   it('el mensaje dice qué falta y dónde ponerlo', async () => {
     await arrancar({ ...COMPLETO, SUPABASE_PUBLISHABLE_KEY: undefined });
     const dicho = registros.join(' ');

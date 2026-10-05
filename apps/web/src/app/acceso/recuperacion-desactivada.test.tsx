@@ -47,6 +47,16 @@ describe('E8 · la decisión por despliegue', () => {
       false,
     );
   });
+
+  it('VACÍA es como sin declarar (DT-15S1-02); cualquier otro valor sigue sin arrancar', () => {
+    const vacia = (NODE_ENV: string) =>
+      despliegue({ NODE_ENV, RECUPERACION_POR_CORREO: '' }).recuperacionPorCorreo;
+    expect(vacia('production')).toBe(false);
+    expect(vacia('development')).toBe(true);
+    expect(() => despliegue({ RECUPERACION_POR_CORREO: 'desactivado' })).toThrow(
+      /RECUPERACION_POR_CORREO: .*'activa' \| 'desactivada'/,
+    );
+  });
 });
 
 describe('E8 · la ruta, desactivada', () => {

@@ -51,8 +51,9 @@ const esquema = z
       )
       .optional(),
     NODE_ENV: z.string().optional(),
-    // E8 (15-R) · AR-04 · sin declarar: desactivada en producción, activa fuera.
-    RECUPERACION_POR_CORREO: z.enum(['activa', 'desactivada']).optional(),
+    // E8 (15-R) · AR-04 · sin declarar o vacía (`RECUPERACION_POR_CORREO=`, como
+    // las tres de Netlify; DT-15S1-02): desactivada en producción, activa fuera.
+    RECUPERACION_POR_CORREO: z.enum(['activa', 'desactivada', '']).optional(),
     CONSOLA_IP_FIRMA_SECRETO: z
       .string()
       .refine((v) => v === '' || (v.length >= 32 && !/\s/.test(v)), {
@@ -97,13 +98,12 @@ export const despliegue = (
       r.error.issues.map((i) => `${i.path.join('.') || '(raíz)'}: ${i.message}`),
     );
   }
+  const recuperacion = vacioAIndefinido(r.data.RECUPERACION_POR_CORREO);
   return {
     apiOrigenPublico: vacioAIndefinido(r.data.API_ORIGEN_PUBLICO),
     cabeceraIpDeConfianza: vacioAIndefinido(r.data.CONSOLA_CABECERA_IP_DE_CONFIANZA),
     ipFirmaSecreto: vacioAIndefinido(r.data.CONSOLA_IP_FIRMA_SECRETO),
     recuperacionPorCorreo:
-      r.data.RECUPERACION_POR_CORREO === undefined
-        ? r.data.NODE_ENV !== 'production'
-        : r.data.RECUPERACION_POR_CORREO === 'activa',
+      recuperacion === undefined ? r.data.NODE_ENV !== 'production' : recuperacion === 'activa',
   };
 };

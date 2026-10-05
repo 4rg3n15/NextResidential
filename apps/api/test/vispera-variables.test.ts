@@ -27,12 +27,12 @@ describe('15-S1 · A2 · variables nuevas desde la 15-N en los .env de la API y 
     sinValoresNiIps(lineas);
   });
 
-  it('las que faltan, por clase: obligatorias, vacías en sitio, de Netlify y «nunca vacía»', () => {
+  it('las que faltan, por clase: obligatorias, vacías en sitio y de Netlify', () => {
     const api = API_COMPLETA.split('\n')
       .filter((l) => !/^(PGBOSS_POOL_MAX|WEB_PUSH_TTL_SEGUNDOS|API_IP_FIRMA_SECRETO)=/.test(l))
       .concat('SUPABASE_POOLER_MAX_CLIENTES=')
       .join('\n');
-    const r = repositorio(api, { '.env': 'RECUPERACION_POR_CORREO=desactivada\n' });
+    const r = repositorio(api, { '.env': '# ninguna de las cuatro nuevas\n' });
     const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
     expect(lineas).toContainEqual(
       expect.stringMatching(
@@ -54,6 +54,11 @@ describe('15-S1 · A2 · variables nuevas desde la 15-N en los .env de la API y 
         /· de Netlify, no están: API_ORIGEN_PUBLICO, CONSOLA_CABECERA_IP_DE_CONFIANZA, CONSOLA_IP_FIRMA_SECRETO/,
       ),
     );
+    expect(lineas).toContainEqual(
+      expect.stringMatching(
+        /· pueden ir vacías en sitio y no están: RECUPERACION_POR_CORREO → basta la línea vacía/,
+      ),
+    );
     sinValoresNiIps(lineas);
   });
 
@@ -68,7 +73,7 @@ describe('15-S1 · A2 · variables nuevas desde la 15-N en los .env de la API y 
       'API_ORIGEN_PUBLICO=https://api.ejemplo.invalid',
       'CONSOLA_CABECERA_IP_DE_CONFIANZA=x-nf-client-connection-ip',
       `CONSOLA_IP_FIRMA_SECRETO=${SECRETO}`,
-      'RECUPERACION_POR_CORREO=',
+      'RECUPERACION_POR_CORREO=desactivado',
     ].join('\n');
     const r = repositorio(api, { '.env': consola });
     const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
@@ -77,18 +82,31 @@ describe('15-S1 · A2 · variables nuevas desde la 15-N en los .env de la API y 
     expect(fallos).toMatch(/TURN: .* van juntas → la API NO arranca/);
     expect(fallos).toMatch(/GUARDIA_AUDIO_TRANSPORTE no es websocket/);
     expect(fallos).toMatch(
-      /RECUPERACION_POR_CORREO vacía: la consola NO arranca → «desactivada» o sin la línea/,
+      /RECUPERACION_POR_CORREO con un valor no admitido: la consola NO arranca → «desactivada», vacía o sin la línea/,
     );
     expect(fallos).toMatch(/API_ORIGEN_PUBLICO con valor: en sitio va vacía/);
     expect(fallos).toMatch(/CONSOLA_CABECERA_IP_DE_CONFIANZA con valor/);
     expect(fallos).toMatch(/CONSOLA_IP_FIRMA_SECRETO con valor/);
-    expect(fallos).not.toMatch(/\bhttp\b|x-nf-client-connection-ip/);
+    expect(fallos).not.toMatch(/\bhttp\b|x-nf-client-connection-ip|desactivado/);
     sinValoresNiIps(lineas);
   });
 
-  it('la consola lee .env y .env.local, y manda el último: como Next en producción', () => {
+  it('RECUPERACION_POR_CORREO vacía no es un ✗: la consola arranca con ella (DT-15S1-02)', () => {
     const r = repositorio(API_COMPLETA, {
-      '.env': `${CONSOLA_DE_SITIO.replace('RECUPERACION_POR_CORREO=desactivada', 'RECUPERACION_POR_CORREO=')}\n`,
+      '.env': CONSOLA_DE_SITIO.replace(
+        'RECUPERACION_POR_CORREO=desactivada',
+        'RECUPERACION_POR_CORREO=',
+      ),
+    });
+    const lineas = lineasDeVariables(leerEntornos(r.raiz, r.rutaEnv));
+    expect(lineas).toContain('    ✓ las 4 nuevas están declaradas');
+    expect(lineas.filter((l) => l.includes('✗'))).toEqual([]);
+  });
+
+  it('la consola lee .env y .env.local, y manda el último: como Next en producción', () => {
+    // En `.env`, un valor que impide arrancar; en `.env.local`, el bueno.
+    const r = repositorio(API_COMPLETA, {
+      '.env': `${CONSOLA_DE_SITIO.replace('RECUPERACION_POR_CORREO=desactivada', 'RECUPERACION_POR_CORREO=desactivado')}\n`,
       '.env.local': 'RECUPERACION_POR_CORREO=desactivada\n',
     });
     const entornos = leerEntornos(r.raiz, r.rutaEnv);
