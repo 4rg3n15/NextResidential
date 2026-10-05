@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
+import { SERVICIO_POR_COPROPIEDAD } from '../src/comun/claims-por-operacion';
 import type { LectorDeVocabulario } from '../src/padron/aplicacion/vocabulario';
 import {
   DesactivarVivienda,
@@ -83,7 +84,7 @@ describe('alta de padrón con superadministrador, contra base', () => {
       console.log('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas. Se ejecuta en CI (ETAPA 14).');
       return;
     }
-    const repo = new RepositorioPadronPg(pool);
+    const repo = new RepositorioPadronPg(pool, SERVICIO_POR_COPROPIEDAD);
     const identificador = `TORRE-A-${String(Date.now()).slice(-8)}`;
     const r = await new RegistrarVivienda(repo, vocabulario).ejecutar(contextoDestino(), {
       identificador,
@@ -120,7 +121,7 @@ describe('alta de padrón con superadministrador, contra base', () => {
       console.log('OMITIDA: sin DATABASE_URL_PRUEBAS o sin semillas. Se ejecuta en CI (ETAPA 14).');
       return;
     }
-    const repo = new RepositorioPadronPg(pool);
+    const repo = new RepositorioPadronPg(pool, SERVICIO_POR_COPROPIEDAD);
     const vivienda = await new RegistrarVivienda(repo, vocabulario).ejecutar(contextoDestino(), {
       identificador: `TORRE-B-${String(Date.now()).slice(-8)}`,
     });

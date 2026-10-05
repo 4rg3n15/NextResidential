@@ -75,8 +75,11 @@ const avanzar = (ms: number): void => {
 
 let proveedor: ProveedorDeIdentidadFalso;
 
-/** Las dos APIs comparten el proveedor falso: las cuentas son las mismas. */
-const montar = async (extra: Partial<Configuracion> = {}): Promise<INestApplication> =>
+/**
+ * Las dos APIs comparten el proveedor falso: las cuentas son las mismas. La URL
+ * llega como argumento porque sólo se monta con la base ya comprobada.
+ */
+const montar = async (url: string, extra: Partial<Configuracion> = {}): Promise<INestApplication> =>
   crearApp(
     firmante,
     (b) =>
@@ -91,8 +94,8 @@ const montar = async (extra: Partial<Configuracion> = {}): Promise<INestApplicat
         .useValue(ajustes),
     {
       PERSISTENCIA_DE_EVENTOS: 'postgres',
-      DATABASE_URL: URL_BASE,
-      DATABASE_POOLER_URL: URL_BASE,
+      DATABASE_URL: url,
+      DATABASE_POOLER_URL: url,
       ...extra,
     },
   );
@@ -126,9 +129,9 @@ beforeAll(async () => {
     return rows[0]?.c ?? null;
   });
   await ajustes.fijarModoPruebas(false, SUPER);
-  app = await montar();
+  app = await montar(URL_BASE);
   // H6 · la MISMA API, con un proxy de confianza que no es el que llama.
-  conOtroProxy = await montar({ API_PROXIES_DE_CONFIANZA: '192.0.2.1' });
+  conOtroProxy = await montar(URL_BASE, { API_PROXIES_DE_CONFIANZA: '192.0.2.1' });
   superadmin = await tokenDe(firmante, {
     rol: 'superadministrador',
     copropiedadId: null,

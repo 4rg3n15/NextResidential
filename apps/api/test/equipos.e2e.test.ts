@@ -3,7 +3,7 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
-import type { ResultadoDeSondeo } from '../src/equipos';
+import type { ResultadoDeSondeo, SondaDeEquipo } from '../src/equipos';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
 import { SondaPorProveedor } from '../src/equipos/infraestructura/sonda-por-proveedor';
 import { OLVIDO_DE_EQUIPO } from '../src/equipos/aplicacion/puertos';
@@ -32,9 +32,9 @@ import type { AlertasDeEquipo } from '../src/eventos';
  */
 let app: INestApplication;
 
-const conEquipos = async (sonda: {
-  probar: (d: unknown) => Promise<ResultadoDeSondeo>;
-}): Promise<{ app: INestApplication; repo: RepositorioDeEquiposEnMemoria; firmante: Firmante }> => {
+const conEquipos = async (
+  sonda: SondaDeEquipo,
+): Promise<{ app: INestApplication; repo: RepositorioDeEquiposEnMemoria; firmante: Firmante }> => {
   const firmante = await crearFirmante();
   const repo = new RepositorioDeEquiposEnMemoria();
   const creada = await crearApp(firmante, undefined, undefined, { repositorio: repo, sonda });

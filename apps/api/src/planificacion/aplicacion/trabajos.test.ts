@@ -296,6 +296,7 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
         throw new Error('getaddrinfo ENOTFOUND servidor-que-no-existe.invalid');
       },
       detener: async () => undefined,
+      estado: () => ({ fase: 'inerte' }),
     };
     await expect(cicloCon(roto, bitacora).onApplicationBootstrap()).resolves.toBeUndefined();
     // La promesa del arranque se resuelve fuera del `await`: se le da un turno.
@@ -313,6 +314,7 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
       programar: (t) => void programados.push(t.nombre),
       arrancar: async () => undefined,
       detener: async () => undefined,
+      estado: () => ({ fase: 'inerte' }),
     };
     await cicloCon(sano, bitacora).onApplicationBootstrap();
     expect(programados).toEqual([
@@ -330,6 +332,7 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
       programar: () => undefined,
       arrancar: async () => void orden.push('arrancar'),
       detener: async () => undefined,
+      estado: () => ({ fase: 'inerte' }),
     };
     const cola = {
       atender: (t: { nombre: string }) => void orden.push(`atender ${t.nombre}`),

@@ -22,7 +22,8 @@ import type { EstadoDelPlanificador, Planificador } from '../planificacion';
  * Una sonda que nadie ha visto ponerse en rojo no está demostrada.
  */
 const reloj = { ahora: () => new Date('2026-09-10T12:00:00Z') };
-const config = { origenesPermitidos: ['https://consola.ejemplo.co'] } as Configuracion;
+const origenesPermitidos: readonly string[] = ['https://consola.ejemplo.co'];
+const config = { origenesPermitidos } as Configuracion;
 
 const enMarcha = { estado: (): EstadoDelPlanificador => ({ fase: 'en-marcha' }) };
 

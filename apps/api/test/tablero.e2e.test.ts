@@ -45,6 +45,8 @@ beforeAll(async () => {
     firmware: 'v0.0.0-prueba',
     ultimoLatido: null,
     ultimaSincronizacion: null,
+    ultimoResultadoDeSincronizacion: null,
+    sincronizacionesFallidas: 0,
   });
 });
 afterAll(async () => {
@@ -129,6 +131,8 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
       firmware: 'v0.0.0-prueba-2',
       ultimoLatido: new Date(),
       ultimaSincronizacion: null,
+      ultimoResultadoDeSincronizacion: null,
+      sincronizacionesFallidas: 0,
       // @ts-expect-error el puerto NO tiene este campo: se inyecta a la fuerza
       // para comprobar que la presentación no lo reenvía por copia de objeto.
       credencialRef: CREDENCIAL,

@@ -31,7 +31,11 @@ const repoFalso = (
     registrarPersona: vi
       .fn()
       .mockResolvedValue({ tipo: 'registrada', id: 'per-1', nombreCompleto: 'Ana Pérez' }),
+    registrarVivienda: vi.fn().mockResolvedValue({ tipo: 'registrada', id: 'viv-9' }),
     desactivarVivienda: vi.fn().mockResolvedValue(true),
+    reactivarVivienda: vi.fn().mockResolvedValue(true),
+    historialDeVivienda: vi.fn().mockResolvedValue(null),
+    borrarViviendaDefinitivamente: vi.fn().mockResolvedValue({ borrada: true }),
     contarVehiculosActivos: vi.fn().mockResolvedValue(0),
     listarViviendas: vi
       .fn()

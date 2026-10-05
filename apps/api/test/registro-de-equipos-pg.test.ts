@@ -49,13 +49,18 @@ const ctxAdmin = (copropiedadId: string): ContextoTenant => ({
   mfaVerificado: true,
 });
 
-const VEREDICTO: ResultadoDeSondeo = {
+/** El veredicto de un aparato que contestó sin decir qué sabe hacer. */
+const VEREDICTO_SIN_CAPACIDADES: ResultadoDeSondeo = {
   clase: 'alcanzado',
   detalle: 'responde',
   modelo: 'MODELO-DE-PRUEBA',
   firmware: 'V0',
   latenciaMs: 3,
   verificado: true,
+};
+
+const VEREDICTO: ResultadoDeSondeo = {
+  ...VEREDICTO_SIN_CAPACIDADES,
   capacidades: capacidadesDescubiertas({
     aperturaRemota: 'si',
     audioBidireccional: { estado: 'si', canal: 2, formato: 'g711u' },
@@ -151,7 +156,7 @@ describe.skipIf(URL_BASE === undefined)('registro de equipos contra base real (D
         usuario: 'servicio',
         secreto: `otra-${CORRIDA}`,
       },
-      { ...VEREDICTO, capacidades: undefined } as ResultadoDeSondeo,
+      VEREDICTO_SIN_CAPACIDADES,
     );
     // Pedir el sobre del equipo de B con la copropiedad A en los claims: nada.
     await expect(repo.credencialPara(ctxAdmin(COP_A), COP_A, creado.id)).resolves.toBeNull();

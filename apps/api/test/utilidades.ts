@@ -1,5 +1,5 @@
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
-import type { JWK } from 'jose';
+import type { JWK, KeyLike } from 'jose';
 import { Test } from '@nestjs/testing';
 import { DiscoveryModule, DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
@@ -19,6 +19,7 @@ import {
 import type { Configuracion } from '../src/configuracion/esquema';
 import type { Rol } from '../src/autenticacion/dominio/claims';
 import { REPOSITORIO_DE_EQUIPOS, SIN_PROBAR, SONDA_DE_EQUIPO } from '../src/equipos';
+import type { SondaDeEquipo } from '../src/equipos';
 import { REPOSITORIO_AUTORIZACIONES_ZONA, REPOSITORIO_ZONAS } from '../src/zonas';
 import { RepositorioZonasEnMemoria } from '../src/zonas/infraestructura/repositorio-zonas-memoria';
 import { RepositorioDeEquiposEnMemoria } from '../src/equipos/infraestructura/repositorio-equipos-en-memoria';
@@ -153,7 +154,12 @@ export interface Firmante {
     },
   ): Promise<string>;
   jwk: JWK;
-  clavePublica: CryptoKey;
+  /**
+   * Lo que `jose` entrega y lo que su verificación acepta. No `CryptoKey`: ese
+   * tipo es de WebCrypto (lib DOM), y abrir las pruebas a los globales del
+   * navegador dejaría compilar lo que en Node no existe (DT-15S1-03).
+   */
+  clavePublica: KeyLike;
 }
 
 /**
@@ -167,7 +173,7 @@ export const crearFirmante = async (kid = 'clave-de-prueba'): Promise<Firmante> 
   const jwk = { ...(await exportJWK(publicKey)), kid, alg: 'RS256', use: 'sig' };
   return {
     jwk,
-    clavePublica: publicKey as CryptoKey,
+    clavePublica: publicKey,
     async emitir(claims, opciones = {}) {
       return new SignJWT(claims)
         .setProtectedHeader({ alg: opciones.alg ?? 'RS256', kid: opciones.kid ?? kid })
@@ -316,7 +322,7 @@ export const crearApp = async (
    */
   equipos?: {
     readonly repositorio?: unknown;
-    readonly sonda?: { probar: (d: unknown) => Promise<unknown> };
+    readonly sonda?: SondaDeEquipo;
   },
 ): Promise<INestApplication> => {
   const equiposPorOmision = equipos?.repositorio;

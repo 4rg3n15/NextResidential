@@ -6,6 +6,7 @@ import type { EventoDeEquipo, PublicacionDeEquipo, VeredictoRemoto } from '@ncr/
 import type { RegistrarAcceso } from '../../eventos';
 import type { EquipoDeclarado } from '../../comun/equipos-de-alarm-server';
 import { IngestorDeEquipos } from './ingestor-de-publicaciones';
+import type { LlamadaEntrante } from './puertos';
 import { INTERPRETE_DE_HECHOS } from '../infraestructura/interprete-de-hechos';
 
 /**
@@ -78,7 +79,8 @@ const montar = (opciones: {
   const ids: GeneradorDeId = { nuevo: () => 'id-fijo' };
   const ejecutar = vi.fn(async () =>
     opciones.registroFalla === true
-      ? fallo(errorDominio('REFERENCIA_INVALIDA', 'referencia inadmisible'))
+      ? // El fallo tipado de `RegistrarAcceso` (`noSePudoRegistrar`): no hay otro código.
+        fallo(errorDominio('INVARIANTE_VIOLADA', 'referencia inadmisible', 'RN-02'))
       : exito({
           eventoId: 'ev-guardado',
           claveIdempotencia: 'clave',
