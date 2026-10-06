@@ -29,9 +29,13 @@ push` manda el texto al servidor, que no las conoce. El banco y el despliegue no
   a ejecutarse; la del CI se recrea en cada corrida. Una migración nueva que «arreglara»
   la 0052 no serviría: la cadena seguiría rota en la 0052.
 - **El control lee el SQL versionado**, como `frontera-append-only.mjs`: avisa cuando
-  alguien escribe la línea, no cuando un despliegue falla. Rechaza toda línea que
-  empiece por `\` (con espacios delante o sin ellos); un comentario `--` que la
-  mencione no cuenta.
+  alguien escribe la línea, no cuando un despliegue falla. Reconoce la orden como
+  `psql`: una `\` fuera de un comentario, una cadena (también `E'…'`), un
+  identificador entre comillas o un cuerpo `$…$`, **también a mitad de línea**
+  (`SELECT 1; \set …`, que psql admite). La primera versión sólo miraba el principio
+  de la línea y dejaba pasar esa forma (revisión de Codex en el PR #49; comprobado:
+  la versión anterior da 0 sobre ella, la nueva la señala). Buscar cualquier `\`
+  no valía: los CHECK reales llevan `'[\x00-\x1F]'`.
 
 - **Dos avisos de dependencias, en el mismo PR.** La CI del PR cayó en `pnpm audit
 --prod --audit-level=high` por dos avisos publicados después del último verde de

@@ -479,18 +479,42 @@ try {
       ? ok('las migraciones reales pasan')
       : mal('las migraciones reales NO pasan: el banco no parte de una línea base limpia');
 
-    const sonda = join(clon, 'supabase', 'migrations', '29990103000000_9999_sonda_psql.sql');
+    // Lo que psql NO toma por orden suya: una `\` dentro de un comentario, una
+    // cadena (también `E'…'` y `''`), un identificador entre comillas o un cuerpo
+    // `$…$`. Las expresiones de los CHECK reales llevan `\x00`: no pueden caer.
+    const legitima = join(clon, 'supabase', 'migrations', '29990103000000_9999_sonda_legitima.sql');
+    writeFileSync(
+      legitima,
+      '-- \\set en un comentario de línea\n' +
+        '/* \\set en un comentario de bloque */\n' +
+        'CREATE TABLE sonda (c text CHECK (c !~ \'[\\x00-\\x1F]\'), "col\\umna" int);\n' +
+        "SELECT 'it''s \\ literal', E'escapada \\' y \\\\', $$ cuerpo \\set $$, $f$ otro \\i $f$;\n" +
+        'SELECT $1 FROM sonda; -- final sin salto de línea',
+    );
+    enClon('node', ['scripts/lib/migraciones-sin-psql.mjs']).codigo === 0
+      ? ok('una `\\` en comentarios, cadenas, identificadores y cuerpos $…$ no cuenta')
+      : mal('marca como orden de psql una `\\` que psql no ejecutaría');
+
+    // Y lo que SÍ: al principio de la línea (el defecto real) y a mitad de ella,
+    // detrás de SQL (la forma que el primer control dejaba pasar, Codex en #49).
+    const sonda = join(clon, 'supabase', 'migrations', '29990104000000_9999_sonda_psql.sql');
     writeFileSync(
       sonda,
-      '-- \\set en un comentario no cuenta\n\\set ON_ERROR_STOP on\nSELECT 1;\n',
+      "SELECT 1;\nSELECT 2; \\set ON_ERROR_STOP on\n\\gexec\nSELECT 'sin cerrar",
     );
     const r = enClon('node', ['scripts/lib/migraciones-sin-psql.mjs']);
-    if (r.codigo !== 0 && /9999_sonda_psql\.sql:2/.test(r.salida)) {
-      ok('detectada, con su fichero y su línea, y salida distinta de cero');
+    if (
+      r.codigo !== 0 &&
+      /9999_sonda_psql\.sql:2/.test(r.salida) &&
+      /9999_sonda_psql\.sql:3/.test(r.salida) &&
+      !/9999_sonda_legitima/.test(r.salida)
+    ) {
+      ok('detectada a mitad de línea y al principio, con su fichero y su línea');
     } else {
-      mal(`NO detectada (codigo ${r.codigo})`);
+      mal(`NO detectada como debe (codigo ${r.codigo}): ${r.salida.slice(0, 300)}`);
     }
     rmSync(sonda);
+    rmSync(legitima);
   }
 
   console.log('\n▸ 6 · un Node fuera de `engines` detiene la verificación');
