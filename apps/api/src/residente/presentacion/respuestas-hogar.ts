@@ -7,16 +7,26 @@ export class VocabularioDeAltaDto {
   @ApiProperty({ type: String, nullable: true }) tipo!: string | null;
   @ApiProperty() etiquetaVivienda!: string;
   @ApiProperty() etiquetaAgrupacion!: string;
+  @ApiProperty({ type: String, nullable: true, description: '15-W · prefijo de sus códigos' })
+  codigoCorto!: string | null;
 }
 
 export class EstadoDeMiAltaDto {
   @ApiProperty() completa!: boolean;
   @ApiProperty() viviendaVinculada!: boolean;
+  @ApiProperty({ description: '15-W · la cuenta ya trae vivienda (asignada o vinculada)' })
+  viviendaAsignada!: boolean;
   @ApiProperty() debeDeclararOcupantes!: boolean;
   @ApiProperty({ type: VocabularioDeAltaDto }) vocabulario!: VocabularioDeAltaDto;
   @ApiProperty() pideAgrupacion!: boolean;
-  @ApiProperty({ description: 'El texto que la pantalla muestra ANTES de confirmar (D6)' })
+  @ApiProperty({ description: 'El texto de Ocupantes, con el tope de la vivienda (D-W10)' })
   avisoOcupantes!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: '15-W · «La administración debe asignarle su vivienda», o null',
+  })
+  aviso!: string | null;
 }
 
 export class CampoRechazadoDto {
@@ -39,6 +49,10 @@ export class ResultadoDeAltaDto {
       'CODIGO_INCORRECTO',
       'DOCUMENTO_EN_USO',
       'YA_VINCULADA',
+      'VIVIENDA_SIN_TITULAR',
+      'TITULAR_NO_SE_MUDA',
+      'SIN_VIVIENDA',
+      'CUENTA_BLOQUEADA_POR_EDAD',
     ],
   })
   motivo!: string | null;
@@ -50,9 +64,15 @@ export class PlazaDeOcupanteDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() numero!: number;
   @ApiProperty() libre!: boolean;
-  @ApiProperty({ type: String, nullable: true, description: 'Sólo en las libres: ABCD-EFGH' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Sólo en las libres, con el prefijo del conjunto: MIRA-ABCD-EFGH',
+  })
   codigo!: string | null;
   @ApiProperty({ type: String, nullable: true }) ocupante!: string | null;
+  @ApiProperty({ description: '15-W · la ocupa una persona sin cuenta (un menor)' })
+  sinCuenta!: boolean;
 }
 
 export class MisOcupantesDto {
@@ -60,6 +80,9 @@ export class MisOcupantesDto {
   @ApiProperty() declarada!: boolean;
   @ApiProperty({ type: [PlazaDeOcupanteDto] }) plazas!: PlazaDeOcupanteDto[];
   @ApiProperty() aviso!: string;
+  @ApiProperty({ description: '15-W · el tope de plazas de la vivienda, contando al titular' })
+  tope!: number;
+  @ApiProperty({ description: '15-W · quien pregunta es el titular' }) esTitular!: boolean;
 }
 
 export class PerfilDelResidenteDto {
@@ -121,6 +144,11 @@ export class CuentaDeResidenteDto {
   @ApiProperty() activa!: boolean;
   @ApiProperty() debeCambiarContrasena!: boolean;
   @ApiProperty() creadaEn!: string;
+  @ApiProperty({
+    enum: ['administracion', 'autorregistro'],
+    description: '15-W · origen de la cuenta',
+  })
+  origen!: 'administracion' | 'autorregistro';
 }
 
 /** C9 (15-M) · lo que contesta la baja: hecha, y cuántas plantillas se suprimieron. */

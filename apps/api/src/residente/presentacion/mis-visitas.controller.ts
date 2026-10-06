@@ -5,6 +5,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   Inject,
   NotFoundException,
   Param,
@@ -25,6 +26,8 @@ import { MiVisitaDto, RepetirVisitaDto, confirmacionDePlaca, hastaDe } from '../
 import { GenerarMiVisita, MisUltimosVisitantes, VolverAAutorizar } from '../aplicacion/mis-visitas';
 import type { ResultadoDeMiVisita } from '../aplicacion/mis-visitas';
 import { MiVisitaGeneradaDto, VisitanteRecienteDto } from './respuestas';
+import { RevocarMiVisita } from '../aplicacion/revocar-mi-visita';
+import { RevocacionDeMiVisitaDto, VisitaRevocadaDto } from './dtos-revocacion';
 
 const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
   if (r.ok) return r.valor;
@@ -110,7 +113,28 @@ export class MisVisitasController {
     @Inject(VolverAAutorizar) private readonly volver: VolverAAutorizar,
     @Inject(MisUltimosVisitantes) private readonly ultimos: MisUltimosVisitantes,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
+    @Inject(RevocarMiVisita) private readonly revocar: RevocarMiVisita,
   ) {}
+
+  /** 15-W (D-W6, D6) · revoco una visita que autoricé; su rostro sale de los equipos. */
+  @Post(':autorizacionId/revocacion')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Roles('residente')
+  @ApiOperation({ summary: 'Revoco una visita vigente de mi vivienda, con motivo (D-W6)' })
+  @ApiOkResponse({ type: VisitaRevocadaDto })
+  async revocarVisita(
+    @Contexto() ctx: ContextoTenant,
+    @Param('id', ParseUUIDPipe) copropiedadId: string,
+    @Param('autorizacionId', ParseUUIDPipe) autorizacionId: string,
+    @Body() dto: RevocacionDeMiVisitaDto,
+  ): Promise<VisitaRevocadaDto> {
+    const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/visitas');
+    const r = desenvolver(
+      await this.revocar.ejecutar(destino, copropiedadId, autorizacionId, dto.motivo),
+    );
+    return { revocada: true, ...r };
+  }
 
   @Post()
   @MideKpi('KPI-09')

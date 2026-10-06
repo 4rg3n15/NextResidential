@@ -42,6 +42,8 @@ import {
   CuentasDeResidentesPg,
 } from './infraestructura/bitacora-residentes-pg';
 import { CodigosDeOcupanteHmac } from './infraestructura/codigos-de-ocupante';
+import { TITULARIDAD_DE_VIVIENDAS } from './aplicacion/puertos-de-titularidad';
+import type { TitularidadDeViviendas } from './aplicacion/puertos-de-titularidad';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -97,9 +99,20 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
   },
   {
     provide: VincularMiVivienda,
-    inject: [ALTA_DEL_RESIDENTE, CODIGOS_DE_OCUPANTE, BITACORA_DE_RESIDENTES, RELOJ],
-    useFactory: (a: AltaDelResidente, c: CodigosDeOcupante, b: BitacoraDeResidentes, r: Reloj) =>
-      new VincularMiVivienda(a, c, b, r),
+    inject: [
+      ALTA_DEL_RESIDENTE,
+      CODIGOS_DE_OCUPANTE,
+      BITACORA_DE_RESIDENTES,
+      RELOJ,
+      OCUPANTES_DE_LA_VIVIENDA,
+    ],
+    useFactory: (
+      a: AltaDelResidente,
+      c: CodigosDeOcupante,
+      b: BitacoraDeResidentes,
+      r: Reloj,
+      o: OcupantesDeLaVivienda,
+    ) => new VincularMiVivienda(a, c, b, r, o),
   },
   {
     provide: VerMisOcupantes,
@@ -160,6 +173,7 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
       VEHICULOS_PROPIOS,
       BITACORA_DE_RESIDENTES,
       RELOJ,
+      TITULARIDAD_DE_VIVIENDAS,
       SuprimirPlantillasDeTitular,
     ],
     useFactory: (
@@ -168,8 +182,9 @@ export const PROVEEDORES_DEL_HOGAR: Provider[] = [
       v: VehiculosPropios,
       b: BitacoraDeResidentes,
       r: Reloj,
+      t: TitularidadDeViviendas,
       s: SuprimirPlantillasDeTitular,
-    ) => new CuentasDeResidentesDelSuperadmin(crear, cuentas, v, b, r, s),
+    ) => new CuentasDeResidentesDelSuperadmin(crear, cuentas, v, b, r, t, s),
   },
   {
     provide: OcupantesDelSuperadmin,

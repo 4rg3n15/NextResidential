@@ -5,6 +5,7 @@ import { nombreDeUsuario } from '../dominio/nombre-de-usuario';
 import { correoSintetico } from '../dominio/correo-sintetico';
 import { motivoDeRechazoDeContrasena } from '../dominio/politica-de-contrasena';
 import type { AdministradorDeCuentas, RepositorioDeCuentas } from './puertos';
+import type { EscrituraDelVinculo } from './puertos-del-registro';
 
 export interface SolicitudDeCuenta {
   readonly copropiedadId: string;
@@ -18,6 +19,10 @@ export interface SolicitudDeCuenta {
   readonly telefono: string | null;
   readonly rol: 'portero' | 'residente';
   readonly contrasenaInicial: string;
+  /** 15-W · `autorregistro` = «Crear cuenta» (D-W1); por omisión, la administración. */
+  readonly origen?: 'administracion' | 'autorregistro';
+  /** 15-W · por omisión SÍ (ADR-023); «Crear cuenta» no, la contraseña es suya. */
+  readonly debeCambiarContrasena?: boolean;
 }
 
 export type RechazoDeAlta =
@@ -28,6 +33,9 @@ export type RechazoDeAlta =
   | { readonly motivo: 'CUPO' }
   /** H2 · se dieron ya los 999 números del pool. */
   | { readonly motivo: 'POOL_AGOTADO' };
+
+/** 15-W · además, la base no aceptó el vínculo: otra alta se llevó la plaza o la titularidad. */
+export type RechazoDeAltaConVinculo = RechazoDeAlta | { readonly motivo: 'VINCULO' };
 
 export interface CuentaCreadaEnBase {
   readonly usuarioId: string;
@@ -58,6 +66,30 @@ export class CrearCuentaPorUsuario {
     s: SolicitudDeCuenta,
     actorId: string,
   ): Promise<Resultado<CuentaCreadaEnBase, RechazoDeAlta>> {
+    const r = await this.crear(s, undefined, actorId);
+    if (r.ok) return r;
+    // Sin vínculo pedido, la base no puede rechazar uno: si pasa, es un defecto.
+    if (r.error.motivo === 'VINCULO') throw new Error('vínculo rechazado sin vínculo pedido');
+    return fallo(r.error);
+  }
+
+  /**
+   * 15-W (D1, D2) · la cuenta y su VÍNCULO con la vivienda, en una transacción:
+   * si la base no acepta el vínculo, la cuenta tampoco queda, en ningún lado.
+   */
+  ejecutarConVinculo(
+    s: SolicitudDeCuenta,
+    vinculo: EscrituraDelVinculo,
+    actorId: string,
+  ): Promise<Resultado<CuentaCreadaEnBase, RechazoDeAltaConVinculo>> {
+    return this.crear(s, vinculo, actorId);
+  }
+
+  private async crear(
+    s: SolicitudDeCuenta,
+    vinculo: EscrituraDelVinculo | undefined,
+    actorId: string,
+  ): Promise<Resultado<CuentaCreadaEnBase, RechazoDeAltaConVinculo>> {
     const usuario = nombreDeUsuario(
       s.rol === 'portero' ? (s.usuario ?? this.generarUsuario()) : (s.usuario ?? ''),
     );
@@ -84,6 +116,11 @@ export class CrearCuentaPorUsuario {
           nombre: s.nombre,
           telefono: s.telefono,
           rol: s.rol,
+          ...(s.origen === undefined ? {} : { origen: s.origen }),
+          ...(s.debeCambiarContrasena === undefined
+            ? {}
+            : { debeCambiarContrasena: s.debeCambiarContrasena }),
+          ...(vinculo === undefined ? {} : { vinculo }),
         },
         actorId,
       );

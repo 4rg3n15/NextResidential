@@ -8,20 +8,23 @@ import {
   PROVEEDOR_DE_IDENTIDAD,
 } from '../src/cuentas';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
+import { VERSION_DE_LA_POLITICA_DE_DATOS } from '../src/cuentas/aplicacion/politica-de-datos';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
 import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * ETAPA 15-I · RESIDENTES Y VEHÍCULOS PROPIOS, CONTRA LA BASE REAL
+ * ETAPA 15-I · RESIDENTES Y VEHÍCULOS PROPIOS, CONTRA LA BASE REAL · 15-W
  *
  * La cadena entera por HTTP, con los adaptadores PostgreSQL del residente, el
  * GANCHO de claims de la base y la RLS forzada: sólo el proveedor de identidad
  * es falso (la suite no alcanza Supabase Auth).
  *
- *   código corto → alta del residente → cambio obligatorio → primer ingreso →
- *   ocupantes (una vez, definitivo) → códigos de un solo uso con límite de
- *   intentos → vehículos propios dentro del tope, también bajo concurrencia →
+ *   código corto → el TITULAR nace con su vivienda (D1) → cambio obligatorio →
+ *   primer ingreso sin vivienda ni código (D3) → ocupantes de 1 al tope → los
+ *   demás crean su cuenta con el código de su plaza (D2) → cambiar de vivienda
+ *   exige código, con límite de intentos → vehículos propios dentro del tope,
+ *   también bajo concurrencia, y su edición y borrado según el historial (D5) →
  *   terceros sin límite → perfil y teléfono de portería → aislamiento por el
  *   camino de servicio.
  *
@@ -97,6 +100,7 @@ const con = (token: string) => ({
     http().post(ruta).set('Authorization', `Bearer ${token}`).send(cuerpo),
   put: (ruta: string, cuerpo: object) =>
     http().put(ruta).set('Authorization', `Bearer ${token}`).send(cuerpo),
+  delete: (ruta: string) => http().delete(ruta).set('Authorization', `Bearer ${token}`),
 });
 const uno = async <T extends object>(sql: string, p: unknown[]): Promise<T | undefined> =>
   (await (pool as Pool).query<T>(sql, p)).rows[0];
@@ -111,26 +115,48 @@ const perfil = (n: number) => ({
   telefono: `+57300${SUFIJO}`.slice(0, 13),
 });
 
-/** Alta por el superadministrador, primer acceso POR CÓDIGO y cambio obligatorio. */
-const residenteNuevo = async (n: number): Promise<string> => {
+/** El acceso por código corto, con la forma EXACTA del cliente Dart generado. */
+const acceder = (usuario: string, contrasena: string, origen: string) =>
+  http()
+    .post('/auth/acceso')
+    // Un origen declarado por residente: el límite por origen (10/min) es de la
+    // consola, que pone a todos detrás de una IP; aquí cada uno es un teléfono.
+    .set('x-ncr-origen', origen)
+    // Los opcionales viajan como `null`. Con `!== undefined` en el servidor,
+    // esto era un acceso por «correo: null» y respondía 401 (H-15I-04). Sin
+    // `nit` desde la 15-L (ADR-031): el cliente regenerado ya no lo lleva.
+    .send({ correo: null, codigo: CODIGO.toLowerCase(), usuario, contrasena });
+
+/** El `usuario_id` de los claims del token: el de la cuenta que habla. */
+const usuarioDe = (token: string): string =>
+  (
+    JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as {
+      usuario_id: string;
+    }
+  ).usuario_id;
+
+/** Una vivienda activa y vacía, montada por el superusuario: no es lo probado. */
+const viviendaEn = async (copropiedadId: string, identificador: string): Promise<string> =>
+  (
+    await uno<{ id: string }>(
+      `INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+       VALUES ($1, $2, 'Z', $3, $3) RETURNING id`,
+      [copropiedadId, identificador, SUPER],
+    )
+  )?.id ?? '';
+
+/** D1 (15-W) · el TITULAR: lo crea la administración con su vivienda; cambio obligatorio. */
+const titularNuevo = async (n: number, viviendaId: string): Promise<string> => {
   const usuario = `res${String(n)}.${SUFIJO}`;
   const alta = await comoSuper('post', `/copropiedades/${COP_A}/residentes/cuentas`).send({
     usuario,
     contrasenaInicial: INICIAL,
     nombre: `Residente ${String(n)}`,
+    viviendaId,
   });
   expect(alta.status, JSON.stringify(alta.body)).toBe(201);
-  // Un origen declarado por residente: el límite por origen (10/min) es de la
-  // consola, que pone a todos detrás de una IP; aquí cada uno es un teléfono.
   const origen = `198.51.100.${String(n)}`;
-  const primero = await http()
-    .post('/auth/acceso')
-    .set('x-ncr-origen', origen)
-    // La forma EXACTA del cliente Dart generado: los opcionales viajan como
-    // `null`. Con `!== undefined` en el servidor, esto era un acceso por
-    // «correo: null» y respondía 401 (hallazgo H-15I-04). Sin `nit` desde la
-    // 15-L (ADR-031): el cliente regenerado ya no lo lleva.
-    .send({ correo: null, codigo: CODIGO.toLowerCase(), usuario, contrasena: INICIAL });
+  const primero = await acceder(usuario, INICIAL, origen);
   expect(primero.status, JSON.stringify(primero.body)).toBe(200);
   expect(primero.body.debeCambiarContrasena).toBe(true);
   // Con el cambio pendiente, ni siquiera el alta: 403 (ADR-023).
@@ -142,11 +168,35 @@ const residenteNuevo = async (n: number): Promise<string> => {
     nueva: NUEVA,
   });
   expect(cambio.status, JSON.stringify(cambio.body)).toBe(200);
-  const segundo = await http()
-    .post('/auth/acceso')
-    .send({ codigo: CODIGO, usuario, contrasena: NUEVA });
+  const segundo = await acceder(usuario, NUEVA, origen);
   expect(segundo.body.debeCambiarContrasena).toBe(false);
   return segundo.body.accessToken as string;
+};
+
+/** D2 (15-W) · los demás: «Crear cuenta» con el código de su plaza, y el acceso de siempre. */
+const ocupanteNuevo = async (n: number, codigo: string): Promise<string> => {
+  const usuario = `res${String(n)}.${SUFIJO}`;
+  const r = await http()
+    .post('/auth/registro')
+    .set('x-forwarded-for', `203.0.113.${String(n)}`)
+    .send({
+      usuario,
+      correo: `res${String(n)}.${SUFIJO}@correo.invalid`,
+      contrasena: NUEVA,
+      confirmacion: NUEVA,
+      codigoDeInvitacion: codigo,
+      fechaNacimiento: '1990-05-17',
+      aceptaTratamientoDeDatos: true,
+      versionPolitica: VERSION_DE_LA_POLITICA_DE_DATOS,
+    });
+  expect(r.status, JSON.stringify(r.body)).toBe(201);
+  // «Crear cuenta» no emite tokens: se entra después, por el acceso de siempre.
+  expect(r.body).toEqual({ creada: true });
+  const a = await acceder(usuario, NUEVA, `198.51.100.${String(n)}`);
+  expect(a.status, JSON.stringify(a.body)).toBe(200);
+  // Quien eligió su contraseña no la cambia al entrar.
+  expect(a.body.debeCambiarContrasena).toBe(false);
+  return a.body.accessToken as string;
 };
 
 describe('15-I · residentes y vehículos propios contra la base real', () => {
@@ -155,6 +205,12 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
   let primero = '';
   let codigos: string[] = [];
   let ocupanteIds: string[] = [];
+  let segundo = '';
+  let tercero = '';
+  // La vivienda Q, del vecino: de ella sale quien se muda a P, y su titular
+  // es el «adulto de otra vivienda» que no alcanza los vehículos de P.
+  let viviendaQ = '';
+  let vecino = '';
 
   it('D1 · el superadministrador asigna el código corto; normalizado y único en la plataforma', async () => {
     if (omitida()) return;
@@ -193,6 +249,8 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
       usuario,
       contrasenaInicial: INICIAL,
       nombre: 'Residente de El Roble',
+      // 15-W (D1) · la cuenta de la administración nace con su vivienda.
+      viviendaId: await viviendaEn(COP_B, `R${SUFIJO}`),
     });
     expect(enRoble.status).toBe(201);
     const inexistente = await http()
@@ -217,138 +275,202 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     expect(porNit.status).toBe(400);
   });
 
-  it('3.2 · primer ingreso: la vivienda sin cuenta se vincula con «no lo tengo»', async () => {
+  it('D1/D3 (15-W) · el titular nace con su vivienda; su primer ingreso no pide vivienda ni código', async () => {
     if (omitida()) return;
-    primero = await residenteNuevo(1);
+    primero = await titularNuevo(1, viviendaId);
     const antes = await con(primero).get(`/copropiedades/${COP_A}/mi/alta`);
-    expect(antes.body).toMatchObject({ completa: false, viviendaVinculada: false });
+    expect(antes.body).toMatchObject({
+      completa: false,
+      viviendaVinculada: false,
+      viviendaAsignada: true,
+      aviso: null,
+    });
     expect(antes.body.vocabulario.etiquetaVivienda).toBe('Casa');
-    expect(antes.body.avisoOcupantes).toContain('DEFINITIVO');
-    const inexistente = await con(primero).post(`/copropiedades/${COP_A}/mi/alta`, {
-      perfil: perfil(1),
-      identificador: 'NO-EXISTE',
-      codigo: null,
+    // El aviso del 15-I («el número es DEFINITIVO») ya no es verdad (D-W10).
+    expect(antes.body.avisoOcupantes).not.toContain('DEFINITIVO');
+    const ruta = `/copropiedades/${COP_A}/mi/alta`;
+    // §6 · ni vivienda, ni la forma del alta vieja, ni el rol: 400 por forma.
+    for (const intruso of [
+      { ...perfil(1), viviendaId },
+      { ...perfil(1), esTitular: true },
+      { perfil: perfil(1), identificador, codigo: null },
+    ]) {
+      const r = await con(primero).post(ruta, intruso);
+      expect(r.status, JSON.stringify(r.body)).toBe(400);
+    }
+    // D3 · el documento es de ADULTO: la tarjeta de identidad es de los menores.
+    const deMenor = await con(primero).post(ruta, {
+      ...perfil(1),
+      tipoDocumento: 'tarjeta_identidad',
     });
-    expect(inexistente.body.motivo).toBe('VIVIENDA_INEXISTENTE');
-    const r = await con(primero).post(`/copropiedades/${COP_A}/mi/alta`, {
-      perfil: perfil(1),
-      identificador,
-      agrupacion: 'z',
-      codigo: null,
-    });
+    expect(deMenor.status).toBe(400);
+    const r = await con(primero).post(ruta, perfil(1));
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body).toMatchObject({ vinculada: true, debeDeclararOcupantes: true });
+    // Titular de ESA vivienda, por la administración (D1): `es_titular` y la ocupación.
+    const fila = await uno<{ titular: boolean; primero: string | null }>(
+      `SELECT r.es_titular AS titular,
+              (SELECT o.primer_residente_id::text FROM public.ocupacion_de_viviendas o
+                WHERE o.vivienda_id = r.vivienda_id) AS primero
+         FROM public.residentes r JOIN public.usuarios u ON u.persona_id = r.persona_id
+        WHERE u.id = $1 AND r.vivienda_id = $2 AND r.estado = 'activo'`,
+      [usuarioDe(primero), viviendaId],
+    );
+    expect(fila).toEqual({ titular: true, primero: usuarioDe(primero) });
     const estado = await con(primero).get(`/copropiedades/${COP_A}/mi/alta`);
     expect(estado.body).toMatchObject({ completa: false, debeDeclararOcupantes: true });
   });
 
-  it('D6 · declara 3 ocupantes UNA vez; volver a declararlo es 403', async () => {
+  it('D6/D-W10 · el titular declara de 1 al tope; volver a declararlo es 403', async () => {
     if (omitida()) return;
-    const sinConfirmar = await con(primero).post(`/copropiedades/${COP_A}/mi/ocupantes`, {
-      numero: 3,
-      confirmoQueEsDefinitivo: false,
-    });
-    expect(sinConfirmar.status).toBe(400);
-    const r = await con(primero).post(`/copropiedades/${COP_A}/mi/ocupantes`, {
-      numero: 3,
-      confirmoQueEsDefinitivo: true,
-    });
+    const ruta = `/copropiedades/${COP_A}/mi/ocupantes`;
+    const deMas = await con(primero).post(ruta, { numero: 5 });
+    expect(deMas.status, JSON.stringify(deMas.body)).toBe(409);
+    expect(JSON.stringify(deMas.body)).toContain('máximo de 4 plazas');
+    const r = await con(primero).post(ruta, { numero: 4 });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
-    expect(r.body.declarados).toBe(3);
+    expect(r.body).toMatchObject({ declarados: 4, tope: 4, esTitular: true });
     codigos = r.body.plazas
       .filter((p: { libre: boolean }) => p.libre)
       .map((p: { codigo: string }) => p.codigo);
-    expect(codigos).toHaveLength(2);
-    const otraVez = await con(primero).post(`/copropiedades/${COP_A}/mi/ocupantes`, {
-      numero: 5,
-      confirmoQueEsDefinitivo: true,
-    });
+    expect(codigos).toHaveLength(3);
+    // D2 · con el prefijo del conjunto: el código dice solo de qué copropiedad es.
+    expect(
+      codigos.every((c) => c.startsWith(`${CODIGO}-`)),
+      codigos.join(' '),
+    ).toBe(true);
+    const otraVez = await con(primero).post(ruta, { numero: 2 });
     expect(otraVez.status).toBe(403);
     const guardados = await uno<{ n: string }>(
       `SELECT count(*)::text AS n FROM public.bitacora_de_residentes
         WHERE vivienda_id = $1 AND detalle LIKE ANY (ARRAY[$2, $3])`,
-      [viviendaId, `%${codigos[0] ?? '-'}%`, `%${(codigos[0] ?? '-').replace('-', '')}%`],
+      [
+        viviendaId,
+        `%${(codigos[0] ?? '-').slice(-9)}%`,
+        `%${(codigos[0] ?? '-').slice(-9).replace('-', '')}%`,
+      ],
     );
     expect(guardados?.n, 'un código de ocupante apareció en la bitácora').toBe('0');
     const estado = await con(primero).get(`/copropiedades/${COP_A}/mi/alta`);
     expect(estado.body.completa).toBe(true);
   });
 
-  it('3.2 · con cuenta dentro, el código es obligatorio; los equivocados se cuentan y bloquean', async () => {
+  it('D2 · los demás crean su cuenta con el código de SU plaza: nace allí, nunca de titular', async () => {
     if (omitida()) return;
-    const segundo = await residenteNuevo(2);
-    const ruta = `/copropiedades/${COP_A}/mi/alta`;
-    const sinCodigo = await con(segundo).post(ruta, {
-      perfil: perfil(2),
-      identificador,
-      agrupacion: 'Z',
+    segundo = await ocupanteNuevo(2, String(codigos[0]));
+    const estado = await con(segundo).get(`/copropiedades/${COP_A}/mi/alta`);
+    expect(estado.body).toMatchObject({
+      viviendaVinculada: false,
+      viviendaAsignada: true,
+      debeDeclararOcupantes: false,
     });
-    expect(sinCodigo.body.motivo).toBe('CODIGO_REQUERIDO');
-    for (let i = 0; i < 5; i += 1) {
-      const malo = await con(segundo).post(ruta, {
-        perfil: perfil(2),
-        identificador,
-        agrupacion: 'Z',
-        codigo: 'AAAA-AAAA',
-      });
-      expect(malo.body.motivo).toBe('CODIGO_INCORRECTO');
-    }
-    const bloqueado = await con(segundo).post(ruta, {
-      perfil: perfil(2),
-      identificador,
-      agrupacion: 'Z',
-      codigo: codigos[0],
-    });
-    expect(bloqueado.body.motivo).toBe('DEMASIADOS_INTENTOS');
-
-    const tercero = await residenteNuevo(3);
-    const bueno = await con(tercero).post(ruta, {
-      perfil: perfil(3),
-      identificador,
-      agrupacion: 'Z',
-      codigo: String(codigos[0]).toLowerCase(),
-    });
-    expect(bueno.body, JSON.stringify(bueno.body)).toMatchObject({
+    const alta = await con(segundo).post(`/copropiedades/${COP_A}/mi/alta`, perfil(2));
+    expect(alta.body, JSON.stringify(alta.body)).toMatchObject({
       vinculada: true,
       debeDeclararOcupantes: false,
     });
-    const cuarto = await residenteNuevo(4);
-    const reusado = await con(cuarto).post(ruta, {
-      perfil: perfil(4),
-      identificador,
-      agrupacion: 'Z',
-      codigo: codigos[0],
-    });
-    expect(reusado.body.motivo, 'un código de ocupante sirvió dos veces').toBe('CODIGO_INCORRECTO');
-    const ajena = await con(cuarto).post(ruta, {
-      perfil: perfil(1),
-      identificador,
-      agrupacion: 'Z',
-      codigo: codigos[1],
-    });
+    const fila = await uno<{ origen: string; titular: boolean; plaza: number }>(
+      `SELECT u.origen_de_alta AS origen, r.es_titular AS titular, p.numero AS plaza
+         FROM public.usuarios u
+         JOIN public.residentes r ON r.persona_id = u.persona_id AND r.estado = 'activo'
+         JOIN public.plazas_de_ocupante p ON p.usuario_id = u.id AND p.estado = 'activo'
+        WHERE u.id = $1 AND r.vivienda_id = $2`,
+      [usuarioDe(segundo), viviendaId],
+    );
+    expect(fila).toEqual({ origen: 'autorregistro', titular: false, plaza: 2 });
+    // Un código sirve una vez: el mismo, para otra cuenta, es el error genérico.
+    const reusado = await http()
+      .post('/auth/registro')
+      .set('x-forwarded-for', '203.0.113.30')
+      .send({
+        usuario: `res30.${SUFIJO}`,
+        correo: `res30.${SUFIJO}@correo.invalid`,
+        contrasena: NUEVA,
+        confirmacion: NUEVA,
+        codigoDeInvitacion: codigos[0],
+        fechaNacimiento: '1990-05-17',
+        aceptaTratamientoDeDatos: true,
+        versionPolitica: VERSION_DE_LA_POLITICA_DE_DATOS,
+      });
+    expect(reusado.status, 'un código de ocupante sirvió dos veces').toBe(400);
+    expect(JSON.stringify(reusado.body)).toContain('no es válido o ya se usó');
+    // Sin guiones y en minúsculas también vale: la normalización es del dominio.
+    tercero = await ocupanteNuevo(3, String(codigos[1]).toLowerCase().replace(/-/g, ''));
+    const ajena = await con(tercero).post(`/copropiedades/${COP_A}/mi/alta`, perfil(1));
     expect(ajena.body.motivo, 'se apropió del documento de otro ocupante').toBe('DOCUMENTO_EN_USO');
+    const propia = await con(tercero).post(`/copropiedades/${COP_A}/mi/alta`, perfil(3));
+    expect(propia.body.vinculada, JSON.stringify(propia.body)).toBe(true);
+  });
+
+  it('3.5 · cambiar de vivienda exige el código de la de destino; los equivocados se cuentan y bloquean', async () => {
+    if (omitida()) return;
+    viviendaQ = await viviendaEn(COP_A, `Q${SUFIJO}`);
+    vecino = await titularNuevo(5, viviendaQ);
+    expect((await con(vecino).post(`/copropiedades/${COP_A}/mi/alta`, perfil(5))).status).toBe(200);
+    const plazasQ = await con(vecino).post(`/copropiedades/${COP_A}/mi/ocupantes`, { numero: 2 });
+    const codigoQ = plazasQ.body.plazas.find((p: { libre: boolean }) => p.libre)?.codigo as string;
+    const ruta = `/copropiedades/${COP_A}/mi/vinculacion`;
+    const hacia = (codigo: string | null) => ({
+      perfil: perfil(3),
+      identificador: `Q${SUFIJO}`,
+      agrupacion: 'z',
+      codigo,
+    });
+    expect((await con(tercero).post(ruta, hacia(null))).body.motivo).toBe('CODIGO_REQUERIDO');
+    // Un prefijo de OTRO conjunto es un código incorrecto, aunque la parte de la plaza sea buena.
+    const otroConjunto = await con(tercero).post(ruta, hacia(`ROBLE-${codigoQ.slice(-9)}`));
+    expect(otroConjunto.body.motivo).toBe('CODIGO_INCORRECTO');
+    for (let i = 0; i < 4; i += 1) {
+      const malo = await con(tercero).post(ruta, hacia('AAAA-AAAA'));
+      expect(malo.body.motivo).toBe('CODIGO_INCORRECTO');
+    }
+    const bloqueado = await con(tercero).post(ruta, hacia(codigoQ));
+    expect(bloqueado.body.motivo).toBe('DEMASIADOS_INTENTOS');
     const f = await uno<{ n: string }>(
       `SELECT count(*)::text AS n FROM public.bitacora_de_residentes
-        WHERE vivienda_id = $1 AND tipo IN ('codigo_incorrecto', 'vinculacion_bloqueada', 'vinculacion')`,
-      [viviendaId],
+        WHERE usuario_id = $1 AND tipo IN ('codigo_incorrecto', 'vinculacion_bloqueada')`,
+      [usuarioDe(tercero)],
     );
-    expect(Number(f?.n)).toBeGreaterThanOrEqual(8);
+    expect(Number(f?.n)).toBeGreaterThanOrEqual(6);
+    // Con el código bueno de la plaza 4 de P, alguien de Q se muda a P (y deja Q).
+    const deQ = await ocupanteNuevo(6, codigoQ);
+    expect((await con(deQ).post(`/copropiedades/${COP_A}/mi/alta`, perfil(6))).status).toBe(200);
+    const mudanza = await con(deQ).post(ruta, {
+      perfil: perfil(6),
+      identificador,
+      agrupacion: 'Z',
+      codigo: codigos[2],
+    });
+    expect(mudanza.body, JSON.stringify(mudanza.body)).toMatchObject({ vinculada: true });
+    // La plaza que dejó en Q quedó libre con OTRO código: el anterior ya no abre nada.
+    const enQ = await con(vecino).get(`/copropiedades/${COP_A}/mi/ocupantes`);
+    const libresQ = enQ.body.plazas.filter((p: { libre: boolean }) => p.libre);
+    expect(libresQ).toHaveLength(1);
+    expect(libresQ[0].codigo).not.toBe(codigoQ);
+    // P-38 · el titular no se muda desde la app: ni se mira el código.
+    const titularDeQ = await con(vecino).post(ruta, {
+      perfil: perfil(5),
+      identificador,
+      agrupacion: 'Z',
+      codigo: libresQ[0].codigo,
+    });
+    expect(titularDeQ.body.motivo).toBe('TITULAR_NO_SE_MUDA');
     const fam = await con(primero).get(`/copropiedades/${COP_A}/mi/familia`);
     ocupanteIds = fam.body.map((m: { residenteId: string }) => m.residenteId);
-    expect(ocupanteIds).toHaveLength(2);
+    expect(ocupanteIds).toHaveLength(4);
   });
 
   it('D5 a · dos propios al instante; el TERCERO se rechaza con su motivo y queda en la bitácora', async () => {
     if (omitida()) return;
     const ruta = `/copropiedades/${COP_A}/mi/vehiculos`;
-    const auto = (placa: string, ocupantes = ocupanteIds) => ({
+    const auto = (placa: string, ocupantes = ocupanteIds.slice(0, 2)) => ({
       placa,
       color: 'Gris',
       modelo: 'Mazda 3',
       tipo: 'automovil',
       ocupantes,
     });
-    const a = await con(primero).post(ruta, auto(`A${SUFIJO.slice(-5)}`, ocupanteIds));
+    const a = await con(primero).post(ruta, auto(`A${SUFIJO.slice(-5)}`));
     const b = await con(primero).post(ruta, auto(`B${SUFIJO.slice(-5)}`, [ocupanteIds[0] ?? '']));
     expect(a.body.registrado, JSON.stringify(a.body)).toBe(true);
     expect(b.body.registrado, JSON.stringify(b.body)).toBe(true);
@@ -498,6 +620,121 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     }
   });
 
+  it('D5 (15-W) · edita y elimina sus vehículos: placa sólo sin historial, borrado o baja según el historial; el del vecino, 404', async () => {
+    if (omitida()) return;
+    const ruta = `/copropiedades/${COP_A}/mi/vehiculos`;
+    // Libera el tope: los dos propios de la prueba de concurrencia, de baja.
+    const { rows } = await (pool as Pool).query<{ id: string }>(
+      `SELECT id FROM public.vehiculos WHERE vivienda_id = $1 AND origen_registro = 'residente'
+          AND estado = 'activo'`,
+      [viviendaId],
+    );
+    for (const v of rows) await con(primero).post(`${ruta}/${v.id}/desactivacion`, {});
+    const alta = (placa: string) =>
+      con(primero).post(ruta, {
+        placa,
+        color: 'Gris',
+        modelo: 'Mazda 3',
+        tipo: 'automovil',
+        ocupantes: [ocupanteIds[0]],
+      });
+    const conPlaca = await alta(`V1${SUFIJO.slice(-4)}`);
+    const sinUso = await alta(`V2${SUFIJO.slice(-4)}`);
+    expect(conPlaca.body.registrado, JSON.stringify(conPlaca.body)).toBe(true);
+    expect(sinUso.body.registrado, JSON.stringify(sinUso.body)).toBe(true);
+    const v1 = String(conPlaca.body.id);
+    const v2 = String(sinUso.body.id);
+
+    // Sin historial la placa cambia, y pasa por el objeto de valor `Placa`.
+    const nueva = `V9${SUFIJO.slice(-4)}`;
+    const editado = await con(primero).put(`${ruta}/${v1}`, {
+      color: 'Azul',
+      modelo: 'Mazda 2',
+      placa: ` ${nueva.toLowerCase()} `,
+      ocupantes: ocupanteIds.slice(0, 2),
+    });
+    expect(editado.status, JSON.stringify(editado.body)).toBe(200);
+    expect(editado.body).toEqual({ editado: true });
+    expect(
+      await uno(
+        `SELECT v.placa, v.color,
+                (SELECT count(*)::text FROM public.vehiculos_ocupantes o
+                  WHERE o.vehiculo_id = v.id AND o.estado = 'activo') AS ocupantes
+           FROM public.vehiculos v WHERE v.id = $1`,
+        [v1],
+      ),
+    ).toEqual({ placa: nueva, color: 'Azul', ocupantes: '2' });
+    // §6 · el tipo no se edita y nadie elige vivienda: 400 por forma, no por regla.
+    for (const intruso of [{ tipo: 'moto' }, { viviendaId }, { estado: 'activo' }]) {
+      const r = await con(primero).put(`${ruta}/${v1}`, {
+        color: 'Azul',
+        modelo: 'Mazda 2',
+        ...intruso,
+      });
+      expect(r.status, JSON.stringify(intruso)).toBe(400);
+    }
+    // La placa de otro vehículo activo: la decide el índice único parcial (ADR-04).
+    const duplicada = await con(primero).put(`${ruta}/${v2}`, {
+      color: 'Rojo',
+      modelo: 'Kia Rio',
+      placa: nueva,
+    });
+    expect(duplicada.status, JSON.stringify(duplicada.body)).toBe(409);
+
+    // Con historial —un paso por la portería con su placa, que monta el superusuario—
+    // la placa ya no cambia: una placa nueva es otro vehículo. Lo demás, sí.
+    await (pool as Pool).query(
+      `INSERT INTO public.eventos (copropiedad_id, ocurrido_en, tipo, resultado, metodo, dispositivo_id,
+                                   regla_aplicada, version_reglas, clave_idempotencia, creado_por, placa_detectada)
+       VALUES ($1, now(), 'ingreso', 'permitido', 'placa', '90000000-0000-4000-8000-000000000001',
+               'prueba-15w-d5', 1, $2, $3, $4)`,
+      [COP_A, `d5-${SUFIJO}`, SUPER, nueva],
+    );
+    const conHistorial = await con(primero).put(`${ruta}/${v1}`, {
+      color: 'Negro',
+      modelo: 'Mazda 2',
+      placa: `V8${SUFIJO.slice(-4)}`,
+    });
+    expect(conHistorial.status).toBe(409);
+    expect(JSON.stringify(conHistorial.body)).toContain(
+      'Dé de baja este vehículo y registre el nuevo',
+    );
+    expect(
+      (await con(primero).put(`${ruta}/${v1}`, { color: 'Negro', modelo: 'Mazda 2' })).status,
+    ).toBe(200);
+
+    // El del vecino no existe para quien no es de su vivienda: 404, y nada cambia.
+    expect(
+      (await con(vecino).put(`${ruta}/${v1}`, { color: 'Verde', modelo: 'Otro' })).status,
+    ).toBe(404);
+    expect((await con(vecino).delete(`${ruta}/${v1}`)).status).toBe(404);
+    expect(
+      (await uno<{ color: string }>('SELECT color FROM public.vehiculos WHERE id = $1', [v1]))
+        ?.color,
+    ).toBe('Negro');
+
+    // Eliminar: sin historial, borrado de verdad; con historial, baja lógica (RN-19).
+    const borrado = await con(primero).delete(`${ruta}/${v2}`);
+    expect(borrado.body, JSON.stringify(borrado.body)).toEqual({ resultado: 'borrado' });
+    expect(await uno('SELECT 1 AS hay FROM public.vehiculos WHERE id = $1', [v2])).toBeUndefined();
+    const deBaja = await con(primero).delete(`${ruta}/${v1}`);
+    expect(deBaja.body, JSON.stringify(deBaja.body)).toEqual({ resultado: 'dado_de_baja' });
+    expect(
+      (
+        await uno<{ estado: string }>('SELECT estado::text FROM public.vehiculos WHERE id = $1', [
+          v1,
+        ])
+      )?.estado,
+    ).toBe('inactivo');
+    expect((await con(primero).delete(`${ruta}/${v1}`)).status).toBe(404);
+    const rastro = await uno<{ n: string }>(
+      `SELECT count(*)::text AS n FROM public.bitacora_de_residentes
+        WHERE vivienda_id = $1 AND tipo IN ('vehiculo_propio_editado', 'vehiculo_propio_borrado')`,
+      [viviendaId],
+    );
+    expect(rastro?.n).toBe('3');
+  });
+
   it('3.5 · el perfil: editable, con la copropiedad y el teléfono de portería; el documento no va a la bitácora', async () => {
     if (omitida()) return;
     const antes = await con(primero).get(`/copropiedades/${COP_A}/mi/perfil`);
@@ -602,14 +839,24 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
     const ruta = `/copropiedades/${COP_A}/viviendas/${viviendaId}/ocupantes`;
     const anadidas = await comoSuper('post', ruta).send({ cantidad: 1, motivo: 'nace un bebé' });
     expect(anadidas.status, JSON.stringify(anadidas.body)).toBe(200);
-    expect(anadidas.body).toHaveLength(4);
+    // Ya estaba en el tope (4): la ruta del superadministrador lo sube a 5 (D4 bis).
+    expect(anadidas.body).toHaveLength(5);
+    expect(
+      (
+        await uno<{ tope: number }>(
+          'SELECT tope_de_plazas AS tope FROM public.viviendas WHERE id = $1',
+          [viviendaId],
+        )
+      )?.tope,
+    ).toBe(5);
     const ocupada = anadidas.body.find((p: { numero: number }) => p.numero === 2);
     const retiro = await comoSuper('post', `${ruta}/${String(ocupada.id)}/retiro`).send({
       motivo: 'se mudó a otra ciudad',
     });
     expect(retiro.status).toBe(200);
     const fam = await con(primero).get(`/copropiedades/${COP_A}/mi/familia`);
-    expect(fam.body.filter((m: { activo: boolean }) => m.activo)).toHaveLength(1);
+    // Eran cuatro: quitar la plaza 2 da de baja a quien la ocupaba.
+    expect(fam.body.filter((m: { activo: boolean }) => m.activo)).toHaveLength(3);
     const rastro = await uno<{ n: string }>(
       `SELECT count(*)::text AS n FROM public.bitacora_de_residentes
         WHERE vivienda_id = $1 AND tipo IN ('plaza_anadida', 'plaza_retirada') AND actor_id = $2`,

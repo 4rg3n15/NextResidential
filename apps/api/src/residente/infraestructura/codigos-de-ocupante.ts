@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { codigoDesdeBytes } from '@ncr/domain-core';
 import { PROPOSITOS, derivarLlave } from '../../comun/cripto/sobre-aes-gcm';
+import type { Proposito } from '../../comun/cripto/sobre-aes-gcm';
 import type { CodigosDeOcupante, PlazaDeOcupante } from '../aplicacion/puertos-hogar';
 
 /**
@@ -25,10 +26,18 @@ import type { CodigosDeOcupante, PlazaDeOcupante } from '../aplicacion/puertos-h
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export class CodigosDeOcupanteHmac implements CodigosDeOcupante {
-  constructor(private readonly llaveMaestra: string) {}
+  /**
+   * 15-W · el mismo mecanismo con OTRO propósito da otro código para la misma
+   * plaza: el de traspaso (S-15W-05) no abre la plaza como un código de
+   * invitación, ni al revés.
+   */
+  constructor(
+    private readonly llaveMaestra: string,
+    private readonly proposito: Proposito = PROPOSITOS.codigoDeOcupante,
+  ) {}
 
   codigoDe(copropiedadId: string, plazaId: string, generacion: number): string {
-    const llave = derivarLlave(this.llaveMaestra, copropiedadId, PROPOSITOS.codigoDeOcupante);
+    const llave = derivarLlave(this.llaveMaestra, copropiedadId, this.proposito);
     const resumen = createHmac('sha256', llave)
       .update(`${plazaId}:${String(generacion)}`)
       .digest();

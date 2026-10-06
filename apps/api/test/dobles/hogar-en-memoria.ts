@@ -117,10 +117,17 @@ export class HogarEnMemoria
       tipo: 'casas',
       etiquetaVivienda: 'Casa',
       etiquetaAgrupacion: 'Manzana',
+      codigoCorto: copropiedadId === COP_A ? 'COPA' : 'COPB',
     };
   }
   async estado(_copropiedadId: string, usuarioId: string): Promise<EstadoDeAltaGuardado> {
-    return { viviendaId: VIVIENDA_DE.get(usuarioId) ?? null, debeDeclararOcupantes: false };
+    const viviendaId = VIVIENDA_DE.get(usuarioId) ?? null;
+    return {
+      viviendaId,
+      debeDeclararOcupantes: false,
+      viviendaAsignada: null,
+      topeDePlazas: viviendaId === null ? null : 4,
+    };
   }
   async buscarVivienda(copropiedadId: string): Promise<readonly ViviendaEncontrada[]> {
     return copropiedadId === COP_A ? [{ id: VIVIENDA_1, activa: true, tieneCuenta: true }] : [];
@@ -141,8 +148,13 @@ export class HogarEnMemoria
   async plazas(_c: string, viviendaId: string): Promise<readonly PlazaDeOcupante[]> {
     return this.plazasDe.get(viviendaId) ?? [];
   }
-  async declaracion(_c: string, viviendaId: string, usuarioId: string) {
-    return { esPrimerResidente: VIVIENDA_DE.get(usuarioId) === viviendaId, declarada: true };
+  async declaracion(c: string, viviendaId: string, usuarioId: string) {
+    return {
+      esPrimerResidente: VIVIENDA_DE.get(usuarioId) === viviendaId,
+      declarada: true,
+      tope: 4,
+      codigoCorto: c === COP_A ? 'COPA' : 'COPB',
+    };
   }
   async declarar(): Promise<boolean> {
     return false;
@@ -257,6 +269,7 @@ export class HogarEnMemoria
           activa: true,
           debeCambiarContrasena: false,
           creadaEn: new Date(0).toISOString(),
+          origen: 'administracion',
         },
       ],
     ],

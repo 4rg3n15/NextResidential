@@ -13,3 +13,19 @@ export { PadronModule } from './padron.module';
  */
 export { LOCALIZADOR_DE_VIVIENDA } from './aplicacion/puertos';
 export type { LocalizadorDeVivienda } from './aplicacion/puertos';
+/**
+ * 15-W (D5) · la lógica de editar y borrar un vehículo, para que el residente
+ * la REUTILICE sobre sus vehículos propios sin copiarla. Sale la función y la
+ * porción estrecha del puerto que usa; el repositorio entero sigue sin salir.
+ */
+export { borrarVehiculoSinHistorial, editarVehiculoCon } from './aplicacion/vehiculos-compartidos';
+export type {
+  EntradaEditarVehiculo,
+  PuertoDeBorradoDeVehiculo,
+  PuertoDeEdicionDeVehiculo,
+} from './aplicacion/vehiculos-compartidos';
+export type {
+  EdicionDeVehiculo,
+  HistorialDeVehiculo,
+  ResultadoEdicionVehiculo,
+} from './aplicacion/puertos';

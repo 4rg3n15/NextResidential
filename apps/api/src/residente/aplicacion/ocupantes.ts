@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AVISO_OCUPANTES_DEFINITIVO,
   RELOJ,
+  avisoDeOcupantes,
   decidirDeclaracion,
   esMotivoDePermiso,
   formatearCodigoDeOcupante,
@@ -23,15 +23,16 @@ import type {
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * OCUPANTES · DECLARAR UNA VEZ, CONSULTAR SIEMPRE (D6, 3.3, ADR-025)
+ * OCUPANTES · DECLARAR, CONSULTAR Y COMPARTIR (D6, 3.3, ADR-025) · RONDA 15-W
  *
- * El residente ve los códigos de las plazas LIBRES —para dárselos a quien vive
- * con él— y el nombre de quien ocupa las demás. El código de una plaza ocupada
- * ya no sirve para nada y no se muestra.
+ * El residente ve los códigos de las plazas LIBRES —con el prefijo de su
+ * conjunto, `MIRA-K7PQ-2XWZ`, para compartirlos (D2)— y el nombre de quien
+ * ocupa las demás, con cuenta o sin ella (un menor, D-W2). El código de una
+ * plaza ocupada ya no sirve para nada y no se muestra.
  *
- * Declarar es del primer residente y una sola vez. Cualquier otro intento
- * —volver a declarar, otro ocupante que lo intenta— es un rechazo de PERMISO
- * (403 en la ruta), porque cambiar el número le toca al superadministrador.
+ * Declarar es del titular y una sola vez, de 1 hasta el tope de su vivienda;
+ * desde la 15-W ya NO es definitivo: después añade y retira plazas libres
+ * (`plazas-del-titular.ts`). Otro intento de declarar es un rechazo de PERMISO.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
@@ -39,9 +40,11 @@ export interface PlazaVisible {
   readonly id: string;
   readonly numero: number;
   readonly libre: boolean;
-  /** Sólo en las libres: «ABCD-EFGH». */
+  /** Sólo en las libres: «MIRA-ABCD-EFGH». */
   readonly codigo: string | null;
   readonly ocupante: string | null;
+  /** 15-W · la ocupa una persona SIN cuenta (un menor del hogar). */
+  readonly sinCuenta: boolean;
 }
 
 export interface MisOcupantes {
@@ -49,6 +52,10 @@ export interface MisOcupantes {
   readonly declarada: boolean;
   readonly plazas: readonly PlazaVisible[];
   readonly aviso: string;
+  /** 15-W (D-W10) · el tope de la vivienda, contando al titular: «3 de 4». */
+  readonly tope: number;
+  /** 15-W · quien pregunta es el titular: sólo él añade y retira plazas. */
+  readonly esTitular: boolean;
 }
 
 export type ResultadoDeDeclaracion =
@@ -64,17 +71,21 @@ export const plazasVisibles = (
   codigos: CodigosDeOcupante,
   copropiedadId: string,
   plazas: readonly PlazaDeOcupante[],
+  prefijo: string | null,
 ): PlazaVisible[] =>
-  plazas.map((p) => ({
-    id: p.id,
-    numero: p.numero,
-    libre: p.usuarioId === null,
-    codigo:
-      p.usuarioId === null
-        ? formatearCodigoDeOcupante(codigos.codigoDe(copropiedadId, p.id, p.generacion))
+  plazas.map((p) => {
+    const libre = p.usuarioId === null && (p.personaId ?? null) === null;
+    return {
+      id: p.id,
+      numero: p.numero,
+      libre,
+      codigo: libre
+        ? formatearCodigoDeOcupante(codigos.codigoDe(copropiedadId, p.id, p.generacion), prefijo)
         : null,
-    ocupante: p.ocupante,
-  }));
+      ocupante: p.ocupante,
+      sinCuenta: (p.personaId ?? null) !== null,
+    };
+  });
 
 @Injectable()
 export class VerMisOcupantes {
@@ -98,8 +109,10 @@ export class VerMisOcupantes {
       valor: {
         declarados: plazas.length,
         declarada: d.declarada,
-        plazas: plazasVisibles(this.codigos, copropiedadId, plazas),
-        aviso: AVISO_OCUPANTES_DEFINITIVO,
+        plazas: plazasVisibles(this.codigos, copropiedadId, plazas, d.codigoCorto),
+        aviso: avisoDeOcupantes(d.tope),
+        tope: d.tope,
+        esTitular: d.esPrimerResidente,
       },
     };
   }
@@ -118,7 +131,7 @@ export class DeclararMisOcupantes {
   async ejecutar(
     ctx: ContextoTenant,
     copropiedadId: string,
-    pedido: { readonly numero: number; readonly confirmado: boolean },
+    pedido: { readonly numero: number },
   ): Promise<Resultado<ResultadoDeDeclaracion, ErrorDominio>> {
     const r = await this.resolver.ejecutar(ctx, copropiedadId);
     if (!r.ok) return r;
@@ -126,9 +139,9 @@ export class DeclararMisOcupantes {
     const d = await this.ocupantes.declaracion(copropiedadId, viviendaId, ctx.usuarioId);
     const decision = decidirDeclaracion({
       numero: pedido.numero,
-      confirmado: pedido.confirmado,
       esPrimerResidente: d.esPrimerResidente,
       yaDeclarada: d.declarada,
+      tope: d.tope,
     });
     if (!decision.ok) return this.rechazo(decision.error);
     // Dos declaraciones simultáneas: la base (plazas_numero_uk) deja pasar una.

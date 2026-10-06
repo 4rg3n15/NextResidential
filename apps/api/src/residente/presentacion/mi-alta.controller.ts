@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { explicacionDelTope } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -20,9 +22,12 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { VerMiAlta, VincularMiVivienda } from '../aplicacion/alta';
 import type { EntradaDeAlta, ResultadoDeAlta } from '../aplicacion/alta';
+import { CompletarMiPrimerIngreso } from '../aplicacion/primer-ingreso';
+import type { ResultadoDePrimerIngreso } from '../aplicacion/primer-ingreso';
 import { DeclararMisOcupantes, VerMisOcupantes } from '../aplicacion/ocupantes';
 import type { MisOcupantes } from '../aplicacion/ocupantes';
 import { AltaDeMiViviendaDto, DeclaracionDeOcupantesDto } from './dtos-hogar';
+import { PrimerIngresoDto } from './dtos-primer-ingreso';
 import { EstadoDeMiAltaDto, MisOcupantesDto, ResultadoDeAltaDto } from './respuestas-hogar';
 
 const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
@@ -64,22 +69,43 @@ const aDto = (r: ResultadoDeAlta): ResultadoDeAltaDto => {
   };
 };
 
+/** D3 (15-W) · el primer ingreso, con la misma forma de respuesta que el alta de antes. */
+const primerIngresoDto = (r: ResultadoDePrimerIngreso): ResultadoDeAltaDto => {
+  if (r.completado) {
+    return {
+      vinculada: true,
+      debeDeclararOcupantes: r.debeDeclararOcupantes,
+      motivo: null,
+      explicacion: null,
+      campos: [],
+    };
+  }
+  if ('campos' in r) {
+    throw new BadRequestException({ mensaje: 'Revise los datos', campos: [...r.campos] });
+  }
+  return {
+    vinculada: false,
+    debeDeclararOcupantes: false,
+    motivo: r.motivo,
+    explicacion: r.explicacion,
+    campos: [],
+  };
+};
+
 const ocupantesDto = (o: MisOcupantes): MisOcupantesDto => ({
-  declarados: o.declarados,
-  declarada: o.declarada,
+  ...o,
   plazas: o.plazas.map((p) => ({ ...p })),
-  aviso: o.aviso,
 });
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * PRIMER INGRESO Y OCUPANTES DEL RESIDENTE · ETAPA 15-I (3.2, 3.3, D6)
+ * PRIMER INGRESO Y OCUPANTES DEL RESIDENTE · ETAPA 15-I (3.2, 3.3, D6) · 15-W
  *
- * El alta es la única superficie del residente SIN ámbito de vivienda, porque
- * es la que lo crea: la vivienda se busca por su número y el vínculo exige
- * código si ya hay alguien dentro. Lleva su propio límite por dirección
- * (30/min, el mismo del acceso: detrás de la wifi de un edificio salen todos
- * por una IP) además del que importa, el de códigos equivocados POR CUENTA que
+ * Desde la 15-W la cuenta YA trae su vivienda (D1, D2): el primer ingreso sólo
+ * completa a la persona (D3) y no lleva vivienda ni código. El cambio de
+ * vivienda desde el perfil sí exige SIEMPRE el código de una plaza libre de la
+ * vivienda de destino (3.5). Límite propio por dirección (30/min, el mismo del
+ * acceso) además del que importa, el de códigos equivocados POR CUENTA que
  * cuenta la bitácora (5 en 15 minutos, S-55).
  * ═════════════════════════════════════════════════════════════════════════════
  */
@@ -90,6 +116,7 @@ export class MiAltaController {
   constructor(
     @Inject(VerMiAlta) private readonly verAlta: VerMiAlta,
     @Inject(VincularMiVivienda) private readonly vincular: VincularMiVivienda,
+    @Inject(CompletarMiPrimerIngreso) private readonly primerIngreso: CompletarMiPrimerIngreso,
     @Inject(VerMisOcupantes) private readonly verOcupantes: VerMisOcupantes,
     @Inject(DeclararMisOcupantes) private readonly declarar: DeclararMisOcupantes,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
@@ -113,16 +140,21 @@ export class MiAltaController {
   @HttpCode(200)
   @Roles('residente')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Primer ingreso: contacto, documento, vivienda y código (3.2)' })
+  @ApiOperation({
+    summary: 'Primer ingreso: nombre, documento de adulto, teléfono y fecha (D3); sin vivienda',
+  })
   @ApiOkResponse({ type: ResultadoDeAltaDto })
   async alta(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) copropiedadId: string,
-    @Body() dto: AltaDeMiViviendaDto,
+    @Body() dto: PrimerIngresoDto,
   ): Promise<ResultadoDeAltaDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/alta');
-    return aDto(
-      await this.vincular.ejecutar(destino, copropiedadId, entradaDe(dto), { cambio: false }),
+    return primerIngresoDto(
+      await this.primerIngreso.ejecutar(destino, copropiedadId, {
+        ...dto,
+        correo: dto.correo ?? null,
+      }),
     );
   }
 
@@ -138,9 +170,7 @@ export class MiAltaController {
     @Body() dto: AltaDeMiViviendaDto,
   ): Promise<ResultadoDeAltaDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/vinculacion');
-    return aDto(
-      await this.vincular.ejecutar(destino, copropiedadId, entradaDe(dto), { cambio: true }),
-    );
+    return aDto(await this.vincular.ejecutar(destino, copropiedadId, entradaDe(dto)));
   }
 
   @Get('ocupantes')
@@ -156,13 +186,14 @@ export class MiAltaController {
   }
 
   /**
-   * D6 · 403 para todo lo que no sea la PRIMERA declaración del PRIMER
-   * residente: el número sólo lo cambia el superadministrador.
+   * D6 · 403 para todo lo que no sea la PRIMERA declaración del titular. Desde
+   * la 15-W va de 1 hasta el tope y ya no es definitiva: después, el titular
+   * añade y retira plazas (`mis-plazas.controller.ts`).
    */
   @Post('ocupantes')
   @HttpCode(200)
   @Roles('residente')
-  @ApiOperation({ summary: 'Declaro cuántos ocupantes hay: una vez y definitivo (D6)' })
+  @ApiOperation({ summary: 'El titular declara cuántos ocupantes hay: de 1 al tope (D6, D-W10)' })
   @ApiOkResponse({ type: MisOcupantesDto })
   async declararOcupantes(
     @Contexto() ctx: ContextoTenant,
@@ -171,21 +202,18 @@ export class MiAltaController {
   ): Promise<MisOcupantesDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'mi/ocupantes');
     const r = desenvolver(
-      await this.declarar.ejecutar(destino, copropiedadId, {
-        numero: dto.numero,
-        confirmado: dto.confirmoQueEsDefinitivo,
-      }),
+      await this.declarar.ejecutar(destino, copropiedadId, { numero: dto.numero }),
     );
     if (r.declarada) return ocupantesDto(r.ocupantes);
     if (r.dePermiso) {
       throw new ForbiddenException(
-        'El número de ocupantes ya está fijado: sólo el superadministrador lo cambia (D6)',
+        'Los ocupantes ya se declararon, o no es el titular: las plazas las gestiona el titular',
       );
     }
-    throw new BadRequestException(
-      r.motivo === 'SIN_CONFIRMACION'
-        ? 'Confirme que el número es definitivo'
-        : 'El número de ocupantes va de 1 a 20',
-    );
+    if (r.motivo === 'SUPERA_EL_TOPE') {
+      const vistos = desenvolver(await this.verOcupantes.ejecutar(destino, copropiedadId));
+      throw new ConflictException(explicacionDelTope(vistos.tope));
+    }
+    throw new BadRequestException('El número de ocupantes va de 1 a 20');
   }
 }

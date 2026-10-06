@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { RELOJ, validarPerfil } from '@ncr/domain-core';
+import { RELOJ, edadEn, puedeTenerCuenta, validarPerfil } from '@ncr/domain-core';
 import type { CampoRechazado, DatosDelPerfil, Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { BITACORA_DE_RESIDENTES, PERFIL_DEL_RESIDENTE } from './puertos-hogar';
@@ -16,6 +16,18 @@ export type ResultadoDePerfil =
   | { readonly guardado: true; readonly perfil: PerfilGuardado }
   | { readonly guardado: false; readonly campos: readonly CampoRechazado[] }
   | { readonly guardado: false; readonly motivo: 'DOCUMENTO_EN_USO' | 'SIN_VINCULO' };
+
+/**
+ * 15-W (D-W2) · el perfil es de una CUENTA, y las cuentas son de mayores de
+ * edad: una fecha de menor se rechaza aquí, como campo, antes de que la base la
+ * rechace (`tg_persona_con_cuenta_solo_mayor`, 0055) con un error genérico.
+ */
+const fechaDeMenor = (fecha: string | null, ahora: Date): CampoRechazado | null => {
+  const edad = fecha === null ? null : edadEn(fecha, ahora);
+  return edad !== null && !puedeTenerCuenta(edad)
+    ? { campo: 'fechaNacimiento', motivo: 'Las cuentas son para mayores de edad' }
+    : null;
+};
 
 @Injectable()
 export class VerMiPerfil {
@@ -41,6 +53,8 @@ export class EditarMiPerfil {
   ): Promise<ResultadoDePerfil> {
     const valido = validarPerfil(datos, this.reloj.ahora());
     if (!valido.ok) return { guardado: false, campos: valido.error };
+    const menor = fechaDeMenor(valido.valor.fechaNacimiento, this.reloj.ahora());
+    if (menor !== null) return { guardado: false, campos: [menor] };
     const r = await this.perfiles.guardar(copropiedadId, ctx.usuarioId, valido.valor);
     if (r !== 'guardado') return { guardado: false, motivo: r };
     await this.bitacora.anotar({
@@ -96,6 +110,8 @@ export class PerfilDeResidentePorSuperadmin {
     if (antes === null) return { guardado: false, motivo: 'SIN_VINCULO' };
     const valido = validarPerfil(datos, this.reloj.ahora());
     if (!valido.ok) return { guardado: false, campos: valido.error };
+    const menor = fechaDeMenor(valido.valor.fechaNacimiento, this.reloj.ahora());
+    if (menor !== null) return { guardado: false, campos: [menor] };
     const cambiados = CAMPOS_DEL_PERFIL.filter(
       (campo) => (antes[campo] ?? null) !== (valido.valor[campo] ?? null),
     );

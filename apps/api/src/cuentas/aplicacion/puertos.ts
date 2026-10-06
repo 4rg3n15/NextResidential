@@ -1,6 +1,7 @@
 import type { Rol } from '../../autenticacion';
 import type { CorreoSintetico } from '../dominio/correo-sintetico';
 import type { NombreDeUsuario } from '../dominio/nombre-de-usuario';
+import type { EscrituraDelVinculo } from './puertos-del-registro';
 
 /**
  * Puertos del módulo de cuentas (ADR-023).
@@ -76,6 +77,11 @@ export interface AltaDeCuenta {
   readonly nombre: string;
   readonly telefono: string | null;
   readonly rol: 'portero' | 'residente';
+  /** 15-W · por omisión, la administración y con el cambio obligatorio (ADR-023). */
+  readonly origen?: 'administracion' | 'autorregistro';
+  readonly debeCambiarContrasena?: boolean;
+  /** 15-W · el vínculo con su vivienda, en la MISMA transacción (`puertos-del-registro.ts`). */
+  readonly vinculo?: EscrituraDelVinculo;
 }
 
 export interface RepositorioDeCuentas {
@@ -103,8 +109,8 @@ export const REPOSITORIO_DE_CUENTAS = Symbol.for('ncr.puerto.RepositorioDeCuenta
 
 export type AltaEnBase =
   | { readonly ok: true; readonly usuarioId: string; readonly numeroDePortero: number | null }
-  /** DUPLICADO: el índice único ganó a un alta simultánea. CUPO y POOL_AGOTADO: H2. */
-  | { readonly ok: false; readonly motivo: 'DUPLICADO' | 'CUPO' | 'POOL_AGOTADO' };
+  /** DUPLICADO: el índice único ganó a un alta simultánea. CUPO y POOL_AGOTADO: H2. VINCULO: 15-W. */
+  | { readonly ok: false; readonly motivo: 'DUPLICADO' | 'CUPO' | 'POOL_AGOTADO' | 'VINCULO' };
 
 /**
  * H5 (15-L) · el bloqueo temporal por (IP, identificador). Lo implementa el

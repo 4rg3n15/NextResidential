@@ -40,6 +40,16 @@ const PUBLICAS = new Set([
    * Su prueba está en `cuentas-y-porteria.e2e.test.ts`.
    */
   'POST /auth/acceso',
+  /**
+   * 15-W (ADR-037) · «Crear cuenta» con el código de una plaza que compartió el
+   * titular. Sin sesión por definición: quien se registra aún no tiene cuenta.
+   * La protegen la edad antes que el código, el código buscado SÓLO en la
+   * copropiedad de su prefijo y en tiempo constante, la misma respuesta y el
+   * mismo tiempo mínimo para todo fallo, los límites por IP y por prefijo, y la
+   * suspensión del registro de esa copropiedad a los 30 fallos en una hora. No
+   * emite tokens. Su prueba está en `autorregistro.e2e.test.ts`.
+   */
+  'POST /auth/registro',
 ]);
 
 /**

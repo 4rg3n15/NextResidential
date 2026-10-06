@@ -110,9 +110,11 @@ const SIN_AMBITO_DE_VIVIENDA = new Set([
   'GET /copropiedades/:id/zonas',
   'GET /copropiedades/:id/mi/zonas',
   'POST /copropiedades/:id/biometria/consentimientos/:consentimientoId/revocacion',
-  // 15-I (3.2) · el ALTA es lo que crea el ámbito: antes de ella la cuenta no
-  // tiene vivienda que acotar. La vivienda se busca por su número y el vínculo
-  // exige código si ya hay alguien dentro; lo prueba `residentes-y-vehiculos-pg`.
+  // 15-W (D3) · el ALTA completa el ámbito que la cuenta ya trae —la vivienda
+  // la asignó la administración (titular) o la plaza de su código—: antes de
+  // ella no hay vínculo que acotar, y ni se pide ni se acepta una vivienda. El
+  // cambio de vivienda exige el código de una plaza de la de destino; lo
+  // prueban `titular-por-administracion-pg` y `residentes-y-vehiculos-pg`.
   'GET /copropiedades/:id/mi/alta',
   'POST /copropiedades/:id/mi/alta',
   'POST /copropiedades/:id/mi/vinculacion',
@@ -140,6 +142,24 @@ const CUBIERTAS_APARTE = new Set([
   'GET /copropiedades/:id/mi/notificaciones/web-push',
   'POST /copropiedades/:id/mi/notificaciones/web-push',
   'POST /copropiedades/:id/mi/notificaciones/web-push/baja',
+  // 15-W · sus adaptadores son de PostgreSQL y su ámbito se prueba contra la
+  // base, con un vecino de verdad. Menores (D4): `menores-del-hogar-pg` —un
+  // adulto de otra vivienda recibe 404—.
+  'GET /copropiedades/:id/mi/menores',
+  'POST /copropiedades/:id/mi/menores',
+  'PUT /copropiedades/:id/mi/menores/:residenteId',
+  'POST /copropiedades/:id/mi/menores/:residenteId/baja',
+  'POST /copropiedades/:id/mi/menores/:residenteId/codigo-de-traspaso',
+  // Plazas del titular (D4 bis): `plazas-del-titular-pg` —otro adulto 403, la
+  // plaza de otra vivienda 404—.
+  'POST /copropiedades/:id/mi/ocupantes/plazas',
+  'POST /copropiedades/:id/mi/ocupantes/plazas/:plazaId/retiro',
+  // Vehículos propios (D5): `residentes-y-vehiculos-pg` —el del vecino, 404—.
+  'PUT /copropiedades/:id/mi/vehiculos/:vehiculoId',
+  'DELETE /copropiedades/:id/mi/vehiculos/:vehiculoId',
+  // Revocar una visita (D6): `mis-visitas-revocacion.e2e` —la del vecino y la
+  // de otra copropiedad, 404—.
+  'POST /copropiedades/:id/mi/visitas/:autorizacionId/revocacion',
 ]);
 
 /**

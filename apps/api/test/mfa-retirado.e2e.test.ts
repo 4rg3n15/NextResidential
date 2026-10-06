@@ -56,6 +56,9 @@ describe('las rutas de MFA propias ya no existen', () => {
       'POST /auth/contrasena',
       'POST /auth/mfa/codigos',
       'POST /auth/mfa/recuperacion',
+      // 15-W (ADR-037) · «Crear cuenta» con código de plaza: pública y sin MFA,
+      // porque sólo crea cuentas de residente, que no lo llevan (RN-20).
+      'POST /auth/registro',
       'POST /auth/restablecimiento',
     ]);
   });

@@ -27,4 +27,14 @@ export type {
 } from './aplicacion/puertos';
 export { RepositorioDeCuentasEnMemoria } from './infraestructura/repositorio-cuentas-memoria';
 export { limitadoresDeAcceso } from './presentacion/limites-de-acceso';
+export { limitadoresDeRegistro } from './presentacion/limites-de-registro';
+// 15-W · lo que el residente cumple para que una cuenta nazca con su vivienda.
+export { REGISTRO_DE_INVITACIONES } from './aplicacion/puertos-del-registro';
+export type {
+  DatosDelRegistro,
+  EjecutorDelAlta,
+  EscrituraDelVinculo,
+  InvitacionesDeResidente,
+  RegistroDeInvitaciones,
+} from './aplicacion/puertos-del-registro';
 export { MENSAJE_CREDENCIALES } from './presentacion/cuentas.controller';

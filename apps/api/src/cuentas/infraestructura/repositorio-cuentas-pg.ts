@@ -120,8 +120,9 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
         const { rows } = await c.query<{ id: string }>(
           `INSERT INTO public.usuarios
              (copropiedad_id, auth_user_id, correo, nombre_usuario, nombre, telefono,
-              numero_de_portero, debe_cambiar_contrasena, creado_por, actualizado_por)
-           VALUES ($1, $2, NULL, $3, $4, $5, $6, true, $7, $7)
+              numero_de_portero, debe_cambiar_contrasena, origen_de_alta, creado_por,
+              actualizado_por)
+           VALUES ($1, $2, NULL, $3, $4, $5, $6, $8, $9, $7, $7)
            RETURNING id`,
           [
             alta.copropiedadId,
@@ -131,6 +132,8 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
             alta.telefono,
             numero,
             actorId,
+            alta.debeCambiarContrasena ?? true,
+            alta.origen ?? 'administracion',
           ],
         );
         const usuarioId = rows[0]?.id;
@@ -141,6 +144,13 @@ export class RepositorioDeCuentasPg implements RepositorioDeCuentas {
            VALUES ($1, $2, $3::rol_usuario, $4, $4)`,
           [alta.copropiedadId, usuarioId, alta.rol, actorId],
         );
+        // 15-W · el vínculo con su vivienda, antes del COMMIT: o los dos o ninguno.
+        const ejecutar = async (sql: string, p: readonly unknown[]): Promise<number> =>
+          (await c.query(sql, [...p])).rowCount ?? 0;
+        if (alta.vinculo !== undefined && !(await alta.vinculo.escribir(ejecutar, usuarioId))) {
+          await c.query('ROLLBACK');
+          return { ok: false, motivo: 'VINCULO' };
+        }
         await c.query('COMMIT');
         return { ok: true, usuarioId, numeroDePortero: numero };
       } catch (error) {

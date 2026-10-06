@@ -14,12 +14,14 @@ export class BitacoraDeResidentesPg implements BitacoraDeResidentes {
   constructor(private readonly pool: Pool) {}
 
   async anotar(h: HechoDeResidente): Promise<void> {
-    await comoServicio(this.pool, h.copropiedadId, h.actorId, async (c) => {
+    // 15-W · sin actor humano (un intento de registro anónimo) firma la ingesta.
+    const firma = h.actorId ?? ACTOR_INGESTA;
+    await comoServicio(this.pool, h.copropiedadId, firma, async (c) => {
       await c.query(
         `INSERT INTO public.bitacora_de_residentes
            (copropiedad_id, ocurrido_en, tipo, usuario_id, actor_id, vivienda_id, vehiculo_id,
             detalle, creado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           h.copropiedadId,
           h.ocurridoEn,
@@ -29,6 +31,7 @@ export class BitacoraDeResidentesPg implements BitacoraDeResidentes {
           h.viviendaId ?? null,
           h.vehiculoId ?? null,
           h.detalle === undefined || h.detalle === null ? null : h.detalle.slice(0, 500),
+          firma,
         ],
       );
     });
@@ -49,14 +52,24 @@ export class CuentasDeResidentesPg implements CuentasDeResidentes {
         activa: boolean;
         debe_cambiar: boolean;
         creado_en: Date;
+        origen: 'administracion' | 'autorregistro';
       }>(
+        // 15-W · antes del primer ingreso, la vivienda que la cuenta YA trae:
+        // la de su titularidad (D1) o la de su plaza (D2).
         `SELECT u.id, u.nombre_usuario::text AS usuario, u.nombre,
-                (SELECT btrim(coalesce(v.agrupacion || ' · ', '') || v.identificador)
-                   FROM public.residentes r JOIN public.viviendas v ON v.id = r.vivienda_id
-                  WHERE r.persona_id = u.persona_id AND r.estado = 'activo'
-                  ORDER BY r.es_titular DESC, r.creado_en LIMIT 1) AS vivienda,
+                coalesce(
+                  (SELECT btrim(coalesce(v.agrupacion || ' · ', '') || v.identificador)
+                     FROM public.residentes r JOIN public.viviendas v ON v.id = r.vivienda_id
+                    WHERE r.persona_id = u.persona_id AND r.estado = 'activo'
+                    ORDER BY r.es_titular DESC, r.creado_en LIMIT 1),
+                  (SELECT btrim(coalesce(v.agrupacion || ' · ', '') || v.identificador)
+                     FROM public.ocupacion_de_viviendas o JOIN public.viviendas v ON v.id = o.vivienda_id
+                    WHERE o.primer_residente_id = u.id LIMIT 1),
+                  (SELECT btrim(coalesce(v.agrupacion || ' · ', '') || v.identificador)
+                     FROM public.plazas_de_ocupante p JOIN public.viviendas v ON v.id = p.vivienda_id
+                    WHERE p.usuario_id = u.id AND p.estado = 'activo' LIMIT 1)) AS vivienda,
                 u.estado = 'activo' AS activa, u.debe_cambiar_contrasena AS debe_cambiar,
-                u.creado_en
+                u.creado_en, u.origen_de_alta AS origen
            FROM public.usuarios u
           WHERE u.copropiedad_id = $1
             -- C9 (15-M) · también las dadas de baja: el rol queda inactivo
@@ -76,6 +89,7 @@ export class CuentasDeResidentesPg implements CuentasDeResidentes {
         activa: f.activa,
         debeCambiarContrasena: f.debe_cambiar,
         creadaEn: f.creado_en.toISOString(),
+        origen: f.origen,
       }));
     });
   }
