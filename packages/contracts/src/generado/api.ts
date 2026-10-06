@@ -3275,7 +3275,7 @@ export interface components {
             nueva: string;
         };
         CambioDeTopeDePlazasDto: {
-            /** @description null = vuelve al tope de su copropiedad */
+            /** @description null = vuelve al tope de su copropiedad. Obligatorio: omitirlo es 400 */
             tope: number | null;
             motivo: string;
         };

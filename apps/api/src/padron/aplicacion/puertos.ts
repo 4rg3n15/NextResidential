@@ -237,7 +237,9 @@ export interface EdicionDeVehiculo {
 export type ResultadoEdicionVehiculo =
   | { readonly tipo: 'editado' }
   | { readonly tipo: 'no_encontrado' }
-  | { readonly tipo: 'placa_activa_duplicada' };
+  | { readonly tipo: 'placa_activa_duplicada' }
+  /** 15-W · la placa no cambia si el vehículo tiene historial, decidido en la misma sentencia. */
+  | { readonly tipo: 'placa_con_historial' };
 
 /** Cuánto historial cuelga de un vehículo: eventos con su placa y autorizaciones. */
 export interface HistorialDeVehiculo {

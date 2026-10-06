@@ -70,7 +70,7 @@ export class TopeDePlazasController {
   ): Promise<TopeDePlazasDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, id, 'viviendas/tope-de-plazas');
     const r = await this.topes.cambiar(destino, id, viviendaId, {
-      tope: dto.tope ?? null,
+      tope: dto.tope,
       motivo: dto.motivo.trim(),
     });
     if (r === 'NO_ENCONTRADA') throw new NotFoundException('Vivienda no encontrada');

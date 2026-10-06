@@ -11212,7 +11212,7 @@
             "nullable": true,
             "minimum": 1,
             "maximum": 20,
-            "description": "null = vuelve al tope de su copropiedad"
+            "description": "null = vuelve al tope de su copropiedad. Obligatorio: omitirlo es 400"
           },
           "motivo": {
             "type": "string",

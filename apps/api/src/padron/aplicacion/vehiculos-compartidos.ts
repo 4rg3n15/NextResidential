@@ -26,6 +26,9 @@ export interface EntradaEditarVehiculo {
   readonly tipo?: TipoDeVehiculo;
 }
 
+/** Con historial, una placa nueva es otro vehículo (15-W, D5). */
+export const MENSAJE_PLACA_CON_HISTORIAL = 'Dé de baja este vehículo y registre el nuevo';
+
 export type PuertoDeEdicionDeVehiculo = Pick<RepositorioPadron, 'editarVehiculo'>;
 export type PuertoDeBorradoDeVehiculo = Pick<
   RepositorioPadron,
@@ -62,6 +65,8 @@ export const editarVehiculoCon = async (
       return exito(undefined);
     case 'no_encontrado':
       return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vehículo no encontrado'));
+    case 'placa_con_historial':
+      return fallo(errorDominio('CONFLICTO_DE_CONCURRENCIA', MENSAJE_PLACA_CON_HISTORIAL, 'RN-19'));
     default:
       return fallo(
         errorDominio(

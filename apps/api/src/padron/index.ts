@@ -18,7 +18,11 @@ export type { LocalizadorDeVivienda } from './aplicacion/puertos';
  * la REUTILICE sobre sus vehículos propios sin copiarla. Sale la función y la
  * porción estrecha del puerto que usa; el repositorio entero sigue sin salir.
  */
-export { borrarVehiculoSinHistorial, editarVehiculoCon } from './aplicacion/vehiculos-compartidos';
+export {
+  MENSAJE_PLACA_CON_HISTORIAL,
+  borrarVehiculoSinHistorial,
+  editarVehiculoCon,
+} from './aplicacion/vehiculos-compartidos';
 export type {
   EntradaEditarVehiculo,
   PuertoDeBorradoDeVehiculo,

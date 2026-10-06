@@ -31,17 +31,27 @@ export class EdicionDeVehiculosPropiosPg implements EdicionDeVehiculosPropios {
   deLaVivienda(ambito: AmbitoDelResidente, actorId: string): VehiculosPropiosDeLaVivienda {
     const { copropiedadId: cop, viviendaId } = ambito;
     return {
+      // La placa sólo cambia SIN historial, y eso se decide en la MISMA sentencia
+      // que la cambia: un evento o una autorización con la placa vieja que
+      // llegue después de la comprobación previa del caso de uso no se salta.
       editarVehiculo: (e: EdicionDeVehiculo): Promise<ResultadoEdicionVehiculo> =>
         comoServicio(this.pool, cop, actorId, async (c) => {
           try {
             const { rowCount } = await c.query(
-              `UPDATE public.vehiculos
-                  SET placa = COALESCE($4, placa),
-                      marca = CASE WHEN $5::boolean THEN $6 ELSE marca END,
-                      modelo = CASE WHEN $7::boolean THEN $8 ELSE modelo END,
-                      color = CASE WHEN $9::boolean THEN $10 ELSE color END,
+              `UPDATE public.vehiculos AS v
+                  SET placa = COALESCE($4, v.placa),
+                      marca = CASE WHEN $5::boolean THEN $6 ELSE v.marca END,
+                      modelo = CASE WHEN $7::boolean THEN $8 ELSE v.modelo END,
+                      color = CASE WHEN $9::boolean THEN $10 ELSE v.color END,
                       actualizado_en = now(), actualizado_por = $11
-                WHERE copropiedad_id = $1 AND id = $2 AND ${PROPIO}`,
+                WHERE v.copropiedad_id = $1 AND v.id = $2 AND ${PROPIO}
+                  AND ($4::text IS NULL OR v.placa = $4
+                       OR NOT (EXISTS (SELECT 1 FROM public.eventos ev
+                                        WHERE ev.copropiedad_id = v.copropiedad_id
+                                          AND ev.placa_detectada = v.placa)
+                            OR EXISTS (SELECT 1 FROM public.autorizaciones au
+                                        WHERE au.copropiedad_id = v.copropiedad_id
+                                          AND au.placa = v.placa)))`,
               [
                 cop,
                 e.vehiculoId,
@@ -56,7 +66,15 @@ export class EdicionDeVehiculosPropiosPg implements EdicionDeVehiculosPropios {
                 actorId,
               ],
             );
-            return (rowCount ?? 0) > 0 ? { tipo: 'editado' } : { tipo: 'no_encontrado' };
+            if ((rowCount ?? 0) > 0) return { tipo: 'editado' };
+            if (e.placa === undefined) return { tipo: 'no_encontrado' };
+            const sigue = await c.query(
+              `SELECT 1 FROM public.vehiculos WHERE copropiedad_id = $1 AND id = $2 AND ${PROPIO}`,
+              [cop, e.vehiculoId, viviendaId],
+            );
+            return (sigue.rowCount ?? 0) > 0
+              ? { tipo: 'placa_con_historial' }
+              : { tipo: 'no_encontrado' };
           } catch (error) {
             if (violacion(error).codigo === '23505') return { tipo: 'placa_activa_duplicada' };
             throw error;

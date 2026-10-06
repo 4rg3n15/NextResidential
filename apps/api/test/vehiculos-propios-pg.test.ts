@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { Placa } from '@ncr/domain-core';
+import { EdicionDeVehiculosPropiosPg } from '../src/residente/infraestructura/vehiculos-propios-edicion-pg';
 import { COP_A } from './utilidades';
 import { SUPER, bancoDelHogar } from './banco-del-hogar-pg';
 import type { Sesion } from './banco-del-hogar-pg';
@@ -126,6 +128,30 @@ describe('15-W · D5 · editar y eliminar un vehículo propio', () => {
     );
     const lodemas = { color: 'Negro', modelo: 'Mazda 2' };
     expect((await banco.con(suyo.token, 'put', `${RUTA}/${v1}`, lodemas)).status).toBe(200);
+  });
+
+  it('el historial que llega DESPUÉS de la comprobación previa tampoco se salta: lo decide el UPDATE', async () => {
+    if (omitida()) return;
+    // Directo al adaptador, sin la comprobación del caso de uso: es lo que vería
+    // una edición cuyo evento llegó entre la comprobación y el cambio.
+    const repo = new EdicionDeVehiculosPropiosPg(banco.pool).deLaVivienda(
+      { copropiedadId: COP_A, viviendaId },
+      suyo.usuarioId,
+    );
+    const nueva = Placa.crear(placa('V7'));
+    if (!nueva.ok) throw new Error(nueva.error.detalle);
+    const r = await repo.editarVehiculo({
+      copropiedadId: COP_A,
+      vehiculoId: v1,
+      placa: nueva.valor,
+      color: 'Blanco',
+      actorId: suyo.usuarioId,
+    });
+    expect(r).toEqual({ tipo: 'placa_con_historial' });
+    expect(await dato('SELECT placa, color FROM public.vehiculos WHERE id = $1', [v1])).toEqual({
+      placa: placa('V9'),
+      color: 'Negro',
+    });
   });
 
   it('el del vecino no existe para quien no es de su vivienda: 404, y nada cambia', async () => {

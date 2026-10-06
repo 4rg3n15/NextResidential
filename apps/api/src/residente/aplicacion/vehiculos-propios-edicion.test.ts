@@ -139,6 +139,16 @@ describe('EditarYEliminarMiVehiculo · editar (15-W, D5)', () => {
       expect(hechos).toEqual([]);
     }
   });
+
+  it('historial llegado entre la comprobación y el cambio: la base lo dice, 409 con su texto', async () => {
+    const { caso, repo, hechos } = montar();
+    repo.editarVehiculo.mockResolvedValueOnce({ tipo: 'placa_con_historial' });
+    expect(await caso.editar(ctx, COP, 've-1', { ...CAMBIOS, placa: 'XYZ789' })).toEqual({
+      ok: true,
+      valor: { hecho: false, estado: 409, explicacion: MENSAJE_PLACA_CON_HISTORIAL },
+    });
+    expect(hechos).toEqual([]);
+  });
 });
 
 describe('EditarYEliminarMiVehiculo · eliminar (15-W, D5)', () => {

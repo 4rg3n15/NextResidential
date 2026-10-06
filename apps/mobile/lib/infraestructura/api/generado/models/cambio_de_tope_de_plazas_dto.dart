@@ -15,7 +15,7 @@ class CambioDeTopeDePlazasDto {
   
   factory CambioDeTopeDePlazasDto.fromJson(Map<String, Object?> json) => _$CambioDeTopeDePlazasDtoFromJson(json);
   
-  /// null = vuelve al tope de su copropiedad
+  /// null = vuelve al tope de su copropiedad. Obligatorio: omitirlo es 400
   final num? tope;
   final String motivo;
 

@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Placa, RELOJ } from '@ncr/domain-core';
 import type { ErrorDominio, Reloj, Resultado } from '@ncr/domain-core';
-import { borrarVehiculoSinHistorial, editarVehiculoCon } from '../../padron';
+import {
+  MENSAJE_PLACA_CON_HISTORIAL,
+  borrarVehiculoSinHistorial,
+  editarVehiculoCon,
+} from '../../padron';
 import type { ContextoTenant } from '../../autenticacion';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import { BITACORA_DE_RESIDENTES, VEHICULOS_PROPIOS } from './puertos-hogar';
@@ -33,7 +37,7 @@ export type ResultadoDeVehiculoEditado =
   | { readonly hecho: true }
   | { readonly hecho: false; readonly estado: 400 | 404 | 409; readonly explicacion: string };
 
-export const MENSAJE_PLACA_CON_HISTORIAL = 'Dé de baja este vehículo y registre el nuevo';
+export { MENSAJE_PLACA_CON_HISTORIAL };
 const NO_ENCONTRADO = { hecho: false, estado: 404, explicacion: 'Vehículo no encontrado' } as const;
 
 @Injectable()

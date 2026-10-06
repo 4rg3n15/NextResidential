@@ -135,6 +135,13 @@ describe('15-W · D4 bis · las plazas del titular', () => {
     const seis = await banco.comoSuper('put', ruta, { tope: 6, motivo: 'Familia numerosa' });
     expect(seis.status, JSON.stringify(seis.body)).toBe(200);
     expect(seis.body).toEqual({ tope: 6, activas: 4, propio: true });
+    // Sin `tope` no es «volver al de la copropiedad»: 400, y el tope propio sigue.
+    expect((await banco.comoSuper('put', ruta, { motivo: 'Cliente a medias' })).status).toBe(400);
+    expect((await banco.comoSuper('get', ruta)).body).toEqual({
+      tope: 6,
+      activas: 4,
+      propio: true,
+    });
     expect((await anadir(titular.token)).status).toBe(200);
     expect(await vivas()).toHaveLength(5);
     const bajo = await banco.comoSuper('put', ruta, { tope: 4, motivo: 'Bajarlo de más' });
@@ -190,5 +197,28 @@ describe('15-W · D4 bis · las plazas del titular', () => {
     await banco.completarAlta(cop.id, suTitular3.token, banco.perfil(4));
     expect((await banco.con(suTitular3.token, 'post', mis(), { numero: 4 })).status).toBe(409);
     expect((await banco.con(suTitular3.token, 'post', mis(), { numero: 3 })).status).toBe(200);
+  });
+
+  it('con cupo para todas, seis «añadir» a la vez entran las seis, cada una con su número', async () => {
+    if (omitida()) return;
+    const holgada = await banco.vivienda(cop.id, '4');
+    const suTitular = await banco.titular(cop.id, holgada, `tit4.${s}`);
+    await banco.completarAlta(cop.id, suTitular.token, banco.perfil(5));
+    expect((await banco.con(suTitular.token, 'post', mis(), { numero: 1 })).status).toBe(200);
+    const ruta = `/copropiedades/${cop.id}/viviendas/${holgada}/tope-de-plazas`;
+    const diez = await banco.comoSuper('put', ruta, { tope: 10, motivo: 'Casa grande' });
+    expect(diez.status, JSON.stringify(diez.body)).toBe(200);
+    const intentos = await Promise.all([1, 2, 3, 4, 5, 6].map(() => anadir(suTitular.token)));
+    // Antes, dos altas elegían el mismo número y la perdedora leía «tope alcanzado».
+    expect(
+      intentos.map((r) => r.status),
+      JSON.stringify(intentos.map((r) => r.body)),
+    ).toEqual([200, 200, 200, 200, 200, 200]);
+    const numeros = await banco.pool.query<{ numero: number }>(
+      `SELECT numero FROM public.plazas_de_ocupante WHERE vivienda_id = $1 AND estado = 'activo'
+        ORDER BY numero`,
+      [holgada],
+    );
+    expect(numeros.rows.map((f) => f.numero)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 });

@@ -1,14 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-  ValidateIf,
-} from 'class-validator';
+import { IsInt, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
 import { OCUPANTES_MAXIMO } from '@ncr/domain-core';
 
 /** RONDA 15-W (D4 bis) · el tope propio de una vivienda, siempre con motivo. */
@@ -18,9 +9,10 @@ export class CambioDeTopeDePlazasDto {
     nullable: true,
     minimum: 1,
     maximum: OCUPANTES_MAXIMO,
-    description: 'null = vuelve al tope de su copropiedad',
+    description: 'null = vuelve al tope de su copropiedad. Obligatorio: omitirlo es 400',
   })
-  @IsOptional()
+  // Sin `@IsOptional`: un cuerpo sin `tope` —un cliente viejo o a medias— no
+  // puede leerse como «vuelve al de la copropiedad». Sólo `null` lo dice.
   @ValidateIf((_o, v) => v !== null)
   @IsInt()
   @Min(1)

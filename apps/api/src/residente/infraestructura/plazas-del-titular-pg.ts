@@ -53,9 +53,11 @@ export class PlazasDelTitularPg implements PlazasDelTitular {
   }
 
   /**
-   * Dos altas a la vez calculan el MISMO número siguiente; el tope las ordena y,
-   * si la segunda aún cabe, choca con `plazas_numero_uk`: se reintenta UNA vez
-   * con el número ya recalculado. El tope sí es definitivo.
+   * El número siguiente se calcula BAJO el bloqueo de la vivienda —el mismo que
+   * toma `tg_tope_de_plazas`, reentrante en la transacción—: dos altas a la vez
+   * ya no eligen el mismo número, y sólo el tope dice «no». Sólo una escritura
+   * que no toma el bloqueo podría quitarle el número: se reintenta UNA vez, y un
+   * segundo choque es un error, NUNCA un «tope alcanzado» que no lo es.
    */
   async anadir(
     copropiedadId: string,
@@ -63,11 +65,10 @@ export class PlazasDelTitularPg implements PlazasDelTitular {
     usuarioId: string,
   ): Promise<PlazaAnadida> {
     const primera = await this.intentarAnadir(copropiedadId, viviendaId, usuarioId);
-    return primera === 'NUMERO_TOMADO'
-      ? (await this.intentarAnadir(copropiedadId, viviendaId, usuarioId)) === 'ANADIDA'
-        ? 'ANADIDA'
-        : 'TOPE_ALCANZADO'
-      : primera;
+    if (primera !== 'NUMERO_TOMADO') return primera;
+    const segunda = await this.intentarAnadir(copropiedadId, viviendaId, usuarioId);
+    if (segunda !== 'NUMERO_TOMADO') return segunda;
+    throw new Error(`plazas: el número de plaza chocó dos veces en la vivienda ${viviendaId}`);
   }
 
   private async intentarAnadir(
@@ -77,6 +78,10 @@ export class PlazasDelTitularPg implements PlazasDelTitular {
   ): Promise<PlazaAnadida | 'NUMERO_TOMADO'> {
     try {
       return await comoServicio(this.pool, copropiedadId, usuarioId, async (c) => {
+        await c.query(
+          `SELECT pg_advisory_xact_lock(hashtextextended('ncr:tope-plazas:' || $1, 0))`,
+          [viviendaId],
+        );
         await c.query(
           `INSERT INTO public.plazas_de_ocupante (copropiedad_id, vivienda_id, numero, creado_por, actualizado_por)
            SELECT $1, $2, coalesce((SELECT max(numero) FROM public.plazas_de_ocupante
