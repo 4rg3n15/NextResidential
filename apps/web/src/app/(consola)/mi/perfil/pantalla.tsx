@@ -137,7 +137,7 @@ export const PantallaDeMiPerfil = ({
         <Tarjeta>
           <CabeceraDeTarjeta
             titulo={`Ocupantes: ${String(ocupantes.data.declarados)}`}
-            descripcion="Sólo la administración cambia este número."
+            descripcion="El titular añade o retira plazas desde la app, hasta el tope de la vivienda; para más, la administración."
           />
           <CuerpoDeTarjeta>
             <ul aria-label="Plazas de ocupante">
