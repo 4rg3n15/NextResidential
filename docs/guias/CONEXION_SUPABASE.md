@@ -215,9 +215,34 @@ supabase link --project-ref <ref-del-proyecto>   # el ref esta en la URL del pan
 supabase db push
 ```
 
-Aplica en orden los 16 archivos de `supabase/migrations/`. Son **idempotentes**:
-volver a ejecutarlos sobre una base ya migrada no produce error ni cambio. Está
-verificado con tres pasadas consecutivas.
+Aplica en orden los archivos de `supabase/migrations/` (16 en la ETAPA 01; 56
+tras la ronda 15-W). Son **idempotentes**: volver a ejecutarlos sobre una base
+ya migrada no produce error ni cambio. Está verificado con tres pasadas
+consecutivas.
+
+**Las migraciones las aplicas tú contra tu proyecto**, con `supabase db push`.
+El agente no ejecuta `supabase db push`: entrega las migraciones y dice cuáles
+faltan.
+
+**Ronda 15-W · `0055` y `0056`.** La `0055` añade el origen de cada cuenta
+(`usuarios.origen_de_alta`), los tipos nuevos de la bitácora de residentes y la
+regla de que ninguna cuenta queda atada a un menor de 18 años
+([ADR-037](../decisiones/ADR-037-titular-asignado-y-crear-cuenta-con-codigo-de-plaza.md)).
+La `0056` añade los documentos de un menor, la persona sin cuenta que ocupa una
+plaza y el tope de plazas por vivienda
+([ADR-038](../decisiones/ADR-038-menores-sin-cuenta-gestionados-por-el-hogar.md)).
+Las dos terminan con **aserciones de despliegue**: si un disparador, una
+restricción o la política `viviendas_tope_plataforma` no quedaron, el
+`db push` falla en vez de dejarlo a medias. Al aplicarse, la `0056` imprime
+`0056: N vivienda(s) con más plazas que el tope por omisión conservan las suyas`:
+anota ese número, son las viviendas que recibieron un tope propio para no
+perder ninguna plaza. Ninguna de las dos crea tablas. Detalle en
+[`modelo-datos.md`](../arquitectura/modelo-datos.md).
+
+Si hubiera que revertirlas, se revierten **en orden descendente y junto con el
+código** —la API de la 15-W cuenta con ellas—: `supabase/reversion/0056_revert.sql`
+y después `0055_revert.sql`, cada una con su variable de confirmación
+(`SET ncr.confirmo_revertir_0056 = 'si';`, `SET ncr.confirmo_revertir_0055 = 'si';`).
 
 **Sobre la reversión.** El CLI de Supabase no tiene _down migrations_. La
 reversibilidad que exige `CLAUDE.md` §6 vive en `supabase/reversion/`, con un
@@ -376,6 +401,35 @@ socket o la conexión se cae a los 5 minutos.
 > (`app.es_mi_vivienda`) **no** usa un claim de vivienda: consulta la tabla
 > `residentes` en cada evaluación. Es la única función `SECURITY DEFINER` del
 > esquema, y está ahí por este motivo.
+
+### 6.4 El alta pública de Supabase Auth, DESACTIVADA
+
+En **Authentication → Sign In / Providers**, el interruptor **«Allow new users
+to sign up»** (el alta pública, `signUp`) tiene que quedar **apagado**. Ya lo
+pedía la 15-H para que nadie registrara a mano un correo bajo
+`usuarios.ncr.invalid`; desde la ronda 15-W hay una razón más, porque ahora
+existe un botón que se llama justamente «Crear cuenta».
+
+**«Crear cuenta» no es el `signUp` de Supabase.** La app manda el formulario a
+la API, `POST /auth/registro`, y es la API la que comprueba la edad, busca el
+código de plaza sólo en la copropiedad de su prefijo, aplica sus límites y su
+suspensión por intentos, y sólo entonces **crea la identidad con la llave
+secreta**, por la API de administración de Auth, con el correo sintético de
+siempre
+([ADR-037](../decisiones/ADR-037-titular-asignado-y-crear-cuenta-con-codigo-de-plaza.md)).
+Ese camino no depende del alta pública: funciona con el interruptor apagado.
+
+**Con el interruptor encendido** habría una segunda puerta sin ninguna de esas
+comprobaciones: la llave **publicable** es pública por diseño (§2), así que
+cualquiera podría crear identidades en `auth.users` sin código, sin edad, sin
+límites y sin rastro en la bitácora. Una identidad así no tiene fila en
+`usuarios` ni claims de rol y copropiedad, y la RLS no le concede nada (§6.1);
+pero existiría, y podría ocupar de antemano el correo sintético de una cuenta
+que la API todavía no ha creado: esa alta fallaría después como usuario
+repetido.
+
+Compruébalo en el panel después de cada cambio de configuración de Auth: es un
+ajuste del proyecto, no de una migración, y `supabase db push` no lo toca.
 
 ---
 
@@ -637,6 +691,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Volver a ejecutarlo no produce error (idempotencia)
 - [ ] Existen las 31 tablas y las 10 particiones de `eventos`
 - [ ] Semillas aplicadas, con las **dos** copropiedades
+- [ ] Migraciones `0055` y `0056` aplicadas por ti, con sus aserciones en verde, y anotado el número de viviendas que imprimió la `0056` (§4)
 
 **Inmutabilidad e identidad de conexión (§12)**
 
@@ -657,6 +712,7 @@ Marca cada casilla antes de dar la conexión por buena.
 - [ ] Ninguna fila de `dispositivos.credencial_ref` contiene algo que no empiece por `vault:` o `env:`
 - [ ] Bucket `evidencias` creado y **privado**
 - [ ] MFA TOTP habilitado en el proyecto
+- [ ] **Alta pública de Supabase Auth desactivada**: «Allow new users to sign up» apagado (§6.4). «Crear cuenta» pasa por la API
 - [ ] El JWKS responde y devuelve al menos una clave
 - [ ] La expiración del token confirmada en Project Settings → Auth
 

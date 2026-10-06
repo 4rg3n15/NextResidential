@@ -2,7 +2,7 @@
 -- 0056 · RONDA 15-W · MENORES DEL HOGAR Y PLAZAS DEL TITULAR
 --
 -- Decisiones del cliente D-W2 y D-W10 (docs/auditoria/contradicciones-y-
--- supuestos.md §3 quinquies) · ADR-038 · supuesto S-15W-03.
+-- supuestos.md §3 bis, E-07) · ADR-038 · supuesto S-15W-03.
 --
 --   1 · tipo_documento: 'tarjeta_identidad' y 'registro_civil', los documentos
 --       de un menor en Colombia. Precedente: 0034. Los valores nuevos NO se

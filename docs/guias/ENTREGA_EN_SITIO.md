@@ -50,7 +50,9 @@
 4. **`supabase db push`**: **0047 a 0054** —conversaciones de guardia, salidas del
    videoportero, Edge en sitio, Edge puente, estado que sobrevive al reinicio,
    suscripciones Web Push, modo de puerta y lectura de usuarios por servicio—, y
-   reinicio de la API.
+   reinicio de la API. **Desde la 15-W, también la 0055 y la 0056** (autorregistro,
+   titular asignado, menores y plazas). La víspera de abajo no las mira todavía
+   (DT-15W-08): confírmelas con `supabase migration list`.
 5. **Contra la base real**, con la API y la consola arrancadas (§1):
    `pnpm sitio:ensayo -- --solo-lectura`. Su bloque **«La víspera»** tiene que decir
    «están las ocho», ningún ✗ en las variables y «contesta por el bucle local y

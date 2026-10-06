@@ -17,6 +17,16 @@
 > enumerados bajan de 31 a **30**. **D-18** — `FUERA_DE_HORARIO` aprobado y
 > añadido a `CLAUDE.md` §2.4. **S-09** — precisado: el corte de medianoche
 > **no** reinicia el contador de aforo.
+>
+> **Actualización del 2026-10-06 · ronda 15-W, migraciones `0055` y `0056`.**
+> Cuentas sólo para mayores de edad, origen de cada cuenta, menores sin cuenta
+> en las plazas de su vivienda y tope de plazas por vivienda
+> ([ADR-037](../decisiones/ADR-037-titular-asignado-y-crear-cuenta-con-codigo-de-plaza.md),
+> [ADR-038](../decisiones/ADR-038-menores-sin-cuenta-gestionados-por-el-hogar.md)):
+> §3.1 y §3.2 (diagramas), §5 (`tipo_documento`), §6.1 y §6.2 (columnas nuevas,
+> y las fichas de `plazas_de_ocupante` y `bitacora_de_residentes`, que vienen de
+> la `0038`), §7, §8.2 (nota 8), §10 y las decisiones **D-15W-01** y **D-15W-02**.
+> Ninguna de las dos migraciones crea tablas.
 
 - **Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `develop`
 - **Fecha de diseño:** 2026-09-06 · **Aprobado e implementado:** 2026-09-06
@@ -147,6 +157,7 @@ erDiagram
         interval margen_cache_reglas
         interval umbral_latido_dispositivo
         interval plazo_consentimiento
+        smallint tope_de_plazas_por_vivienda "4 por omisión, de 1 a 20 · 0056"
     }
     usuarios {
         uuid id PK
@@ -156,6 +167,7 @@ erDiagram
         text nombre
         boolean mfa_habilitado
         estado_registro estado
+        text origen_de_alta "administracion o autorregistro · 0055"
     }
     roles_usuario {
         uuid id PK
@@ -176,6 +188,8 @@ erDiagram
     personas  ||--o{ visitantes : "es"
     personas  ||--o{ listas_negras : "puede figurar en"
     personas  ||--o{ vehiculos : "posee"
+    viviendas ||--o{ plazas_de_ocupante : "tiene"
+    personas  |o--o{ plazas_de_ocupante : "ocupa sin cuenta (menor)"
 
     viviendas {
         uuid id PK
@@ -185,15 +199,27 @@ erDiagram
         estado_administrativo estado_administrativo
         estado_registro estado
         timestamptz desactivado_en
+        smallint tope_de_plazas "NULL = el de su copropiedad · 0056"
     }
     personas {
         uuid id PK
         uuid copropiedad_id FK
-        tipo_documento tipo_documento
+        tipo_documento tipo_documento "con tarjeta_identidad y registro_civil desde 0056"
         text numero_documento "normalizado"
         text nombre_completo
         text telefono
         citext correo
+        date fecha_nacimiento "0038 · la edad la vigila 0055"
+        estado_registro estado
+    }
+    plazas_de_ocupante {
+        uuid id PK
+        uuid copropiedad_id FK
+        uuid vivienda_id FK
+        smallint numero "1 a 50 · UK parcial por vivienda"
+        integer generacion "sube al liberarse (ADR-025)"
+        uuid usuario_id FK "la cuenta que la ocupa"
+        uuid persona_id FK "el menor sin cuenta · 0056"
         estado_registro estado
     }
     residentes {
@@ -562,7 +588,7 @@ Enumerados y no `text` con `CHECK`: un valor inesperado falla al escribir, la li
 | `estado_registro`       | `activo`, `inactivo`                                                                                                                                                                                        | RN-19                                                   |
 | `estado_tenant`         | `activa`, `suspendida`, `cancelada`                                                                                                                                                                         | Diagrama, `Copropiedad.estado`                          |
 | `rol_usuario`           | `superadministrador`, `administrador`, `portero`, `operador_central`, `residente`, `servicio`                                                                                                               | §5 de requisitos — los **6** roles                      |
-| `tipo_documento`        | `cedula`, `cedula_extranjeria`, `pasaporte`, `nit`, `otro`                                                                                                                                                  | Glosario · mockups (campo «CI»)                         |
+| `tipo_documento`        | `cedula`, `cedula_extranjeria`, `pasaporte`, `nit`, `otro` · **`tarjeta_identidad`**, **`registro_civil`** (0056: los documentos de un menor, ADR-038)                                                      | Glosario · mockups (campo «CI»)                         |
 | `estado_administrativo` | `al_dia`, `en_mora`, `suspendida`                                                                                                                                                                           | PDF del reto §3 · `[SUPUESTO]` **S-01**                 |
 | `categoria_visitante`   | `visitante`, `contratista`, `proveedor`, `servicio_domestico`                                                                                                                                               | Mockups W-05 y M-4 · ver **D-03**                       |
 | `tipo_autorizacion`     | `unica`, `recurrente`                                                                                                                                                                                       | PDF del reto · HU-07, HU-08 · ver **D-03**              |
@@ -603,32 +629,57 @@ Solo se listan las columnas propias; las de §4 (identidad, tenant, auditoría, 
 
 #### `copropiedades` — _sin `copropiedad_id` (es el tenant)_ · auditoría ✔ · baja lógica ✖ (usa `estado_tenant`)
 
-| Columna                      | Tipo                                               | Restricción                         | Justificación                                     |
-| ---------------------------- | -------------------------------------------------- | ----------------------------------- | ------------------------------------------------- |
-| `nombre`                     | `text NOT NULL`                                    | `length <= 200`                     |                                                   |
-| `nit`                        | `text NOT NULL`                                    | `UNIQUE`, formato normalizado       | Identidad legal del tenant                        |
-| `zona_horaria`               | `text NOT NULL DEFAULT 'America/Bogota'`           | `CHECK` contra `pg_timezone_names`  | Interpreta `PatronRecurrencia` y horarios de zona |
-| `estado`                     | `estado_tenant NOT NULL DEFAULT 'activa'`          |                                     |                                                   |
-| `version_reglas_actual`      | `bigint NOT NULL DEFAULT 0`                        | `CHECK >= 0`                        | Monótona · hueco **H-07** de la ETAPA 00          |
-| `politica_contingencia_edge` | `politica_contingencia NOT NULL DEFAULT 'denegar'` |                                     | CU-04 3a · denegar por defecto                    |
-| `umbral_confianza_placa`     | `numeric(4,3) NOT NULL DEFAULT 0.850`              | `CHECK BETWEEN 0 AND 1`             | `[SUPUESTO]` **S-05**                             |
-| `margen_cache_reglas`        | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-03** · KPI-31                    |
-| `umbral_latido_dispositivo`  | `interval NOT NULL DEFAULT '5 minutes'`            | `CHECK > '0'`                       | `[SUPUESTO]` **S-06** · CA-26                     |
-| `plazo_consentimiento`       | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-04** · CU-02 3a                  |
-| `retencion_eventos`          | `interval NOT NULL DEFAULT '24 months'`            | `CHECK > '0'`                       | **D-21** · Ley 1581, finalidad                    |
-| `retencion_evidencia`        | `interval NOT NULL DEFAULT '90 days'`              | `CHECK > '0'`                       | **D-21** · minimización                           |
-| `margen_supresion_plantilla` | `interval NOT NULL DEFAULT '24 hours'`             | **`CHECK > '0' AND <= '24 hours'`** | **D-21** · RN-11 como **cota superior**           |
+| Columna                       | Tipo                                               | Restricción                         | Justificación                                               |
+| ----------------------------- | -------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `nombre`                      | `text NOT NULL`                                    | `length <= 200`                     |                                                             |
+| `nit`                         | `text NOT NULL`                                    | `UNIQUE`, formato normalizado       | Identidad legal del tenant                                  |
+| `zona_horaria`                | `text NOT NULL DEFAULT 'America/Bogota'`           | `CHECK` contra `pg_timezone_names`  | Interpreta `PatronRecurrencia` y horarios de zona           |
+| `estado`                      | `estado_tenant NOT NULL DEFAULT 'activa'`          |                                     |                                                             |
+| `version_reglas_actual`       | `bigint NOT NULL DEFAULT 0`                        | `CHECK >= 0`                        | Monótona · hueco **H-07** de la ETAPA 00                    |
+| `politica_contingencia_edge`  | `politica_contingencia NOT NULL DEFAULT 'denegar'` |                                     | CU-04 3a · denegar por defecto                              |
+| `umbral_confianza_placa`      | `numeric(4,3) NOT NULL DEFAULT 0.850`              | `CHECK BETWEEN 0 AND 1`             | `[SUPUESTO]` **S-05**                                       |
+| `margen_cache_reglas`         | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-03** · KPI-31                              |
+| `umbral_latido_dispositivo`   | `interval NOT NULL DEFAULT '5 minutes'`            | `CHECK > '0'`                       | `[SUPUESTO]` **S-06** · CA-26                               |
+| `plazo_consentimiento`        | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-04** · CU-02 3a                            |
+| `retencion_eventos`           | `interval NOT NULL DEFAULT '24 months'`            | `CHECK > '0'`                       | **D-21** · Ley 1581, finalidad                              |
+| `retencion_evidencia`         | `interval NOT NULL DEFAULT '90 days'`              | `CHECK > '0'`                       | **D-21** · minimización                                     |
+| `margen_supresion_plantilla`  | `interval NOT NULL DEFAULT '24 hours'`             | **`CHECK > '0' AND <= '24 hours'`** | **D-21** · RN-11 como **cota superior**                     |
+| `tope_de_plazas_por_vivienda` | `smallint NOT NULL DEFAULT 4` · **0056**           | `CHECK BETWEEN 1 AND 20`            | **D-W10** · `[SUPUESTO]` **S-15W-03** · contando al titular |
+
+**15-W · migración 0056.** El tope de plazas por omisión de toda vivienda sin
+tope propio. Lo cambia **sólo el superadministrador**: `tg_tope_de_plazas_de_la_copropiedad`
+rechaza a cualquier otro rol con claims, también por la REST, donde la política
+de edición de la 0014 deja al administrador editar su copropiedad. **Bajarlo
+nunca quita plazas**: el disparador `AFTER UPDATE`
+`tg_conservar_plazas_al_bajar_el_tope` llama a `app.conservar_plazas_sobre_el_tope`,
+que da a cada vivienda sin tope propio con más plazas activas que el nuevo tope
+un tope propio igual a las que tiene (hasta 20). La migración llama a la misma
+función una vez al desplegar, **antes** de crear el disparador del tope, e
+imprime cuántas viviendas tocó (en la base de pruebas, ninguna). Ver **D-15W-02**.
 
 #### `usuarios` — tenant **NULL permitido** · auditoría ✔ · baja lógica ✔
 
-| Columna          | Tipo                                | Restricción     | Justificación                         |
-| ---------------- | ----------------------------------- | --------------- | ------------------------------------- |
-| `auth_user_id`   | `uuid NOT NULL UNIQUE`              |                 | Identidad en Supabase Auth            |
-| `correo`         | `citext NOT NULL`                   | `UNIQUE` global | Requiere extensión `citext`           |
-| `nombre`         | `text NOT NULL`                     |                 |                                       |
-| `telefono`       | `text NULL`                         |                 |                                       |
-| `persona_id`     | `uuid NULL REFERENCES personas(id)` |                 | Un residente es persona **y** usuario |
-| `mfa_habilitado` | `boolean NOT NULL DEFAULT false`    |                 | RN-20 · proyección de Auth, no fuente |
+| Columna          | Tipo                                                | Restricción                                    | Justificación                         |
+| ---------------- | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------- |
+| `auth_user_id`   | `uuid NOT NULL UNIQUE`                              |                                                | Identidad en Supabase Auth            |
+| `correo`         | `citext NOT NULL`                                   | `UNIQUE` global                                | Requiere extensión `citext`           |
+| `nombre`         | `text NOT NULL`                                     |                                                |                                       |
+| `telefono`       | `text NULL`                                         |                                                |                                       |
+| `persona_id`     | `uuid NULL REFERENCES personas(id)`                 |                                                | Un residente es persona **y** usuario |
+| `mfa_habilitado` | `boolean NOT NULL DEFAULT false`                    |                                                | RN-20 · proyección de Auth, no fuente |
+| `origen_de_alta` | `text NOT NULL DEFAULT 'administracion'` · **0055** | `CHECK IN ('administracion', 'autorregistro')` | **D-W1, D-W9** · ADR-037              |
+
+**15-W · migración 0055.** `origen_de_alta` dice quién dio la cuenta: la
+administración —el titular de cada vivienda, o cualquier cuenta anterior a la
+15-W, que conserva el valor por omisión— o «Crear cuenta» con un código de
+plaza. Una cuenta no se lo cambia a sí misma por la REST: la 0055 rehace
+`app.tg_usuario_campos_propios` (0037) para añadirlo a los campos protegidos;
+si pudiera, un autorregistro se haría pasar por cuenta de la administración. Y
+**ninguna cuenta queda atada a un menor**: `tg_cuenta_solo_mayores`
+(`BEFORE INSERT OR UPDATE OF persona_id`) lee la fecha de nacimiento de la
+persona y lanza `usuarios_solo_mayores` si no cumplió 18 en el día de Bogotá
+(`app.es_menor_de_edad`); si con los claims de quien escribe la persona no se
+ve, niega. Ver **D-15W-01**.
 
 **No hay columna de contraseña, hash, secreto ni token.** Las credenciales viven exclusivamente en Supabase Auth. Si alguna vez apareciera una columna así en una migración, sería un hallazgo crítico de la ETAPA 13.
 
@@ -647,24 +698,46 @@ Solo se listan las columnas propias; las de §4 (identidad, tenant, auditoría, 
 
 #### `viviendas` — tenant ✔ · auditoría ✔ · baja lógica ✔
 
-| Columna                 | Tipo                                              | Restricción                                                    | Justificación                                                   |
-| ----------------------- | ------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| `identificador`         | `text NOT NULL`                                   | `UNIQUE (copropiedad_id, identificador) WHERE estado='activo'` | «Casa 42»                                                       |
-| `manzana`               | `text NULL`                                       |                                                                | Mockup M-1, «Manzana B»                                         |
-| `direccion`             | `text NULL`                                       |                                                                |                                                                 |
-| `estado_administrativo` | `estado_administrativo NOT NULL DEFAULT 'al_dia'` |                                                                | `[SUPUESTO]` **S-01** · leído por el motor, **nunca calculado** |
+| Columna                 | Tipo                                              | Restricción                                                         | Justificación                                                   |
+| ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `identificador`         | `text NOT NULL`                                   | `UNIQUE (copropiedad_id, identificador) WHERE estado='activo'`      | «Casa 42»                                                       |
+| `manzana`               | `text NULL`                                       |                                                                     | Mockup M-1, «Manzana B»                                         |
+| `direccion`             | `text NULL`                                       |                                                                     |                                                                 |
+| `estado_administrativo` | `estado_administrativo NOT NULL DEFAULT 'al_dia'` |                                                                     | `[SUPUESTO]` **S-01** · leído por el motor, **nunca calculado** |
+| `tope_de_plazas`        | `smallint NULL` · **0056**                        | `CHECK (tope_de_plazas IS NULL OR tope_de_plazas BETWEEN 1 AND 20)` | **D-W10** · tope propio; nulo = el de su copropiedad            |
+
+**15-W · migración 0056.** El tope propio lo pone **sólo el superadministrador**,
+a petición del hogar. La edición de `viviendas` es del administrador (política
+de la 0014), así que la 0056 añade una política **estrecha**,
+`viviendas_tope_plataforma` (`FOR UPDATE` sólo para el superadministrador), y
+`tg_tope_de_plazas_de_la_vivienda` la estrecha aún más: de una vivienda, el
+superadministrador sólo cambia `tope_de_plazas` y `actualizado_*`; nadie más
+toca el tope; y, bajo el mismo bloqueo por vivienda que el alta de una plaza, el
+tope **nunca queda por debajo de las plazas activas**
+(`viviendas_tope_bajo_las_plazas`), tampoco al volver al de la copropiedad. Ver
+**D-15W-02**.
 
 #### `personas` — tenant ✔ · auditoría ✔ · baja lógica ✔ · **ver D-01**
 
-| Columna            | Tipo                      | Restricción                      |
-| ------------------ | ------------------------- | -------------------------------- |
-| `tipo_documento`   | `tipo_documento NOT NULL` |                                  |
-| `numero_documento` | `text NOT NULL`           | Normalizado · `CHECK` de formato |
-| `nombre_completo`  | `text NOT NULL`           | `length <= 200`                  |
-| `telefono`         | `text NULL`               | Canal de consentimiento          |
-| `correo`           | `citext NULL`             | Canal de consentimiento          |
+| Columna            | Tipo                      | Restricción                                                                 |
+| ------------------ | ------------------------- | --------------------------------------------------------------------------- |
+| `tipo_documento`   | `tipo_documento NOT NULL` |                                                                             |
+| `numero_documento` | `text NOT NULL`           | Normalizado · `CHECK` de formato                                            |
+| `nombre_completo`  | `text NOT NULL`           | `length <= 200`                                                             |
+| `telefono`         | `text NULL`               | Canal de consentimiento                                                     |
+| `correo`           | `citext NULL`             | Canal de consentimiento                                                     |
+| `fecha_nacimiento` | `date NULL` · **0038**    | `CHECK (fecha_nacimiento IS NULL OR fecha_nacimiento >= DATE '1900-01-01')` |
 
 `UNIQUE (copropiedad_id, tipo_documento, numero_documento) WHERE estado = 'activo'`
+
+**15-W · migraciones 0055 y 0056.** La fecha de nacimiento decide quién puede
+tener cuenta (D-W2, ADR-038). El techo —que no sea futura— lo pone el dominio
+con el reloj inyectado, porque una restricción no puede leer la fecha de hoy
+(0038). La 0055 añade `tg_persona_con_cuenta_solo_mayor`
+(`BEFORE UPDATE OF fecha_nacimiento`): la fecha de una persona **con cuenta** no
+se cambia por la de un menor (`usuarios_solo_mayores`). La 0056 añade al
+enumerado los documentos de un menor (§5). Un menor es una persona con un
+residente y **sin** fila en `usuarios`.
 
 #### `residentes` — tenant ✔ · auditoría ✔ · baja lógica ✔
 
@@ -717,6 +790,70 @@ CHECK ( estado <> 'levantada' OR (levantada_por IS NOT NULL AND motivo_levantami
 UNIQUE (copropiedad_id, persona_id) WHERE estado = 'activa' AND persona_id IS NOT NULL
 UNIQUE (copropiedad_id, placa)      WHERE estado = 'activa' AND placa IS NOT NULL
 ```
+
+#### `plazas_de_ocupante` — tenant ✔ · auditoría ✔ · baja lógica ✔ · **0038, ampliada por la 0056**
+
+Una plaza por ocupante de la vivienda. Su código **no se guarda**: se deriva
+bajo demanda de la plaza y su generación (ADR-025). Desde la 15-W la ocupa una
+cuenta —un adulto— **o** una persona sin cuenta —un menor— (ADR-038).
+
+| Columna       | Tipo                                | Restricción                                                                  | Justificación                                                 |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `vivienda_id` | `uuid NOT NULL`                     | Clave ajena compuesta `(copropiedad_id, vivienda_id)` (`plazas_vivienda_fk`) | D-06                                                          |
+| `numero`      | `smallint NOT NULL`                 | `CHECK BETWEEN 1 AND 50`                                                     | La 1 es la del titular                                        |
+| `generacion`  | `integer NOT NULL DEFAULT 1`        | `CHECK >= 1`                                                                 | Sube al liberarse: el código anterior deja de valer (ADR-025) |
+| `usuario_id`  | `uuid NULL REFERENCES usuarios(id)` | `CHECK ((usuario_id IS NULL) = (usada_en IS NULL))`                          | La cuenta que la ocupa                                        |
+| `usada_en`    | `timestamptz NULL`                  |                                                                              |                                                               |
+| `persona_id`  | `uuid NULL` · **0056**              | Clave ajena compuesta `(copropiedad_id, persona_id)` (`plazas_persona_fk`)   | **D-W2** · el menor sin cuenta que la ocupa                   |
+
+```
+CHECK (num_nonnulls(usuario_id, persona_id) <= 1)                  -- plazas_cuenta_o_persona · 0056
+UNIQUE (vivienda_id, numero) WHERE estado = 'activo'                -- plazas_numero_uk
+UNIQUE (usuario_id) WHERE estado = 'activo' AND usuario_id IS NOT NULL   -- plazas_usuario_uk
+UNIQUE (persona_id) WHERE estado = 'activo' AND persona_id IS NOT NULL   -- plazas_persona_uk · 0056
+```
+
+**Libre** es la plaza sin cuenta y sin persona. El **titular** de la vivienda es
+`ocupacion_de_viviendas.primer_residente_id` (0038), que desde la 15-W escribe
+la administración al dar de alta al titular (ADR-037). Disparadores:
+
+| Disparador                                                     | Qué impone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tg_plazas_solo_superadministrador` (0038, rehecho en la 0056) | Sin claims o con el superadministrador, todo. Con la API en nombre de una cuenta: una plaza nace libre y, tras la declaración, sólo la añade el titular; nunca cambia de vivienda, número ni copropiedad; el estado sólo lo cambia el titular, de activa a inactiva, en una plaza libre y nunca la 1; la ocupa con una persona un adulto con cuenta de esa vivienda, si la persona no tiene cuenta, es residente de la vivienda y es **menor** (`plazas_persona_menor`; fecha desconocida, se niega); la libera un adulto de la vivienda, o la propia persona al reclamarla con su cuenta (traspaso) |
+| `tg_tope_de_plazas` (0056)                                     | Al nacer o al revivir una plaza activa: bloqueo consultivo por vivienda (`ncr:tope-plazas:<vivienda>`), cuenta las activas y, si llegan al tope de la vivienda —el propio o el de su copropiedad—, lanza `plazas_tope`. Sin tope legible, niega. Vale también para el superadministrador (`[CONTRADICCIÓN]` C-59, **D-15W-02**)                                                                                                                                                                                                                                                                      |
+| `tg_prohibir_delete` y `tg_auditoria` (0038)                   | Sin borrado físico (RN-19) y auditoría de cada cambio (KPI-05)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+#### `bitacora_de_residentes` — tenant ✔ · **solo inserción** (las tres capas de ADR-005) · **0038, ampliada por la 0055**
+
+El rastro de altas, vinculaciones —y de los códigos equivocados, que cuentan
+para los límites—, ocupantes, menores y vehículos propios. **El documento de
+identidad y la IP en claro nunca se escriben aquí.**
+
+| Columna                      | Tipo                                | Restricción          | Justificación                                                                                                                          |
+| ---------------------------- | ----------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ocurrido_en`                | `timestamptz NOT NULL`              |                      |                                                                                                                                        |
+| `tipo`                       | `text NOT NULL`                     | `CHECK` con la lista | 13 tipos de la 0038 y 15 de la 0055 (abajo)                                                                                            |
+| `usuario_id`                 | `uuid NULL REFERENCES usuarios(id)` |                      | **Nulo** en los fallos de «Crear cuenta»: se anotan antes de que exista la cuenta                                                      |
+| `actor_id`                   | `uuid NULL REFERENCES usuarios(id)` |                      | Quién lo hizo                                                                                                                          |
+| `vivienda_id`, `vehiculo_id` | `uuid NULL`, **sin** clave ajena    |                      | El rastro sobrevive al borrado de una vivienda o un vehículo sin historial                                                             |
+| `detalle`                    | `text NULL`                         | `length <= 500`      | En un fallo de «Crear cuenta», sólo `ip:<16 hex>`: HMAC de la IP con la llave de la copropiedad y el propósito `ncr:ip-de-registro:v1` |
+
+**Los 15 tipos de la 0055** (los 13 de la 0038 se conservan): `autorregistro`,
+`autorregistro_rechazado`, `registro_codigo_incorrecto`,
+`registro_suspendido_por_intentos`, `registro_reanudado`,
+`titular_asignado_por_administracion`, `vivienda_asignada_por_administracion`,
+`cuenta_bloqueada_por_edad`, `menor_registrado`, `menor_editado`,
+`menor_dado_de_baja`, `tope_de_plazas_cambiado`, `vehiculo_propio_editado`,
+`vehiculo_propio_borrado` y `visita_revocada_por_residente`. La suspensión de
+«Crear cuenta» se cuenta aquí: 30 `registro_codigo_incorrecto` de una
+copropiedad en una hora escriben `registro_suspendido_por_intentos`, y
+`registro_reanudado` es la marca con la que el superadministrador la levanta
+(ADR-037). El índice parcial `bitacora_residentes_registro_idx` (§7.2) los
+cuenta sin recorrer la bitácora entera.
+
+La reversión de la 0055 no borra filas de esta tabla, que es de solo inserción:
+vuelve a la lista de la 0038 como `NOT VALID`, que rechaza los tipos de la 15-W
+desde ese momento sin exigir borrar los que ya existen.
 
 ### 6.3 Contexto · Autorizaciones
 
@@ -1077,27 +1214,29 @@ Sin este libro la retención sería **indemostrable**: pasado el plazo no quedar
 | `(copropiedad_id, clave_idempotencia)`                                     | `bandeja_salida_edge`         | **RN-17**                  | CA-22, KPI-29             |
 | `(plantilla_id, dispositivo_id)`                                           | `plantilla_sincronizaciones`  | Una fila por terminal      | CA-10                     |
 | `(bucket, ruta)`                                                           | `evidencias`                  | Sin objetos duplicados     | —                         |
+| `(persona_id) WHERE estado='activo' AND persona_id IS NOT NULL` · **0056** | `plazas_de_ocupante`          | Una plaza viva por persona | **D-W2** · `99l`          |
 
 ### 7.2 Índices de consulta, derivados de los filtros reales de las pantallas
 
 No se inventan: cada uno corresponde a un filtro que existe en un mockup o a una consulta que un caso de uso hace en el camino crítico.
 
-| Índice                                                                | Tabla                        | Pantalla o caso de uso que lo motiva                  |
-| --------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------- |
-| `(copropiedad_id, ocurrido_en DESC)`                                  | `eventos`                    | W-02 «Últimos eventos», W-08 paginación               |
-| `(copropiedad_id, vivienda_id, ocurrido_en DESC)`                     | `eventos`                    | **HU-32** «filtrando por vivienda» · W-10             |
-| `(copropiedad_id, persona_id, ocurrido_en DESC)`                      | `eventos`                    | **HU-32** «por persona» · M-6 historial del residente |
-| `(copropiedad_id, dispositivo_id, ocurrido_en DESC)`                  | `eventos`                    | W-08 filtro «Dispositivo»                             |
-| `(copropiedad_id, tipo, ocurrido_en DESC)`                            | `eventos`                    | W-08 filtro «Tipo de Evento»                          |
-| `(copropiedad_id, placa) WHERE placa IS NOT NULL AND estado='activa'` | `autorizaciones`             | **CU-01 paso 3** — camino crítico del LPR             |
-| GiST sobre `vigencia`                                                 | `autorizaciones`             | CU-01 paso 4 — contención de instante                 |
-| `(copropiedad_id, vivienda_id) WHERE estado='activa'`                 | `autorizaciones`             | W-05, M-4                                             |
-| `(copropiedad_id, vivienda_id) WHERE estado='activo'`                 | `residentes`, `vehiculos`    | W-03, W-04, M-2, M-3                                  |
-| `(copropiedad_id, estado_salud) WHERE estado='activo'`                | `dispositivos`               | W-02 «Estado dispositivos», W-07                      |
-| `(copropiedad_id, ultimo_latido)`                                     | `dispositivos`               | **CA-26** — detección de caídos                       |
-| `(copropiedad_id, estado, generada_en DESC)`                          | `alertas`                    | W-08 banda «alertas críticas sin resolver»            |
-| `(copropiedad_id, suprimir_en) WHERE estado <> 'suprimida'`           | `plantillas_biometricas`     | **RN-11** — barrido de supresión de pg-boss           |
-| `(copropiedad_id, estado) WHERE estado='pendiente'`                   | `plantilla_sincronizaciones` | CU-02 6a — cola de reintentos                         |
+| Índice                                                                           | Tabla                        | Pantalla o caso de uso que lo motiva                                  |
+| -------------------------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `(copropiedad_id, ocurrido_en DESC)`                                             | `eventos`                    | W-02 «Últimos eventos», W-08 paginación                               |
+| `(copropiedad_id, vivienda_id, ocurrido_en DESC)`                                | `eventos`                    | **HU-32** «filtrando por vivienda» · W-10                             |
+| `(copropiedad_id, persona_id, ocurrido_en DESC)`                                 | `eventos`                    | **HU-32** «por persona» · M-6 historial del residente                 |
+| `(copropiedad_id, dispositivo_id, ocurrido_en DESC)`                             | `eventos`                    | W-08 filtro «Dispositivo»                                             |
+| `(copropiedad_id, tipo, ocurrido_en DESC)`                                       | `eventos`                    | W-08 filtro «Tipo de Evento»                                          |
+| `(copropiedad_id, placa) WHERE placa IS NOT NULL AND estado='activa'`            | `autorizaciones`             | **CU-01 paso 3** — camino crítico del LPR                             |
+| GiST sobre `vigencia`                                                            | `autorizaciones`             | CU-01 paso 4 — contención de instante                                 |
+| `(copropiedad_id, vivienda_id) WHERE estado='activa'`                            | `autorizaciones`             | W-05, M-4                                                             |
+| `(copropiedad_id, vivienda_id) WHERE estado='activo'`                            | `residentes`, `vehiculos`    | W-03, W-04, M-2, M-3                                                  |
+| `(copropiedad_id, estado_salud) WHERE estado='activo'`                           | `dispositivos`               | W-02 «Estado dispositivos», W-07                                      |
+| `(copropiedad_id, ultimo_latido)`                                                | `dispositivos`               | **CA-26** — detección de caídos                                       |
+| `(copropiedad_id, estado, generada_en DESC)`                                     | `alertas`                    | W-08 banda «alertas críticas sin resolver»                            |
+| `(copropiedad_id, suprimir_en) WHERE estado <> 'suprimida'`                      | `plantillas_biometricas`     | **RN-11** — barrido de supresión de pg-boss                           |
+| `(copropiedad_id, estado) WHERE estado='pendiente'`                              | `plantilla_sincronizaciones` | CU-02 6a — cola de reintentos                                         |
+| `(copropiedad_id, ocurrido_en DESC)` sólo de los 3 tipos del registro · **0055** | `bitacora_de_residentes`     | «Crear cuenta»: 30 fallos en una hora suspenden el registro (ADR-037) |
 
 **Sin N+1 desde el diseño.** El caso de uso `ResolverAcceso` (CU-01) es el camino crítico con presupuesto de 3 segundos: carga autorización, lista negra, zona y reglas vigentes. Los cuatro accesos son por índice y se resuelven en una sola ida a la base, no en cuatro consultas encadenadas.
 
@@ -1142,7 +1281,7 @@ Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 | `copropiedades`               | R I U ᴾ    | R ᵀ           | R ᵀ       | R ᴹ              | R ᵀ         | R ˢ         |
 | `usuarios`                    | R I U ᴾ    | R I U ᵀ       | —         | —                | R (propia)  | —           |
 | `roles_usuario`               | R I U ᴾ    | R I U ᵀ       | —         | —                | R (propia)  | —           |
-| `viviendas`                   | R ᴾ        | R I U ᵀ       | R ᵀ       | R ᴹ              | R ⱽ         | R ˢ         |
+| `viviendas`                   | R U ᴾ ⁸    | R I U ᵀ       | R ᵀ       | R ᴹ              | R ⱽ         | R ˢ         |
 | `personas`                    | R ᴾ        | R I U ᵀ       | R ᵀ       | R ᴹ              | R I ⱽ       | R ˢ         |
 | `residentes`                  | R ᴾ        | R I U ᵀ       | R ᵀ       | R ᴹ              | R ⱽ         | R ˢ         |
 | `vehiculos`                   | R ᴾ        | R I U ᵀ       | R ᵀ       | R ᴹ              | **R I U ⱽ** | R ˢ         |
@@ -1178,6 +1317,7 @@ Operaciones: `R` = SELECT · `I` = INSERT · `U` = UPDATE · `—` = sin acceso.
 5. El residente ve el **estado** del consentimiento de sus visitantes —para saber si el acceso facial quedó habilitado—, nunca la evidencia ni el vector.
 6. **Nadie lee `vector_cifrado` por RLS.** La columna se excluye de toda vista y su lectura queda reservada al proceso de sincronización, que la descifra con la llave de bóveda y no la persiste en ningún otro sitio.
 7. El administrador ve los eventos de seguridad **de su copropiedad** (`copropiedad_id_objetivo = T`), no los del actor externo. Los intentos sin tenant resuelto solo los ve el superadministrador.
+8. **15-W, migración 0056.** La política `viviendas_tope_plataforma` (`FOR UPDATE`, `USING` y `WITH CHECK` `app.es_superadmin()`) deja al superadministrador actualizar una vivienda **sólo para cambiar su tope de plazas**: `tg_tope_de_plazas_de_la_vivienda` rechaza cualquier otra columna salvo `actualizado_*`. El resto de la fila sigue siendo del administrador (HU-36).
 
 ### 8.3 Prueba negativa por política
 
@@ -1477,6 +1617,10 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 | **KPI-31** vigencia del caché                           | `cache_potencialmente_obsoleto` + `margen_cache_reglas`                                             | 1     |
 | **Ley 1581 · finalidad** (D-21)                         | `retencion_eventos`, `retencion_evidencia` + libro `purgas_retencion` append-only                   | 1     |
 | **RN-11 como cota legal** (D-21)                        | `CHECK (margen_supresion_plantilla <= '24 hours')` + disparador que ata `suprimir_en` a la vigencia | 1+2   |
+| **D-W2** ninguna cuenta para un menor de 18 (15-W)      | `tg_cuenta_solo_mayores` + `tg_persona_con_cuenta_solo_mayor` con el día de Bogotá (**D-15W-01**)   | 2     |
+| **D-W2** una plaza: cuenta o persona, nunca las dos     | `CHECK plazas_cuenta_o_persona` + `plazas_persona_uk` + clave ajena compuesta (0056)                | 1     |
+| **D-W2** sin cuenta, sólo ocupa plaza un menor          | `tg_plazas_solo_superadministrador` (`plazas_persona_menor`)                                        | 2     |
+| **D-W10** tope de plazas por vivienda                   | `CHECK BETWEEN 1 AND 20` + `tg_tope_de_plazas` bajo bloqueo por vivienda (**D-15W-02**)             | 1+2   |
 
 **Las trece invariantes que `CLAUDE.md` §6 marca como no negociables tienen contraparte de nivel 1**, salvo RN-13 y las dos coherencias que cruzan tablas, que son nivel 2 por imposibilidad de expresarlas como restricción declarativa. Cada una está señalada arriba.
 
@@ -1582,3 +1726,44 @@ Dos consecuencias que no son obvias:
 
 1. **Un `INSERT … SELECT` bajo RLS inserta menos filas sin error.** `niveles_acceso` se poblaba con un `SELECT` sobre `copropiedades`; bajo el contexto de una copropiedad, ese `SELECT` solo ve una. No fallaba: creaba la mitad de las filas, y el problema aparecía mucho después, al insertar un residente de la copropiedad sin niveles. Se ejecuta ahora una vez por copropiedad, en su contexto.
 2. **Una sola sentencia no puede insertar filas de dos copropiedades.** Cada fila se valida contra el contexto activo. Los datos de la segunda copropiedad van en su propio tramo — no por estilo, sino porque es lo que hace que el seed **respete** el aislamiento que la suite prueba.
+
+> **Numeración.** Las dos decisiones siguientes son de la ronda 15-W y llevan el
+> prefijo de su ronda: los números D-25 en adelante ya los usa la serie de
+> deudas de los informes de etapa, y un identificador emitido no se reutiliza.
+
+### D-15W-01 · La mayoría de edad se comprueba dos veces, con el día civil de Bogotá, y ninguna con un `CHECK`
+
+**Ronda 15-W · migración 0055 · D-W2 ·
+[ADR-038](../decisiones/ADR-038-menores-sin-cuenta-gestionados-por-el-hogar.md).**
+
+Una restricción declarativa no puede leer la fecha de hoy sin dejar de ser inmutable: es el mismo motivo por el que la `0038` dejó al dominio el techo de `personas.fecha_nacimiento`. Así que la regla vive dos veces, con la misma aritmética:
+
+1. **En el dominio** (`edad.ts`), con el reloj inyectado. Es donde se lee y se explica, y donde la aplican «Crear cuenta», el primer ingreso y el registro de menores.
+2. **En la base**, `app.es_menor_de_edad(date)` —`STABLE` y no `IMMUTABLE`, porque depende de `now()`— y un disparador por cada lado de la relación: `tg_cuenta_solo_mayores` sobre `usuarios`, al atar una cuenta a una persona, y `tg_persona_con_cuenta_solo_mayor` sobre `personas`, al cambiar la fecha de una persona que ya tiene cuenta. Sin el segundo, «ninguna cuenta vinculada a un menor, tampoco por la base» tendría una puerta.
+
+Lo no obvio:
+
+- **El día es el de Bogotá, no el de UTC**: `(now() AT TIME ZONE 'America/Bogota')::date`. A las 20:00 del día anterior al cumpleaños, en Bogotá, en UTC ya es el cumpleaños. El dominio pide el día al calendario de la zona, no a un desfase fijo.
+- **Restar el intervalo decide el 29 de febrero**: quien nació ese día cumple 18, en los años no bisiestos, el 1 de marzo (`[SUPUESTO]` S-15W-06). El dominio dice lo mismo.
+- **Una fecha desconocida no es «menor» para una cuenta, pero sí niega una plaza sin cuenta.** La fecha la exige el dominio en el alta, y en `usuarios` la base sólo niega lo que sabe. Ocupar una plaza **sin** cuenta es la excepción que se concede a un menor (`plazas_persona_menor`), y sin fecha no se concede.
+- **Si no ve a la persona, niega.** Con claims y sin poder leer la persona —la RLS se la oculta a quien escribe—, la edad no se puede comprobar y `tg_cuenta_solo_mayores` falla cerrado. Sin claims —migraciones, semillas, el dueño— no se niega por no verla, como en el resto del esquema.
+
+Prueba: `supabase/policies/tests/99l_autorregistro_y_menores.sql` §1 · `packages/domain-core/src/residente/edad.test.ts`.
+
+### D-15W-02 · Una plaza la ocupa una cuenta o una persona, y su tope se cuenta bajo un bloqueo por vivienda
+
+**Ronda 15-W · migración 0056 · D-W2, D-W10 ·
+[ADR-038](../decisiones/ADR-038-menores-sin-cuenta-gestionados-por-el-hogar.md).**
+
+**Una columna más, no una tabla más.** El menor ocupa la plaza con `persona_id`, al lado de `usuario_id`, y `CHECK (num_nonnulls(usuario_id, persona_id) <= 1)` impide que la ocupen las dos; libre es «ni una ni otra». Así el tope cuenta las plazas activas de una sola tabla (`app.plazas_activas`), las ocupe quien las ocupe. La clave ajena es **compuesta**, `(copropiedad_id, persona_id)` (D-06): una plaza no puede apuntar a una persona de otra copropiedad.
+
+**El tope, con el patrón del tope de vehículos (ADR-026) y no con `FOR UPDATE`** (`[CONTRADICCIÓN]` C-59). `tg_tope_de_plazas` toma un bloqueo consultivo de transacción por vivienda antes de contar: la segunda alta espera a que la primera confirme y, en `READ COMMITTED`, cada sentencia del disparador toma su propia instantánea, así que la cuenta ya la incluye. Un `FOR UPDATE` sobre `viviendas` exigiría que la política de edición de viviendas dejara pasar a quien inserta la plaza, y la API la inserta en nombre del titular, que no edita viviendas. Medido: 20 altas simultáneas sobre la cuarta plaza, entra una (`99l_plazas_concurrentes.sh`).
+
+Lo no obvio:
+
+- **Cuenta también la plaza que revive** (de inactiva a activa). Ninguna ruta lo hace hoy, pero un tope que se salta con un `UPDATE` no es un tope.
+- **En la declaración inicial**, un `INSERT` de varias filas: la función, volátil, ve las filas que la misma sentencia ya insertó, y la que pasa del tope cae.
+- **El tope de una vivienda nunca queda por debajo de sus plazas activas**, y se comprueba bajo el MISMO bloqueo que el alta de una plaza: un alta simultánea no se cuela entre la cuenta y el cambio.
+- **Nadie pierde plazas.** Antes de crear el disparador del tope, la migración da un tope propio igual a sus plazas activas a toda vivienda que ya supera el de su copropiedad, y la misma función (`app.conservar_plazas_sobre_el_tope`) corre cada vez que el tope de una copropiedad baja. Una vivienda con más de 20 conserva sus plazas, pero no suma más: 20 es la cota de la restricción.
+
+Prueba: `supabase/policies/tests/99l_autorregistro_y_menores.sql` §2 a §7 · `supabase/policies/tests/99l_plazas_concurrentes.sh` · `apps/api/test/plazas-del-titular-pg.test.ts`.

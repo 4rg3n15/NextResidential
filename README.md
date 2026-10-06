@@ -88,6 +88,7 @@ El desarrollo se ejecuta en **17 etapas secuenciales**. Cada una tiene alcance d
 | **15-Q2** | El Edge como puente (P-27 = A) | **El Edge es el único que habla con los equipos** ([ADR-035](docs/decisiones/ADR-035-el-edge-es-el-puente-local-permanente.md)): túnel saliente a la API, la nube decide y el Edge ejecuta; credenciales de los equipos sólo en el Edge; audio y video a través de él |
 | **15-U** | Vulnerabilidades de dependencias | NestJS 11 y Express 5: `pnpm audit --prod` de **12 a 0** sin tocar una aserción (AR-02 se corrige, no se acepta) |
 | **15-R** | Huecos funcionales y decisiones del cliente | MFA y bloqueos que sobreviven al reinicio; **avisos por Web Push sin Firebase** ([ADR-036](docs/decisiones/ADR-036-avisos-por-web-push-sin-firebase.md)); puerta **libre o bloqueada** con vuelta automática (P-25); SSE y audio **directos a la API** con billete de un solo uso (P-20); cuarentena en el Edge (P-31); rotación de la llave de la bóveda; [aceptaciones de riesgo](docs/seguridad/ACEPTACIONES_DE_RIESGO.md). [Informe](docs/etapas/ETAPA-15R.md) · **Corrección:** el Edge compone su proveedor de equipos como la API, el reloj incluido (DT-15R-09). [Informe](docs/etapas/ETAPA-15R-proveedor-del-edge.md) |
+| **15-W** | Cuentas y hogar (D-W1 a D-W10) | **La administración crea al titular** de cada vivienda, ya asignado ([ADR-037](docs/decisiones/ADR-037-titular-asignado-y-crear-cuenta-con-codigo-de-plaza.md)); los demás, **«Crear cuenta»** con un código de plaza; **menores sin cuenta** gestionados por los adultos del hogar ([ADR-038](docs/decisiones/ADR-038-menores-sin-cuenta-gestionados-por-el-hogar.md)); plazas del titular con tope; vehículos editables y visitas revocables por el residente. [Informe](docs/etapas/ETAPA-15W-cuentas-y-hogar.md) |
 
 **Métricas al cierre de la ETAPA 11:** ver el veredicto literal en [`docs/etapas/ETAPA-11.md`](docs/etapas/ETAPA-11.md) §6 · TypeScript y Dart se miden **por separado y por capa**, porque un agregado alto esconde una capa por debajo
 
@@ -736,23 +737,25 @@ La tabla de eventos no admite `UPDATE` ni `DELETE`. Tres barreras superpuestas: 
 
 ## 10. Decisiones de arquitectura (ADR)
 
-| ID          | Decisión                                                                                           | Estado                              |
-| ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk                                     | Cerrada                             |
-| **ADR-002** | Empaquetado de escritorio con **Tauri**                                                            | Cerrada                             |
-| **ADR-003** | El hardware va al final. Todo el sistema funciona contra `MockProvider`                            | Cerrada                             |
-| **ADR-004** | La integridad concurrente se resuelve en la base de datos                                          | Cerrada                             |
-| **ADR-005** | Inmutabilidad de eventos por permisos, no por código                                               | Cerrada                             |
-| **ADR-018** | Un único punto de composición decide qué proveedor de hardware se inyecta                          | Aceptada (15-C)                     |
-| **ADR-019** | El hardware se elige por **capacidades**, nunca por marca ni modelo                                | Aceptada (15-D)                     |
-| **ADR-022** | La vista en vivo se negocia con la API; el navegador nunca ve RTSP                                 | Aceptada (15-E)                     |
-| **ADR-028** | Netlify aloja sólo la consola; la API va en un servidor con procesos permanentes (Cloud Run, P-20) | Aceptada (15-I)                     |
-| **ADR-032** | Consentimiento declarado por quien registra                                                        | Aceptada (15-L)                     |
-| **ADR-034** | El Edge como contingencia                                                                          | **Sustituida en parte** por ADR-035 |
-| **ADR-035** | **El Edge es el puente local permanente** entre la nube y los equipos                              | Aceptada (15-Q2)                    |
-| **ADR-036** | Avisos al residente por **Web Push estándar, sin Firebase**                                        | Aceptada (15-R)                     |
+| ID          | Decisión                                                                                                 | Estado                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **ADR-001** | Intercom por **ISAPI TwoWayAudio**; se descarta SIP + Asterisk                                           | Cerrada                                                   |
+| **ADR-002** | Empaquetado de escritorio con **Tauri**                                                                  | Cerrada                                                   |
+| **ADR-003** | El hardware va al final. Todo el sistema funciona contra `MockProvider`                                  | Cerrada                                                   |
+| **ADR-004** | La integridad concurrente se resuelve en la base de datos                                                | Cerrada                                                   |
+| **ADR-005** | Inmutabilidad de eventos por permisos, no por código                                                     | Cerrada                                                   |
+| **ADR-018** | Un único punto de composición decide qué proveedor de hardware se inyecta                                | Aceptada (15-C)                                           |
+| **ADR-019** | El hardware se elige por **capacidades**, nunca por marca ni modelo                                      | Aceptada (15-D)                                           |
+| **ADR-022** | La vista en vivo se negocia con la API; el navegador nunca ve RTSP                                       | Aceptada (15-E)                                           |
+| **ADR-028** | Netlify aloja sólo la consola; la API va en un servidor con procesos permanentes (Cloud Run, P-20)       | Aceptada (15-I)                                           |
+| **ADR-032** | Consentimiento declarado por quien registra                                                              | Aceptada (15-L)                                           |
+| **ADR-034** | El Edge como contingencia                                                                                | **Sustituida en parte** por ADR-035                       |
+| **ADR-035** | **El Edge es el puente local permanente** entre la nube y los equipos                                    | Aceptada (15-Q2)                                          |
+| **ADR-036** | Avisos al residente por **Web Push estándar, sin Firebase**                                              | Aceptada (15-R)                                           |
+| **ADR-037** | La administración crea al **titular** de cada vivienda; los demás, «Crear cuenta» con un código de plaza | Aceptada (15-W); sustituye a ADR-023 sólo para residentes |
+| **ADR-038** | **Menores sin cuenta**, gestionados por los adultos del hogar                                            | Aceptada (15-W)                                           |
 
-Son 33 en total (ADR-001 a ADR-008 y ADR-012 a ADR-036; ADR-009 a ADR-011 no existen). Índice completo y detalle en [`docs/decisiones/`](./docs/decisiones/).
+Son 35 en total (ADR-001 a ADR-008 y ADR-012 a ADR-038; ADR-009 a ADR-011 no existen). Índice completo y detalle en [`docs/decisiones/`](./docs/decisiones/).
 
 **Sobre ADR-001:** la sección de stack sugerido del documento de requisitos proponía SIP con puente WebRTC. Prevalece ISAPI TwoWayAudio por decisión del cliente. Ningún requisito, regla de negocio ni criterio de aceptación exige SIP; los indicadores comprometidos son de latencia y trazabilidad, agnósticos al protocolo. La ruta SIP sobrevive como contingencia documentada, realizable como adaptador nuevo detrás del mismo puerto sin tocar el dominio.
 

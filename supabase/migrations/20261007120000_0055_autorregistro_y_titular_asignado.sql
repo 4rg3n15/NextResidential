@@ -3,7 +3,7 @@
 --        ADMINISTRACIÓN
 --
 -- Decisiones del cliente D-W1, D-W2, D-W8 y D-W9 (docs/auditoria/
--- contradicciones-y-supuestos.md §3 quinquies) · ADR-037.
+-- contradicciones-y-supuestos.md §3 bis, E-07) · ADR-037.
 --
 --   1 · usuarios.origen_de_alta: 'administracion' (la cuenta la dio la
 --       administración —el titular, D-W9— o es anterior a esta ronda) o
