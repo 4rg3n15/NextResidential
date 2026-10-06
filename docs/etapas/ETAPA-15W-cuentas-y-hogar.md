@@ -70,6 +70,16 @@
      mismo código recibía 409 y sin el tiempo mínimo: la única respuesta de
      código que no era uniforme. Salió al revisar la documentación.
    - Los cuatro están corregidos, y cada uno tiene una prueba que lo ve fallar.
+   - **Y tras abrir el PR, la revisión automática encontró tres más, los tres
+     reales**, corregidos en el mismo PR con su prueba vista fallar:
+     - un `PUT` del tope sin el campo `tope` devolvía la vivienda al tope de su
+       copropiedad, en silencio; ahora es 400, y sólo `null` lo hace;
+     - con cupo para varias, dos altas de plaza a la vez elegían el mismo número
+       y la perdedora leía «tope alcanzado»; ahora el número se calcula bajo el
+       bloqueo de la vivienda, y seis altas simultáneas entran las seis;
+     - el historial de la placa se comprobaba en otra transacción que el cambio;
+       ahora lo decide el propio `UPDATE`, y un evento llegado entre medias ya
+       no deja cambiar la placa.
 8. **Me salté dos veces el límite de §2.3 y lo corregí antes del cierre.**
    - `MiHogarController` y `SupervisionDeResidentesController` llegaron a seis
      métodos públicos. Las rutas nuevas salieron a sus propios controladores
@@ -555,6 +565,15 @@ ejecuta.
 - 164 campos de texto con cota.
 - 56 migraciones aplicables con `supabase db push`.
 
+**Después de esta corrida** entraron las tres correcciones de la revisión automática del PR (`fix(etapa-15w/hogar)`, posterior al cierre).
+
+- Se validaron con:
+  - las 41 suites de vehículos, plazas, padrón, residente y cuentas contra la base (365 en verde);
+  - lint y typecheck;
+  - el contrato y los dos clientes regenerados;
+  - una sonda por corrección, en rojo con su violación.
+- La verificación completa de esa cabeza es la del CI del PR, que corre `verificar-etapa.sh --con-base` en macOS.
+
 Antes de esta corrida, la base y las suites tocadas se ejecutaron por separado:
 
 - La suite SQL en modo Supabase.
@@ -620,6 +639,7 @@ Transversales (§2.7.8):
     - las tres listas exhaustivas;
     - `residentes-y-vehiculos-pg.test.ts` (620 → 752);
     - el recorrido de la app `apps/mobile/e2e/recorrido-web.mjs` (788 → 868), con los pasos de la 15-W.
+  - Y `padron/aplicacion/puertos.ts` (416 → 418): la variante `placa_con_historial` del resultado de editar, que exige la corrección del PR.
   - Se suman a DT-15P-02 y anteriores (§4).
 - **DT-15W-04 · La ficha de plazas de la consola no distingue a un menor sin cuenta** (`PlazaDeOcupanteDto.sinCuenta`): ve «ocupada». Se pinta en la app, no en la consola.
 - **DT-15W-05 · Los 400 de forma del `ValidationPipe` llegan en inglés y sin `campos`.** Los de la regla —el caso de uso— sí llevan `campos` y texto en español. La app cubre en el teléfono los casos conocidos.
@@ -703,3 +723,5 @@ Rama `etapa-15w-cuentas-y-hogar`, desde `develop` (`f605442`) · PR [4rg3n15/Nex
 - `eaacafd` feat(etapa-15w/app): «Crear cuenta», primer ingreso, menores, plazas, vehículos y visitas en la app del residente
 - `3ded4f5` docs(etapa-15w): ADR-037 y ADR-038, el registro (C-57 a C-61, E-07, S-15W, P-36 a P-38), modelo de datos y guías
 - cierre: `chore(etapa-15w): cierre de etapa` — este informe y la ficha y cabecera de `docs/ESTADO_ETAPAS.md`
+- `6bc6995` fix(etapa-15w/hogar): las tres observaciones de la revisión del PR — tope omitido, número de plaza y placa con historial
+- y su registro en este informe y en la ficha (`docs(etapa-15w)`)
