@@ -6102,7 +6102,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorApiDto"];
                 };
             };
-            /** @description Usuario ocupado o plaza ya tomada */
+            /** @description Usuario ocupado */
             409: {
                 headers: {
                     [name: string]: unknown;

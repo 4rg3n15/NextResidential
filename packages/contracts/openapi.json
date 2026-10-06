@@ -277,7 +277,7 @@
             }
           },
           "409": {
-            "description": "Usuario ocupado o plaza ya tomada",
+            "description": "Usuario ocupado",
             "content": {
               "application/json": {
                 "schema": {

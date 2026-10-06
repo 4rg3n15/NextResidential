@@ -192,11 +192,12 @@ describe('15-W · D2 · «Crear cuenta» con código de plaza', () => {
   it('el mismo código cuatro veces a la vez → UNA cuenta, y ninguna identidad sobrante queda viva', async () => {
     if (omitida()) return;
     // Quien pierde lo hace en uno de dos sitios, según llegue: al resolver el
-    // código (la plaza ya no está libre: 400, el genérico) o en la transacción,
-    // con su identidad YA creada en el proveedor (409, y la compensación la
-    // borra). El orden no se controla; el invariante, sí: una cuenta, y ninguna
-    // identidad de un perdedor sobrevive. La compensación sola, sin depender
-    // del azar, la prueba `crear-cuenta-con-vinculo.test.ts`.
+    // código (la plaza ya no está libre) o en la transacción, con su identidad
+    // YA creada en el proveedor (y la compensación la borra). En los dos casos
+    // contesta lo MISMO que un código usado: 400, el genérico. El orden no se
+    // controla; el invariante, sí: una cuenta, y ninguna identidad de un
+    // perdedor sobrevive. La compensación sola, sin depender del azar, la prueba
+    // `crear-cuenta-con-vinculo.test.ts`.
     const usuarios = [1, 2, 3, 4].map((i) => `par${String(i)}.${s}`);
     const intentos = await Promise.all(
       usuarios.map((u) => banco.registrar(cuerpo(u, String(codigos[2])))),
@@ -207,7 +208,7 @@ describe('15-W · D2 · «Crear cuenta» con código de plaza', () => {
       JSON.stringify(intentos.map((r) => r.body)),
     ).toHaveLength(1);
     expect(
-      estados.every((e) => e === 201 || e === 400 || e === 409),
+      estados.every((e) => e === 201 || e === 400),
       estados.join(','),
     ).toBe(true);
     for (const [i, usuario] of usuarios.entries()) {

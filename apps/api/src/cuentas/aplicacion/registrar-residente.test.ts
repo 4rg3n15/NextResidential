@@ -184,7 +184,7 @@ describe('RegistrarResidente (15-W, D2)', () => {
   it('lo que dice el alta se traduce: ocupado, plaza tomada, formato y proveedor', async () => {
     const casos = [
       [fallo({ motivo: 'DUPLICADO' as const }), { motivo: 'USUARIO_OCUPADO' }],
-      [fallo({ motivo: 'VINCULO' as const }), { motivo: 'CODIGO_EN_USO' }],
+      [fallo({ motivo: 'VINCULO' as const }), { motivo: 'CODIGO' }],
       [
         fallo({ motivo: 'FORMATO' as const, detalle: 'usuario raro' }),
         { motivo: 'CAMPOS', campos: [{ campo: 'usuario', motivo: 'usuario raro' }] },
@@ -192,8 +192,13 @@ describe('RegistrarResidente (15-W, D2)', () => {
       [fallo({ motivo: 'PROVEEDOR' as const }), { motivo: 'NO_DISPONIBLE' }],
     ] as const;
     for (const [alta, esperado] of casos) {
-      const { caso } = montar({ alta });
+      const { caso, rastro } = montar({ alta });
       expect(await caso.ejecutar(solicitud(), null)).toEqual({ ok: false, error: esperado });
+      // La plaza tomada en ese instante es un código usado: el mismo tiempo, y no cuenta.
+      if (esperado.motivo === 'CODIGO') {
+        expect(rastro.esperas).toEqual([TIEMPO_MINIMO_DE_REGISTRO_FALLIDO_MS]);
+        expect(rastro.fallos).toEqual([]);
+      }
     }
   });
 

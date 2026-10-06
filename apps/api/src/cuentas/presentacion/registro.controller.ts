@@ -66,7 +66,7 @@ export class RegistroController {
     type: ErrorApiDto,
     description: `Campos, menor de edad o «${MENSAJE_CODIGO_DE_INVITACION}». Lleva la política vigente`,
   })
-  @ApiConflictResponse({ type: ErrorApiDto, description: 'Usuario ocupado o plaza ya tomada' })
+  @ApiConflictResponse({ type: ErrorApiDto, description: 'Usuario ocupado' })
   @ApiTooManyRequestsResponse({
     type: ErrorApiDto,
     description: '10 cada 10 min por IP y 5 cada 15 min por (IP, prefijo del código)',
@@ -84,8 +84,6 @@ export class RegistroController {
         throw new BadRequestException(MENSAJE_CUENTA_DE_MENOR);
       case 'CODIGO':
         throw new BadRequestException(MENSAJE_CODIGO_DE_INVITACION);
-      case 'CODIGO_EN_USO':
-        throw new ConflictException(MENSAJE_CODIGO_DE_INVITACION);
       case 'USUARIO_OCUPADO':
         throw new ConflictException('Ese usuario no está disponible');
       case 'NO_DISPONIBLE':

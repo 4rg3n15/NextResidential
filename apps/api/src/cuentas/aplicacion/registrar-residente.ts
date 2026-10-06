@@ -68,10 +68,11 @@ export interface CampoDelRegistro {
 export type RechazoDeRegistro =
   | { readonly motivo: 'CAMPOS'; readonly campos: readonly CampoDelRegistro[] }
   | { readonly motivo: 'MENOR_DE_EDAD' }
-  /** Incorrecto, usado, de otro conjunto o con el registro suspendido: indistinguibles. */
+  /**
+   * Incorrecto, usado, de otro conjunto, con el registro suspendido o tomado en
+   * ese instante por otra alta: indistinguibles, en respuesta y en tiempo.
+   */
   | { readonly motivo: 'CODIGO' }
-  /** El código era bueno, pero otra alta simultánea se llevó la plaza. */
-  | { readonly motivo: 'CODIGO_EN_USO' }
   | { readonly motivo: 'USUARIO_OCUPADO' }
   | { readonly motivo: 'NO_DISPONIBLE' };
 
@@ -169,7 +170,10 @@ export class RegistrarResidente {
     );
     if (r.ok) return exito({ creada: true });
     if (r.error.motivo === 'DUPLICADO') return fallo({ motivo: 'USUARIO_OCUPADO' });
-    if (r.error.motivo === 'VINCULO') return fallo({ motivo: 'CODIGO_EN_USO' });
+    // Otra alta simultánea se llevó la plaza: para quien llega tarde, el código
+    // ya está usado, y lo dice igual que cualquier código usado. No cuenta para
+    // la suspensión: no adivinó nada.
+    if (r.error.motivo === 'VINCULO') return igualado(fallo({ motivo: 'CODIGO' }));
     if (r.error.motivo === 'FORMATO') {
       return fallo({ motivo: 'CAMPOS', campos: [{ campo: 'usuario', motivo: r.error.detalle }] });
     }
