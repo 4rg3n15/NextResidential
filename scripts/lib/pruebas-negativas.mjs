@@ -3467,7 +3467,7 @@ try {
   }
 
   console.log(
-    '\n▸ 41 · un error de tipos en una prueba de la API rompe `pnpm typecheck` (DT-15S1-03)',
+    '\n▸ 41 · un error de tipos en una prueba de la API, del dominio, de proveedores o del Edge rompe `pnpm typecheck` (DT-15S1-03, DT-15S1-C02)',
   );
   {
     /**
@@ -3481,22 +3481,45 @@ try {
      * seguía en verde con UNA llave para todas las copropiedades, y la de «el
      * motivo no lleva la dirección», cuyo mensaje nunca la llevó.
      *
-     * Ahora el `typecheck` de `@ncr/api` compila también `tsconfig.pruebas.json`.
-     * Aquí se le ve fallar: se devuelve el defecto que abrió la deuda —el doble
-     * `HogarEnMemoria` sin `darDeBaja`— y se mete un error en una prueba de
-     * `src/`. Y se vigila lo que lo dejaría ciego sin ponerse rojo: un
-     * `typecheck` que ya no las compila, una configuración menos estricta, o
-     * turbo sirviendo de su caché un verde viejo (H-15S1-C05).
+     * DT-15S1-C02 · Y EL MISMO AGUJERO EN DOMINIO, PROVEEDORES Y EDGE. Sus
+     * `tsconfig.json` excluyen las pruebas y el del Edge no alcanza `test/`:
+     * proveedores tenía tres errores de tipos en pruebas que pasaban.
+     *
+     * Ahora el `typecheck` de cada uno compila también su `tsconfig.pruebas.json`.
+     * Aquí se le ve fallar: en la API se devuelve el defecto que abrió la deuda
+     * —el doble `HogarEnMemoria` sin `darDeBaja`—, en proveedores uno de sus
+     * tres errores, y en los cuatro se mete un error en una prueba. Y se vigila
+     * lo que lo dejaría ciego sin ponerse rojo: un `typecheck` que ya no las
+     * compila, una configuración menos estricta, o turbo sirviendo de su caché un
+     * verde viejo (H-15S1-C05: las pruebas de la API y las del Edge leen ficheros
+     * de otros paquetes, y las de proveedores, `scripts/`).
      *
      * Por qué en un espejo y con `tsc -p`: el banco no tiene `node_modules`, y
-     * `tsc -b` necesitaría los `dist/` de los paquetes internos.
-     * `tsconfig.pruebas.json` los resuelve al FUENTE (`paths`), así que basta
+     * `tsc -b` necesitaría los `dist/` de los paquetes internos. Los
+     * `tsconfig.pruebas.json` los resuelven al FUENTE (`paths`), así que basta
      * enlazar `node_modules`. Y con el `tsc` del repositorio, no el del PATH: en
      * el contenedor de la nube hay un TypeScript 6 global que rechaza la
      * configuración por otra razón, y la sonda concluiría sobre él.
      * ════════════════════════════════════════════════════════════════════════
      */
-    if (exigeControl('apps/api/tsconfig.pruebas.json')) {
+    const PROGRAMAS = [
+      { de: 'de la API', paquete: '@ncr/api', carpeta: 'apps/api', sonda: 'src' },
+      {
+        de: 'del dominio',
+        paquete: '@ncr/domain-core',
+        carpeta: 'packages/domain-core',
+        sonda: 'src',
+      },
+      {
+        de: 'de proveedores',
+        paquete: '@ncr/providers',
+        carpeta: 'packages/providers',
+        sonda: 'src',
+      },
+      // En el Edge se siembra en `test/`: es lo que su `tsconfig.json` no alcanzaba.
+      { de: 'del Edge', paquete: '@ncr/edge', carpeta: 'apps/edge', sonda: 'test' },
+    ];
+    if (PROGRAMAS.every(({ carpeta }) => exigeControl(`${carpeta}/tsconfig.pruebas.json`))) {
       const espejo = join(banco, 'tipos-de-las-pruebas');
       cpSync(clon, espejo, { recursive: true, filter: (o) => o !== join(clon, '.git') });
       const enlazar = (relativo) => {
@@ -3512,19 +3535,7 @@ try {
       const TSC = join(raiz, 'node_modules', 'typescript', 'bin', 'tsc');
       const tsc = (...args) =>
         correr(process.execPath, [TSC, ...args], { cwd: espejo, timeout: 300_000 });
-      const compilar = () => tsc('-p', 'apps/api/tsconfig.pruebas.json');
-
-      const base = compilar();
-      base.codigo === 0
-        ? ok('la línea base compila: las pruebas de la API, sin un error de tipos')
-        : mal(`la línea base NO compila (codigo ${base.codigo}): ${base.salida.slice(0, 400)}`);
-
-      const guion =
-        JSON.parse(readFileSync(join(espejo, 'apps/api/package.json'), 'utf8')).scripts
-          ?.typecheck ?? '';
-      /\btsc -p tsconfig\.pruebas\.json\b/.test(guion)
-        ? ok('`typecheck` de @ncr/api compila las pruebas: `pnpm typecheck` (paso 4) las ve')
-        : mal(`\`typecheck\` de @ncr/api ya no compila las pruebas: «${guion}»`);
+      const compilar = (carpeta) => tsc('-p', `${carpeta}/tsconfig.pruebas.json`);
 
       // Las opciones EFECTIVAS (`--showConfig` resuelve el `extends`).
       const ESTRICTAS = [
@@ -3540,46 +3551,66 @@ try {
         const r = tsc('-p', tsconfig, '--showConfig');
         return r.codigo === 0 ? (JSON.parse(r.salida).compilerOptions ?? {}) : {};
       };
-      const deLaApi = opciones('apps/api/tsconfig.json');
-      const relajadas = () => {
-        const deLasPruebas = opciones('apps/api/tsconfig.pruebas.json');
-        const menos = ESTRICTAS.filter((o) => deLaApi[o] !== true || deLasPruebas[o] !== true);
+      const relajadas = (carpeta) => {
+        const delPaquete = opciones(`${carpeta}/tsconfig.json`);
+        const deLasPruebas = opciones(`${carpeta}/tsconfig.pruebas.json`);
+        const menos = ESTRICTAS.filter((o) => delPaquete[o] !== true || deLasPruebas[o] !== true);
         return deLasPruebas.noEmit === true ? menos : [...menos, 'noEmit'];
       };
-      relajadas().length === 0
-        ? ok('con las mismas opciones estrictas que la API, y sin emitir')
-        : mal(`las pruebas se compilan con menos rigor: ${relajadas().join(', ')}`);
-      // Y esa comprobación, vista fallar: un `false` heredado no pasa.
+      const rutaTurbo = join(espejo, 'turbo.json');
+      const sinCache = (paquete) =>
+        JSON.parse(readFileSync(rutaTurbo, 'utf8')).tasks?.[`${paquete}#typecheck`]?.cache ===
+        false;
+
+      for (const { de, paquete, carpeta } of PROGRAMAS) {
+        const base = compilar(carpeta);
+        base.codigo === 0
+          ? ok(`la línea base compila: las pruebas ${de}, sin un error de tipos`)
+          : mal(
+              `la línea base ${de} NO compila (codigo ${base.codigo}): ${base.salida.slice(0, 400)}`,
+            );
+        const guion =
+          JSON.parse(readFileSync(join(espejo, carpeta, 'package.json'), 'utf8')).scripts
+            ?.typecheck ?? '';
+        /\btsc -p tsconfig\.pruebas\.json\b/.test(guion)
+          ? ok(
+              `\`typecheck\` de ${paquete} compila las pruebas: \`pnpm typecheck\` (paso 4) las ve`,
+            )
+          : mal(`\`typecheck\` de ${paquete} ya no compila las pruebas: «${guion}»`);
+        const menos = relajadas(carpeta);
+        menos.length === 0
+          ? ok(`las ${de}, con las mismas opciones estrictas que su paquete, y sin emitir`)
+          : mal(`las pruebas ${de} se compilan con menos rigor: ${menos.join(', ')}`);
+        sinCache(paquete)
+          ? ok(`\`typecheck\` de ${paquete} no se sirve de la caché de turbo`)
+          : mal(
+              `\`typecheck\` de ${paquete} se sirve de la caché de turbo: un verde viejo pasa por nuevo`,
+            );
+      }
+
+      // Y esas dos vigilancias, vistas fallar: un `false` heredado no pasa, y
+      // quitar `cache: false` tampoco.
       const rutaConfig = join(espejo, 'apps/api/tsconfig.pruebas.json');
       const config = readFileSync(rutaConfig, 'utf8');
       const floja = JSON.parse(config);
       floja.compilerOptions.exactOptionalPropertyTypes = false;
       writeFileSync(rutaConfig, JSON.stringify(floja));
-      relajadas().includes('exactOptionalPropertyTypes')
+      relajadas('apps/api').includes('exactOptionalPropertyTypes')
         ? ok('una configuración de pruebas relajada se nombra')
         : mal('relajar `exactOptionalPropertyTypes` en las pruebas pasa inadvertido');
       writeFileSync(rutaConfig, config);
-
-      // H-15S1-C05 · turbo calcula la caché con las entradas DEL PAQUETE, y estas
-      // pruebas leen también el Edge, la consola y los contratos: con caché, un
-      // error en `apps/edge/test` devolvía el verde de la corrida anterior.
-      const rutaTurbo = join(espejo, 'turbo.json');
       const turbo = readFileSync(rutaTurbo, 'utf8');
-      const sinCache = () =>
-        JSON.parse(readFileSync(rutaTurbo, 'utf8')).tasks?.['@ncr/api#typecheck']?.cache === false;
-      sinCache()
-        ? ok('`typecheck` de @ncr/api no se sirve de la caché de turbo')
-        : mal(
-            '`typecheck` de @ncr/api se sirve de la caché de turbo: un verde viejo pasa por nuevo',
-          );
-      const conCache = JSON.parse(turbo);
-      delete conCache.tasks['@ncr/api#typecheck'];
-      writeFileSync(rutaTurbo, JSON.stringify(conCache));
-      sinCache()
-        ? mal('quitarle `cache: false` en turbo.json pasa inadvertido')
-        : ok('y quitarle `cache: false` se nombra');
-      writeFileSync(rutaTurbo, turbo);
+      for (const paquete of ['@ncr/api', '@ncr/edge']) {
+        const conCache = JSON.parse(turbo);
+        delete conCache.tasks[`${paquete}#typecheck`];
+        writeFileSync(rutaTurbo, JSON.stringify(conCache));
+        sinCache(paquete)
+          ? mal(`quitarle \`cache: false\` a ${paquete} en turbo.json pasa inadvertido`)
+          : ok(`y quitarle \`cache: false\` a ${paquete} se nombra`);
+        writeFileSync(rutaTurbo, turbo);
+      }
 
+      // Los defectos que abrieron las deudas, devueltos.
       const hogar = join(espejo, 'apps/api/test/dobles/hogar-en-memoria.ts');
       const doble = readFileSync(hogar, 'utf8');
       const sinBaja = doble.replace(/\n {2}async darDeBaja\([\s\S]*?\n {2}}\n/, '\n');
@@ -3587,21 +3618,48 @@ try {
         mal('la sonda no encontró `darDeBaja` en el doble: no puede devolver el defecto');
       } else {
         writeFileSync(hogar, sinBaja);
-        const a = compilar();
+        const a = compilar('apps/api');
         a.codigo !== 0 && /hogar-en-memoria\.ts\(\d+,\d+\): error TS2420/.test(a.salida)
           ? ok('el doble sin `darDeBaja` —el defecto de DT-15S1-03— rompe la compilación')
           : mal(`el doble sin \`darDeBaja\` NO se detecta (codigo ${a.codigo})`);
         writeFileSync(hogar, doble);
       }
-
-      writeFileSync(
-        join(espejo, 'apps/api/src/sonda-de-tipos.test.ts'),
-        "export const n: number = 'no es un número';\n",
+      const apertura = join(
+        espejo,
+        'packages/providers/src/diagnostico/apertura-de-verificacion.test.ts',
       );
-      const b = compilar();
-      b.codigo !== 0 && /sonda-de-tipos\.test\.ts\(1,\d+\): error TS2322/.test(b.salida)
-        ? ok('un error de tipos en una prueba de `src/` se detecta, con su fichero')
-        : mal(`un error de tipos en \`src/**/*.test.ts\` NO se detecta (codigo ${b.codigo})`);
+      const prueba = readFileSync(apertura, 'utf8');
+      const conIndefinido = prueba.replace(
+        '{ ...opciones, body: null }',
+        '{ ...opciones, body: undefined }',
+      );
+      if (conIndefinido === prueba) {
+        mal(
+          'la sonda no encontró `body: null` en la prueba de proveedores: no puede devolver el defecto',
+        );
+      } else {
+        writeFileSync(apertura, conIndefinido);
+        const c = compilar('packages/providers');
+        c.codigo !== 0 &&
+        /apertura-de-verificacion\.test\.ts\(\d+,\d+\): error TS2345/.test(c.salida)
+          ? ok(
+              '`body: undefined` con `exactOptionalPropertyTypes` —uno de los tres de DT-15S1-C02— rompe la compilación',
+            )
+          : mal(
+              `\`body: undefined\` en la prueba de proveedores NO se detecta (codigo ${c.codigo})`,
+            );
+        writeFileSync(apertura, prueba);
+      }
+
+      for (const { de, carpeta, sonda } of PROGRAMAS) {
+        const fichero = join(espejo, carpeta, sonda, 'sonda-de-tipos.test.ts');
+        writeFileSync(fichero, "export const n: number = 'no es un número';\n");
+        const b = compilar(carpeta);
+        b.codigo !== 0 && /sonda-de-tipos\.test\.ts\(1,\d+\): error TS2322/.test(b.salida)
+          ? ok(`un error de tipos en una prueba de \`${sonda}/\` ${de} se detecta, con su fichero`)
+          : mal(`un error de tipos en \`${carpeta}/${sonda}\` NO se detecta (codigo ${b.codigo})`);
+        rmSync(fichero, { force: true });
+      }
       rmSync(espejo, { recursive: true, force: true });
     }
   }
