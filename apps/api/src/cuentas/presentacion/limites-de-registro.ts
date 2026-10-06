@@ -13,7 +13,9 @@ import { normalizarCodigoDeOcupante } from '@ncr/domain-core';
  *  · `default` en la ruta: 10 cada 10 min por IP.
  *  · `registro`, con nombre y `skipIf` como los de acceso: 5 cada 15 min por
  *    (IP, prefijo del código). Frena a quien prueba códigos de UN conjunto sin
- *    gastar el cupo de otros.
+ *    gastar el cupo de otros. Una petición SIN código no entra en él: no hay
+ *    prefijo que contar, no llega a comparar ningún código (la forma la para
+ *    antes) y es con la que la app pide la política (C-60); la cuenta la IP.
  *  · En la base, dentro del caso de uso: 30 códigos fallidos en una hora en una
  *    copropiedad suspenden su registro una hora (la bitácora los cuenta, como
  *    el límite de vinculación de ADR-025). Es lo que no se esquiva rotando IP.
@@ -38,9 +40,14 @@ const esRutaDeRegistro = (contexto: ExecutionContext): boolean =>
 export const prefijoIntentado = (cuerpo: unknown): string => {
   if (typeof cuerpo !== 'object' || cuerpo === null) return 'sin-cuerpo';
   const bruto = (cuerpo as Record<string, unknown>)['codigoDeInvitacion'];
-  if (typeof bruto !== 'string') return 'sin-codigo';
+  if (typeof bruto !== 'string' || bruto.trim() === '') return 'sin-codigo';
   const codigo = normalizarCodigoDeOcupante(bruto.slice(0, 40));
   return codigo.ok ? (codigo.valor.prefijo ?? 'sin-prefijo') : 'malformado';
+};
+
+const sinCodigo = (contexto: ExecutionContext): boolean => {
+  const intento = prefijoIntentado(contexto.switchToHttp().getRequest<{ body?: unknown }>().body);
+  return intento === 'sin-cuerpo' || intento === 'sin-codigo';
 };
 
 export const limitadoresDeRegistro = (
@@ -50,7 +57,7 @@ export const limitadoresDeRegistro = (
     name: LIMITADOR_REGISTRO,
     ttl: VENTANA_DE_REGISTRO_POR_PREFIJO_MS,
     limit: async () => LIMITE_DE_REGISTRO_POR_PREFIJO * (await factor()),
-    skipIf: (contexto) => !esRutaDeRegistro(contexto),
+    skipIf: (contexto) => !esRutaDeRegistro(contexto) || sinCodigo(contexto),
     getTracker: (peticion) => {
       const p = peticion as { body?: unknown; ip?: string };
       return `${p.ip ?? 'desconocido'}|${prefijoIntentado(p.body)}`;
