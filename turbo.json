@@ -12,6 +12,9 @@
     },
     "typecheck": { "dependsOn": ["^build"] },
     "@ncr/api#typecheck": { "dependsOn": ["^build"], "cache": false },
+    "@ncr/domain-core#typecheck": { "dependsOn": ["^build"], "cache": false },
+    "@ncr/providers#typecheck": { "dependsOn": ["^build"], "cache": false },
+    "@ncr/edge#typecheck": { "dependsOn": ["^build"], "cache": false },
     "lint": {},
     "test": {
       "dependsOn": ["^build"],
