@@ -25,6 +25,10 @@ import type { EstadoDelRegistro, SuspensionDelRegistro } from './puertos-de-susp
  * `exigirAlcance`. Aquí sólo se decide qué se hace.
  * ═════════════════════════════════════════════════════════════════════════════
  */
+/** D1 · lo que oye la administración al pedir un segundo titular. */
+export const VIVIENDA_CON_TITULAR =
+  'Esta vivienda ya tiene titular: los demás entran con un código de plaza';
+
 @Injectable()
 export class TitularesDeViviendas {
   constructor(

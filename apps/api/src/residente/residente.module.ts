@@ -5,6 +5,8 @@ import { REGISTRO_DE_INVITACIONES } from '../cuentas';
 import type { InvitacionesDeResidente, RegistroDeInvitaciones } from '../cuentas';
 import { INVITACIONES_DE_RESIDENTE, PROVEEDORES_DE_LA_15W } from './hogar-15w.providers';
 import { MisPlazasController } from './presentacion/mis-plazas.controller';
+import { MisVehiculosController } from './presentacion/mis-vehiculos.controller';
+import { TitularesController } from './presentacion/titulares.controller';
 import { MisMenoresController } from './presentacion/mis-menores.controller';
 import {
   TopeDePlazasController,
@@ -97,7 +99,9 @@ export class ResidenteModule implements OnModuleInit {
         // su supervisión por el superadministrador.
         MiAltaController,
         MiHogarController,
+        MisVehiculosController, // 15-W (D5) · editar y eliminar los propios.
         SupervisionDeResidentesController,
+        TitularesController, // 15-W (D1) · titulares de las viviendas.
         OcupantesDeViviendaController,
         // 15-L (G) · el superadministrador edita el perfil de un residente.
         PerfilDeResidentesController,
