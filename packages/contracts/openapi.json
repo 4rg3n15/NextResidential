@@ -241,6 +241,68 @@
         ]
       }
     },
+    "/auth/registro": {
+      "post": {
+        "operationId": "RegistroController_registro",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroDeResidenteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistroCreadoDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Campos, menor de edad o «El código de invitación no es válido o ya se usó». Lleva la política vigente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Usuario ocupado o plaza ya tomada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "10 cada 10 min por IP y 5 cada 15 min por (IP, prefijo del código)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApiDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Crear cuenta de residente con un código de plaza (D-W1, D-W8). No emite tokens",
+        "tags": [
+          "cuentas"
+        ]
+      }
+    },
     "/auth/restablecimiento": {
       "post": {
         "operationId": "AutenticacionController_registrarRestablecimiento",
@@ -4575,7 +4637,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AltaDeMiViviendaDto"
+                "$ref": "#/components/schemas/PrimerIngresoDto"
               }
             }
           }
@@ -4597,7 +4659,7 @@
             "bearer": []
           }
         ],
-        "summary": "Primer ingreso: contacto, documento, vivienda y código (3.2)",
+        "summary": "Primer ingreso: nombre, documento de adulto, teléfono y fecha (D3); sin vivienda",
         "tags": [
           "residente"
         ]
@@ -4785,6 +4847,241 @@
           }
         ],
         "summary": "El historial de mi vivienda, con los filtros del mockup (HU-33, M-6)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/menores": {
+      "get": {
+        "operationId": "MisMenoresController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MenorDelHogarDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Los menores de mi vivienda: edad, documento enmascarado y plaza",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MisMenoresController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenorRegistradoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra un menor en una plaza libre de mi vivienda (D-W2)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/menores/{residenteId}": {
+      "put": {
+        "operationId": "MisMenoresController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicionDeMenorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenorRegistradoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edita nombre, parentesco y fecha de un menor de mi vivienda",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/menores/{residenteId}/baja": {
+      "post": {
+        "operationId": "MisMenoresController_baja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BajaDeMenorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenorRegistradoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de baja a un menor con motivo: su plaza queda libre (D4)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/menores/{residenteId}/codigo-de-traspaso": {
+      "post": {
+        "operationId": "MisMenoresController_codigoDeTraspaso",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigoDeTraspasoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El titular genera el código con el que un mayor de 18 crea su cuenta",
         "tags": [
           "residente"
         ]
@@ -5085,7 +5382,97 @@
             "bearer": []
           }
         ],
-        "summary": "Declaro cuántos ocupantes hay: una vez y definitivo (D6)",
+        "summary": "El titular declara cuántos ocupantes hay: de 1 al tope (D6, D-W10)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/ocupantes/plazas": {
+      "post": {
+        "operationId": "MisPlazasController_anadir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisOcupantesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El titular añade una plaza, hasta el tope de su vivienda (D-W10)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/ocupantes/plazas/{plazaId}/retiro": {
+      "post": {
+        "operationId": "MisPlazasController_retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plazaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetiroDeOcupanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisOcupantesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El titular retira una plaza LIBRE, con motivo; nunca la suya (D-W10)",
         "tags": [
           "residente"
         ]
@@ -5249,6 +5636,102 @@
           }
         ],
         "summary": "Registro un vehículo propio: activo al instante, dentro del tope (D5 a)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/vehiculos/{vehiculoId}": {
+      "put": {
+        "operationId": "MiHogarController_editarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicionDeVehiculoPropioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoEditadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edito un vehículo propio; la placa sólo si no tiene historial (D5)",
+        "tags": [
+          "residente"
+        ]
+      },
+      "delete": {
+        "operationId": "MiHogarController_eliminarVehiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehiculoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoEliminadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Elimino un vehículo propio: borrado sin historial, baja lógica con él (D5)",
         "tags": [
           "residente"
         ]
@@ -5478,6 +5961,60 @@
           }
         ],
         "summary": "Vuelvo a autorizar a un visitante anterior con su foto (F6)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/visitas/{autorizacionId}/revocacion": {
+      "post": {
+        "operationId": "MisVisitasController_revocarVisita",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "autorizacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevocacionDeMiVisitaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaRevocadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoco una visita vigente de mi vivienda, con motivo (D-W6)",
         "tags": [
           "residente"
         ]
@@ -7166,7 +7703,7 @@
             "bearer": []
           }
         ],
-        "summary": "Alta de un residente con usuario y contraseña inicial (3.1)",
+        "summary": "Alta del TITULAR de una vivienda, con contraseña inicial y su vivienda (D1, D-W9)",
         "tags": [
           "residentes"
         ]
@@ -7322,6 +7859,142 @@
         ]
       }
     },
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/vivienda": {
+      "post": {
+        "operationId": "SupervisionDeResidentesController_asignarVivienda",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsignacionDeViviendaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViviendaAsignadaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asigna su vivienda a una cuenta antigua, como titular (D1)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/residentes/registro": {
+      "get": {
+        "operationId": "RegistroDeLaCopropiedadController_estado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDelRegistroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "¿Está suspendido «Crear cuenta» por intentos? (§7)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/residentes/registro/reanudacion": {
+      "post": {
+        "operationId": "RegistroDeLaCopropiedadController_reanudar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanudacionDelRegistroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistroReanudadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reanuda «Crear cuenta» antes de la hora, con motivo (§7)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
     "/copropiedades/{id}/residentes/vehiculos": {
       "get": {
         "operationId": "SupervisionDeResidentesController_vehiculos",
@@ -7356,6 +8029,54 @@
           }
         ],
         "summary": "Vehículos registrados por residentes, con fecha y vivienda (D5 a)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/residentes/viviendas-sin-titular": {
+      "get": {
+        "operationId": "SupervisionDeResidentesController_viviendasSinTitular",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Número o agrupación; vacío = todas (50 como máximo)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViviendaSinTitularDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Viviendas activas sin titular, por número o agrupación (D1)",
         "tags": [
           "residentes"
         ]
@@ -7466,6 +8187,86 @@
         "summary": "Las cuatro tarjetas de indicadores del tablero (HU-38)",
         "tags": [
           "tablero"
+        ]
+      }
+    },
+    "/copropiedades/{id}/tope-de-plazas": {
+      "get": {
+        "operationId": "TopeDePlazasPorOmisionController_ver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopePorOmisionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tope de plazas por vivienda de la copropiedad (D-W10)",
+        "tags": [
+          "residentes"
+        ]
+      },
+      "put": {
+        "operationId": "TopeDePlazasPorOmisionController_cambiar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioDeTopePorOmisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopePorOmisionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia el tope por omisión; nadie pierde plazas si baja (D-W10)",
+        "tags": [
+          "residentes"
         ]
       }
     },
@@ -8215,6 +9016,102 @@
           }
         ],
         "summary": "Quita un ocupante; si la plaza estaba ocupada, da de baja el vínculo (D6)",
+        "tags": [
+          "residentes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/viviendas/{viviendaId}/tope-de-plazas": {
+      "get": {
+        "operationId": "TopeDePlazasController_ver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopeDePlazasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plazas activas y tope de la vivienda (D-W10)",
+        "tags": [
+          "residentes"
+        ]
+      },
+      "put": {
+        "operationId": "TopeDePlazasController_cambiar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambioDeTopeDePlazasDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopeDePlazasDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia el tope de plazas de la vivienda, con motivo (D-W10)",
         "tags": [
           "residentes"
         ]
@@ -9292,12 +10189,18 @@
             "type": "string",
             "nullable": true,
             "maxLength": 24
+          },
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Vivienda activa y sin titular de la copropiedad"
           }
         },
         "required": [
           "usuario",
           "contrasenaInicial",
-          "nombre"
+          "nombre",
+          "viviendaId"
         ]
       },
       "AltaDeEdgeDto": {
@@ -9423,8 +10326,8 @@
           "codigo": {
             "type": "string",
             "nullable": true,
-            "maxLength": 12,
-            "description": "Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta)"
+            "maxLength": 24,
+            "description": "Código de una plaza de la vivienda de destino, con o sin el prefijo del conjunto («MIRA-K7PQ-2XWZ»). Sin él no hay cambio de vivienda (15-W, D3)"
           }
         },
         "required": [
@@ -9577,6 +10480,24 @@
         "required": [
           "motivo",
           "ids"
+        ]
+      },
+      "AsignacionDeViviendaDto": {
+        "type": "object",
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "viviendaId",
+          "motivo"
         ]
       },
       "AtestacionDeEquipoDto": {
@@ -10025,6 +10946,19 @@
           "plantillasPendientes"
         ]
       },
+      "BajaDeMenorDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "BajaDePorteroDto": {
         "type": "object",
         "properties": {
@@ -10268,6 +11202,46 @@
         "required": [
           "actual",
           "nueva"
+        ]
+      },
+      "CambioDeTopeDePlazasDto": {
+        "type": "object",
+        "properties": {
+          "tope": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 20,
+            "description": "null = vuelve al tope de su copropiedad"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "tope",
+          "motivo"
+        ]
+      },
+      "CambioDeTopePorOmisionDto": {
+        "type": "object",
+        "properties": {
+          "tope": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "tope",
+          "motivo"
         ]
       },
       "CambiosDeConfiguracionDto": {
@@ -10580,6 +11554,19 @@
         },
         "required": [
           "xlsxBase64"
+        ]
+      },
+      "CodigoDeTraspasoDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "MIRA-K7PQ-2XWZ",
+            "description": "Un solo uso: para «Crear cuenta»"
+          }
+        },
+        "required": [
+          "codigo"
         ]
       },
       "CodigoDelEquipoDto": {
@@ -11252,6 +12239,14 @@
           },
           "creadaEn": {
             "type": "string"
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "administracion",
+              "autorregistro"
+            ],
+            "description": "15-W · origen de la cuenta"
           }
         },
         "required": [
@@ -11261,7 +12256,8 @@
           "vivienda",
           "activa",
           "debeCambiarContrasena",
-          "creadaEn"
+          "creadaEn",
+          "origen"
         ]
       },
       "CupoDePorterosDto": {
@@ -11417,12 +12413,13 @@
           },
           "confirmoQueEsDefinitivo": {
             "type": "boolean",
-            "description": "El residente confirmó que el número es DEFINITIVO"
+            "nullable": true,
+            "deprecated": true,
+            "description": "Obsoleto desde la 15-W: la declaración ya no es definitiva. Se ignora"
           }
         },
         "required": [
-          "numero",
-          "confirmoQueEsDefinitivo"
+          "numero"
         ]
       },
       "DefinicionKpiDto": {
@@ -11722,6 +12719,71 @@
             "nullable": true
           }
         }
+      },
+      "EdicionDeMenorDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellidos": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "2015-08-21"
+          },
+          "parentesco": {
+            "type": "string",
+            "maxLength": 60,
+            "example": "Hija"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "fechaNacimiento",
+          "parentesco"
+        ]
+      },
+      "EdicionDeVehiculoPropioDto": {
+        "type": "object",
+        "properties": {
+          "color": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "modelo": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "marca": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "ocupantes": {
+            "nullable": true,
+            "description": "`residenteId` de su vivienda",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 12,
+            "description": "Sólo si el vehículo no tiene historial"
+          }
+        },
+        "required": [
+          "color",
+          "modelo"
+        ]
       },
       "EditarVehiculoDto": {
         "type": "object",
@@ -12526,6 +13588,10 @@
           "viviendaVinculada": {
             "type": "boolean"
           },
+          "viviendaAsignada": {
+            "type": "boolean",
+            "description": "15-W · la cuenta ya trae vivienda (asignada o vinculada)"
+          },
           "debeDeclararOcupantes": {
             "type": "boolean"
           },
@@ -12537,16 +13603,23 @@
           },
           "avisoOcupantes": {
             "type": "string",
-            "description": "El texto que la pantalla muestra ANTES de confirmar (D6)"
+            "description": "El texto de Ocupantes, con el tope de la vivienda (D-W10)"
+          },
+          "aviso": {
+            "type": "string",
+            "nullable": true,
+            "description": "15-W · «La administración debe asignarle su vivienda», o null"
           }
         },
         "required": [
           "completa",
           "viviendaVinculada",
+          "viviendaAsignada",
           "debeDeclararOcupantes",
           "vocabulario",
           "pideAgrupacion",
-          "avisoOcupantes"
+          "avisoOcupantes",
+          "aviso"
         ]
       },
       "EstadoDeSesionDto": {
@@ -12675,6 +13748,28 @@
           "ultimoEvento",
           "ultimoLatido",
           "ultimaSenal"
+        ]
+      },
+      "EstadoDelRegistroDto": {
+        "type": "object",
+        "properties": {
+          "suspendido": {
+            "type": "boolean"
+          },
+          "hasta": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "fallosRecientes": {
+            "type": "number",
+            "description": "Códigos fallidos en la última hora"
+          }
+        },
+        "required": [
+          "suspendido",
+          "hasta",
+          "fallosRecientes"
         ]
       },
       "EventoDelEdgeDto": {
@@ -14217,6 +15312,131 @@
           "proporcionRostro"
         ]
       },
+      "MenorDelHogarDto": {
+        "type": "object",
+        "properties": {
+          "residenteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombres": {
+            "type": "string",
+            "nullable": true
+          },
+          "apellidos": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombreCompleto": {
+            "type": "string"
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "nullable": true
+          },
+          "edad": {
+            "type": "number",
+            "nullable": true
+          },
+          "tipoDocumento": {
+            "type": "string"
+          },
+          "documento": {
+            "type": "string",
+            "description": "Enmascarado: ••••5678"
+          },
+          "parentesco": {
+            "type": "string",
+            "nullable": true
+          },
+          "plazaId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "plazaNumero": {
+            "type": "number",
+            "nullable": true
+          },
+          "tieneRostro": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "residenteId",
+          "nombres",
+          "apellidos",
+          "nombreCompleto",
+          "fechaNacimiento",
+          "edad",
+          "tipoDocumento",
+          "documento",
+          "parentesco",
+          "plazaId",
+          "plazaNumero",
+          "tieneRostro"
+        ]
+      },
+      "MenorDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellidos": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "2015-08-21"
+          },
+          "parentesco": {
+            "type": "string",
+            "maxLength": 60,
+            "example": "Hija"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "tarjeta_identidad",
+              "registro_civil"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "plazaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Una plaza LIBRE de su vivienda"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "fechaNacimiento",
+          "parentesco",
+          "tipoDocumento",
+          "numeroDocumento",
+          "plazaId"
+        ]
+      },
+      "MenorRegistradoDto": {
+        "type": "object",
+        "properties": {
+          "residenteId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "residenteId"
+        ]
+      },
       "MiAutorizacionDto": {
         "type": "object",
         "properties": {
@@ -14732,13 +15952,23 @@
           },
           "aviso": {
             "type": "string"
+          },
+          "tope": {
+            "type": "number",
+            "description": "15-W · el tope de plazas de la vivienda, contando al titular"
+          },
+          "esTitular": {
+            "type": "boolean",
+            "description": "15-W · quien pregunta es el titular"
           }
         },
         "required": [
           "declarados",
           "declarada",
           "plazas",
-          "aviso"
+          "aviso",
+          "tope",
+          "esTitular"
         ]
       },
       "ModificacionDto": {
@@ -15713,11 +16943,15 @@
           "codigo": {
             "type": "string",
             "nullable": true,
-            "description": "Sólo en las libres: ABCD-EFGH"
+            "description": "Sólo en las libres, con el prefijo del conjunto: MIRA-ABCD-EFGH"
           },
           "ocupante": {
             "type": "string",
             "nullable": true
+          },
+          "sinCuenta": {
+            "type": "boolean",
+            "description": "15-W · la ocupa una persona sin cuenta (un menor)"
           }
         },
         "required": [
@@ -15725,7 +16959,8 @@
           "numero",
           "libre",
           "codigo",
-          "ocupante"
+          "ocupante",
+          "sinCuenta"
         ]
       },
       "PlazaRetiradaDto": {
@@ -15917,6 +17152,55 @@
           "dudoso"
         ]
       },
+      "PrimerIngresoDto": {
+        "type": "object",
+        "properties": {
+          "nombres": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellidos": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "cedula",
+              "cedula_extranjeria",
+              "pasaporte"
+            ]
+          },
+          "numeroDocumento": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 24,
+            "description": "Canal de CONTACTO, no de acceso"
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "1990-05-17"
+          },
+          "correo": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 254,
+            "description": "Contacto NO verificado (S-15W-04)"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "tipoDocumento",
+          "numeroDocumento",
+          "telefono",
+          "fechaNacimiento"
+        ]
+      },
       "PuntoDeAccesoDto": {
         "type": "object",
         "properties": {
@@ -16014,6 +17298,19 @@
         },
         "required": [
           "puntos"
+        ]
+      },
+      "ReanudacionDelRegistroDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "motivo"
         ]
       },
       "ReceptorDeLaFichaDto": {
@@ -16225,6 +17522,87 @@
           "identificador"
         ]
       },
+      "RegistroCreadoDto": {
+        "type": "object",
+        "properties": {
+          "creada": {
+            "type": "boolean",
+            "description": "Siempre true: la cuenta nació con su plaza"
+          }
+        },
+        "required": [
+          "creada"
+        ]
+      },
+      "RegistroDeResidenteDto": {
+        "type": "object",
+        "properties": {
+          "usuario": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "example": "ana.perez"
+          },
+          "correo": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Contacto NO verificado: no sirve para entrar ni para recuperar la contraseña"
+          },
+          "contrasena": {
+            "type": "string",
+            "format": "password",
+            "maxLength": 256
+          },
+          "confirmacion": {
+            "type": "string",
+            "format": "password",
+            "maxLength": 256,
+            "description": "Igual a `contrasena`"
+          },
+          "codigoDeInvitacion": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "MIRA-K7PQ-2XWZ",
+            "description": "El código de una plaza: `<código corto>-XXXX-XXXX`; guiones y espacios opcionales"
+          },
+          "fechaNacimiento": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "1990-05-17"
+          },
+          "aceptaTratamientoDeDatos": {
+            "type": "boolean",
+            "description": "Acepta la política de tratamiento de datos: debe ser true"
+          },
+          "versionPolitica": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "La versión de la política que se mostró"
+          }
+        },
+        "required": [
+          "usuario",
+          "correo",
+          "contrasena",
+          "confirmacion",
+          "codigoDeInvitacion",
+          "fechaNacimiento",
+          "aceptaTratamientoDeDatos",
+          "versionPolitica"
+        ]
+      },
+      "RegistroReanudadoDto": {
+        "type": "object",
+        "properties": {
+          "reanudado": {
+            "type": "boolean",
+            "description": "Siempre true"
+          }
+        },
+        "required": [
+          "reanudado"
+        ]
+      },
       "RepetirVisitaDto": {
         "type": "object",
         "properties": {
@@ -16334,7 +17712,11 @@
               "CODIGO_REQUERIDO",
               "CODIGO_INCORRECTO",
               "DOCUMENTO_EN_USO",
-              "YA_VINCULADA"
+              "YA_VINCULADA",
+              "VIVIENDA_SIN_TITULAR",
+              "TITULAR_NO_SE_MUDA",
+              "SIN_VIVIENDA",
+              "CUENTA_BLOQUEADA_POR_EDAD"
             ]
           },
           "explicacion": {
@@ -16739,6 +18121,19 @@
           "numeroDePuerta"
         ]
       },
+      "RevocacionDeMiVisitaDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
       "RevocacionDto": {
         "type": "object",
         "properties": {
@@ -17106,6 +18501,39 @@
           "plataforma"
         ]
       },
+      "TopeDePlazasDto": {
+        "type": "object",
+        "properties": {
+          "tope": {
+            "type": "number"
+          },
+          "activas": {
+            "type": "number",
+            "description": "Plazas vivas, la del titular incluida"
+          },
+          "propio": {
+            "type": "boolean",
+            "description": "El tope es de esta vivienda, no el de su copropiedad"
+          }
+        },
+        "required": [
+          "tope",
+          "activas",
+          "propio"
+        ]
+      },
+      "TopePorOmisionDto": {
+        "type": "object",
+        "properties": {
+          "tope": {
+            "type": "number",
+            "description": "Plazas por vivienda, contando al titular, salvo tope propio"
+          }
+        },
+        "required": [
+          "tope"
+        ]
+      },
       "TotalesDeViviendasDto": {
         "type": "object",
         "properties": {
@@ -17405,6 +18833,33 @@
           "viviendaIdentificador",
           "propietarioId",
           "propietarioNombre"
+        ]
+      },
+      "VehiculoEditadoDto": {
+        "type": "object",
+        "properties": {
+          "editado": {
+            "type": "boolean",
+            "description": "Siempre true"
+          }
+        },
+        "required": [
+          "editado"
+        ]
+      },
+      "VehiculoEliminadoDto": {
+        "type": "object",
+        "properties": {
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "borrado",
+              "dado_de_baja"
+            ]
+          }
+        },
+        "required": [
+          "resultado"
         ]
       },
       "VehiculoEnLaInstantaneaDto": {
@@ -17836,6 +19291,33 @@
           "equiposPendientes"
         ]
       },
+      "VisitaRevocadaDto": {
+        "type": "object",
+        "properties": {
+          "revocada": {
+            "type": "boolean",
+            "description": "Siempre true"
+          },
+          "rostrosSuprimidos": {
+            "type": "number",
+            "description": "Rostros del visitante suprimidos (RN-11)"
+          },
+          "equiposRetirados": {
+            "type": "number",
+            "description": "Equipos de los que ya salió el rostro"
+          },
+          "equiposPendientes": {
+            "type": "number",
+            "description": "Equipos que lo retirarán al reintentar"
+          }
+        },
+        "required": [
+          "revocada",
+          "rostrosSuprimidos",
+          "equiposRetirados",
+          "equiposPendientes"
+        ]
+      },
       "VisitanteRecienteDto": {
         "type": "object",
         "properties": {
@@ -17894,6 +19376,18 @@
           "total",
           "grupos",
           "colisiones"
+        ]
+      },
+      "ViviendaAsignadaDto": {
+        "type": "object",
+        "properties": {
+          "asignada": {
+            "type": "boolean",
+            "description": "Siempre true"
+          }
+        },
+        "required": [
+          "asignada"
         ]
       },
       "ViviendaDeVisitaDto": {
@@ -17983,6 +19477,27 @@
           "identificador"
         ]
       },
+      "ViviendaSinTitularDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identificador": {
+            "type": "string"
+          },
+          "agrupacion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "identificador",
+          "agrupacion"
+        ]
+      },
       "VocabularioDeAltaDto": {
         "type": "object",
         "properties": {
@@ -17998,13 +19513,19 @@
           },
           "etiquetaAgrupacion": {
             "type": "string"
+          },
+          "codigoCorto": {
+            "type": "string",
+            "nullable": true,
+            "description": "15-W · prefijo de sus códigos"
           }
         },
         "required": [
           "copropiedadNombre",
           "tipo",
           "etiquetaVivienda",
-          "etiquetaAgrupacion"
+          "etiquetaAgrupacion",
+          "codigoCorto"
         ]
       },
       "ZonaDto": {

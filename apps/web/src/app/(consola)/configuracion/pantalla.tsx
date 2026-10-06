@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import { Building2, Clock, Lock, ShieldCheck, UserRound } from 'lucide-react';
+import { Building2, Clock, House, Lock, ShieldCheck, UserRound } from 'lucide-react';
 import type { Sesion } from '@ncr/contracts';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Distintivo } from '@/componentes/ui/distintivo';
@@ -9,6 +9,8 @@ import type { AlcanceActivo } from '../copropiedad';
 import { FormularioDeConfiguracion } from './formulario';
 import { InterruptorDeModoPruebas } from './modo-pruebas';
 import { PreferenciasDeAtencionEditables } from './preferencias-de-atencion';
+import { AvisoDeRegistroSuspendido } from './registro-de-residentes';
+import { TopeDePlazasPorOmision } from './tope-de-plazas-por-omision';
 
 /**
  * Configuración, ahora editable (bloque 7 de la ETAPA 09-B).
@@ -122,6 +124,13 @@ export const PantallaDeConfiguracion = ({
         titulo="Configuración"
         descripcion="Identidad de la copropiedad activa, plazos de conservación de datos y estado de tu sesión."
       />
+
+      {/* 15-W · arriba y no dentro de un bloque: mientras dura, nadie del conjunto
+          puede crear su cuenta, y eso se tiene que ver al entrar. Sólo lo consulta
+          el superadministrador, que es a quien la API se lo responde. */}
+      {sesion.rol === 'superadministrador' ? (
+        <AvisoDeRegistroSuspendido copropiedadId={alcance.copropiedadId ?? ''} />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Bloque
@@ -239,6 +248,21 @@ export const PantallaDeConfiguracion = ({
             <Distintivo tono="neutro">Pendiente de diseño</Distintivo>
           </Dato>
         </Bloque>
+
+        {sesion.rol === 'superadministrador' ? (
+          <Bloque
+            titulo="Hogares"
+            descripcion="Cuántas plazas tiene cada vivienda. Lo cambia sólo el superadministrador, con motivo."
+            icono={<House className="h-5 w-5" strokeWidth={1.75} />}
+          >
+            <Dato
+              etiqueta="Plazas por vivienda (contando al titular)"
+              ayuda="El titular crea desde la app las plazas de su hogar hasta este número; cada plaza es un código con el que otra persona crea su cuenta. El tope propio de una vivienda se cambia en Residentes."
+            >
+              <TopeDePlazasPorOmision copropiedadId={alcance.copropiedadId ?? ''} />
+            </Dato>
+          </Bloque>
+        ) : null}
       </div>
     </>
   );

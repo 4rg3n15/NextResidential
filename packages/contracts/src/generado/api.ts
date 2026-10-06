@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/registro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crear cuenta de residente con un código de plaza (D-W1, D-W8). No emite tokens */
+        post: operations["RegistroController_registro"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/restablecimiento": {
         parameters: {
             query?: never;
@@ -1254,7 +1271,7 @@ export interface paths {
         /** Qué le falta al residente para operar: vivienda y ocupantes (3.2) */
         get: operations["MiAltaController_estado"];
         put?: never;
-        /** Primer ingreso: contacto, documento, vivienda y código (3.2) */
+        /** Primer ingreso: nombre, documento de adulto, teléfono y fecha (D3); sin vivienda */
         post: operations["MiAltaController_alta"];
         delete?: never;
         options?: never;
@@ -1308,6 +1325,75 @@ export interface paths {
         get: operations["MiController_historial"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/menores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Los menores de mi vivienda: edad, documento enmascarado y plaza */
+        get: operations["MisMenoresController_listar"];
+        put?: never;
+        /** Registra un menor en una plaza libre de mi vivienda (D-W2) */
+        post: operations["MisMenoresController_registrar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/menores/{residenteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edita nombre, parentesco y fecha de un menor de mi vivienda */
+        put: operations["MisMenoresController_editar"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/menores/{residenteId}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Da de baja a un menor con motivo: su plaza queda libre (D4) */
+        post: operations["MisMenoresController_baja"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/menores/{residenteId}/codigo-de-traspaso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El titular genera el código con el que un mayor de 18 crea su cuenta */
+        post: operations["MisMenoresController_codigoDeTraspaso"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1393,8 +1479,42 @@ export interface paths {
         /** Mis ocupantes y los códigos de las plazas libres (3.3) */
         get: operations["MiAltaController_ocupantes"];
         put?: never;
-        /** Declaro cuántos ocupantes hay: una vez y definitivo (D6) */
+        /** El titular declara cuántos ocupantes hay: de 1 al tope (D6, D-W10) */
         post: operations["MiAltaController_declararOcupantes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/ocupantes/plazas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El titular añade una plaza, hasta el tope de su vivienda (D-W10) */
+        post: operations["MisPlazasController_anadir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/ocupantes/plazas/{plazaId}/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El titular retira una plaza LIBRE, con motivo; nunca la suya (D-W10) */
+        post: operations["MisPlazasController_retirar"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1432,6 +1552,24 @@ export interface paths {
         /** Registro un vehículo propio: activo al instante, dentro del tope (D5 a) */
         post: operations["MiHogarController_vehiculo"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/vehiculos/{vehiculoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edito un vehículo propio; la placa sólo si no tiene historial (D5) */
+        put: operations["MiHogarController_editarVehiculo"];
+        post?: never;
+        /** Elimino un vehículo propio: borrado sin historial, baja lógica con él (D5) */
+        delete: operations["MiHogarController_eliminarVehiculo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1516,6 +1654,23 @@ export interface paths {
         put?: never;
         /** Vuelvo a autorizar a un visitante anterior con su foto (F6) */
         post: operations["MisVisitasController_repetir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/visitas/{autorizacionId}/revocacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoco una visita vigente de mi vivienda, con motivo (D-W6) */
+        post: operations["MisVisitasController_revocarVisita"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2002,7 +2157,7 @@ export interface paths {
         /** Cuentas de residentes y su vivienda (sin correo) */
         get: operations["SupervisionDeResidentesController_listar"];
         put?: never;
-        /** Alta de un residente con usuario y contraseña inicial (3.1) */
+        /** Alta del TITULAR de una vivienda, con contraseña inicial y su vivienda (D1, D-W9) */
         post: operations["SupervisionDeResidentesController_alta"];
         delete?: never;
         options?: never;
@@ -2045,6 +2200,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/residentes/cuentas/{usuarioId}/vivienda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Asigna su vivienda a una cuenta antigua, como titular (D1) */
+        post: operations["SupervisionDeResidentesController_asignarVivienda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/residentes/registro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ¿Está suspendido «Crear cuenta» por intentos? (§7) */
+        get: operations["RegistroDeLaCopropiedadController_estado"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/residentes/registro/reanudacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reanuda «Crear cuenta» antes de la hora, con motivo (§7) */
+        post: operations["RegistroDeLaCopropiedadController_reanudar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/residentes/vehiculos": {
         parameters: {
             query?: never;
@@ -2054,6 +2260,23 @@ export interface paths {
         };
         /** Vehículos registrados por residentes, con fecha y vivienda (D5 a) */
         get: operations["SupervisionDeResidentesController_vehiculos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/residentes/viviendas-sin-titular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Viviendas activas sin titular, por número o agrupación (D1) */
+        get: operations["SupervisionDeResidentesController_viviendasSinTitular"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2106,6 +2329,24 @@ export interface paths {
         /** Las cuatro tarjetas de indicadores del tablero (HU-38) */
         get: operations["TableroController_leerIndicadores"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/tope-de-plazas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tope de plazas por vivienda de la copropiedad (D-W10) */
+        get: operations["TopeDePlazasPorOmisionController_ver"];
+        /** Cambia el tope por omisión; nadie pierde plazas si baja (D-W10) */
+        put: operations["TopeDePlazasPorOmisionController_cambiar"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2297,6 +2538,24 @@ export interface paths {
         put?: never;
         /** Quita un ocupante; si la plaza estaba ocupada, da de baja el vínculo (D6) */
         post: operations["OcupantesDeViviendaController_retirar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/viviendas/{viviendaId}/tope-de-plazas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plazas activas y tope de la vivienda (D-W10) */
+        get: operations["TopeDePlazasController_ver"];
+        /** Cambia el tope de plazas de la vivienda, con motivo (D-W10) */
+        put: operations["TopeDePlazasController_cambiar"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2730,6 +2989,11 @@ export interface components {
             contrasenaInicial: string;
             nombre: string;
             telefono?: string | null;
+            /**
+             * Format: uuid
+             * @description Vivienda activa y sin titular de la copropiedad
+             */
+            viviendaId: string;
         };
         AltaDeEdgeDto: {
             /** @description Cómo lo verá el operador */
@@ -2771,7 +3035,7 @@ export interface components {
             identificador: string;
             /** @description La agrupación (torre, manzana…): obligatoria en un conjunto de apartamentos */
             agrupacion?: string | null;
-            /** @description Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta) */
+            /** @description Código de una plaza de la vivienda de destino, con o sin el prefijo del conjunto («MIRA-K7PQ-2XWZ»). Sin él no hay cambio de vivienda (15-W, D3) */
             codigo?: string | null;
         };
         AltaDePorteroDto: {
@@ -2810,6 +3074,11 @@ export interface components {
         ArchivoMasivoDeAlertasDto: {
             motivo: string;
             ids: string[];
+        };
+        AsignacionDeViviendaDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            motivo: string;
         };
         AtestacionDeEquipoDto: {
             id: string;
@@ -2928,6 +3197,9 @@ export interface components {
             /** @description Siguen en el equipo: no contestó al retirarlas */
             plantillasPendientes: number;
         };
+        BajaDeMenorDto: {
+            motivo: string;
+        };
         BajaDePorteroDto: {
             motivo: string;
         };
@@ -3001,6 +3273,15 @@ export interface components {
             actual: string;
             /** Format: password */
             nueva: string;
+        };
+        CambioDeTopeDePlazasDto: {
+            /** @description null = vuelve al tope de su copropiedad */
+            tope: number | null;
+            motivo: string;
+        };
+        CambioDeTopePorOmisionDto: {
+            tope: number;
+            motivo: string;
         };
         CambiosDeConfiguracionDto: {
             /** @example Urbanización Mira */
@@ -3110,6 +3391,13 @@ export interface components {
              * @description Hoja .xlsx en base64. Se valida el TIPO REAL por firma, nunca la extensión.
              */
             xlsxBase64: string;
+        };
+        CodigoDeTraspasoDto: {
+            /**
+             * @description Un solo uso: para «Crear cuenta»
+             * @example MIRA-K7PQ-2XWZ
+             */
+            codigo: string;
         };
         CodigoDelEquipoDto: {
             mayor: number;
@@ -3375,6 +3663,11 @@ export interface components {
             activa: boolean;
             debeCambiarContrasena: boolean;
             creadaEn: string;
+            /**
+             * @description 15-W · origen de la cuenta
+             * @enum {string}
+             */
+            origen: "administracion" | "autorregistro";
         };
         CupoDePorterosDto: {
             cupo: number;
@@ -3427,8 +3720,11 @@ export interface components {
         };
         DeclaracionDeOcupantesDto: {
             numero: number;
-            /** @description El residente confirmó que el número es DEFINITIVO */
-            confirmoQueEsDefinitivo: boolean;
+            /**
+             * @deprecated
+             * @description Obsoleto desde la 15-W: la declaración ya no es definitiva. Se ignora
+             */
+            confirmoQueEsDefinitivo?: boolean | null;
         };
         DefinicionKpiDto: {
             /** @example KPI-32 */
@@ -3530,6 +3826,23 @@ export interface components {
             probarConexion: boolean;
             /** Format: uuid */
             zonaId?: string | null;
+        };
+        EdicionDeMenorDto: {
+            nombres: string;
+            apellidos: string;
+            /** @example 2015-08-21 */
+            fechaNacimiento: string;
+            /** @example Hija */
+            parentesco: string;
+        };
+        EdicionDeVehiculoPropioDto: {
+            color: string;
+            modelo: string;
+            marca?: string | null;
+            /** @description `residenteId` de su vivienda */
+            ocupantes?: string[] | null;
+            /** @description Sólo si el vehículo no tiene historial */
+            placa?: string | null;
         };
         EditarVehiculoDto: {
             placa?: string;
@@ -3777,11 +4090,15 @@ export interface components {
         EstadoDeMiAltaDto: {
             completa: boolean;
             viviendaVinculada: boolean;
+            /** @description 15-W · la cuenta ya trae vivienda (asignada o vinculada) */
+            viviendaAsignada: boolean;
             debeDeclararOcupantes: boolean;
             vocabulario: components["schemas"]["VocabularioDeAltaDto"];
             pideAgrupacion: boolean;
-            /** @description El texto que la pantalla muestra ANTES de confirmar (D6) */
+            /** @description El texto de Ocupantes, con el tope de la vivienda (D-W10) */
             avisoOcupantes: string;
+            /** @description 15-W · «La administración debe asignarle su vivienda», o null */
+            aviso: string | null;
         };
         EstadoDeSesionDto: {
             /** @enum {string} */
@@ -3819,6 +4136,13 @@ export interface components {
             ultimoLatido: string | null;
             /** Format: date-time */
             ultimaSenal: string | null;
+        };
+        EstadoDelRegistroDto: {
+            suspendido: boolean;
+            /** Format: date-time */
+            hasta: string | null;
+            /** @description Códigos fallidos en la última hora */
+            fallosRecientes: number;
         };
         EventoDelEdgeDto: {
             copropiedadId: string;
@@ -4278,6 +4602,43 @@ export interface components {
             iluminacion: number;
             proporcionRostro: number;
         };
+        MenorDelHogarDto: {
+            /** Format: uuid */
+            residenteId: string;
+            nombres: string | null;
+            apellidos: string | null;
+            nombreCompleto: string;
+            fechaNacimiento: string | null;
+            edad: number | null;
+            tipoDocumento: string;
+            /** @description Enmascarado: ••••5678 */
+            documento: string;
+            parentesco: string | null;
+            /** Format: uuid */
+            plazaId: string | null;
+            plazaNumero: number | null;
+            tieneRostro: boolean;
+        };
+        MenorDto: {
+            nombres: string;
+            apellidos: string;
+            /** @example 2015-08-21 */
+            fechaNacimiento: string;
+            /** @example Hija */
+            parentesco: string;
+            /** @enum {string} */
+            tipoDocumento: "tarjeta_identidad" | "registro_civil";
+            numeroDocumento: string;
+            /**
+             * Format: uuid
+             * @description Una plaza LIBRE de su vivienda
+             */
+            plazaId: string;
+        };
+        MenorRegistradoDto: {
+            /** Format: uuid */
+            residenteId: string;
+        };
         MiAutorizacionDto: {
             /** Format: uuid */
             id: string;
@@ -4429,6 +4790,10 @@ export interface components {
             declarada: boolean;
             plazas: components["schemas"]["PlazaDeOcupanteDto"][];
             aviso: string;
+            /** @description 15-W · el tope de plazas de la vivienda, contando al titular */
+            tope: number;
+            /** @description 15-W · quien pregunta es el titular */
+            esTitular: boolean;
         };
         ModificacionDto: {
             modificada: boolean;
@@ -4725,9 +5090,11 @@ export interface components {
             id: string;
             numero: number;
             libre: boolean;
-            /** @description Sólo en las libres: ABCD-EFGH */
+            /** @description Sólo en las libres, con el prefijo del conjunto: MIRA-ABCD-EFGH */
             codigo: string | null;
             ocupante: string | null;
+            /** @description 15-W · la ocupa una persona sin cuenta (un menor) */
+            sinCuenta: boolean;
         };
         PlazaRetiradaDto: {
             retirada: boolean;
@@ -4779,6 +5146,19 @@ export interface components {
             lista_negra: components["schemas"]["PreferenciaDeDisparadorDto"];
             dudoso: components["schemas"]["PreferenciaDeDisparadorDto"];
         };
+        PrimerIngresoDto: {
+            nombres: string;
+            apellidos: string;
+            /** @enum {string} */
+            tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte";
+            numeroDocumento: string;
+            /** @description Canal de CONTACTO, no de acceso */
+            telefono: string;
+            /** @example 1990-05-17 */
+            fechaNacimiento: string;
+            /** @description Contacto NO verificado (S-15W-04) */
+            correo?: string | null;
+        };
         PuntoDeAccesoDto: {
             /** Format: uuid */
             id: string;
@@ -4806,6 +5186,9 @@ export interface components {
         };
         PuntosDeAccesoDto: {
             puntos: components["schemas"]["PuntoDeAccesoDto"][];
+        };
+        ReanudacionDelRegistroDto: {
+            motivo: string;
         };
         ReceptorDeLaFichaDto: {
             host: string | null;
@@ -4881,6 +5264,38 @@ export interface components {
             /** @example B */
             agrupacion?: string;
         };
+        RegistroCreadoDto: {
+            /** @description Siempre true: la cuenta nació con su plaza */
+            creada: boolean;
+        };
+        RegistroDeResidenteDto: {
+            /** @example ana.perez */
+            usuario: string;
+            /** @description Contacto NO verificado: no sirve para entrar ni para recuperar la contraseña */
+            correo: string;
+            /** Format: password */
+            contrasena: string;
+            /**
+             * Format: password
+             * @description Igual a `contrasena`
+             */
+            confirmacion: string;
+            /**
+             * @description El código de una plaza: `<código corto>-XXXX-XXXX`; guiones y espacios opcionales
+             * @example MIRA-K7PQ-2XWZ
+             */
+            codigoDeInvitacion: string;
+            /** @example 1990-05-17 */
+            fechaNacimiento: string;
+            /** @description Acepta la política de tratamiento de datos: debe ser true */
+            aceptaTratamientoDeDatos: boolean;
+            /** @description La versión de la política que se mostró */
+            versionPolitica: string;
+        };
+        RegistroReanudadoDto: {
+            /** @description Siempre true */
+            reanudado: boolean;
+        };
         RepetirVisitaDto: {
             /** Format: date-time */
             inicio: string;
@@ -4917,7 +5332,7 @@ export interface components {
             vinculada: boolean;
             debeDeclararOcupantes: boolean;
             /** @enum {string|null} */
-            motivo: "DEMASIADOS_INTENTOS" | "VIVIENDA_INEXISTENTE" | "AGRUPACION_REQUERIDA" | "VIVIENDA_INACTIVA" | "CODIGO_REQUERIDO" | "CODIGO_INCORRECTO" | "DOCUMENTO_EN_USO" | "YA_VINCULADA" | null;
+            motivo: "DEMASIADOS_INTENTOS" | "VIVIENDA_INEXISTENTE" | "AGRUPACION_REQUERIDA" | "VIVIENDA_INACTIVA" | "CODIGO_REQUERIDO" | "CODIGO_INCORRECTO" | "DOCUMENTO_EN_USO" | "YA_VINCULADA" | "VIVIENDA_SIN_TITULAR" | "TITULAR_NO_SE_MUDA" | "SIN_VIVIENDA" | "CUENTA_BLOQUEADA_POR_EDAD" | null;
             explicacion: string | null;
             campos: components["schemas"]["CampoRechazadoDto"][];
         };
@@ -5025,6 +5440,9 @@ export interface components {
             dispositivoId: string;
             numeroDePuerta: number;
             motivo?: string;
+        };
+        RevocacionDeMiVisitaDto: {
+            motivo: string;
         };
         RevocacionDto: {
             revocada: boolean;
@@ -5139,6 +5557,17 @@ export interface components {
             /** @enum {string} */
             plataforma: "ios" | "android" | "web";
         };
+        TopeDePlazasDto: {
+            tope: number;
+            /** @description Plazas vivas, la del titular incluida */
+            activas: number;
+            /** @description El tope es de esta vivienda, no el de su copropiedad */
+            propio: boolean;
+        };
+        TopePorOmisionDto: {
+            /** @description Plazas por vivienda, contando al titular, salvo tope propio */
+            tope: number;
+        };
         TotalesDeViviendasDto: {
             activas: number;
             inactivas: number;
@@ -5220,6 +5649,14 @@ export interface components {
             /** Format: uuid */
             propietarioId: string | null;
             propietarioNombre: string | null;
+        };
+        VehiculoEditadoDto: {
+            /** @description Siempre true */
+            editado: boolean;
+        };
+        VehiculoEliminadoDto: {
+            /** @enum {string} */
+            resultado: "borrado" | "dado_de_baja";
         };
         VehiculoEnLaInstantaneaDto: {
             placa: string;
@@ -5348,6 +5785,16 @@ export interface components {
             equiposRetirados: number;
             equiposPendientes: number;
         };
+        VisitaRevocadaDto: {
+            /** @description Siempre true */
+            revocada: boolean;
+            /** @description Rostros del visitante suprimidos (RN-11) */
+            rostrosSuprimidos: number;
+            /** @description Equipos de los que ya salió el rostro */
+            equiposRetirados: number;
+            /** @description Equipos que lo retirarán al reintentar */
+            equiposPendientes: number;
+        };
         VisitanteRecienteDto: {
             /** Format: uuid */
             autorizacionId: string;
@@ -5363,6 +5810,10 @@ export interface components {
             grupos: components["schemas"]["GrupoProyectadoDto"][];
             /** @description Las que ya existen activas. Con una sola, la confirmacion se niega entera: la generacion solo inserta y nunca sustituye nada. */
             colisiones: components["schemas"]["ViviendaProyectadaDto"][];
+        };
+        ViviendaAsignadaDto: {
+            /** @description Siempre true */
+            asignada: boolean;
         };
         ViviendaDeVisitaDto: {
             id: string;
@@ -5387,11 +5838,19 @@ export interface components {
             agrupacion: string | null;
             identificador: string;
         };
+        ViviendaSinTitularDto: {
+            /** Format: uuid */
+            id: string;
+            identificador: string;
+            agrupacion: string | null;
+        };
         VocabularioDeAltaDto: {
             copropiedadNombre: string;
             tipo: string | null;
             etiquetaVivienda: string;
             etiquetaAgrupacion: string;
+            /** @description 15-W · prefijo de sus códigos */
+            codigoCorto: string | null;
         };
         ZonaDto: {
             /** Format: uuid */
@@ -5603,6 +6062,56 @@ export interface operations {
                 };
             };
             /** @description 5 por minuto (§2.7.5) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+        };
+    };
+    RegistroController_registro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistroDeResidenteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistroCreadoDto"];
+                };
+            };
+            /** @description Campos, menor de edad o «El código de invitación no es válido o ya se usó». Lleva la política vigente */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description Usuario ocupado o plaza ya tomada */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorApiDto"];
+                };
+            };
+            /** @description 10 cada 10 min por IP y 5 cada 15 min por (IP, prefijo del código) */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -7945,7 +8454,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AltaDeMiViviendaDto"];
+                "application/json": components["schemas"]["PrimerIngresoDto"];
             };
         };
         responses: {
@@ -8046,6 +8555,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiEventoDto"][];
+                };
+            };
+        };
+    };
+    MisMenoresController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MenorDelHogarDto"][];
+                };
+            };
+        };
+    };
+    MisMenoresController_registrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MenorDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MenorRegistradoDto"];
+                };
+            };
+        };
+    };
+    MisMenoresController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EdicionDeMenorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MenorRegistradoDto"];
+                };
+            };
+        };
+    };
+    MisMenoresController_baja: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaDeMenorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MenorRegistradoDto"];
+                };
+            };
+        };
+    };
+    MisMenoresController_codigoDeTraspaso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoDeTraspasoDto"];
                 };
             };
         };
@@ -8222,6 +8851,53 @@ export interface operations {
             };
         };
     };
+    MisPlazasController_anadir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MisOcupantesDto"];
+                };
+            };
+        };
+    };
+    MisPlazasController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                plazaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetiroDeOcupanteDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MisOcupantesDto"];
+                };
+            };
+        };
+    };
     MiHogarController_perfil: {
         parameters: {
             query?: never;
@@ -8310,6 +8986,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDeVehiculoPropioDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_editarVehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EdicionDeVehiculoPropioDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehiculoEditadoDto"];
+                };
+            };
+        };
+    };
+    MiHogarController_eliminarVehiculo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                vehiculoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehiculoEliminadoDto"];
                 };
             };
         };
@@ -8429,6 +9153,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MiVisitaGeneradaDto"];
+                };
+            };
+        };
+    };
+    MisVisitasController_revocarVisita: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                autorizacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevocacionDeMiVisitaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitaRevocadaDto"];
                 };
             };
         };
@@ -9393,6 +10143,78 @@ export interface operations {
             };
         };
     };
+    SupervisionDeResidentesController_asignarVivienda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuarioId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsignacionDeViviendaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViviendaAsignadaDto"];
+                };
+            };
+        };
+    };
+    RegistroDeLaCopropiedadController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDelRegistroDto"];
+                };
+            };
+        };
+    };
+    RegistroDeLaCopropiedadController_reanudar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReanudacionDelRegistroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistroReanudadoDto"];
+                };
+            };
+        };
+    };
     SupervisionDeResidentesController_vehiculos: {
         parameters: {
             query?: never;
@@ -9410,6 +10232,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VehiculoDeResidenteDto"][];
+                };
+            };
+        };
+    };
+    SupervisionDeResidentesController_viviendasSinTitular: {
+        parameters: {
+            query?: {
+                /** @description Número o agrupación; vacío = todas (50 como máximo) */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViviendaSinTitularDto"][];
                 };
             };
         };
@@ -9473,6 +10319,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicadoresDto"];
+                };
+            };
+        };
+    };
+    TopeDePlazasPorOmisionController_ver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopePorOmisionDto"];
+                };
+            };
+        };
+    };
+    TopeDePlazasPorOmisionController_cambiar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioDeTopePorOmisionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopePorOmisionDto"];
                 };
             };
         };
@@ -9836,6 +10728,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlazaRetiradaDto"];
+                };
+            };
+        };
+    };
+    TopeDePlazasController_ver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopeDePlazasDto"];
+                };
+            };
+        };
+    };
+    TopeDePlazasController_cambiar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                viviendaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambioDeTopeDePlazasDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopeDePlazasDto"];
                 };
             };
         };
