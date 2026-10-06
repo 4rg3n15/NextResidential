@@ -51,6 +51,7 @@ export class RegistroDeResidenteDto {
 
   @ApiProperty({ maxLength: 10, example: '1990-05-17' })
   @IsString()
+  @MaxLength(10)
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La fecha va como AAAA-MM-DD' })
   fechaNacimiento!: string;
 
