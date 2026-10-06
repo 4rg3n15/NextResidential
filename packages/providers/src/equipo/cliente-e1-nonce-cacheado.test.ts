@@ -242,7 +242,7 @@ describe('E1 · la marca es del equipo; el desafío, de cada conexión', () => {
     expect(llamadas).toBe(1);
     const error = comoErrorNeutral('terminal-1', r.cuerpo, r.estado, r);
     expect(error).toBeInstanceOf(SinDesafioDigest);
-    expect(error.reintentable).toBe(true);
+    expect(error instanceof SinDesafioDigest && error.reintentable).toBe(true);
     // Y la siguiente petición vuelve a intentarlo: no quedó marca.
     await c.pedir('GET', '/ISAPI/System/deviceInfo');
     expect(llamadas).toBe(2);

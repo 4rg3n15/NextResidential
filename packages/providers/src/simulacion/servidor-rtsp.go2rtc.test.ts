@@ -136,7 +136,8 @@ describe.skipIf(binario === null)(
       // Ni un DESCRIBE con backchannel más: la corrección evita la conexión cerrada.
       expect(camara.describesConBackchannel()).toBe(1);
       expect(camara.metodos()).toContain('SETUP');
-      await hastaQue(() => camara.metodos().includes('PLAY'));
+      const enCurso = camara;
+      await hastaQue(() => enCurso.metodos().includes('PLAY'));
       expect(camara.metodos()).toContain('PLAY');
       // Sin STUN la respuesta llega enseguida (KPI-33): con el STUN por omisión tardaba 5 s.
       expect(tardo).toBeLessThan(3000);

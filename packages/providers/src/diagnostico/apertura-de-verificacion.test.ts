@@ -82,7 +82,7 @@ describe('anexo 15-K · aperturaDeVerificacion (--abrir)', () => {
     });
     let n = 0;
     const peticion = ((url: string | URL, opciones?: RequestInit) =>
-      simulado(url, n++ === 0 ? { ...opciones, body: undefined } : opciones)) as typeof fetch;
+      simulado(url, n++ === 0 ? { ...opciones, body: null } : opciones)) as typeof fetch;
     const r = await aperturaDeVerificacion(conexion(host, peticion), 'terminal', 1);
     expect(r.aceptada).toBe(false);
     expect(r.peticiones[0]?.estado).toBe(400);
