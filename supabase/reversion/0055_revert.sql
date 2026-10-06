@@ -40,5 +40,31 @@ COMMENT ON TABLE public.bitacora_de_residentes IS
   'cuentan para el límite de intentos), ocupantes y vehículos propios. Mismas tres capas que '
   'eventos (ADR-005). El documento de identidad NUNCA se escribe aquí.';
 
+-- Los campos propios de una cuenta, como los dejó la 0037 (antes de soltar la columna).
+CREATE OR REPLACE FUNCTION app.tg_usuario_campos_propios()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF app.usuario_id() IS NULL OR OLD.id IS DISTINCT FROM app.usuario_id()
+     OR app.rol() IN ('superadministrador', 'administrador', 'servicio') THEN
+    RETURN NEW;
+  END IF;
+  IF app.rol() = 'portero' THEN
+    RAISE EXCEPTION 'El portero ve su perfil y no lo edita (E-02, B3)'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.nombre_usuario IS DISTINCT FROM OLD.nombre_usuario
+     OR NEW.debe_cambiar_contrasena IS DISTINCT FROM OLD.debe_cambiar_contrasena
+     OR NEW.copropiedad_id IS DISTINCT FROM OLD.copropiedad_id
+     OR NEW.auth_user_id IS DISTINCT FROM OLD.auth_user_id
+     OR NEW.persona_id IS DISTINCT FROM OLD.persona_id
+     OR NEW.estado IS DISTINCT FROM OLD.estado
+     OR NEW.mfa_habilitado IS DISTINCT FROM OLD.mfa_habilitado THEN
+    RAISE EXCEPTION 'Una cuenta no puede cambiarse a sí misma su identidad ni su estado (ADR-023)'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
 ALTER TABLE public.usuarios DROP CONSTRAINT IF EXISTS usuarios_origen_de_alta;
 ALTER TABLE public.usuarios DROP COLUMN IF EXISTS origen_de_alta;

@@ -32,6 +32,34 @@ COMMENT ON COLUMN public.usuarios.origen_de_alta IS
   'D-W1 · D-W9 · ADR-037 · administracion (la dio la administración: el titular de cada vivienda, '
   'o una cuenta anterior a la 15-W) o autorregistro («Crear cuenta» con un código de plaza).';
 
+-- La cuenta no se cambia a sí misma su ORIGEN por la REST: se añade a los campos
+-- que `tg_usuario_campos_propios` (0037) ya protegía. Lo demás, idéntico.
+CREATE OR REPLACE FUNCTION app.tg_usuario_campos_propios()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF app.usuario_id() IS NULL OR OLD.id IS DISTINCT FROM app.usuario_id()
+     OR app.rol() IN ('superadministrador', 'administrador', 'servicio') THEN
+    RETURN NEW;
+  END IF;
+  IF app.rol() = 'portero' THEN
+    RAISE EXCEPTION 'El portero ve su perfil y no lo edita (E-02, B3)'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.nombre_usuario IS DISTINCT FROM OLD.nombre_usuario
+     OR NEW.debe_cambiar_contrasena IS DISTINCT FROM OLD.debe_cambiar_contrasena
+     OR NEW.copropiedad_id IS DISTINCT FROM OLD.copropiedad_id
+     OR NEW.auth_user_id IS DISTINCT FROM OLD.auth_user_id
+     OR NEW.persona_id IS DISTINCT FROM OLD.persona_id
+     OR NEW.estado IS DISTINCT FROM OLD.estado
+     OR NEW.mfa_habilitado IS DISTINCT FROM OLD.mfa_habilitado
+     OR NEW.origen_de_alta IS DISTINCT FROM OLD.origen_de_alta THEN
+    RAISE EXCEPTION 'Una cuenta no puede cambiarse a sí misma su identidad ni su estado (ADR-023)'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
 -- 2 · bitacora_de_residentes: los tipos de hecho de la 15-W -------------------
 -- Se conservan TODOS los de la 0038 y se añaden los nuevos. `registro_reanudado`
 -- es la marca con la que el superadministrador levanta la suspensión del

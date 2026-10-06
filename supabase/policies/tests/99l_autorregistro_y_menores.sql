@@ -117,6 +117,14 @@ BEGIN
     RAISE EXCEPTION 'usuarios_origen_de_alta: entró un origen inventado';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
+  -- Una cuenta no se cambia a sí misma el origen por la REST (0037 ampliada).
+  BEGIN
+    SET LOCAL request.jwt.claims = '{"rol":"residente","usuario_id":"00000000-0000-4000-8000-000000000013","copropiedad_id":"10000000-0000-4000-8000-000000000001","copropiedades":["10000000-0000-4000-8000-000000000001"]}';
+    UPDATE public.usuarios SET origen_de_alta = 'autorregistro'
+     WHERE id = '00000000-0000-4000-8000-000000000013';
+    RAISE EXCEPTION 'tg_usuario_campos_propios: una cuenta se cambió su propio origen';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   -- Cumple 18 MAÑANA: todavía no.
   BEGIN
     UPDATE public.usuarios SET persona_id = '9e000000-0000-4000-8000-000000000e01'
