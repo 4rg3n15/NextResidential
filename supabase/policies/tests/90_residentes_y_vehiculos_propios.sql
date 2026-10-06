@@ -41,7 +41,10 @@ VALUES ('90000000-0000-4000-8000-0000000000a3', '10000000-0000-4000-8000-0000000
 
 -- ---------------------------------------------------------------------------
 -- 1 · D6 · el servicio NO cambia el número de ocupantes una vez declarado.
+--     Desde la 15-W (D-W10, 0056) el TITULAR sí añade y retira plazas libres
+--     —lo prueba 99l—: aquí el servicio actúa en nombre de OTRA cuenta.
 -- ---------------------------------------------------------------------------
+SET LOCAL request.jwt.claims = '{"rol":"servicio","usuario_id":"00000000-0000-4000-8000-000000000011","copropiedad_id":"10000000-0000-4000-8000-000000000001","copropiedades":["10000000-0000-4000-8000-000000000001"]}';
 DO $$
 BEGIN
   BEGIN
