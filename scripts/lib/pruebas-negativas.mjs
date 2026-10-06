@@ -470,6 +470,29 @@ try {
       : mal('una restricción ya retirada se sigue contando');
   }
 
+  console.log('\n▸ 5 bis · una orden de psql en una migración se detecta al escribirla');
+  {
+    // El defecto real de la víspera de sitio (2026-10-06): `\set ON_ERROR_STOP on`
+    // en la 0052 y la 0053. `psql -f` la entendía; `supabase db push`, no.
+    // Las migraciones del clon son las reales, copiadas en el bloque 5.
+    enClon('node', ['scripts/lib/migraciones-sin-psql.mjs']).codigo === 0
+      ? ok('las migraciones reales pasan')
+      : mal('las migraciones reales NO pasan: el banco no parte de una línea base limpia');
+
+    const sonda = join(clon, 'supabase', 'migrations', '29990103000000_9999_sonda_psql.sql');
+    writeFileSync(
+      sonda,
+      '-- \\set en un comentario no cuenta\n\\set ON_ERROR_STOP on\nSELECT 1;\n',
+    );
+    const r = enClon('node', ['scripts/lib/migraciones-sin-psql.mjs']);
+    if (r.codigo !== 0 && /9999_sonda_psql\.sql:2/.test(r.salida)) {
+      ok('detectada, con su fichero y su línea, y salida distinta de cero');
+    } else {
+      mal(`NO detectada (codigo ${r.codigo})`);
+    }
+    rmSync(sonda);
+  }
+
   console.log('\n▸ 6 · un Node fuera de `engines` detiene la verificación');
   {
     // Se altera el package.json DEL CLON, no el real.

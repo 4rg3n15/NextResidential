@@ -17,8 +17,6 @@
 -- orden: 120 min por omisión, entre 15 y 720 (12 h, el tope de plataforma
 -- [SUPUESTO] S-15R-04). Lo cambia quien administra la copropiedad.
 -- ============================================================================
-\set ON_ERROR_STOP on
-
 CREATE TABLE IF NOT EXISTS public.ordenes_de_modo_de_puerta (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   -- El ORDEN de las órdenes es el de inserción, no el del reloj: dos órdenes

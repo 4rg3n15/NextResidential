@@ -24,8 +24,6 @@
 --     otra.
 -- Sin borrado físico: la baja es lógica, con motivo (404/410 del servicio).
 -- ============================================================================
-\set ON_ERROR_STOP on
-
 ALTER TABLE public.dispositivos_de_notificacion
   ADD COLUMN IF NOT EXISTS vivienda_id    uuid NULL,
   ADD COLUMN IF NOT EXISTS clave_p256dh   text NULL,

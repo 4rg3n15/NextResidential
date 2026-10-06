@@ -940,6 +940,14 @@ else
   mal "clave ajena vigente hacia una tabla append-only (ADR-005)"
   echo "$salida_append" | head -10 | sed 's/^/     /'
 fi
+# 15-S1 · víspera de sitio · el verificador aplica con `psql -f` y entiende
+# `\set`; `supabase db push` no, y la base real se detuvo en la 0052.
+if salida_psql=$(con_limite "$LIMITE_CORTO" node scripts/lib/migraciones-sin-psql.mjs 2>&1); then
+  ok "$salida_psql"
+else
+  mal "una migración lleva órdenes de psql que supabase db push no aplica"
+  echo "$salida_psql" | head -10 | sed 's/^/     /'
+fi
 
 # ETAPA 14 · la consola es INSTALABLE, y se comprueba. Una PWA que no lo es no
 # da ningún error: el navegador simplemente no ofrece instalarla. Este control

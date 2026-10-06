@@ -29,6 +29,7 @@
   "scripts/lib/longitud-por-campo.mjs": 0,
   "scripts/lib/mermaid-analizable.mjs": 8,
   "scripts/lib/metricas.mjs": 50,
+  "scripts/lib/migraciones-sin-psql.mjs": 0,
   "scripts/lib/omisiones-sin-base.mjs": 0,
   "scripts/lib/pasos-ejecutados.mjs": 3,
   "scripts/lib/portabilidad.mjs": 2,
