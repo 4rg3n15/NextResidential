@@ -34,6 +34,10 @@
 /// «Vencida» o «Rechazada» con el motivo— y la pantalla se recarga sola
 /// mientras está a la vista; tirar hacia abajo la recarga en el acto. Lo que
 /// espera en la bandeja sobrevive al cierre de la app.
+///
+/// 15-W · una visita vigente o programada lleva «Revocar», con motivo
+/// obligatorio: la foto del visitante sale de los equipos y el aviso dice de
+/// cuántos.
 library;
 
 import 'package:flutter/material.dart';
@@ -59,6 +63,7 @@ class PantallaDeVisitantes extends StatelessWidget {
     required this.pendientes,
     required this.alReintentarPendientes,
     this.alRecargar,
+    this.alRevocar,
   });
 
   final ControladorDeVista<List<Autorizacion>> controlador;
@@ -78,6 +83,9 @@ class PantallaDeVisitantes extends StatelessWidget {
   /// sesión, recargar lo visible, vaciar la bandeja—; sin armazón, las dos
   /// lecturas de la pestaña.
   final Future<void> Function()? alRecargar;
+
+  /// 15-W · revocar una visita vigente o programada, con motivo.
+  final void Function(Autorizacion visita)? alRevocar;
 
   Future<void> _recargar() async {
     final r = alRecargar;
@@ -133,7 +141,7 @@ class PantallaDeVisitantes extends StatelessWidget {
                       'Todavía no ha autorizado a ningún visitante.',
                       style: TextStyle(color: Paleta.textoSuave),
                     ),
-                  ...lista.map(FilaDeAutorizacion.new),
+                  ...lista.map((a) => FilaDeAutorizacion(a, alRevocar: alRevocar)),
                 ],
               ),
             ),

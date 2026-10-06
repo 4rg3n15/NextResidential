@@ -13,6 +13,7 @@ import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/app.dart';
 import 'package:ncr_residente/presentacion/widgets/foto_del_visitante.dart';
 
+import '../dobles/hogar_15w_falso.dart';
 import '../dobles/hogar_falso.dart';
 import '../dobles/sincronizacion.dart';
 import '../dobles/visitas.dart';
@@ -213,12 +214,11 @@ void main() {
       reloj: reloj,
       notificaciones: FuenteGobernada(),
       claves: () => 'clave-fija-de-prueba',
-      alta: alta,
-      hogar: HogarFalso(),
-      cuenta: CuentaFalsa(),
-      llamador: LlamadorFalso(),
+      alta: alta, hogar: HogarFalso(), cuenta: CuentaFalsa(), llamador: LlamadorFalso(),
       servidor: cambioDeServidor(sesion),
       notificacionesDelConjunto: NotificacionesQueAnotan(),
+      registro: RegistroFalso(), menores: MenoresFalsos(),
+      plazas: PlazasFalsas(alta), revocacion: RevocacionFalsa(),
     );
   });
 

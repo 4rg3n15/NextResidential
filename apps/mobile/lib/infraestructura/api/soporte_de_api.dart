@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import '../../aplicacion/sesion_en_uso.dart';
 import '../../dominio/causa_de_red.dart';
 import '../../dominio/puertos.dart';
+import 'cuerpo_de_error.dart';
 
 /// Ejecuta la llamada y convierte cualquier `DioException` en un `Fallo`
 /// tipado: la excepción de Dio no sale de la capa de infraestructura.
@@ -82,6 +83,9 @@ Fallo falloDeDio(DioException e) {
   final codigo = e.response?.statusCode;
   final detalle = detalleDeError(e.response?.data) ?? e.message ?? 'Error de servidor';
   return switch (codigo) {
+    // 15-W · el limitador contesta en inglés y sin plazo: aquí, en palabras y
+    // con el `Retry-After` que manda.
+    429 => Fallo(ClaseDeFallo.servidor, mensajeDeEspera(segundosDeEspera(e.response))),
     // 400 y 422 son la FORMA de lo enviado. No se mezclan con `servidor`
     // porque la bandeja de salida reintenta `servidor`, y reintentar ocho
     // veces un formulario al que le falta la casilla sólo retrasa decirlo.
@@ -104,7 +108,9 @@ String? detalleDeError(dynamic datos) {
     final mensaje = datos['mensaje'] ?? datos['message'];
     if (mensaje is String) return sinCodigosDelProyecto(mensaje);
     if (mensaje is Map) {
-      final interno = mensaje['message'];
+      // 15-W · los rechazos por campos llevan su texto en `mensaje.mensaje`
+      // («Revise los datos») y los de Nest, en `mensaje.message`.
+      final interno = mensaje['mensaje'] ?? mensaje['message'];
       if (interno is String) return sinCodigosDelProyecto(interno);
       if (interno is List && interno.isNotEmpty) {
         return interno.map((m) => sinCodigosDelProyecto('$m')).join(', ');

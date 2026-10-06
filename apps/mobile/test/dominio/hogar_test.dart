@@ -12,6 +12,8 @@ void main() {
       declarados: 2,
       declarada: true,
       aviso: '',
+      tope: 4,
+      esTitular: true,
       plazas: [
         PlazaDeOcupante(id: 'a', numero: 1, libre: false, codigo: null, ocupante: 'Ana'),
         PlazaDeOcupante(id: 'b', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null),

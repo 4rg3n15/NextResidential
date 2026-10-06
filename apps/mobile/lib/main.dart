@@ -26,8 +26,12 @@ import 'infraestructura/api/comprobador_de_salud.dart';
 import 'infraestructura/api/generado/clients/cuentas_api.dart';
 import 'infraestructura/api/generado/clients/residente_api.dart';
 import 'infraestructura/api/hogar_api.dart';
+import 'infraestructura/api/menores_api.dart';
 import 'infraestructura/api/notificaciones_api.dart';
+import 'infraestructura/api/plazas_api.dart';
+import 'infraestructura/api/registro_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
+import 'infraestructura/api/revocacion_api.dart';
 import 'infraestructura/api/soporte_de_api.dart';
 import 'infraestructura/camara/camara_del_telefono.dart';
 import 'infraestructura/notificaciones/fuente.dart';
@@ -116,6 +120,12 @@ Future<void> main() async {
           sesion: sesion,
         ),
         notificacionesDelConjunto: NotificacionesPorApi(api: api, sesion: sesion),
+        // 15-W · «Crear cuenta» va SIN sesión, como el acceso: su `Dio` es el
+        // del acceso, que sigue la dirección y no lleva el interceptor.
+        registro: RegistroPorApi(api: CuentasApi(dioDeAcceso)),
+        menores: MenoresPorApi(api: api, sesion: sesion),
+        plazas: PlazasPorApi(api: api, sesion: sesion),
+        revocacion: RevocacionPorApi(api: api, sesion: sesion),
         almacen: recuerdos,
         cambiosDeRed: cambiosDeRed(),
       ),

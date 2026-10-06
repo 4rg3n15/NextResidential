@@ -14,7 +14,8 @@ import '../dobles/servidor_falso.dart';
 
 /// Los adaptadores del hogar (15-I): que traducen el contrato GENERADO a las
 /// entidades del dominio, que la copropiedad sale de la sesión, y que un motivo
-/// desconocido nunca se pinta como éxito.
+/// desconocido nunca se pinta como éxito. El primer ingreso, el cambio de
+/// vivienda y los vehículos de 15-W están en `primer_ingreso_y_vehiculos_api_test.dart`.
 class AutenticadorFijo implements Autenticador {
   @override
   Future<Sesion> iniciarSesion(IdentificadorDeAcceso i, {required String clave}) async => Sesion(
@@ -85,77 +86,31 @@ void main() {
     final (alta, _, _) = await montar((_) => json(200, {
           'completa': false,
           'viviendaVinculada': false,
+          'viviendaAsignada': false,
           'debeDeclararOcupantes': false,
           'vocabulario': {
             'copropiedadNombre': 'Torres del Parque',
             'tipo': 'apartamentos',
             'etiquetaVivienda': 'Apartamento',
             'etiquetaAgrupacion': 'Torre',
+            'codigoCorto': 'TORR',
           },
           'pideAgrupacion': true,
-          'avisoOcupantes': 'DEFINITIVO',
+          'avisoOcupantes': 'Usted gestiona las plazas de su vivienda: hasta 4 en total.',
+          'aviso': 'La administración debe asignarle su vivienda',
         }));
     final e = await alta.miAlta();
     expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/alta');
     expect(e.vocabulario.etiquetaAgrupacion, 'Torre');
+    expect(e.vocabulario.codigoCorto, 'TORR');
     expect(e.pideAgrupacion, isTrue);
-    expect(e.avisoOcupantes, 'DEFINITIVO');
+    expect(e.avisoOcupantes, contains('hasta 4'));
+    // 15-W · una cuenta sin vivienda asignada lo sabe y lee el aviso.
+    expect(e.viviendaAsignada, isFalse);
+    expect(e.aviso, 'La administración debe asignarle su vivienda');
   });
 
-  test('3.2 · «no lo tengo» viaja como código nulo; el cambio va a /mi/vinculacion', () async {
-    final (alta, _, _) = await montar((_) => json(200, {
-          'vinculada': true,
-          'debeDeclararOcupantes': true,
-          'motivo': null,
-          'explicacion': null,
-          'campos': [],
-        }));
-    final r = await alta.completarAlta(
-      const SolicitudDeAlta(perfil: datos, identificador: '42', agrupacion: null, codigo: null),
-    );
-    expect(r, isA<AltaHecha>());
-    expect((r as AltaHecha).debeDeclararOcupantes, isTrue);
-    expect(servidor.cuerpo(0)['codigo'], isNull);
-    expect(servidor.peticiones[0].path, endsWith('/mi/alta'));
-
-    await alta.completarAlta(
-      const SolicitudDeAlta(perfil: datos, identificador: '7', agrupacion: 'B', codigo: 'ABCDEFGH'),
-      cambio: true,
-    );
-    expect(servidor.peticiones[1].path, endsWith('/mi/vinculacion'));
-    expect(servidor.cuerpo(1)['codigo'], 'ABCDEFGH');
-  });
-
-  test('3.2 · rechazo con explicación y rechazo por campos se distinguen', () async {
-    var n = 0;
-    final (alta, _, _) = await montar((_) {
-      n += 1;
-      return n == 1
-          ? json(200, {
-              'vinculada': false,
-              'debeDeclararOcupantes': false,
-              'motivo': 'CODIGO_INCORRECTO',
-              'explicacion': 'El código no corresponde.',
-              'campos': [],
-            })
-          : json(200, {
-              'vinculada': false,
-              'debeDeclararOcupantes': false,
-              'motivo': null,
-              'explicacion': null,
-              'campos': [
-                {'campo': 'telefono', 'motivo': 'El teléfono tiene de 7 a 15 cifras'},
-              ],
-            });
-    });
-    final s = const SolicitudDeAlta(perfil: datos, identificador: '42', agrupacion: null, codigo: 'X');
-    final a = await alta.completarAlta(s);
-    expect(a, isA<AltaRechazada>().having((r) => r.motivo, 'motivo', 'CODIGO_INCORRECTO'));
-    final b = await alta.completarAlta(s);
-    expect((b as AltaConErrores).campos['telefono'], contains('7 a 15'));
-  });
-
-  test('D6 · la declaración envía la confirmación; un 403 es sinPermiso', () async {
+  test('D-W10 · las plazas llegan con el tope, el titular y los códigos con prefijo', () async {
     var n = 0;
     final (alta, _, _) = await montar((_) {
       n += 1;
@@ -163,17 +118,45 @@ void main() {
           ? json(200, {
               'declarados': 3,
               'declarada': true,
-              'aviso': 'DEFINITIVO',
+              'aviso': 'Usted gestiona las plazas de su vivienda: hasta 4 en total.',
+              'tope': 4,
+              'esTitular': true,
               'plazas': [
-                {'id': 'p1', 'numero': 1, 'libre': false, 'codigo': null, 'ocupante': 'Ana'},
-                {'id': 'p2', 'numero': 2, 'libre': true, 'codigo': 'ABCD-EFGH', 'ocupante': null},
+                {
+                  'id': 'p1',
+                  'numero': 1,
+                  'libre': false,
+                  'codigo': null,
+                  'ocupante': 'Ana',
+                  'sinCuenta': false,
+                },
+                {
+                  'id': 'p2',
+                  'numero': 2,
+                  'libre': true,
+                  'codigo': 'MIRA-ABCD-EFGH',
+                  'ocupante': null,
+                  'sinCuenta': false,
+                },
+                {
+                  'id': 'p3',
+                  'numero': 3,
+                  'libre': false,
+                  'codigo': null,
+                  'ocupante': 'Sofía',
+                  'sinCuenta': true,
+                },
               ],
             })
-          : json(403, {'mensaje': 'El número de ocupantes ya está fijado'});
+          : json(403, {'mensaje': 'Los ocupantes ya se declararon, o no es el titular'});
     });
     final o = await alta.declararOcupantes(3);
-    expect(servidor.cuerpo(0), {'numero': 3, 'confirmoQueEsDefinitivo': true});
-    expect(o.libres.single.codigo, 'ABCD-EFGH');
+    // 15-W · la confirmación de «definitivo» ya no se envía.
+    expect(servidor.cuerpo(0)['numero'], 3);
+    expect(servidor.cuerpo(0)['confirmoQueEsDefinitivo'], isNull);
+    expect((o.cupo, o.esTitular), ('3 de 4', true));
+    expect(o.libres.single.codigo, 'MIRA-ABCD-EFGH');
+    expect(o.plazas.last.sinCuenta, isTrue);
     await expectLater(
       alta.declararOcupantes(4),
       throwsA(isA<Fallo>().having((f) => f.clase, 'clase', ClaseDeFallo.sinPermiso)),
@@ -219,12 +202,6 @@ void main() {
     expect(r.explicacion, contains('2 vehículos'));
     expect(servidor.cuerpo(0)['ocupantes'], ['r-1']);
     expect(servidor.cuerpo(0)['tipo'], 'automovil');
-  });
-
-  test('D5 a · baja: la respuesta del servidor decide', () async {
-    final (_, hogar, _) = await montar((_) => json(200, {'desactivado': false}));
-    expect(await hogar.desactivarVehiculo('veh-1'), isFalse);
-    expect(servidor.peticiones.single.path, '/copropiedades/cop-1/mi/vehiculos/veh-1/desactivacion');
   });
 
   test('ADR-023 · el cambio de contraseña pasa el motivo del servidor', () async {

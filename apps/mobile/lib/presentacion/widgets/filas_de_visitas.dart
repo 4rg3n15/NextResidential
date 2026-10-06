@@ -14,6 +14,13 @@
 /// Una visita creada sin red espera en el teléfono con la marca «Pendiente de
 /// envío» hasta que el conjunto la recibe. No está autorizada, y la fila no
 /// puede parecerse a una que sí.
+///
+/// ═════════════════════════════════════════════════════════════════════════════
+/// «REVOCAR» SÓLO DONDE TIENE SENTIDO (15-W)
+///
+/// Una visita vigente o programada se puede revocar, con motivo. Una vencida o
+/// ya rechazada no ofrece el botón: el servidor la rechazaría igual, y un botón
+/// que siempre falla enseña a no creer en los botones.
 library;
 
 import 'package:flutter/material.dart';
@@ -21,6 +28,7 @@ import 'package:flutter/material.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/bandeja_de_salida.dart';
 import '../../dominio/entidades.dart';
+import '../../dominio/revocacion.dart';
 import '../pantallas/comunes.dart';
 
 String etiquetaDeSituacion(SituacionDeVisita s) => switch (s) {
@@ -48,11 +56,14 @@ class DistintivoDeSituacion extends StatelessWidget {
 }
 
 class FilaDeAutorizacion extends StatelessWidget {
-  const FilaDeAutorizacion(this.a, {super.key, this.conHasta = true});
+  const FilaDeAutorizacion(this.a, {super.key, this.conHasta = true, this.alRevocar});
   final Autorizacion a;
 
   /// Inicio enseña la fila corta; la pestaña, hasta cuándo vale.
   final bool conHasta;
+
+  /// 15-W · `null` = sin revocación (Inicio, las pruebas de antes).
+  final void Function(Autorizacion visita)? alRevocar;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +103,15 @@ class FilaDeAutorizacion extends StatelessWidget {
               Text(
                 'Motivo: $motivo',
                 style: TextStyle(color: Paleta.peligroSuave.texto, fontWeight: FontWeight.w600),
+              ),
+            if (alRevocar != null && sePuedeRevocar(a))
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: Key('visita.revocar.${a.id}'),
+                  onPressed: () => alRevocar!(a),
+                  child: const Text('Revocar'),
+                ),
               ),
           ],
         ),

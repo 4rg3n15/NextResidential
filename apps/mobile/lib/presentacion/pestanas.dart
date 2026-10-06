@@ -5,16 +5,20 @@
 /// esto dice QUÉ lectura corresponde a cada pestaña y la pinta.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../dominio/bandeja_de_salida.dart';
 import '../dominio/entidades.dart';
 import '../dominio/hogar.dart';
+import '../dominio/menores.dart';
 import '../dominio/notificaciones.dart';
 import '../dominio/puertos.dart';
 import 'acciones_del_hogar.dart';
 import 'controlador.dart';
+import 'dependencias.dart';
 import 'pantallas/inicio.dart';
 import 'pantallas/perfil.dart';
 import 'pantallas/vehiculos.dart';
@@ -29,6 +33,7 @@ class ControladoresDelArmazon {
     required RepositorioDelHogar hogar,
     required RepositorioDeAlta alta,
     required RepositorioDeNotificaciones notificaciones,
+    required RepositorioDeMenores menores,
   }) : inicio = controladorDeInicio(repo),
        familia = controladorDeFamilia(repo),
        vehiculos = controladorDeVehiculos(repo),
@@ -38,10 +43,20 @@ class ControladoresDelArmazon {
        zonas = controladorDeZonas(repo),
        perfil = ControladorDeVista<PerfilDelResidente>(leer: hogar.miPerfil),
        ocupantes = ControladorDeVista<MisOcupantes>(leer: alta.misOcupantes),
+       menores = ControladorDeVista<List<MenorDelHogar>>(leer: menores.misMenores),
        notificaciones = ControladorDeVista<List<Notificacion>>(
          leer: notificaciones.misNotificaciones,
          estaVacio: (l) => l.isEmpty,
        );
+
+  /// Los del armazón, sobre los puertos de la app.
+  factory ControladoresDelArmazon.de(Dependencias d) => ControladoresDelArmazon(
+    repo: d.repositorio,
+    hogar: d.hogar,
+    alta: d.alta,
+    notificaciones: d.notificacionesDelConjunto,
+    menores: d.menores,
+  );
 
   final ControladorDeVista<MiHogar> inicio;
   final ControladorDeVista<List<MiembroDeFamilia>> familia;
@@ -52,6 +67,9 @@ class ControladoresDelArmazon {
   final ControladorDeVista<List<ZonaComun>> zonas;
   final ControladorDeVista<PerfilDelResidente> perfil;
   final ControladorDeVista<MisOcupantes> ocupantes;
+
+  /// 15-W · los menores del hogar: se leen en «Mi familia».
+  final ControladorDeVista<List<MenorDelHogar>> menores;
 
   /// 15-L · las de la API. Se recargan en TODA vuelta del ciclo, no sólo con
   /// su pantalla abierta: alimentan el contador de Inicio y el de la barra.
@@ -67,8 +85,24 @@ class ControladoresDelArmazon {
     zonas,
     perfil,
     ocupantes,
+    menores,
     notificaciones,
   ];
+
+  /// Todo, a la vez: al entrar y tras un cambio de vivienda.
+  void cargarTodo() {
+    for (final c in todos) {
+      unawaited(c.cargarAhora());
+    }
+  }
+
+  /// Al cerrar la sesión: los datos de una cuenta no se quedan en memoria
+  /// para la siguiente.
+  void olvidarTodo() {
+    for (final c in todos) {
+      c.olvidar();
+    }
+  }
 
   /// Lo que se ve en cada pestaña. Es lo que el ciclo recarga.
   List<ControladorDeVista<Object?>> dePestana(int pestana) => switch (pestana) {
@@ -99,6 +133,8 @@ class PestanasDelArmazon extends StatelessWidget {
     required this.alAbrirFamilia,
     required this.alAbrirHistorial,
     required this.alAbrirNotificaciones,
+    required this.alAbrirOcupantes,
+    required this.alRevocarVisita,
   });
 
   final int pestana;
@@ -117,6 +153,8 @@ class PestanasDelArmazon extends StatelessWidget {
   final void Function() alAbrirFamilia;
   final void Function() alAbrirHistorial;
   final void Function() alAbrirNotificaciones;
+  final void Function() alAbrirOcupantes;
+  final void Function(Autorizacion visita) alRevocarVisita;
 
   Widget _pantalla(BuildContext context) {
     final c = controladores;
@@ -142,12 +180,14 @@ class PestanasDelArmazon extends StatelessWidget {
         pendientes: pendientes,
         alReintentarPendientes: alReintentarPendientes,
         alRecargar: alRecargar,
+        alRevocar: alRevocarVisita,
       ),
       2 => PantallaDeVehiculos(
         controlador: c.vehiculos,
         alPedirAcceso: alPedirAcceso,
         alRegistrar: () => acciones.registrarVehiculo(context),
-        alDesactivar: (v) => acciones.desactivarVehiculo(context, v),
+        alEditar: (v) => acciones.editarVehiculo(context, v),
+        alEliminar: (v) => acciones.eliminarVehiculo(context, v),
       ),
       3 => PantallaDeZonas(
         controlador: c.zonas,
@@ -167,6 +207,7 @@ class PestanasDelArmazon extends StatelessWidget {
         alEditarPerfil: (p) => acciones.editarPerfil(context, p),
         alCambiarVivienda: (p) => acciones.cambiarVivienda(context, p),
         alCambiarContrasena: () => acciones.cambiarContrasena(context),
+        alAbrirOcupantes: alAbrirOcupantes,
         alRecargar: alRecargar,
       ),
     };

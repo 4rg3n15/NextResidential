@@ -14,6 +14,7 @@ class PlazaDeOcupanteDto {
     required this.libre,
     required this.codigo,
     required this.ocupante,
+    required this.sinCuenta,
   });
   
   factory PlazaDeOcupanteDto.fromJson(Map<String, Object?> json) => _$PlazaDeOcupanteDtoFromJson(json);
@@ -22,9 +23,12 @@ class PlazaDeOcupanteDto {
   final num numero;
   final bool libre;
 
-  /// Sólo en las libres: ABCD-EFGH
+  /// Sólo en las libres, con el prefijo del conjunto: MIRA-ABCD-EFGH
   final String? codigo;
   final String? ocupante;
+
+  /// 15-W · la ocupa una persona sin cuenta (un menor)
+  final bool sinCuenta;
 
   Map<String, Object?> toJson() => _$PlazaDeOcupanteDtoToJson(this);
 }

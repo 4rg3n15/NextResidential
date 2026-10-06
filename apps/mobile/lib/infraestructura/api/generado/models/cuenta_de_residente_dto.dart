@@ -4,6 +4,8 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'cuenta_de_residente_dto_origen.dart';
+
 part 'cuenta_de_residente_dto.g.dart';
 
 @JsonSerializable()
@@ -16,6 +18,7 @@ class CuentaDeResidenteDto {
     required this.activa,
     required this.debeCambiarContrasena,
     required this.creadaEn,
+    required this.origen,
   });
   
   factory CuentaDeResidenteDto.fromJson(Map<String, Object?> json) => _$CuentaDeResidenteDtoFromJson(json);
@@ -27,6 +30,9 @@ class CuentaDeResidenteDto {
   final bool activa;
   final bool debeCambiarContrasena;
   final String creadaEn;
+
+  /// 15-W · origen de la cuenta
+  final CuentaDeResidenteDtoOrigen origen;
 
   Map<String, Object?> toJson() => _$CuentaDeResidenteDtoToJson(this);
 }

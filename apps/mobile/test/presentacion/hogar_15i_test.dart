@@ -1,6 +1,6 @@
 /// ETAPA 15-I en la app, pantalla por pantalla: el acceso por código, la
-/// puerta del primer ingreso, los ocupantes DEFINITIVOS, el vehículo propio
-/// con tope y la portería.
+/// puerta del primer ingreso, la declaración de ocupantes (que desde la 15-W ya
+/// no es definitiva), el vehículo propio con tope y la portería.
 library;
 
 import 'package:flutter/material.dart';
@@ -114,7 +114,7 @@ void main() {
     expect(a.identificadores.last, isA<PorCorreo>());
   });
 
-  testWidgets('3.2 · primer ingreso: contraseña → formulario → ocupantes DEFINITIVOS → app',
+  testWidgets('3.2 · primer ingreso: contraseña → datos de la persona → ocupantes → app',
       (t) async {
     lienzoGrande(t);
     final autenticador = AutenticadorQueGuarda(cambio: true);
@@ -131,6 +131,7 @@ void main() {
         sesion: sesion,
         alta: alta,
         cuenta: cuenta,
+        reloj: RelojReal(),
         alTerminar: () => termino += 1,
         alSalir: () {},
       ),
@@ -148,31 +149,27 @@ void main() {
     expect(cuenta.cambios.single, ('Inicial#2026', 'Nueva#2026x'));
     expect(autenticador.renovaciones, 1, reason: 'ADR-023 · se renueva para perder el indicador');
 
-    // 2 · el formulario, con las etiquetas de la copropiedad y «no lo tengo».
+    // 2 · 15-W · sólo la persona: ni vivienda ni código.
     expect(find.text('Complete sus datos'), findsOneWidget);
-    expect(find.text('Número de casa'), findsOneWidget);
+    expect(find.byKey(const Key('alta.vivienda')), findsNothing);
+    expect(find.byKey(const Key('alta.codigo')), findsNothing);
     await t.enterText(find.byKey(const Key('perfil.nombres')), 'Ana');
     await t.enterText(find.byKey(const Key('perfil.apellidos')), 'Pérez');
+    await t.enterText(find.byKey(const Key('perfil.fechaNacimiento')), '1990-05-17');
     await t.enterText(find.byKey(const Key('perfil.numeroDocumento')), '1000000001');
-    await t.enterText(find.byKey(const Key('perfil.correo')), 'ana@ejemplo.invalid');
     await t.enterText(find.byKey(const Key('perfil.telefono')), '+573000000001');
-    await t.enterText(find.byKey(const Key('alta.vivienda')), '42');
-    await t.tap(find.byKey(const Key('alta.sinCodigo')));
-    await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('alta.enviar')));
     await t.pumpAndSettle();
-    final s = alta.solicitudes.single;
-    expect((s.identificador, s.codigo, alta.cambios.single), ('42', null, false));
+    final d = alta.primerosIngresos.single;
+    expect((d.tipoDocumento, d.fechaNacimiento, d.correo), ('cedula', '1990-05-17', null));
 
-    // 3 · los ocupantes: el aviso se lee ANTES y otra vez al confirmar.
+    // 3 · los ocupantes: el aviso se lee, y ya no hay «es definitivo».
     expect(find.byKey(const Key('ocupantes.aviso')), findsOneWidget);
+    expect(find.textContaining('definitivo'), findsNothing);
     await t.tap(find.byTooltip('Uno más'));
     await t.tap(find.byTooltip('Uno más'));
     await t.pump();
     await t.tap(find.byKey(const Key('ocupantes.declarar')));
-    await t.pumpAndSettle();
-    expect(find.text(avisoDePrueba), findsNWidgets(2), reason: 'en la pantalla y en el diálogo');
-    await t.tap(find.byKey(const Key('ocupantes.confirmar')));
     // Al terminar, la puerta queda en su indicador de carga hasta que el
     // armazón la reemplace: `pumpAndSettle` no se asentaría nunca.
     for (var i = 0; i < 5; i++) {
@@ -184,12 +181,15 @@ void main() {
     expect(termino, 1);
   });
 
-  testWidgets('3.2 · el rechazo del servidor se pinta; «Revisar» no declara nada', (t) async {
+  testWidgets('D6 · el rechazo del servidor al declarar se pinta tal cual', (t) async {
     lienzoGrande(t);
     final sesion = await sesionCon(AutenticadorQueGuarda());
     final alta = AltaFalsa(
       estados: [estadoDeAlta(vinculada: true, declarar: true)],
-      falloDeclarar: const Fallo(ClaseDeFallo.sinPermiso, 'Ya está fijado: sólo el superadministrador'),
+      falloDeclarar: const Fallo(
+        ClaseDeFallo.servidor,
+        'Su vivienda tiene el máximo de 4 plazas. Para más, pídalo a la administración.',
+      ),
     );
     await t.pumpWidget(MaterialApp(
       home: PuertaDePrimerIngreso(
@@ -203,15 +203,8 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('ocupantes.declarar')));
     await t.pumpAndSettle();
-    await t.tap(find.text('Revisar'));
-    await t.pumpAndSettle();
     expect(alta.declaraciones, isEmpty);
-
-    await t.tap(find.byKey(const Key('ocupantes.declarar')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('ocupantes.confirmar')));
-    await t.pumpAndSettle();
-    expect(find.text('Ya está fijado: sólo el superadministrador'), findsOneWidget);
+    expect(find.textContaining('el máximo de 4 plazas'), findsOneWidget);
   });
 
   testWidgets('D5 a · el tercer vehículo: el motivo del servidor y a quién pedírselo', (t) async {

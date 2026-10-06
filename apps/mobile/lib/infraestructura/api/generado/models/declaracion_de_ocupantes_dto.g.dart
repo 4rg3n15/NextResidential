@@ -10,7 +10,7 @@ DeclaracionDeOcupantesDto _$DeclaracionDeOcupantesDtoFromJson(
   Map<String, dynamic> json,
 ) => DeclaracionDeOcupantesDto(
   numero: json['numero'] as num,
-  confirmoQueEsDefinitivo: json['confirmoQueEsDefinitivo'] as bool,
+  confirmoQueEsDefinitivo: json['confirmoQueEsDefinitivo'] as bool?,
 );
 
 Map<String, dynamic> _$DeclaracionDeOcupantesDtoToJson(

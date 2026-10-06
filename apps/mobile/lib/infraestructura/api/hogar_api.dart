@@ -1,26 +1,34 @@
-/// Los adaptadores del hogar del residente (ETAPA 15-I): alta, ocupantes,
-/// perfil, vehículos propios y la contraseña.
+/// Los adaptadores del hogar del residente (ETAPA 15-I, RONDA 15-W): primer
+/// ingreso, cambio de vivienda, ocupantes, perfil, vehículos propios y la
+/// contraseña.
 ///
 /// Misma regla que `repositorio_api.dart`: el cliente GENERADO adentro, las
 /// entidades del dominio afuera. Ningún DTO ni `DioException` cruza esta
 /// frontera, y ningún texto que la app y la consola deban decir igual —el aviso
-/// DEFINITIVO de los ocupantes, la explicación del tope— se inventa aquí: se
-/// pasa tal como lo manda el servidor.
+/// de las plazas con su tope, la explicación del tope de vehículos— se inventa
+/// aquí: se pasa tal como lo manda el servidor.
 library;
+
+import 'package:dio/dio.dart';
 
 import '../../aplicacion/sesion_en_uso.dart';
 import '../../dominio/hogar.dart';
+import 'cuerpo_de_error.dart';
 import 'generado/clients/cuentas_api.dart';
 import 'generado/clients/residente_api.dart';
 import 'generado/models/alta_de_mi_vivienda_dto.dart';
 import 'generado/models/cambio_de_contrasena_dto.dart';
 import 'generado/models/campo_rechazado_dto.dart';
 import 'generado/models/declaracion_de_ocupantes_dto.dart';
+import 'generado/models/edicion_de_vehiculo_propio_dto.dart';
 import 'generado/models/mis_ocupantes_dto.dart';
 import 'generado/models/perfil_del_residente_dto.dart';
 import 'generado/models/perfil_dto.dart';
 import 'generado/models/perfil_dto_tipo_documento.dart';
+import 'generado/models/primer_ingreso_dto.dart';
+import 'generado/models/primer_ingreso_dto_tipo_documento.dart';
 import 'generado/models/resultado_de_alta_dto.dart';
+import 'generado/models/vehiculo_eliminado_dto_resultado.dart';
 import 'generado/models/vehiculo_propio_dto.dart';
 import 'generado/models/vehiculo_propio_dto_tipo.dart';
 import 'soporte_de_api.dart';
@@ -42,31 +50,76 @@ class AltaPorApi implements RepositorioDeAlta {
       completa: d.completa,
       viviendaVinculada: d.viviendaVinculada,
       debeDeclararOcupantes: d.debeDeclararOcupantes,
+      viviendaAsignada: d.viviendaAsignada,
       vocabulario: VocabularioDeAlta(
         copropiedad: d.vocabulario.copropiedadNombre,
         tipo: d.vocabulario.tipo,
         etiquetaVivienda: d.vocabulario.etiquetaVivienda,
         etiquetaAgrupacion: d.vocabulario.etiquetaAgrupacion,
+        codigoCorto: d.vocabulario.codigoCorto,
       ),
       pideAgrupacion: d.pideAgrupacion,
       avisoOcupantes: d.avisoOcupantes,
+      aviso: d.aviso,
     );
   });
 
+  /// D3 (15-W) · sin vivienda ni código: la cuenta ya trae la suya.
   @override
-  Future<ResultadoDeAlta> completarAlta(SolicitudDeAlta s, {bool cambio = false}) =>
-      pedirALaApi(() async {
-        final cuerpo = AltaDeMiViviendaDto(
-          perfil: perfilDto(s.perfil),
-          identificador: s.identificador,
-          agrupacion: s.agrupacion,
-          codigo: s.codigo,
-        );
-        final d = cambio
-            ? await _api.miAltaControllerCambioDeVivienda(id: _copropiedad, body: cuerpo)
-            : await _api.miAltaControllerAlta(id: _copropiedad, body: cuerpo);
-        return resultadoDeAlta(d);
-      });
+  Future<ResultadoDeAlta> completarPrimerIngreso(DatosDePrimerIngreso p) {
+    final tipo = PrimerIngresoDtoTipoDocumento.fromJson(p.tipoDocumento);
+    // Un tipo que el contrato no conoce no se puede serializar: se dice en el
+    // campo, en vez de reventar al codificar el cuerpo.
+    if (tipo == PrimerIngresoDtoTipoDocumento.$unknown) {
+      return Future.value(
+        const AltaConErrores({'tipoDocumento': 'Cédula, cédula de extranjería o pasaporte'}),
+      );
+    }
+    return _conCampos(() async {
+      final d = await _api.miAltaControllerAlta(
+        id: _copropiedad,
+        body: PrimerIngresoDto(
+          nombres: p.nombres,
+          apellidos: p.apellidos,
+          tipoDocumento: tipo,
+          numeroDocumento: p.numeroDocumento,
+          telefono: p.telefono,
+          fechaNacimiento: p.fechaNacimiento,
+          correo: p.correo,
+        ),
+      );
+      return resultadoDeAlta(d);
+    });
+  }
+
+  /// 3.5 · siempre con el código de una plaza libre de la vivienda de destino.
+  @override
+  Future<ResultadoDeAlta> cambiarDeVivienda(SolicitudDeCambioDeVivienda s) => _conCampos(() async {
+    final d = await _api.miAltaControllerCambioDeVivienda(
+      id: _copropiedad,
+      body: AltaDeMiViviendaDto(
+        perfil: perfilDto(s.perfil),
+        identificador: s.identificador,
+        agrupacion: s.agrupacion,
+        codigo: s.codigo,
+      ),
+    );
+    return resultadoDeAlta(d);
+  });
+
+  /// El servidor contesta los CAMPOS rechazados con un 400: se devuelven como
+  /// resultado, campo por campo, y no como un fallo con un texto suelto.
+  Future<ResultadoDeAlta> _conCampos(Future<ResultadoDeAlta> Function() llamada) async {
+    try {
+      return await llamada();
+    } on DioException catch (e) {
+      final campos = e.response?.statusCode == 400
+          ? camposDelRechazo(e.response?.data)
+          : const <String, String>{};
+      if (campos.isNotEmpty) return AltaConErrores(campos);
+      throw falloDeDio(e);
+    }
+  }
 
   @override
   Future<MisOcupantes> misOcupantes() => pedirALaApi(() async {
@@ -77,9 +130,9 @@ class AltaPorApi implements RepositorioDeAlta {
   Future<MisOcupantes> declararOcupantes(int numero) => pedirALaApi(() async {
     final d = await _api.miAltaControllerDeclararOcupantes(
       id: _copropiedad,
-      // La confirmación la exige el servidor: la app sólo la envía después
-      // de que el residente leyó el aviso y pulsó «Confirmar».
-      body: DeclaracionDeOcupantesDto(numero: numero, confirmoQueEsDefinitivo: true),
+      // 15-W · la declaración ya no es definitiva: la confirmación que pedía
+      // el servidor está obsoleta y no se envía.
+      body: DeclaracionDeOcupantesDto(numero: numero),
     );
     return ocupantesDe(d);
   });
@@ -137,10 +190,34 @@ class HogarPorApi implements RepositorioDelHogar {
     );
   });
 
+  /// 15-W (D5) · la placa sólo si no tiene historial: con historial el
+  /// servidor contesta 409 con su texto, que llega como `Fallo`.
   @override
-  Future<bool> desactivarVehiculo(String vehiculoId) => pedirALaApi(() async {
-    final d = await _api.miHogarControllerDesactivar(id: _copropiedad, vehiculoId: vehiculoId);
-    return d.desactivado;
+  Future<void> editarVehiculo(String vehiculoId, EdicionDeVehiculo c) => pedirALaApi(() async {
+    await _api.miHogarControllerEditarVehiculo(
+      id: _copropiedad,
+      vehiculoId: vehiculoId,
+      body: EdicionDeVehiculoPropioDto(
+        color: c.color,
+        modelo: c.modelo,
+        marca: c.marca,
+        placa: c.placa,
+      ),
+    );
+  });
+
+  /// 15-W (D5) · sin historial se borra; con historial, baja lógica.
+  @override
+  Future<EliminacionDeVehiculo> eliminarVehiculo(String vehiculoId) => pedirALaApi(() async {
+    final d = await _api.miHogarControllerEliminarVehiculo(
+      id: _copropiedad,
+      vehiculoId: vehiculoId,
+    );
+    // Un resultado que esta versión no conozca no se presenta como borrado:
+    // la baja lógica es la lectura que no promete de más.
+    return d.resultado == VehiculoEliminadoDtoResultado.borrado
+        ? EliminacionDeVehiculo.borrado
+        : EliminacionDeVehiculo.dadoDeBaja;
   });
 }
 
@@ -176,17 +253,17 @@ Map<String, String> camposDe(List<CampoRechazadoDto> campos) => {
 ResultadoDeAlta resultadoDeAlta(ResultadoDeAltaDto d) {
   if (d.vinculada) return AltaHecha(debeDeclararOcupantes: d.debeDeclararOcupantes);
   if (d.campos.isNotEmpty) return AltaConErrores(camposDe(d.campos));
-  return AltaRechazada(
-    motivo: d.motivo?.json ?? 'DESCONOCIDO',
-    explicacion:
-        d.explicacion ?? 'El conjunto no permitió la vinculación. Consulte con la administración.',
-  );
+  final motivo = d.motivo?.json ?? 'DESCONOCIDO';
+  // El texto es el del servidor; el del dominio sólo si no mandó ninguno.
+  return AltaRechazada(motivo: motivo, explicacion: d.explicacion ?? explicacionDeAlta(motivo));
 }
 
 MisOcupantes ocupantesDe(MisOcupantesDto d) => MisOcupantes(
   declarados: d.declarados.toInt(),
   declarada: d.declarada,
   aviso: d.aviso,
+  tope: d.tope.toInt(),
+  esTitular: d.esTitular,
   plazas: d.plazas
       .map(
         (p) => PlazaDeOcupante(
@@ -195,6 +272,7 @@ MisOcupantes ocupantesDe(MisOcupantesDto d) => MisOcupantes(
           libre: p.libre,
           codigo: p.codigo,
           ocupante: p.ocupante,
+          sinCuenta: p.sinCuenta,
         ),
       )
       .toList(growable: false),

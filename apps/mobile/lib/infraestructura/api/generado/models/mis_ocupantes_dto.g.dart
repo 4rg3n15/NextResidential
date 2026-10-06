@@ -14,6 +14,8 @@ MisOcupantesDto _$MisOcupantesDtoFromJson(Map<String, dynamic> json) =>
           .map((e) => PlazaDeOcupanteDto.fromJson(e as Map<String, dynamic>))
           .toList(),
       aviso: json['aviso'] as String,
+      tope: json['tope'] as num,
+      esTitular: json['esTitular'] as bool,
     );
 
 Map<String, dynamic> _$MisOcupantesDtoToJson(MisOcupantesDto instance) =>
@@ -22,4 +24,6 @@ Map<String, dynamic> _$MisOcupantesDtoToJson(MisOcupantesDto instance) =>
       'declarada': instance.declarada,
       'plazas': instance.plazas,
       'aviso': instance.aviso,
+      'tope': instance.tope,
+      'esTitular': instance.esTitular,
     };

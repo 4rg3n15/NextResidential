@@ -10,15 +10,15 @@ part 'declaracion_de_ocupantes_dto.g.dart';
 class DeclaracionDeOcupantesDto {
   const DeclaracionDeOcupantesDto({
     required this.numero,
-    required this.confirmoQueEsDefinitivo,
+    this.confirmoQueEsDefinitivo,
   });
   
   factory DeclaracionDeOcupantesDto.fromJson(Map<String, Object?> json) => _$DeclaracionDeOcupantesDtoFromJson(json);
   
   final num numero;
 
-  /// El residente confirmó que el número es DEFINITIVO
-  final bool confirmoQueEsDefinitivo;
+  /// Obsoleto desde la 15-W: la declaración ya no es definitiva. Se ignora
+  final bool? confirmoQueEsDefinitivo;
 
   Map<String, Object?> toJson() => _$DeclaracionDeOcupantesDtoToJson(this);
 }

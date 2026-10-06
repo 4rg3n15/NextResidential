@@ -79,6 +79,28 @@ void main() {
         PasoDePrimerIngreso.listo,
       );
     });
+
+    test('15-W · una cuenta sin vivienda asignada espera: no hay formulario que llenar', () {
+      expect(
+        pasoDePrimerIngreso(
+          debeCambiarContrasena: false,
+          viviendaVinculada: false,
+          viviendaAsignada: false,
+          debeDeclararOcupantes: false,
+        ),
+        PasoDePrimerIngreso.esperarVivienda,
+      );
+      // La contraseña sigue yendo antes que nada.
+      expect(
+        pasoDePrimerIngreso(
+          debeCambiarContrasena: true,
+          viviendaVinculada: false,
+          viviendaAsignada: false,
+          debeDeclararOcupantes: false,
+        ),
+        PasoDePrimerIngreso.cambiarContrasena,
+      );
+    });
   });
 
   group('política de contraseña (paridad con el servidor)', () {

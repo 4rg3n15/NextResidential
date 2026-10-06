@@ -25,6 +25,10 @@ import '../widgets/servidor.dart';
 /// residentes— sin ningún requisito que lo respalde. El perfil ofrecerá
 /// activarlo voluntariamente en 11-B.
 ///
+/// **«Crear cuenta» (15-W).** Quien recibió un código de invitación de su
+/// titular crea aquí su propia cuenta; al terminar entra solo. Sin quien sepa
+/// abrir esa pantalla (una prueba suelta), el enlace no se pinta.
+///
 /// **«Servidor», a la vista (15-L).** La dirección del Mac cambia de una red a
 /// otra; si la app no llega, el acceso es la primera pantalla donde se nota y
 /// la única donde no hay otra cosa que hacer. Por eso la dirección se ve abajo
@@ -36,11 +40,15 @@ class PantallaDeAcceso extends StatefulWidget {
     required this.ambiente,
     required this.sesion,
     required this.alEntrar,
+    this.alCrearCuenta,
   });
 
   final Ambiente ambiente;
   final SesionEnUso sesion;
   final void Function() alEntrar;
+
+  /// 15-W · abre «Crear cuenta».
+  final VoidCallback? alCrearCuenta;
 
   @override
   State<PantallaDeAcceso> createState() => _PantallaDeAccesoState();
@@ -218,6 +226,26 @@ class _PantallaDeAccesoState extends State<PantallaDeAcceso> {
                         ),
                       ),
                     ],
+                    // 15-W · después del error del acceso, que es de «Entrar».
+                    if (widget.alCrearCuenta != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text(
+                              '¿Tiene un código de invitación?',
+                              style: TextStyle(color: Paleta.textoSuave),
+                            ),
+                            TextButton(
+                              key: const Key('acceso.crearCuenta'),
+                              onPressed: _enviando ? null : widget.alCrearCuenta,
+                              child: const Text('Crear cuenta'),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     _OpcionDeServidor(alCambiar: () => setState(() => _fallo = null)),
                   ],

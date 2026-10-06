@@ -1,11 +1,20 @@
-/// El hogar del residente: alta, ocupantes, perfil y vehículos propios (15-I).
+/// El hogar del residente: alta, ocupantes, perfil y vehículos propios (15-I,
+/// 15-W).
 ///
 /// Entidades y puertos, sin Dio ni plataforma. Los textos que la app y la
-/// consola tienen que decir igual —el aviso de que el número de ocupantes es
-/// DEFINITIVO, la explicación del tope de vehículos— NO se escriben aquí: los
-/// manda el servidor, que los saca del dominio compartido. Si la app los
-/// reescribiera, el día que cambien habría dos versiones y una sería falsa.
+/// consola tienen que decir igual —el aviso de las plazas con su tope, la
+/// explicación del tope de vehículos— NO se escriben aquí: los manda el
+/// servidor, que los saca del dominio compartido. Si la app los reescribiera,
+/// el día que cambien habría dos versiones y una sería falsa.
 library;
+
+import 'plazas.dart';
+import 'primer_ingreso.dart';
+import 'vehiculos_propios.dart';
+
+export 'plazas.dart';
+export 'primer_ingreso.dart';
+export 'vehiculos_propios.dart';
 
 /// Cómo llama ESTA copropiedad a sus viviendas (nunca codificado, 3.2).
 class VocabularioDeAlta {
@@ -14,32 +23,47 @@ class VocabularioDeAlta {
     required this.tipo,
     required this.etiquetaVivienda,
     required this.etiquetaAgrupacion,
+    this.codigoCorto,
   });
   final String copropiedad;
   final String? tipo;
   final String etiquetaVivienda;
   final String etiquetaAgrupacion;
+
+  /// 15-W · el prefijo de sus códigos de plaza («MIRA»). `null` si aún no
+  /// tiene.
+  final String? codigoCorto;
 }
 
 class EstadoDeAlta {
   const EstadoDeAlta({
     required this.completa,
     required this.viviendaVinculada,
+    required this.viviendaAsignada,
     required this.debeDeclararOcupantes,
     required this.vocabulario,
     required this.pideAgrupacion,
     required this.avisoOcupantes,
+    required this.aviso,
   });
   final bool completa;
   final bool viviendaVinculada;
+
+  /// 15-W · la cuenta ya trae vivienda, asignada o vinculada. Sin ella, el
+  /// primer ingreso no tiene nada que completar todavía.
+  final bool viviendaAsignada;
   final bool debeDeclararOcupantes;
   final VocabularioDeAlta vocabulario;
 
-  /// En un conjunto de apartamentos la torre es obligatoria.
+  /// En un conjunto de apartamentos la torre es obligatoria (cambio de
+  /// vivienda).
   final bool pideAgrupacion;
 
-  /// El texto que se muestra ANTES de confirmar la declaración (D6).
+  /// El texto de las plazas, con el tope de la vivienda.
   final String avisoOcupantes;
+
+  /// 15-W · lo que lee una cuenta sin vivienda; `null` si la tiene.
+  final String? aviso;
 }
 
 /// Datos personales y de CONTACTO (no de acceso: no hay SMTP, D9).
@@ -71,8 +95,10 @@ const tiposDeDocumento = <String, String>{
   'otro': 'Otro',
 };
 
-class SolicitudDeAlta {
-  const SolicitudDeAlta({
+/// 3.5 · el cambio de vivienda desde el perfil: siempre con el código de una
+/// plaza libre de la vivienda de destino, con o sin el prefijo del conjunto.
+class SolicitudDeCambioDeVivienda {
+  const SolicitudDeCambioDeVivienda({
     required this.perfil,
     required this.identificador,
     required this.agrupacion,
@@ -81,9 +107,7 @@ class SolicitudDeAlta {
   final DatosDePerfil perfil;
   final String identificador;
   final String? agrupacion;
-
-  /// `null` = marcó «no lo tengo» (sólo vale si la vivienda no tiene cuenta).
-  final String? codigo;
+  final String codigo;
 }
 
 sealed class ResultadoDeAlta {
@@ -99,44 +123,18 @@ final class AltaRechazada extends ResultadoDeAlta {
   const AltaRechazada({required this.motivo, required this.explicacion});
   final String motivo;
   final String explicacion;
+
+  /// 15-W · la fecha era de un menor: el servidor bloqueó la cuenta.
+  bool get bloqueadaPorEdad => motivo == motivoCuentaBloqueadaPorEdad;
+
+  /// 15-W · la administración aún no le asignó vivienda.
+  bool get sinVivienda => motivo == motivoSinVivienda;
 }
 
 /// Campos que el servidor rechazó, por nombre. Nunca con el valor escrito.
 final class AltaConErrores extends ResultadoDeAlta {
   const AltaConErrores(this.campos);
   final Map<String, String> campos;
-}
-
-class PlazaDeOcupante {
-  const PlazaDeOcupante({
-    required this.id,
-    required this.numero,
-    required this.libre,
-    required this.codigo,
-    required this.ocupante,
-  });
-  final String id;
-  final int numero;
-  final bool libre;
-
-  /// Sólo en las libres: «ABCD-EFGH», para dárselo a quien vive con él.
-  final String? codigo;
-  final String? ocupante;
-}
-
-class MisOcupantes {
-  const MisOcupantes({
-    required this.declarados,
-    required this.declarada,
-    required this.plazas,
-    required this.aviso,
-  });
-  final int declarados;
-  final bool declarada;
-  final List<PlazaDeOcupante> plazas;
-  final String aviso;
-
-  List<PlazaDeOcupante> get libres => plazas.where((p) => p.libre).toList();
 }
 
 class PerfilDelResidente {
@@ -231,23 +229,29 @@ final class VehiculoRechazado extends ResultadoDeVehiculo {
   bool get esTope => motivo == 'TOPE_ALCANZADO';
 }
 
-/// Alta y ocupantes (3.2, 3.3). Ninguna recibe la vivienda del vecino: la del
-/// alta se busca por número y exige código si ya hay alguien dentro.
+/// Primer ingreso, cambio de vivienda y ocupantes (D3, 3.5, 3.3). Ninguna
+/// recibe la vivienda: la del primer ingreso es la de la cuenta, y la del
+/// cambio se busca por número y exige el código de una plaza libre.
 abstract interface class RepositorioDeAlta {
   Future<EstadoDeAlta> miAlta();
-  Future<ResultadoDeAlta> completarAlta(SolicitudDeAlta solicitud, {bool cambio = false});
+  Future<ResultadoDeAlta> completarPrimerIngreso(DatosDePrimerIngreso datos);
+  Future<ResultadoDeAlta> cambiarDeVivienda(SolicitudDeCambioDeVivienda solicitud);
   Future<MisOcupantes> misOcupantes();
 
-  /// D6 · una vez y definitivo; lanza `Fallo(sinPermiso)` si ya se declaró.
+  /// D6 · el titular, una vez, de 1 al tope; lanza `Fallo(sinPermiso)` si ya
+  /// se declaró. Después, las plazas se añaden y retiran una a una.
   Future<MisOcupantes> declararOcupantes(int numero);
 }
 
-/// Perfil y vehículos propios (3.4, 3.5).
+/// Perfil y vehículos propios (3.4, 3.5). Editar y eliminar rechazan con un
+/// `Fallo` que lleva el texto del servidor (la placa con historial, la placa
+/// duplicada, el vehículo que registró la administración).
 abstract interface class RepositorioDelHogar {
   Future<PerfilDelResidente> miPerfil();
   Future<ResultadoDePerfil> editarPerfil(DatosDePerfil datos);
   Future<ResultadoDeVehiculo> registrarVehiculo(NuevoVehiculo vehiculo);
-  Future<bool> desactivarVehiculo(String vehiculoId);
+  Future<void> editarVehiculo(String vehiculoId, EdicionDeVehiculo cambios);
+  Future<EliminacionDeVehiculo> eliminarVehiculo(String vehiculoId);
 }
 
 /// ADR-023 · el cambio de contraseña de la propia cuenta.

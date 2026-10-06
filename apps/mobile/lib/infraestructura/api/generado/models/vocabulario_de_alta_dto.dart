@@ -13,6 +13,7 @@ class VocabularioDeAltaDto {
     required this.tipo,
     required this.etiquetaVivienda,
     required this.etiquetaAgrupacion,
+    required this.codigoCorto,
   });
   
   factory VocabularioDeAltaDto.fromJson(Map<String, Object?> json) => _$VocabularioDeAltaDtoFromJson(json);
@@ -21,6 +22,9 @@ class VocabularioDeAltaDto {
   final String? tipo;
   final String etiquetaVivienda;
   final String etiquetaAgrupacion;
+
+  /// 15-W · prefijo de sus códigos
+  final String? codigoCorto;
 
   Map<String, Object?> toJson() => _$VocabularioDeAltaDtoToJson(this);
 }
