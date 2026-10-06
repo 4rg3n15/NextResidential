@@ -175,6 +175,10 @@ describe('15-W · D4 bis · las plazas del titular', () => {
     );
     expect(suyo.body).toEqual({ tope: 4, activas: 4, propio: true });
     expect((await anadir(suTitular.token)).status).toBe(409);
+    // Una plaza de OTRA vivienda no existe para su titular: 404, y sigue viva.
+    const deLaPrimera = (await vivas()).find((p) => p.libre);
+    expect((await retirar(suTitular.token, String(deLaPrimera?.id), 'No es mía')).status).toBe(404);
+    expect((await vivas()).map((p) => p.id)).toContain(deLaPrimera?.id);
     // La 1 tenía tope propio (6): no la toca. Una vivienda nueva ya va con 3.
     const primera = await banco.comoSuper(
       'get',
