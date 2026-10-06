@@ -33,17 +33,27 @@ push` manda el texto al servidor, que no las conoce. El banco y el despliegue no
   empiece por `\` (con espacios delante o sin ellos); un comentario `--` que la
   mencione no cuenta.
 
+- **Dos avisos de dependencias, en el mismo PR.** La CI del PR cayó en `pnpm audit
+--prod --audit-level=high` por dos avisos publicados después del último verde de
+  `develop`: **crítico** `proxy-addr` < 2.0.8 (GHSA-jqcg-44mw-7w3h; lo usa `express`
+  para `API_PROXIES_DE_CONFIANZA`, de lo que depende la lista blanca de porteros) y
+  **alto** `source-map-js` < 1.2.2 (GHSA-68fv-2mgg-jv7q; `postcss` de la consola). No
+  son de este cambio, pero rompen todo PR y `develop` en su siguiente corrida. Se
+  acotan en `pnpm.overrides` con `^`, como H-13-26. `pnpm audit --prod` → 0; las 86
+  pruebas de IP, proxies y porteros de la API, en verde; API y consola compilan.
+
 ## 3 · Árbol de archivos
 
-| Fichero                                                              | Propósito                                              |
-| -------------------------------------------------------------------- | ------------------------------------------------------ |
-| `supabase/migrations/20261004130000_0052_suscripciones_web_push.sql` | Sin `\set ON_ERROR_STOP on`                            |
-| `supabase/migrations/20261004140000_0053_modo_de_puerta.sql`         | Sin `\set ON_ERROR_STOP on`                            |
-| `scripts/lib/migraciones-sin-psql.mjs`                               | Control nuevo: ninguna migración lleva órdenes de psql |
-| `scripts/verificar-etapa.sh`                                         | Lo ejecuta en el paso 10                               |
-| `scripts/lib/pruebas-negativas.mjs`                                  | Sonda 5 bis: lo ve fallar                              |
-| `scripts/lib/ramas-de-los-controles.json`                            | Línea base de ramas del control nuevo (0 sin ejercer)  |
-| `docs/ESTADO_ETAPAS.md`                                              | Cabecera y ficha                                       |
+| Fichero                                                              | Propósito                                                        |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `supabase/migrations/20261004130000_0052_suscripciones_web_push.sql` | Sin `\set ON_ERROR_STOP on`                                      |
+| `supabase/migrations/20261004140000_0053_modo_de_puerta.sql`         | Sin `\set ON_ERROR_STOP on`                                      |
+| `scripts/lib/migraciones-sin-psql.mjs`                               | Control nuevo: ninguna migración lleva órdenes de psql           |
+| `scripts/verificar-etapa.sh`                                         | Lo ejecuta en el paso 10                                         |
+| `scripts/lib/pruebas-negativas.mjs`                                  | Sonda 5 bis: lo ve fallar                                        |
+| `scripts/lib/ramas-de-los-controles.json`                            | Línea base de ramas del control nuevo (0 sin ejercer)            |
+| `package.json`, `pnpm-lock.yaml`                                     | `proxy-addr` ^2.0.8 y `source-map-js` ^1.2.2 en `pnpm.overrides` |
+| `docs/ESTADO_ETAPAS.md`                                              | Cabecera y ficha                                                 |
 
 ## 4 · Tabla SOLID
 
