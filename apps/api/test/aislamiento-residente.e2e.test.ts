@@ -154,7 +154,7 @@ const CUBIERTAS_APARTE = new Set([
   // plaza de otra vivienda 404—.
   'POST /copropiedades/:id/mi/ocupantes/plazas',
   'POST /copropiedades/:id/mi/ocupantes/plazas/:plazaId/retiro',
-  // Vehículos propios (D5): `residentes-y-vehiculos-pg` —el del vecino, 404—.
+  // Vehículos propios (D5): `vehiculos-propios-pg` —el del vecino, 404—.
   'PUT /copropiedades/:id/mi/vehiculos/:vehiculoId',
   'DELETE /copropiedades/:id/mi/vehiculos/:vehiculoId',
   // Revocar una visita (D6): `mis-visitas-revocacion.e2e` —la del vecino y la

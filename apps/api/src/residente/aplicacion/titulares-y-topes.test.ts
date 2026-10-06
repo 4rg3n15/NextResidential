@@ -20,7 +20,8 @@ import type { TopeDePlazasDeLaCopropiedad } from './tope-de-la-copropiedad';
  * 15-W · D1, D2, D4 bis · lo que hace el superadministrador, SIN base: el
  * titular nace con su vivienda (o no nace), la vivienda de una cuenta antigua,
  * la reanudación del registro y el tope por omisión. Contra PostgreSQL:
- * `titular-por-administracion-pg`, `autorregistro.e2e` y `plazas-del-titular-pg`.
+ * `titular-por-administracion-pg`, `asignar-vivienda-pg`, `autorregistro-limites.e2e`
+ * y `plazas-del-titular-pg`.
  */
 const COP = '10000000-0000-4000-8000-000000000001';
 const AHORA = new Date('2026-10-06T15:00:00Z');

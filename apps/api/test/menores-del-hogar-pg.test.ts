@@ -36,8 +36,9 @@ describe('15-W · D4 · los menores del hogar', () => {
     plazaId,
     ...extra,
   });
+  const ocupantes = () => `/copropiedades/${cop.id}/mi/ocupantes`;
   const libres = async (token: string) =>
-    (await banco.con(token, 'get', `/copropiedades/${cop.id}/mi/ocupantes`)).body.plazas.filter(
+    (await banco.con(token, 'get', ocupantes())).body.plazas.filter(
       (p: { libre: boolean }) => p.libre,
     ) as typeof plazas;
 
@@ -47,14 +48,7 @@ describe('15-W · D4 · los menores del hogar', () => {
     const casa = await banco.vivienda(cop.id, '7');
     titular = await banco.titular(cop.id, casa, `tit.${s}`);
     await banco.completarAlta(cop.id, titular.token, banco.perfil(1));
-    const declaradas = await banco.con(
-      titular.token,
-      'post',
-      `/copropiedades/${cop.id}/mi/ocupantes`,
-      {
-        numero: 4,
-      },
-    );
+    const declaradas = await banco.con(titular.token, 'post', ocupantes(), { numero: 4 });
     plazas = declaradas.body.plazas;
     adulto = await banco.adultoConCodigo(
       cop.id,
@@ -161,9 +155,7 @@ describe('15-W · D4 · los menores del hogar', () => {
       adulto.token,
       'post',
       ruta(),
-      menor(String(plazas[1]?.id), {
-        numeroDocumento: `4${s}9`,
-      }),
+      menor(String(plazas[1]?.id), { numeroDocumento: `4${s}9` }),
     );
     expect(ocupada.status, JSON.stringify(ocupada.body)).toBe(409);
     const [plaza] = await libres(adulto.token);
@@ -211,9 +203,7 @@ describe('15-W · D4 · los menores del hogar', () => {
       vecino.token,
       'post',
       ruta(),
-      menor(String(plazas[3]?.id), {
-        numeroDocumento: `7${s}9`,
-      }),
+      menor(String(plazas[3]?.id), { numeroDocumento: `7${s}9` }),
     );
     expect(ajena.status).toBe(404);
   });

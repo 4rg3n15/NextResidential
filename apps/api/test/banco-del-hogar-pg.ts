@@ -16,25 +16,20 @@ import { URL_BASE, exigirBase } from './base-exigida';
  * ═════════════════════════════════════════════════════════════════════════════
  * EL BANCO DE LA RONDA 15-W CONTRA LA BASE REAL
  *
- * Lo comparten las suites de titulares, «Crear cuenta», menores, plazas y
- * revocación de visitas. Es la cadena de producción —controladores, casos de
- * uso, adaptadores PostgreSQL, el GANCHO de claims de la base y la RLS
- * forzada—; sólo el proveedor de identidad es falso, porque la suite no
- * alcanza Supabase Auth.
+ * Lo comparten las suites de la 15-W contra PostgreSQL. Es la cadena de
+ * producción —controladores, casos de uso, adaptadores PostgreSQL, el GANCHO
+ * de claims de la base y la RLS forzada—; sólo el proveedor de identidad es
+ * falso, porque la suite no alcanza Supabase Auth.
  *
- * Dos decisiones que evitan pruebas que fallan por culpa de OTRA suite (vitest
- * corre los ficheros en paralelo contra la misma base, H-15M-C01):
- *
- *  · La sesión se abre con el proveedor falso directamente, con el correo
- *    sintético de la cuenta. `POST /auth/acceso` tiene su propia suite y exige
- *    el código corto de la copropiedad, que `residentes-y-vehiculos-pg` cambia
- *    en COP_A mientras las demás corren.
- *  · Quien registra cuentas lo hace en una COPROPIEDAD PROPIA: el código corto,
- *    el tope de plazas por omisión y la suspensión del registro son estado de
- *    la copropiedad, y treinta códigos fallidos suspenden su registro una hora.
- *
- * Las direcciones de los registros son de documentación (RFC 5737), una por
- * petición: el límite por IP tiene su prueba dedicada y no debe saltar aquí.
+ * Vitest corre los ficheros en paralelo contra la misma base (H-15M-C01). Para
+ * que ninguna suite falle por culpa de OTRA:
+ *  · la sesión se abre con el proveedor falso y el correo sintético de la
+ *    cuenta: `POST /auth/acceso` exige el código corto de la copropiedad, que
+ *    `residentes-y-vehiculos-pg` cambia en COP_A mientras las demás corren;
+ *  · quien registra cuentas lo hace en una COPROPIEDAD PROPIA: el código corto,
+ *    el tope por omisión y la suspensión del registro son suyos;
+ *  · cada registro sale de su propia IP de documentación (RFC 5737): el límite
+ *    por IP tiene su prueba dedicada y no debe saltar aquí.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const SUPER = '00000000-0000-4000-8000-000000000001';

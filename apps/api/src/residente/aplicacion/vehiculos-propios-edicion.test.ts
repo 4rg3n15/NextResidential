@@ -16,7 +16,7 @@ import type { CambiosDeVehiculoPropio } from './vehiculos-propios-edicion';
  * 15-W · D5 · editar y eliminar un vehículo propio SIN base: la placa sólo
  * cambia sin historial y pasa por el objeto de valor; los ocupantes son de SU
  * vivienda; sin historial se borra, con él se da de baja. Contra PostgreSQL,
- * con el índice único y el disparador del borrado: `residentes-y-vehiculos-pg`.
+ * con el índice único y el disparador del borrado: `vehiculos-propios-pg`.
  */
 const COP = '10000000-0000-4000-8000-000000000001';
 const AHORA = new Date('2026-10-06T15:00:00Z');

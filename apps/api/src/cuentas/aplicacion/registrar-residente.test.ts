@@ -20,8 +20,8 @@ import type { SolicitudDeRegistro } from './registrar-residente';
  * la edad no tocan nada —ni el proveedor ni el código—; todo fallo de código
  * espera el mismo tiempo mínimo; sólo un código evaluado en una copropiedad
  * real cuenta para su suspensión, con la IP para su HMAC; y el vínculo que la
- * base niega no deja cuenta. La cadena real, contra PostgreSQL, la recorre
- * `autorregistro.e2e.test.ts`.
+ * base niega no deja cuenta. La cadena real, contra PostgreSQL, la recorren
+ * `autorregistro.e2e.test.ts` y, la suspensión, `autorregistro-limites.e2e.test.ts`.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const AHORA = new Date('2026-10-06T15:00:00Z');
