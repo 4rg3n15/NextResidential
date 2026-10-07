@@ -28,6 +28,19 @@ export const TIPOS_DE_DOCUMENTO_DE_RESIDENTE: readonly TipoDeDocumento[] = [
   'otro',
 ];
 
+/** D3 (15-W) · el documento de un ADULTO con cuenta, en su primer ingreso. */
+export const TIPOS_DE_DOCUMENTO_DE_ADULTO: readonly TipoDeDocumento[] = [
+  'cedula',
+  'cedula_extranjeria',
+  'pasaporte',
+];
+
+/** D4 (15-W, D-W2) · el documento de un menor del hogar, que no tiene cuenta. */
+export const TIPOS_DE_DOCUMENTO_DE_MENOR: readonly TipoDeDocumento[] = [
+  'tarjeta_identidad',
+  'registro_civil',
+];
+
 export interface DatosDelPerfil {
   readonly nombres: string;
   readonly apellidos: string;
@@ -35,7 +48,8 @@ export interface DatosDelPerfil {
   readonly fechaNacimiento: string | null;
   readonly tipoDocumento: string;
   readonly numeroDocumento: string;
-  readonly correo: string;
+  /** `null` si no lo da (15-W: el primer ingreso no lo exige, S-15W-04). */
+  readonly correo: string | null;
   readonly telefono: string;
 }
 
@@ -45,7 +59,7 @@ export interface PerfilValido {
   readonly fechaNacimiento: string | null;
   readonly tipoDocumento: TipoDeDocumento;
   readonly numeroDocumento: string;
-  readonly correo: string;
+  readonly correo: string | null;
   readonly telefono: string;
 }
 
@@ -91,7 +105,7 @@ export const validarPerfil = (
   const rechazos: CampoRechazado[] = [];
   const nombres = sanear(d.nombres);
   const apellidos = sanear(d.apellidos);
-  const correo = sanear(d.correo).toLowerCase();
+  const correo = d.correo === null ? null : sanear(d.correo).toLowerCase();
   const telefono = normalizarTelefonoDeContacto(sanear(d.telefono));
   const numeroDocumento = normalizarDocumento(d.numeroDocumento);
   if (nombres.length < 1 || nombres.length > 100) {
@@ -100,7 +114,9 @@ export const validarPerfil = (
   if (apellidos.length < 1 || apellidos.length > 100) {
     rechazos.push({ campo: 'apellidos', motivo: 'El apellido tiene de 1 a 100 caracteres' });
   }
-  if (!CORREO.test(correo)) rechazos.push({ campo: 'correo', motivo: 'El correo no es válido' });
+  if (correo !== null && !CORREO.test(correo)) {
+    rechazos.push({ campo: 'correo', motivo: 'El correo no es válido' });
+  }
   if (!TELEFONO.test(telefono)) {
     rechazos.push({ campo: 'telefono', motivo: 'El teléfono tiene de 7 a 15 cifras' });
   }

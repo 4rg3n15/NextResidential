@@ -22,6 +22,14 @@ enum ResultadoDeAltaDtoMotivo {
   documentoEnUso('DOCUMENTO_EN_USO'),
   @JsonValue('YA_VINCULADA')
   yaVinculada('YA_VINCULADA'),
+  @JsonValue('VIVIENDA_SIN_TITULAR')
+  viviendaSinTitular('VIVIENDA_SIN_TITULAR'),
+  @JsonValue('TITULAR_NO_SE_MUDA')
+  titularNoSeMuda('TITULAR_NO_SE_MUDA'),
+  @JsonValue('SIN_VIVIENDA')
+  sinVivienda('SIN_VIVIENDA'),
+  @JsonValue('CUENTA_BLOQUEADA_POR_EDAD')
+  cuentaBloqueadaPorEdad('CUENTA_BLOQUEADA_POR_EDAD'),
   /// Default value for all unparsed values, allows backward compatibility when adding new values on the backend.
   $unknown(null);
 

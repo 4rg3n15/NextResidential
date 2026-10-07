@@ -18,8 +18,8 @@ import '../controlador.dart';
 ///    teléfono (con su propio formulario), y los vehículos (su pestaña).
 ///  · Se VE la vivienda, y cambiarla exige el código de quien ya vive allí.
 ///  · La copropiedad —nombre y dirección— es de SOLO LECTURA.
-///  · Los códigos de las plazas libres se ven aquí para dárselos a quien vive
-///    con el residente (3.3).
+///  · «Ocupantes» lleva a las plazas y sus códigos, para compartirlos con
+///    quien vive con el residente; el titular añade y retira plazas (15-W).
 ///  · «Llamar a portería» marca el teléfono que registró el superadministrador
 ///    (D7) y, si no hay ninguno, lo dice en vez de quedarse mudo.
 ///
@@ -45,6 +45,7 @@ class PantallaDePerfil extends StatelessWidget {
     required this.alEditarPerfil,
     required this.alCambiarVivienda,
     required this.alCambiarContrasena,
+    this.alAbrirOcupantes,
     this.alRecargar,
   });
 
@@ -73,6 +74,7 @@ class PantallaDePerfil extends StatelessWidget {
   final void Function(PerfilDelResidente perfil) alEditarPerfil;
   final void Function(PerfilDelResidente? perfil) alCambiarVivienda;
   final void Function() alCambiarContrasena;
+  final void Function()? alAbrirOcupantes;
 
   static T? _datos<T>(Estado<T> e) => switch (e) {
     ConDatos<T>(datos: final d) => d,
@@ -162,9 +164,9 @@ class PantallaDePerfil extends StatelessWidget {
                   ),
                 ),
               ],
-              if (ocupantes != null && ocupantes.declarada) ...[
+              if (ocupantes != null && ocupantes.plazas.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                TarjetaDeOcupantes(ocupantes: ocupantes),
+                TarjetaDeOcupantes(ocupantes: ocupantes, alAbrir: alAbrirOcupantes),
               ],
               const SizedBox(height: 20),
               Text('Atajos', style: t.titleMedium),

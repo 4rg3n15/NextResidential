@@ -31,6 +31,8 @@ export interface VocabularioDeAlta {
   readonly tipo: string | null;
   readonly etiquetaVivienda: string;
   readonly etiquetaAgrupacion: string;
+  /** 15-W · el prefijo de sus códigos de invitación (D1 de la 15-I), si lo tiene. */
+  readonly codigoCorto: string | null;
 }
 
 export interface EstadoDeAltaGuardado {
@@ -38,6 +40,14 @@ export interface EstadoDeAltaGuardado {
   readonly viviendaId: string | null;
   /** Primer residente de una vivienda cuyos ocupantes aún no se declararon. */
   readonly debeDeclararOcupantes: boolean;
+  /**
+   * 15-W (D3) · la vivienda que la cuenta ya trae ANTES del primer ingreso: la
+   * del titular, por la administración (D1), o la de su plaza (D2). `null` si
+   * no tiene ninguna: «la administración debe asignarle su vivienda».
+   */
+  readonly viviendaAsignada: { readonly viviendaId: string; readonly comoTitular: boolean } | null;
+  /** D-W10 · el tope de plazas de ESA vivienda (vinculada o asignada); `null` sin vivienda. */
+  readonly topeDePlazas: number | null;
 }
 
 export interface ViviendaEncontrada {
@@ -51,14 +61,19 @@ export interface PlazaDeOcupante {
   readonly id: string;
   readonly numero: number;
   readonly generacion: number;
-  /** La cuenta que la ocupa, o `null` si está libre. */
+  /** La cuenta que la ocupa, o `null`. Libre = sin cuenta y sin persona (15-W). */
   readonly usuarioId: string | null;
+  /** 15-W (D-W2) · la persona SIN cuenta (un menor) que la ocupa, o `null`. */
+  readonly personaId?: string | null;
   readonly ocupante: string | null;
 }
 
-export type ModoDeVinculo =
-  | { readonly tipo: 'primer_residente' }
-  | { readonly tipo: 'plaza'; readonly plazaId: string; readonly generacion: number };
+/** 15-W · ya sólo con código: nadie se vincula como primer residente (D-W9). */
+export interface ModoDeVinculo {
+  readonly tipo: 'plaza';
+  readonly plazaId: string;
+  readonly generacion: number;
+}
 
 export interface VinculoPedido {
   readonly copropiedadId: string;
@@ -72,10 +87,7 @@ export interface VinculoPedido {
 /** Lo que la base puede rechazar AUNQUE la decisión del dominio fuera «sí»: una carrera. */
 export type VinculoEscrito =
   | { readonly ok: true; readonly residenteId: string }
-  | {
-      readonly ok: false;
-      readonly motivo: 'DOCUMENTO_EN_USO' | 'CODIGO_REQUERIDO' | 'CODIGO_INCORRECTO';
-    };
+  | { readonly ok: false; readonly motivo: 'DOCUMENTO_EN_USO' | 'CODIGO_INCORRECTO' };
 
 export interface AltaDelResidente {
   vocabulario(copropiedadId: string): Promise<VocabularioDeAlta | null>;
@@ -90,23 +102,27 @@ export interface AltaDelResidente {
   codigosIncorrectosDesde(copropiedadId: string, usuarioId: string, desde: Date): Promise<number>;
   plazasLibres(copropiedadId: string, viviendaId: string): Promise<readonly PlazaDeOcupante[]>;
   /**
-   * TODO en una transacción, bajo un bloqueo por vivienda: la persona (la del
-   * documento, si existe y está libre), el residente, el vínculo de la cuenta,
-   * la plaza ocupada o la marca de primer residente, la baja del vínculo
-   * anterior si es un cambio de vivienda, y su fila en la bitácora. El rastro
-   * va en la MISMA transacción que el cambio, como el de la 0028.
+   * El cambio de vivienda (3.5), TODO en una transacción y bajo un bloqueo por
+   * vivienda: la plaza ocupada, la persona (la del documento, si existe y está
+   * libre), el residente, el vínculo de la cuenta, la baja del vínculo anterior
+   * y su fila en la bitácora, como el rastro de la 0028.
    */
   vincular(pedido: VinculoPedido): Promise<VinculoEscrito>;
 }
 
 export interface OcupantesDeLaVivienda {
   plazas(copropiedadId: string, viviendaId: string): Promise<readonly PlazaDeOcupante[]>;
-  /** ¿Es esta cuenta la que puede declarar, y ya se declaró? */
+  /** ¿Es esta cuenta el titular, ya se declaró, cuál es el tope y el prefijo de los códigos? */
   declaracion(
     copropiedadId: string,
     viviendaId: string,
     usuarioId: string,
-  ): Promise<{ readonly esPrimerResidente: boolean; readonly declarada: boolean }>;
+  ): Promise<{
+    readonly esPrimerResidente: boolean;
+    readonly declarada: boolean;
+    readonly tope: number;
+    readonly codigoCorto: string | null;
+  }>;
   /** Crea N plazas (la 1, ocupada por quien declara) y sella la declaración. `false` si otro ganó. */
   declarar(
     copropiedadId: string,
@@ -114,13 +130,13 @@ export interface OcupantesDeLaVivienda {
     usuarioId: string,
     numero: number,
   ): Promise<boolean>;
-  /** Superadministrador: añade `cantidad` plazas al final. `null` si la vivienda no es de ahí. */
+  /** Superadministrador: `cantidad` plazas más. `null` si la vivienda no es de ahí; 20 es la cota. */
   anadir(
     copropiedadId: string,
     viviendaId: string,
     cantidad: number,
     actorId: string,
-  ): Promise<readonly PlazaDeOcupante[] | null>;
+  ): Promise<readonly PlazaDeOcupante[] | null | 'COTA_DE_LA_PLATAFORMA'>;
   /** Superadministrador: retira una plaza; si estaba ocupada, da de baja ese vínculo. */
   retirar(
     copropiedadId: string,
@@ -222,6 +238,8 @@ export interface CuentaDeResidente {
   readonly activa: boolean;
   readonly debeCambiarContrasena: boolean;
   readonly creadaEn: string;
+  /** 15-W · la dio la administración (el titular) o la creó el residente con su código. */
+  readonly origen: 'administracion' | 'autorregistro';
 }
 
 /** C9 (15-M) · lo que la baja necesita saber después: la persona, para sus plantillas. */
@@ -246,34 +264,10 @@ export interface CuentasDeResidentes {
   ): Promise<CuentaDadaDeBaja | null>;
 }
 
-export type TipoDeHechoDeResidente =
-  | 'alta_de_cuenta'
-  | 'vinculacion'
-  | 'vinculacion_rechazada'
-  | 'codigo_incorrecto'
-  | 'vinculacion_bloqueada'
-  | 'cambio_de_vivienda'
-  | 'ocupantes_declarados'
-  | 'plaza_anadida'
-  | 'plaza_retirada'
-  | 'vehiculo_propio_registrado'
-  | 'vehiculo_propio_rechazado_por_tope'
-  | 'vehiculo_propio_desactivado'
-  | 'perfil_editado';
-
-export interface HechoDeResidente {
-  readonly copropiedadId: string;
-  readonly tipo: TipoDeHechoDeResidente;
-  readonly ocurridoEn: Date;
-  readonly usuarioId: string | null;
-  readonly actorId: string;
-  readonly viviendaId?: string | null;
-  readonly vehiculoId?: string | null;
-  /** Nunca el documento ni el código: la bitácora es de hechos, no de secretos. */
-  readonly detalle?: string | null;
-}
-
-/** Bitácora de solo inserción (0038). */
-export interface BitacoraDeResidentes {
-  anotar(hecho: HechoDeResidente): Promise<void>;
-}
+// 15-W · los tipos de hecho de la bitácora viven en su fichero (el de la 0055
+// es más largo que el de la 0038); se reexportan para no mover a nadie.
+export type {
+  BitacoraDeResidentes,
+  HechoDeResidente,
+  TipoDeHechoDeResidente,
+} from './tipos-de-hecho';

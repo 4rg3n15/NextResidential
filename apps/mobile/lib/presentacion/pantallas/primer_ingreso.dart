@@ -2,9 +2,15 @@
 /// pantalla.
 ///
 /// Qué pantalla toca lo decide `pasoDePrimerIngreso` (dominio, puro): el cambio
-/// de contraseña pendiente que viaja en el token, si hay vivienda vinculada, y
-/// si el primer residente aún no declaró sus ocupantes. Esta pieza sólo pide a
-/// la API lo que falta saber y monta la pantalla del paso.
+/// de contraseña pendiente que viaja en el token, si hay vivienda vinculada, si
+/// la cuenta al menos trae una asignada (15-W) y si el titular aún no declaró
+/// sus ocupantes. Esta pieza sólo pide a la API lo que falta saber y monta la
+/// pantalla del paso.
+///
+/// 15-W · una cuenta sin vivienda asignada no tiene formulario que llenar: ve
+/// el aviso del servidor («La administración debe asignarle su vivienda») y
+/// puede volver a consultar. El correo escrito en «Crear cuenta», si se acaba
+/// de crear, llega propuesto al formulario: vive sólo en memoria.
 ///
 /// La puerta NO es la barrera: la barrera es el servidor, que responde 403 a
 /// una cuenta con el cambio pendiente y 404 a una sin vivienda. La puerta evita
@@ -19,7 +25,7 @@ import '../../dominio/hogar.dart';
 import '../../dominio/puertos.dart';
 import 'alta.dart';
 import 'cambio_de_contrasena.dart';
-import 'ocupantes.dart';
+import 'declarar_ocupantes.dart';
 import '../widgets/servidor.dart';
 
 class PuertaDePrimerIngreso extends StatefulWidget {
@@ -31,6 +37,8 @@ class PuertaDePrimerIngreso extends StatefulWidget {
     required this.alTerminar,
     required this.alSalir,
     this.recuperada = false,
+    this.reloj = const RelojDelSistema(),
+    this.correoDeContacto,
   });
 
   final SesionEnUso sesion;
@@ -38,6 +46,12 @@ class PuertaDePrimerIngreso extends StatefulWidget {
   final ServicioDeCuenta cuenta;
   final void Function() alTerminar;
   final void Function() alSalir;
+
+  /// El de la app: la fecha de nacimiento se juzga con él.
+  final Reloj reloj;
+
+  /// 15-W · el correo escrito en «Crear cuenta», si se acaba de crear.
+  final String? correoDeContacto;
 
   /// La sesión se recuperó del llavero al arrancar, en vez de abrirse ahora.
   /// `[SUPUESTO]` S-59 · sin red al arrancar con una sesión así, se deja pasar
@@ -59,6 +73,7 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
   PasoDePrimerIngreso get _paso => pasoDePrimerIngreso(
     debeCambiarContrasena: _debeCambiar,
     viviendaVinculada: _estado?.viviendaVinculada,
+    viviendaAsignada: _estado?.viviendaAsignada ?? true,
     debeDeclararOcupantes: _estado?.debeDeclararOcupantes ?? false,
   );
 
@@ -77,6 +92,7 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
       case PasoDePrimerIngreso.consultarAlta:
         await _consultar();
       case PasoDePrimerIngreso.cambiarContrasena:
+      case PasoDePrimerIngreso.esperarVivienda:
       case PasoDePrimerIngreso.completarAlta:
       case PasoDePrimerIngreso.declararOcupantes:
         setState(() {});
@@ -130,12 +146,20 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
           alCambiar: _trasCambiar,
           alSalir: widget.alSalir,
         );
+      case PasoDePrimerIngreso.esperarVivienda when estado != null && !_consultando:
+        return _SinVivienda(
+          aviso: estado.aviso ?? avisoSinVivienda,
+          alConsultar: _consultar,
+          alSalir: widget.alSalir,
+        );
       case PasoDePrimerIngreso.completarAlta when estado != null:
         return PantallaDeAlta(
           estado: estado,
           repositorio: widget.alta,
+          hoy: widget.reloj.ahora(),
+          correoDeContacto: widget.correoDeContacto,
           alSalir: widget.alSalir,
-          alCompletar: (hecha) {
+          alCompletar: () {
             setState(() => _estado = null);
             _consultar();
           },
@@ -200,6 +224,39 @@ class _Consultando extends StatelessWidget {
                       TextButton(onPressed: alSalir, child: const Text('Salir')),
                     ],
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 15-W · la cuenta no trae vivienda: no hay nada que llenar hasta que la
+/// administración se la asigne. Se dice con el texto del servidor.
+class _SinVivienda extends StatelessWidget {
+  const _SinVivienda({required this.aviso, required this.alConsultar, required this.alSalir});
+  final String aviso;
+  final Future<void> Function() alConsultar;
+  final void Function() alSalir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.home_work_outlined, size: 48),
+                const SizedBox(height: 12),
+                Text(aviso, key: const Key('alta.sinVivienda'), textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(onPressed: alConsultar, child: const Text('Volver a consultar')),
+                TextButton(onPressed: alSalir, child: const Text('Salir')),
+              ],
+            ),
           ),
         ),
       ),

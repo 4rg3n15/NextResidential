@@ -12,7 +12,8 @@
  * consola sin estilos— eran invisibles en la suite y evidentes en el navegador.
  *
  * Esto compila la app **para web**, la sirve y la recorre con Playwright:
- * acceso → inicio → familia → vehículos → historial → perfil.
+ * acceso → «Crear cuenta» (15-W) → inicio → familia → vehículos → historial →
+ * perfil.
  *
  * **Lo que NO es: una prueba de la API.** Enfrente hay un servidor de guardarropa
  * que contesta las cinco rutas del residente y el `token` de Supabase. La API de
@@ -65,20 +66,35 @@ const tokenCon = (segundos) =>
     exp: Math.floor(Date.now() / 1000) + segundos,
   })}.sin-firma-porque-el-servidor-real-la-verifica`;
 
+const AVISO_DE_PLAZAS =
+  'Usted gestiona las plazas de su vivienda: hasta 4 en total, contándose usted. ' +
+  'Puede añadir plazas y retirar las libres; para más, pídalo a la administración.';
+
+/** 15-W · la política de tratamiento de datos que viaja en el 400 de «Crear cuenta». */
+const POLITICA = {
+  version: 'recorrido-1',
+  texto:
+    'Autorizo el tratamiento de mis datos para gestionar el acceso a mi copropiedad (recorrido).',
+};
+
 const DATOS = {
   // 15-I · el primer ingreso ya completo: la puerta deja pasar a la app.
   alta: {
     completa: true,
     viviendaVinculada: true,
+    // 15-W · la cuenta trae su vivienda y ya no hay aviso de «sin vivienda».
+    viviendaAsignada: true,
     debeDeclararOcupantes: false,
     vocabulario: {
       copropiedadNombre: 'Urbanización de prueba',
       tipo: 'casas',
       etiquetaVivienda: 'Casa',
       etiquetaAgrupacion: 'Manzana',
+      codigoCorto: 'MIRA',
     },
     pideAgrupacion: false,
-    avisoOcupantes: 'El número de ocupantes es DEFINITIVO.',
+    avisoOcupantes: AVISO_DE_PLAZAS,
+    aviso: null,
   },
   perfil: {
     nombres: 'Maria',
@@ -93,15 +109,35 @@ const DATOS = {
     copropiedadDireccion: 'Calle inventada 00',
     telefonoPorteria: '+576015550100',
   },
+  // 15-W · el tope y el titular los dice el servidor; los códigos llevan el
+  // prefijo del conjunto. El número ya no es definitivo.
   ocupantes: {
     declarados: 2,
     declarada: true,
-    aviso: 'El número de ocupantes es DEFINITIVO.',
+    aviso: AVISO_DE_PLAZAS,
+    tope: 4,
+    esTitular: true,
     plazas: [
-      { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Maria Titular' },
-      { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null },
+      {
+        id: 'p1',
+        numero: 1,
+        libre: false,
+        codigo: null,
+        ocupante: 'Maria Titular',
+        sinCuenta: false,
+      },
+      {
+        id: 'p2',
+        numero: 2,
+        libre: true,
+        codigo: 'MIRA-ABCD-EFGH',
+        ocupante: null,
+        sinCuenta: false,
+      },
     ],
   },
+  // 15-W · «Mi familia» lee también los menores del hogar (aquí, ninguno).
+  menores: [],
   vivienda: {
     vivienda: {
       id: 'viv-1',
@@ -239,6 +275,8 @@ const TIPOS = {
 const vistas = [];
 /** Cuerpos de `POST /auth/acceso`: la prueba mira que lleven código y usuario. */
 const accesos = [];
+/** 15-W · cuerpos de `POST /auth/registro`: el de la política va vacío. */
+const registros = [];
 
 const servidor = createServer(async (peticion, respuesta) => {
   const url = new URL(peticion.url, `http://127.0.0.1:${PUERTO}`);
@@ -268,6 +306,24 @@ const servidor = createServer(async (peticion, respuesta) => {
       refreshToken: 'refresco-de-recorrido',
       expiraEn: 40,
       debeCambiarContrasena: false,
+    });
+  }
+
+  // 15-W · «Crear cuenta»: la app pide la política enviando el formulario
+  // vacío, y TODO 400 de esta ruta la trae dentro del sobre (`mensaje`).
+  if (url.pathname === '/auth/registro' && peticion.method === 'POST') {
+    let cuerpo = '';
+    for await (const trozo of peticion) cuerpo += trozo;
+    registros.push(JSON.parse(cuerpo || '{}'));
+    return responder(400, {
+      estado: 400,
+      correlacion: 'recorrido',
+      mensaje: {
+        message: ['usuario must be longer than or equal to 3 characters'],
+        error: 'Bad Request',
+        statusCode: 400,
+        politica: POLITICA,
+      },
     });
   }
 
@@ -594,6 +650,27 @@ try {
     : mal('el acceso no enseña la dirección del servidor');
   await captura('1-acceso');
 
+  // ── 1b · «Crear cuenta» (15-W) ────────────────────────────────────────────
+  // Sin teclear nada: se abre, se comprueba que la política llega DEL SERVIDOR
+  // —la pidió el formulario vacío— y que el código dice a quién pedírselo, y
+  // se vuelve al acceso por la flecha.
+  await pulsar('Crear cuenta');
+  (await hay(POLITICA.texto))
+    ? ok('«Crear cuenta» muestra la política que mandó el servidor')
+    : mal('«Crear cuenta» no muestra la política del servidor');
+  registros.length > 0 && registros.every((r) => !r.usuario && r.aceptaTratamientoDeDatos === false)
+    ? ok('la política se pidió con el formulario vacío, sin aceptar nada')
+    : mal(`la política se pidió con ${JSON.stringify(registros.at(-1) ?? null)}`);
+  (await hay('Pídaselo al titular de su vivienda: lo ve en Ocupantes'))
+    ? ok('el código de invitación dice a quién pedírselo')
+    : mal('el código de invitación no dice a quién pedírselo');
+  await captura('1b-crear-cuenta');
+  await pagina
+    .getByRole('button', { name: /Back|Atrás/i })
+    .first()
+    .click();
+  await esperarTexto('Acceso del residente');
+
   /**
    * El formulario se rellena PULSANDO y TECLEANDO, no con `fill()`.
    *
@@ -754,6 +831,9 @@ try {
   (await hay('Llamar a portería'))
     ? ok('y el botón de portería (D7)')
     : mal('no se ve el botón de portería');
+  (await hay('Plazas: 2 de 4'))
+    ? ok('«Ocupantes» enseña el cupo de plazas con su tope (15-W)')
+    : mal('el perfil no enseña el cupo de plazas');
   (await pagina.content()).includes('usuarios.ncr.invalid')
     ? mal('el correo sintético aparece en la página (C-36)')
     : ok('el correo sintético del token no aparece en ninguna parte (C-36)');

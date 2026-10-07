@@ -8,6 +8,8 @@ import 'package:retrofit/retrofit.dart';
 import '../models/acceso_dto.dart';
 import '../models/cambio_de_contrasena_dto.dart';
 import '../models/hecho_de_cuenta_dto.dart';
+import '../models/registro_creado_dto.dart';
+import '../models/registro_de_residente_dto.dart';
 import '../models/restablecimiento_de_contrasena_dto.dart';
 import '../models/sesion_de_acceso_dto.dart';
 
@@ -31,6 +33,12 @@ abstract class CuentasApi {
   @POST('/auth/contrasena')
   Future<HechoDeCuentaDto> cuentasControllerContrasena({
     @Body() required CambioDeContrasenaDto body,
+  });
+
+  /// Crear cuenta de residente con un código de plaza (D-W1, D-W8). No emite tokens
+  @POST('/auth/registro')
+  Future<RegistroCreadoDto> registroControllerRegistro({
+    @Body() required RegistroDeResidenteDto body,
   });
 
   /// Restablece la contraseña de una cuenta con una temporal y cambio obligatorio

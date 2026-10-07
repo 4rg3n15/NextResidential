@@ -38,29 +38,29 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../aplicacion/avisos_en_uso.dart';
 import '../aplicacion/envio_de_visitas.dart';
 import '../aplicacion/notificaciones_vistas.dart';
 import '../aplicacion/servidor_en_uso.dart';
 import '../aplicacion/sesion_en_uso.dart';
-import '../configuracion/tema.dart';
 import '../dominio/causa_de_red.dart';
 import '../dominio/puertos.dart';
 import '../infraestructura/almacen/almacen_de_texto.dart';
 import '../infraestructura/bandeja/bandeja_guardada.dart';
 import '../infraestructura/camara/fuente_de_fotos.dart';
+import 'acciones_de_la_familia.dart';
 import 'acciones_de_visitas.dart';
 import 'acciones_del_hogar.dart';
 import 'contador_de_notificaciones.dart';
 import 'controlador.dart';
 import 'dependencias.dart';
+import 'material_de_la_app.dart';
 import 'pantallas/acceso.dart';
-import 'pantallas/familia.dart';
 import 'pantallas/historial.dart';
 import 'pantallas/notificaciones.dart';
 import 'pantallas/primer_ingreso.dart';
+import 'pantallas/registro.dart';
 import 'pestanas.dart';
 import 'sincronizacion_de_la_app.dart';
 import 'widgets/servidor.dart';
@@ -77,22 +77,7 @@ class AppDelResidente extends StatelessWidget {
     // encima de las pestañas, encuentra «Cambiar servidor» en su contexto.
     return ServidorDeLaApp(
       cambio: dependencias.servidor,
-      child: MaterialApp(
-        title: 'Next Control Residencial',
-        debugShowCheckedModeBanner: false,
-        theme: temaClaro(),
-        darkTheme: temaOscuro(),
-        // C5 (15-M) · los selectores de fecha y hora hablan español de
-        // Colombia; sin esto el `locale` del `showDatePicker` no tiene textos.
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [Locale('es', 'CO'), Locale('es'), Locale('en')],
-        locale: const Locale('es', 'CO'),
-        home: Armazon(dependencias: dependencias),
-      ),
+      child: MaterialDeLaApp(inicio: Armazon(dependencias: dependencias)),
     );
   }
 }
@@ -111,22 +96,15 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   SesionEnUso get _sesion => _d.sesion;
   DireccionDelServidor get _direccion => _d.servidor.direccion;
 
-  late final _c = ControladoresDelArmazon(
-    repo: _repo,
-    hogar: _d.hogar,
-    alta: _d.alta,
-    notificaciones: _d.notificacionesDelConjunto,
-  );
-  late final AccionesDelHogar _acciones = AccionesDelHogar(
-    sesion: _sesion,
-    alta: _d.alta,
-    hogar: _d.hogar,
-    cuenta: _d.cuenta,
+  late final _c = ControladoresDelArmazon.de(_d);
+  late final AccionesDelHogar _acciones = AccionesDelHogar.delArmazon(
+    _d,
     familia: _c.familia,
     vehiculos: _c.vehiculos,
     perfil: _c.perfil,
     alCambiarDeVivienda: _cargarTodo,
   );
+  late final _familia = AccionesDeLaFamilia.delArmazon(_d, _c, abrir: _abrir);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
     fuente: _d.notificaciones,
     repositorio: _repo,
@@ -146,6 +124,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   late final AccionesDeVisitas _visitas = AccionesDeVisitas(
     envio: _envio,
     repositorio: _repo,
+    revocacion: _d.revocacion,
     reloj: _d.reloj,
     claves: _d.claves,
     // La cámara real si la hay; si no, la simulada y declarada como tal.
@@ -176,6 +155,10 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
 
   /// La sesión vino del llavero al arrancar (S-59), no de un acceso de ahora.
   bool _recuperada = false;
+
+  /// 15-W · el correo escrito en «Crear cuenta», para proponerlo en el primer
+  /// ingreso. Sólo en memoria, y se olvida al cerrar la sesión.
+  String? _correoDelRegistro;
 
   @override
   void initState() {
@@ -233,9 +216,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
   }
 
   void _cargarTodo() {
-    for (final c in _c.todos) {
-      unawaited(c.cargarAhora());
-    }
+    _c.cargarTodo();
     // El token de FCM rota solo. Sin Firebase en esta compilación no hay
     // token y esto no registra nada; queda conectado para cuando lo haya.
     unawaited(_avisos.asegurarRegistro());
@@ -253,9 +234,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     // los controladores llenos, los datos del residente anterior seguirían en
     // pantalla un instante. En un teléfono compartido eso es una fuga.
     _sincronia.alPasarASegundoPlano();
-    for (final c in _c.todos) {
-      c.olvidar();
-    }
+    _c.olvidarTodo();
     // El token pertenece al aparato; el REGISTRO pertenece a la cuenta.
     _avisos.olvidar();
     unawaited(_sesion.cerrar());
@@ -264,7 +243,27 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       _autenticado = false;
       _primerIngresoHecho = false;
       _pestana = 0;
+      _correoDelRegistro = null;
     });
+  }
+
+  /// Con sesión recién abierta: al primer ingreso, que dice qué falta.
+  void _entrar({String? correoDelRegistro}) => setState(() {
+    _autenticado = true;
+    _recuperada = false;
+    _primerIngresoHecho = false;
+    _correoDelRegistro = correoDelRegistro;
+  });
+
+  /// 15-W · «Crear cuenta»: si la cuenta se creó y entró, al primer ingreso.
+  Future<void> _crearCuenta() async {
+    final correo = await abrirRegistro(
+      context,
+      servicio: _d.registro,
+      sesion: _sesion,
+      reloj: _d.reloj,
+    );
+    if (correo != null && mounted) _entrar(correoDelRegistro: correo);
   }
 
   void _pedirAcceso() {
@@ -311,11 +310,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       return PantallaDeAcceso(
         ambiente: _d.ambiente,
         sesion: _sesion,
-        alEntrar: () => setState(() {
-          _autenticado = true;
-          _recuperada = false;
-          _primerIngresoHecho = false;
-        }),
+        alEntrar: _entrar,
+        alCrearCuenta: _crearCuenta,
       );
     }
 
@@ -325,6 +321,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         alta: _d.alta,
         cuenta: _d.cuenta,
         recuperada: _recuperada,
+        reloj: _d.reloj,
+        correoDeContacto: _correoDelRegistro,
         alSalir: _cerrarSesion,
         alTerminar: () {
           setState(() => _primerIngresoHecho = true);
@@ -352,10 +350,9 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
       alVolverAAutorizar: (v) =>
           _sincronia.conEncima(const [], () => _visitas.volverAAutorizar(context, v)),
       alReintentarPendientes: () => _visitas.vaciarBandeja(context),
-      alAbrirFamilia: () => _abrir(
-        PantallaDeFamilia(controlador: _c.familia, alPedirAcceso: _pedirAcceso),
-        [_c.familia],
-      ),
+      alAbrirFamilia: () => _familia.abrirFamilia(context, alPedirAcceso: _pedirAcceso),
+      alAbrirOcupantes: () => _familia.abrirOcupantes(context, alPedirAcceso: _pedirAcceso),
+      alRevocarVisita: (v) => _visitas.revocar(context, v),
       alAbrirHistorial: () => _abrir(
         PantallaDeHistorial(controlador: _c.historial, alPedirAcceso: _pedirAcceso),
         [_c.historial],

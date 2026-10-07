@@ -16,10 +16,10 @@
 /// EL PRIMER INGRESO, COMO UNA FUNCIÓN PURA
 ///
 /// Hasta completarlo no se ve ninguna otra pantalla (3.2). Qué pantalla toca es
-/// una decisión de tres hechos —el cambio de contraseña pendiente que viaja en
-/// el token, si hay vivienda vinculada, y si el primer residente aún no declaró
-/// sus ocupantes—, y se decide aquí para poder probar los cuatro casos sin
-/// montar la app.
+/// una decisión de cuatro hechos —el cambio de contraseña pendiente que viaja
+/// en el token, si hay vivienda vinculada, si la cuenta al menos trae una
+/// asignada (15-W) y si el titular aún no declaró sus ocupantes—, y se decide
+/// aquí para poder probar todos los casos sin montar la app.
 library;
 
 sealed class IdentificadorDeAcceso {
@@ -70,10 +70,15 @@ enum PasoDePrimerIngreso {
   /// Se sabe que la contraseña está al día y falta preguntar a la API.
   consultarAlta,
 
-  /// 3.2 · contacto, documento, vivienda y código de vinculación.
+  /// 15-W · la cuenta no trae vivienda: la administración tiene que
+  /// asignársela. No hay formulario que llenar mientras tanto.
+  esperarVivienda,
+
+  /// D3 (15-W) · nombres, documento de adulto, teléfono y fecha de
+  /// nacimiento. Sin vivienda ni código: la cuenta ya trae la suya.
   completarAlta,
 
-  /// D6 · el primer residente declara cuántos ocupantes hay.
+  /// D6 · el titular declara cuántos ocupantes hay, de 1 al tope.
   declararOcupantes,
 
   /// Todo listo: la app normal.
@@ -84,10 +89,15 @@ PasoDePrimerIngreso pasoDePrimerIngreso({
   required bool debeCambiarContrasena,
   required bool? viviendaVinculada,
   required bool debeDeclararOcupantes,
+  bool viviendaAsignada = true,
 }) {
   if (debeCambiarContrasena) return PasoDePrimerIngreso.cambiarContrasena;
   if (viviendaVinculada == null) return PasoDePrimerIngreso.consultarAlta;
-  if (!viviendaVinculada) return PasoDePrimerIngreso.completarAlta;
+  if (!viviendaVinculada) {
+    return viviendaAsignada
+        ? PasoDePrimerIngreso.completarAlta
+        : PasoDePrimerIngreso.esperarVivienda;
+  }
   if (debeDeclararOcupantes) return PasoDePrimerIngreso.declararOcupantes;
   return PasoDePrimerIngreso.listo;
 }

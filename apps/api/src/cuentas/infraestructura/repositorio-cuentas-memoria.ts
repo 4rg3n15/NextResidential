@@ -127,13 +127,18 @@ export class RepositorioDeCuentasEnMemoria implements RepositorioDeCuentas, Dire
       pool.siguiente += 1;
     }
     const usuarioId = randomUUID();
+    // 15-W · sin base no hay transacción: el vínculo se ejecuta contra un
+    // ejecutor que no escribe nada, y su «no» deshace el alta igual que en PG.
+    if (alta.vinculo !== undefined && !(await alta.vinculo.escribir(async () => 1, usuarioId))) {
+      return { ok: false, motivo: 'VINCULO' };
+    }
     this.cuentas.set(usuarioId, {
       usuarioId,
       authUserId: alta.authUserId,
       copropiedadId: alta.copropiedadId,
       rol: alta.rol,
       acceso: { tipo: 'usuario', usuario: alta.usuario },
-      debeCambiarContrasena: true,
+      debeCambiarContrasena: alta.debeCambiarContrasena ?? true,
       nombre: alta.nombre,
       telefono: alta.telefono,
       ...(numeroDePortero === null ? {} : { numeroDePortero }),

@@ -405,11 +405,30 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
    * vehículo y la cuenta viajan en la RUTA desde su fila.
    */
   'residentes/dialogos.tsx':
-    'alta del residente: usuario (nombre legible, no UUID), contraseña inicial, nombre y teléfono; el restablecimiento toma el usuarioId de la fila',
+    'alta del titular: usuario (nombre legible, no UUID), contraseña inicial, nombre y teléfono; la vivienda se elige de la lista de viviendas sin titular que devuelve la API, buscada por número o agrupación; el restablecimiento toma el usuarioId de la fila; prueba propia del cuerpo enviado',
   'residentes/ocupantes.tsx':
     'la vivienda sale de un desplegable con las viviendas de la API; la plaza que se quita viene de su fila; sólo se teclean cantidad y motivo',
   'residentes/vehiculos-de-residentes.tsx':
     'desactivar: el vehiculoId viene de la fila; sólo se teclea el motivo',
+  /**
+   * RONDA 15-W · titulares, plazas y registro. Ninguna pide un identificador
+   * tecleado: la cuenta viaja en la RUTA desde su fila, la vivienda se ELIGE de
+   * la lista de viviendas sin titular que devuelve la API (o viaja en la ruta
+   * desde el selector de la ficha), y lo único que se teclea es un número de
+   * plazas y el motivo. El barrido no puede recorrerlas: el alta exige una
+   * contraseña que cumpla la política y las demás leen listas que su servidor
+   * falso no siembra. Lo comprueban `residentes/titulares.test.tsx`,
+   * `residentes/tope-de-plazas.test.tsx` y
+   * `configuracion/registro-y-plazas.test.tsx`, que leen el cuerpo exacto.
+   */
+  'residentes/asignar-vivienda.tsx':
+    'la cuenta viaja en la ruta desde su fila; la vivienda se elige de la lista de la API; sólo se teclea el motivo; prueba propia del cuerpo enviado',
+  'residentes/tope-de-plazas.tsx':
+    'la vivienda viaja en la ruta desde el selector de la ficha; se teclean el número de plazas y el motivo; prueba propia del cuerpo enviado',
+  'configuracion/registro-de-residentes.tsx':
+    'reanudar sólo pide el motivo; la copropiedad viaja en la ruta; prueba propia del cuerpo enviado',
+  'configuracion/tope-de-plazas-por-omision.tsx':
+    'número de plazas y motivo en texto; la copropiedad viaja en la ruta; prueba propia del cuerpo enviado',
   /**
    * ETAPA 15-I · HU-35 · la lista negra. Se teclean una PLACA o un DOCUMENTO,
    * que son identificadores legibles, nunca un UUID: el servidor resuelve el

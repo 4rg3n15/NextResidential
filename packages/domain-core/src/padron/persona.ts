@@ -20,15 +20,27 @@ import { errorDominio } from '../compartido/errores';
  * ninguna razón para pedir un identificador interno: pide nombre y documento,
  * que es lo que quien autoriza tiene a mano.
  */
-export type TipoDeDocumento = 'cedula' | 'cedula_extranjeria' | 'pasaporte' | 'nit' | 'otro';
+export type TipoDeDocumento =
+  | 'cedula'
+  | 'cedula_extranjeria'
+  | 'pasaporte'
+  | 'nit'
+  | 'otro'
+  | 'tarjeta_identidad'
+  | 'registro_civil';
 
-/** El mismo catálogo del enumerado `tipo_documento` de la migración `0002`. */
+/**
+ * El mismo catálogo del enumerado `tipo_documento` de la migración `0002`, con
+ * los dos documentos de un menor que añadió la `0056` (D-W2, ronda 15-W).
+ */
 export const TIPOS_DE_DOCUMENTO: readonly TipoDeDocumento[] = [
   'cedula',
   'cedula_extranjeria',
   'pasaporte',
   'nit',
   'otro',
+  'tarjeta_identidad',
+  'registro_civil',
 ];
 
 const esTipoDeDocumento = (v: unknown): v is TipoDeDocumento =>

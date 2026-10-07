@@ -9,8 +9,11 @@ import '../aplicacion/sesion_en_uso.dart';
 import '../configuracion/ambiente.dart';
 import '../dominio/causa_de_red.dart';
 import '../dominio/hogar.dart';
+import '../dominio/menores.dart';
 import '../dominio/notificaciones.dart';
 import '../dominio/puertos.dart';
+import '../dominio/registro.dart';
+import '../dominio/revocacion.dart';
 
 class Dependencias {
   const Dependencias({
@@ -26,6 +29,10 @@ class Dependencias {
     required this.llamador,
     required this.servidor,
     required this.notificacionesDelConjunto,
+    required this.registro,
+    required this.menores,
+    required this.plazas,
+    required this.revocacion,
     this.tomarFoto,
     this.almacen,
     this.cambiosDeRed,
@@ -53,6 +60,13 @@ class Dependencias {
 
   /// 15-L · las notificaciones de la vivienda, leídas de la API.
   final RepositorioDeNotificaciones notificacionesDelConjunto;
+
+  /// RONDA 15-W · «Crear cuenta», los menores del hogar, las plazas del
+  /// titular y la revocación de una visita propia.
+  final ServicioDeRegistro registro;
+  final RepositorioDeMenores menores;
+  final RepositorioDePlazas plazas;
+  final RevocacionDeVisitas revocacion;
 
   /// 15-I (hito 3) · la cámara REAL del teléfono, y su galería. `null` = la
   /// simulada (web, recorrido y pruebas), declarada en `fuente_de_fotos.dart`.

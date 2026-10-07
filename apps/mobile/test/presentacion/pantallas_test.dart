@@ -339,11 +339,11 @@ void main() {
     // 3.5 · el nombre de la PERSONA, no el correo de la sesión (C-36).
     expect(find.text('Ana Pérez'), findsWidgets);
     expect(find.text('Casa 42 · Manzana B · Titular'), findsOneWidget);
-    // La copropiedad, de solo lectura, y los códigos de las plazas libres.
+    // La copropiedad, de solo lectura, y «Ocupantes» con el cupo de las plazas (15-W).
     expect(find.text('Calle inventada 00'), findsOneWidget);
-    await t.scrollUntilVisible(find.text('Código: ABCD-EFGH'), 200,
+    await t.scrollUntilVisible(find.byKey(const Key('perfil.ocupantes')), 200,
         scrollable: find.byType(Scrollable).first);
-    expect(find.text('Código: ABCD-EFGH'), findsOneWidget);
+    expect(find.text('Plazas: 2 de 4 · 1 libre con código'), findsOneWidget);
 
     // En 11-A las notificaciones eran dos interruptores apagados; en 11-B, el
     // estado del registro push. Esta compilación no lleva servicio de

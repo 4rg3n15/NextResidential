@@ -105,13 +105,22 @@ const CODIGO_DE_A = async (): Promise<string> => {
 describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
   const usuario = `baja${SUFIJO}`;
   let usuarioId = '';
+  let viviendaId = '';
 
   it('alta por el superadministrador y primer ingreso: la cuenta vive', async () => {
     if (omitida()) return;
+    // 15-W (D1) · la cuenta nace con su vivienda: una propia, activa y sin titular.
+    const vivienda = await uno<{ id: string }>(
+      `INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
+       VALUES ($1, $2, 'C9', $3, $3) RETURNING id`,
+      [COP_A, `B${SUFIJO}`, SUPER],
+    );
+    viviendaId = vivienda?.id ?? '';
     const alta = await comoSuper('post', `/copropiedades/${COP_A}/residentes/cuentas`).send({
       usuario,
       contrasenaInicial: INICIAL,
       nombre: `Residente de baja ${SUFIJO}`,
+      viviendaId,
     });
     expect(alta.status, JSON.stringify(alta.body)).toBe(201);
     usuarioId = alta.body.usuarioId as string;
@@ -120,6 +129,12 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
       .set('x-ncr-origen', '198.51.100.77')
       .send({ codigo: await CODIGO_DE_A(), usuario, contrasena: INICIAL });
     expect(acceso.status, JSON.stringify(acceso.body)).toBe(200);
+    // Con su titular activo, la vivienda ya no se ofrece a otra primera cuenta.
+    const libres = await comoSuper(
+      'get',
+      `/copropiedades/${COP_A}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
+    );
+    expect((libres.body as { id: string }[]).map((v) => v.id)).not.toContain(viviendaId);
   });
 
   it('sin motivo (o con uno de menos de 5 letras) no hay baja: 400 con palabras', async () => {
@@ -195,6 +210,15 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
       (c) => c.usuarioId === usuarioId,
     );
     expect(fila?.activa).toBe(false);
+
+    // 15-W (D1) · un titular dado de baja no deja la vivienda bloqueada: vuelve a
+    // estar sin titular y la administración puede entregar otra primera cuenta.
+    const libres = await comoSuper(
+      'get',
+      `/copropiedades/${COP_A}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
+    );
+    expect(libres.status, JSON.stringify(libres.body)).toBe(200);
+    expect((libres.body as { id: string }[]).map((v) => v.id)).toContain(viviendaId);
   });
 
   it('repetir la baja es 404: ya no hay residente activo con ese identificador', async () => {

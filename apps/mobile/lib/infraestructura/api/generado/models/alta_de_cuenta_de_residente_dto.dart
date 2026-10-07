@@ -12,6 +12,7 @@ class AltaDeCuentaDeResidenteDto {
     required this.usuario,
     required this.contrasenaInicial,
     required this.nombre,
+    required this.viviendaId,
     this.telefono,
   });
   
@@ -21,6 +22,9 @@ class AltaDeCuentaDeResidenteDto {
   final String contrasenaInicial;
   final String nombre;
   final String? telefono;
+
+  /// Vivienda activa y sin titular de la copropiedad
+  final String viviendaId;
 
   Map<String, Object?> toJson() => _$AltaDeCuentaDeResidenteDtoToJson(this);
 }

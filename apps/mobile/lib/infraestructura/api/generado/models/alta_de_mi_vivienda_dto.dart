@@ -27,7 +27,7 @@ class AltaDeMiViviendaDto {
   /// La agrupación (torre, manzana…): obligatoria en un conjunto de apartamentos
   final String? agrupacion;
 
-  /// Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta)
+  /// Código de una plaza de la vivienda de destino, con o sin el prefijo del conjunto («MIRA-K7PQ-2XWZ»). Sin él no hay cambio de vivienda (15-W, D3)
   final String? codigo;
 
   Map<String, Object?> toJson() => _$AltaDeMiViviendaDtoToJson(this);

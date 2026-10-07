@@ -8,6 +8,13 @@
 ///
 /// Los vehículos de terceros NO entran por aquí: entran con una autorización
 /// de visitante con día y franja (D5 b), sin límite de cantidad.
+///
+/// 15-W (D5) · la misma pantalla EDITA un vehículo propio: color, modelo,
+/// marca y la placa. El tipo no se edita, y quién lo usa tampoco desde aquí
+/// —la lista no trae sus ocupantes, y enviarlos los reemplazaría a ciegas—.
+/// La placa sólo cambia si el vehículo no tiene historial; si lo tiene, el
+/// servidor contesta que se dé de baja y se registre el nuevo, y ese texto es
+/// el que se ve.
 library;
 
 import 'package:flutter/material.dart';
@@ -23,12 +30,25 @@ class PantallaDeNuevoVehiculo extends StatefulWidget {
     required this.repositorio,
     required this.ocupantes,
     required this.alRegistrar,
-  });
+  }) : vehiculo = null;
+
+  /// 15-W · editar un vehículo propio ya registrado.
+  const PantallaDeNuevoVehiculo.editar({
+    super.key,
+    required this.repositorio,
+    required Vehiculo this.vehiculo,
+    required this.alRegistrar,
+  }) : ocupantes = const [];
 
   final RepositorioDelHogar repositorio;
 
   /// Los residentes activos de la vivienda: el vehículo es de uno o varios.
   final List<MiembroDeFamilia> ocupantes;
+
+  /// `null` = registrar uno nuevo.
+  final Vehiculo? vehiculo;
+
+  /// Registrado o guardado.
   final void Function() alRegistrar;
 
   @override
@@ -37,10 +57,10 @@ class PantallaDeNuevoVehiculo extends StatefulWidget {
 
 class _EstadoDelVehiculo extends State<PantallaDeNuevoVehiculo> {
   final _formulario = GlobalKey<FormState>();
-  final _placa = TextEditingController();
-  final _color = TextEditingController();
-  final _modelo = TextEditingController();
-  final _marca = TextEditingController();
+  late final _placa = TextEditingController(text: widget.vehiculo?.placa ?? '');
+  late final _color = TextEditingController(text: widget.vehiculo?.color ?? '');
+  late final _modelo = TextEditingController(text: widget.vehiculo?.modelo ?? '');
+  late final _marca = TextEditingController(text: widget.vehiculo?.marca ?? '');
   String _tipo = 'automovil';
   final Set<String> _elegidos = {};
   bool _enviando = false;
@@ -57,7 +77,40 @@ class _EstadoDelVehiculo extends State<PantallaDeNuevoVehiculo> {
     super.dispose();
   }
 
+  /// Sin separadores y en mayúsculas, como la compara el servidor.
+  static String _sinSeparadores(String placa) =>
+      placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+
+  Future<void> _guardar(Vehiculo v) async {
+    if (!(_formulario.currentState?.validate() ?? false)) return;
+    setState(() {
+      _enviando = true;
+      _error = null;
+    });
+    try {
+      final placa = _placa.text.trim();
+      final marca = _marca.text.trim();
+      await widget.repositorio.editarVehiculo(
+        v.id,
+        EdicionDeVehiculo(
+          color: _color.text.trim(),
+          modelo: _modelo.text.trim(),
+          marca: marca.isEmpty ? null : marca,
+          // Sólo si cambió: la misma placa no es un cambio de placa.
+          placa: _sinSeparadores(placa) == _sinSeparadores(v.placa) ? null : placa,
+        ),
+      );
+      if (mounted) widget.alRegistrar();
+    } on Fallo catch (f) {
+      if (mounted) setState(() => _error = f.detalle);
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
   Future<void> _registrar() async {
+    final editado = widget.vehiculo;
+    if (editado != null) return _guardar(editado);
     if (!(_formulario.currentState?.validate() ?? false)) return;
     if (_elegidos.isEmpty) {
       setState(() => _error = 'Elija al menos un ocupante que use el vehículo');
@@ -112,8 +165,9 @@ class _EstadoDelVehiculo extends State<PantallaDeNuevoVehiculo> {
   @override
   Widget build(BuildContext context) {
     final rechazo = _rechazo;
+    final nuevo = widget.vehiculo == null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Registrar vehículo')),
+      appBar: AppBar(title: Text(nuevo ? 'Registrar vehículo' : 'Editar vehículo')),
       body: SafeArea(
         child: Form(
           key: _formulario,
@@ -131,42 +185,12 @@ class _EstadoDelVehiculo extends State<PantallaDeNuevoVehiculo> {
               _campo(_color, 'Color', 'color'),
               _campo(_modelo, 'Modelo', 'modelo'),
               _campo(_marca, 'Marca (opcional)', 'marca', requerido: false),
-              DropdownButtonFormField<String>(
-                key: const Key('vehiculo.tipo'),
-                initialValue: _tipo,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: tiposDeVehiculo.entries
-                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-                    .toList(),
-                onChanged: (v) => setState(() => _tipo = v ?? 'automovil'),
-              ),
-              const SizedBox(height: 16),
-              Text('¿Quién lo usa?', style: Theme.of(context).textTheme.titleSmall),
-              if (_activos.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No hay ocupantes activos en su vivienda.'),
-                ),
-              ..._activos.map(
-                (o) => CheckboxListTile(
-                  key: Key('vehiculo.ocupante.${o.residenteId}'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _elegidos.contains(o.residenteId),
-                  title: Text(o.nombre),
-                  onChanged: (v) => setState(() {
-                    if (v == true) {
-                      _elegidos.add(o.residenteId);
-                    } else {
-                      _elegidos.remove(o.residenteId);
-                    }
-                  }),
-                ),
-              ),
+              if (nuevo) ..._tipoYOcupantes(context),
               const SizedBox(height: 16),
               FilledButton(
                 key: const Key('vehiculo.registrar'),
                 onPressed: _enviando ? null : _registrar,
-                child: Text(_enviando ? 'Registrando…' : 'Registrar'),
+                child: Text(_enviando ? 'Guardando…' : (nuevo ? 'Registrar' : 'Guardar')),
               ),
             ],
           ),
@@ -174,4 +198,38 @@ class _EstadoDelVehiculo extends State<PantallaDeNuevoVehiculo> {
       ),
     );
   }
+
+  List<Widget> _tipoYOcupantes(BuildContext context) => [
+    DropdownButtonFormField<String>(
+      key: const Key('vehiculo.tipo'),
+      initialValue: _tipo,
+      decoration: const InputDecoration(labelText: 'Tipo'),
+      items: tiposDeVehiculo.entries
+          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+          .toList(),
+      onChanged: (v) => setState(() => _tipo = v ?? 'automovil'),
+    ),
+    const SizedBox(height: 16),
+    Text('¿Quién lo usa?', style: Theme.of(context).textTheme.titleSmall),
+    if (_activos.isEmpty)
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('No hay ocupantes activos en su vivienda.'),
+      ),
+    ..._activos.map(
+      (o) => CheckboxListTile(
+        key: Key('vehiculo.ocupante.${o.residenteId}'),
+        contentPadding: EdgeInsets.zero,
+        value: _elegidos.contains(o.residenteId),
+        title: Text(o.nombre),
+        onChanged: (v) => setState(() {
+          if (v == true) {
+            _elegidos.add(o.residenteId);
+          } else {
+            _elegidos.remove(o.residenteId);
+          }
+        }),
+      ),
+    ),
+  ];
 }

@@ -20,6 +20,9 @@ const casa = 'http://mac-de-argenis.local:3000';
 const sitio = 'http://oficina.local:3000';
 
 Future<void> abrirServidorDesdeElAcceso(WidgetTester t) async {
+  // 15-W · el acceso ganó «Crear cuenta» y en 600 px la opción queda debajo:
+  // se baja hasta ella como lo haría el pulgar.
+  await t.ensureVisible(find.byKey(const Key('acceso.servidor')));
   await t.tap(find.byKey(const Key('acceso.servidor')));
   await t.pumpAndSettle();
 }

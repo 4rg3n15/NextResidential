@@ -15,6 +15,8 @@ class MisOcupantesDto {
     required this.declarada,
     required this.plazas,
     required this.aviso,
+    required this.tope,
+    required this.esTitular,
   });
   
   factory MisOcupantesDto.fromJson(Map<String, Object?> json) => _$MisOcupantesDtoFromJson(json);
@@ -23,6 +25,12 @@ class MisOcupantesDto {
   final bool declarada;
   final List<PlazaDeOcupanteDto> plazas;
   final String aviso;
+
+  /// 15-W · el tope de plazas de la vivienda, contando al titular
+  final num tope;
+
+  /// 15-W · quien pregunta es el titular
+  final bool esTitular;
 
   Map<String, Object?> toJson() => _$MisOcupantesDtoToJson(this);
 }

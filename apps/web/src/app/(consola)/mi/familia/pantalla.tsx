@@ -60,7 +60,7 @@ export const PantallaDeFamilia = ({
     <div className="space-y-6">
       <EncabezadoDePantalla
         titulo="Mi familia"
-        descripcion="Las personas registradas en tu vivienda. La administración del conjunto las vincula desde la consola."
+        descripcion="Las personas registradas en tu vivienda. Los adultos entran con un código de plaza; a los menores los registra un adulto del hogar desde la app."
         resumen={
           familia.data !== undefined ? (
             <span className="text-secundario text-texto-apagado">

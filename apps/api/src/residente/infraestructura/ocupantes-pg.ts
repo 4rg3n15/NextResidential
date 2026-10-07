@@ -19,14 +19,16 @@ export class OcupantesDeLaViviendaPg implements OcupantesDeLaVivienda {
         numero: number;
         generacion: number;
         usuario_id: string | null;
+        persona_id: string | null;
         ocupante: string | null;
       }>(
-        `SELECT p.id, p.numero, p.generacion, p.usuario_id,
-                CASE WHEN p.usuario_id IS NULL THEN NULL
-                     ELSE coalesce(per.nombre_completo, u.nombre) END AS ocupante
+        `SELECT p.id, p.numero, p.generacion, p.usuario_id, p.persona_id,
+                CASE WHEN p.usuario_id IS NOT NULL THEN coalesce(per.nombre_completo, u.nombre)
+                     WHEN p.persona_id IS NOT NULL THEN menor.nombre_completo END AS ocupante
            FROM public.plazas_de_ocupante p
       LEFT JOIN public.usuarios u   ON u.id = p.usuario_id
       LEFT JOIN public.personas per ON per.id = u.persona_id
+      LEFT JOIN public.personas menor ON menor.id = p.persona_id
           WHERE p.copropiedad_id = $1 AND p.vivienda_id = $2 AND p.estado = 'activo'
           ORDER BY p.numero`,
         [copropiedadId, viviendaId],
@@ -36,6 +38,7 @@ export class OcupantesDeLaViviendaPg implements OcupantesDeLaVivienda {
         numero: f.numero,
         generacion: f.generacion,
         usuarioId: f.usuario_id,
+        personaId: f.persona_id,
         ocupante: f.ocupante,
       }));
     });
@@ -43,15 +46,29 @@ export class OcupantesDeLaViviendaPg implements OcupantesDeLaVivienda {
 
   async declaracion(copropiedadId: string, viviendaId: string, usuarioId: string) {
     return comoServicio(this.pool, copropiedadId, usuarioId, async (c) => {
-      const { rows } = await c.query<{ es_primero: boolean; declarada: boolean }>(
-        `SELECT primer_residente_id IS NOT DISTINCT FROM $3::uuid AS es_primero,
-                declarada_en IS NOT NULL AS declarada
-           FROM public.ocupacion_de_viviendas
-          WHERE copropiedad_id = $1 AND vivienda_id = $2`,
+      const { rows } = await c.query<{
+        es_primero: boolean;
+        declarada: boolean;
+        tope: number;
+        codigo_corto: string | null;
+      }>(
+        `SELECT coalesce(o.primer_residente_id = $3::uuid, false) AS es_primero,
+                o.declarada_en IS NOT NULL AS declarada,
+                coalesce(v.tope_de_plazas, c.tope_de_plazas_por_vivienda)::int AS tope,
+                c.codigo_corto::text AS codigo_corto
+           FROM public.viviendas v
+           JOIN public.copropiedades c ON c.id = v.copropiedad_id
+      LEFT JOIN public.ocupacion_de_viviendas o ON o.vivienda_id = v.id
+          WHERE v.copropiedad_id = $1 AND v.id = $2`,
         [copropiedadId, viviendaId, usuarioId],
       );
       const f = rows[0];
-      return { esPrimerResidente: f?.es_primero ?? false, declarada: f?.declarada ?? false };
+      return {
+        esPrimerResidente: f?.es_primero ?? false,
+        declarada: f?.declarada ?? false,
+        tope: f?.tope ?? 0,
+        codigoCorto: f?.codigo_corto ?? null,
+      };
     });
   }
 
@@ -95,32 +112,51 @@ export class OcupantesDeLaViviendaPg implements OcupantesDeLaVivienda {
     viviendaId: string,
     cantidad: number,
     actorId: string,
-  ): Promise<readonly PlazaDeOcupante[] | null> {
-    const hecho = await comoPlataforma(this.pool, actorId, async (c) => {
-      const { rows } = await c.query<{ existe: boolean }>(
-        'SELECT EXISTS (SELECT 1 FROM public.viviendas WHERE id = $2 AND copropiedad_id = $1) AS existe',
-        [copropiedadId, viviendaId],
-      );
-      if (rows[0]?.existe !== true) return false;
-      await c.query(
-        `INSERT INTO public.plazas_de_ocupante (copropiedad_id, vivienda_id, numero, creado_por, actualizado_por)
+  ): Promise<readonly PlazaDeOcupante[] | null | 'COTA_DE_LA_PLATAFORMA'> {
+    const hecho = await deshaciendo(() =>
+      comoPlataforma(this.pool, actorId, async (c) => {
+        const { rows } = await c.query<{ existe: boolean }>(
+          'SELECT EXISTS (SELECT 1 FROM public.viviendas WHERE id = $2 AND copropiedad_id = $1) AS existe',
+          [copropiedadId, viviendaId],
+        );
+        if (rows[0]?.existe !== true) return false;
+        // D4 bis · el superadministrador sube el tope de ESTA vivienda si hace falta.
+        await c.query(
+          `UPDATE public.viviendas v
+            SET tope_de_plazas = least(20, (SELECT count(*) FROM public.plazas_de_ocupante p
+                                             WHERE p.vivienda_id = v.id AND p.estado = 'activo') + $3)
+          WHERE v.id = $2 AND v.copropiedad_id = $1
+            AND (SELECT count(*) FROM public.plazas_de_ocupante p
+                  WHERE p.vivienda_id = v.id AND p.estado = 'activo') + $3
+                > (SELECT coalesce(v.tope_de_plazas, c.tope_de_plazas_por_vivienda)
+                     FROM public.copropiedades c WHERE c.id = v.copropiedad_id)`,
+          [copropiedadId, viviendaId, cantidad],
+        );
+        await c.query(
+          `INSERT INTO public.plazas_de_ocupante (copropiedad_id, vivienda_id, numero, creado_por, actualizado_por)
          SELECT $1, $2, coalesce((SELECT max(numero) FROM public.plazas_de_ocupante
                                    WHERE vivienda_id = $2 AND estado = 'activo'), 0) + n, $4, $4
            FROM generate_series(1, $3::int) AS n`,
-        [copropiedadId, viviendaId, cantidad, actorId],
-      );
-      // Añadir plazas es también declarar: la vivienda queda con número fijado.
-      await c.query(
-        `INSERT INTO public.ocupacion_de_viviendas
+          [copropiedadId, viviendaId, cantidad, actorId],
+        );
+        // Añadir plazas es también declarar: la vivienda queda con número fijado.
+        await c.query(
+          `INSERT INTO public.ocupacion_de_viviendas
            (vivienda_id, copropiedad_id, declarada_en, declarada_por, creado_por, actualizado_por)
          VALUES ($2, $1, now(), $3, $3, $3)
          ON CONFLICT (vivienda_id) DO UPDATE
            SET declarada_en = coalesce(public.ocupacion_de_viviendas.declarada_en, now()),
                declarada_por = coalesce(public.ocupacion_de_viviendas.declarada_por, $3)`,
-        [copropiedadId, viviendaId, actorId],
-      );
-      return true;
+          [copropiedadId, viviendaId, actorId],
+        );
+        return true;
+      }),
+    ).catch((e: unknown) => {
+      // Más de 20 plazas vivas: la cota de la plataforma, que ningún tope supera.
+      if (violacion(e).restriccion === 'plazas_tope') return 'COTA_DE_LA_PLATAFORMA' as const;
+      throw e;
     });
+    if (hecho === 'COTA_DE_LA_PLATAFORMA') return hecho;
     return hecho ? this.plazas(copropiedadId, viviendaId) : null;
   }
 

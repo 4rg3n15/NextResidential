@@ -6,6 +6,7 @@ import { PantallaDeResidentes } from './pantalla';
 
 const COP = '10000000-0000-4000-8000-000000000001';
 const VIVIENDA = '30000000-0000-4000-8000-000000000042';
+const SIN_TITULAR = '30000000-0000-4000-8000-000000000007';
 
 const respuestas: Record<string, unknown> = {
   [`/api/ncr/copropiedades/${COP}/residentes/cuentas`]: [
@@ -17,6 +18,7 @@ const respuestas: Record<string, unknown> = {
       activa: true,
       debeCambiarContrasena: false,
       creadaEn: '2026-09-26T10:00:00.000Z',
+      origen: 'administracion',
     },
     {
       usuarioId: '00000000-0000-4000-8000-0000000000a2',
@@ -26,8 +28,18 @@ const respuestas: Record<string, unknown> = {
       activa: true,
       debeCambiarContrasena: true,
       creadaEn: '2026-09-26T11:00:00.000Z',
+      origen: 'administracion',
     },
   ],
+  // 15-W · el alta del titular elige su vivienda de esta lista.
+  [`/api/ncr/copropiedades/${COP}/residentes/viviendas-sin-titular`]: [
+    { id: SIN_TITULAR, identificador: '7', agrupacion: 'A' },
+  ],
+  [`/api/ncr/copropiedades/${COP}/viviendas/${VIVIENDA}/tope-de-plazas`]: {
+    tope: 4,
+    activas: 2,
+    propio: false,
+  },
   [`/api/ncr/copropiedades/${COP}/residentes/vehiculos`]: [
     {
       id: '50000000-0000-4000-8000-0000000000c1',
@@ -91,11 +103,11 @@ const envolver = (hijo: ReactNode) => (
 );
 
 describe('panel de residentes (15-I)', () => {
-  it('lista las cuentas con su vivienda o «Sin vincular», sin correo', async () => {
+  it('lista las cuentas con su vivienda o «Sin vivienda», sin correo', async () => {
     render(envolver(<PantallaDeResidentes copropiedadId={COP} />));
     const tabla = await screen.findByRole('table', { name: /Cuentas de residentes/ });
     expect(within(tabla).getByText('Ana Pérez')).toBeTruthy();
-    expect(within(tabla).getByText('Sin vincular')).toBeTruthy();
+    expect(within(tabla).getByText('Sin vivienda')).toBeTruthy();
     expect(within(tabla).getByText('Primer ingreso pendiente')).toBeTruthy();
     expect(document.body.textContent).not.toContain('@');
   });
@@ -115,9 +127,12 @@ describe('panel de residentes (15-I)', () => {
     await waitFor(() => expect(within(selector).getAllByRole('option')).toHaveLength(2));
     fireEvent.change(selector, { target: { value: VIVIENDA } });
     expect(await screen.findByText(/código ABCD-EFGH/)).toBeTruthy();
+    // 15-W · la ficha de plazas de la vivienda dice cuántas tiene y cuántas puede tener.
+    expect(await screen.findByText('Plazas: 2 de 4')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cambiar tope' })).toBeTruthy();
   });
 
-  it('3.1 · el alta envía usuario y contraseña inicial por la API, sin correo', async () => {
+  it('3.1 · el alta del titular envía usuario, contraseña inicial y vivienda por la API, sin correo', async () => {
     render(envolver(<PantallaDeResidentes copropiedadId={COP} />));
     fireEvent.click(await screen.findByRole('button', { name: 'Nuevo residente' }));
     fireEvent.change(screen.getByLabelText(/^Usuario/), { target: { value: 'casa9.eva' } });
@@ -125,6 +140,9 @@ describe('panel de residentes (15-I)', () => {
       target: { value: 'Inicial#2026' },
     });
     fireEvent.change(screen.getByLabelText(/^Nombre(?!s)/), { target: { value: 'Eva Ruiz' } });
+    const vivienda = screen.getByLabelText('Vivienda sin titular');
+    await waitFor(() => expect(within(vivienda).getAllByRole('option')).toHaveLength(2));
+    fireEvent.change(vivienda, { target: { value: SIN_TITULAR } });
     fireEvent.click(screen.getByRole('button', { name: 'Dar de alta' }));
     const esAlta = (p: Request): boolean =>
       p.url.endsWith('/residentes/cuentas') && p.method === 'POST';
@@ -137,6 +155,7 @@ describe('panel de residentes (15-I)', () => {
       usuario: 'casa9.eva',
       contrasenaInicial: 'Inicial#2026',
       nombre: 'Eva Ruiz',
+      viviendaId: SIN_TITULAR,
     });
   });
 

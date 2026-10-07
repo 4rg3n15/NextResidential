@@ -60,6 +60,10 @@ export const PROPOSITOS = {
    * dice. Con llave: un volcado de la base no permite verificar uno adivinado.
    */
   huellaDeAlarmServer: 'ncr:huella-de-secreto-de-alarm-server:v1',
+  /** 15-W (D2) · HMAC de la IP de un intento de registro: nunca la IP en claro. */
+  ipDeRegistro: 'ncr:ip-de-registro:v1',
+  /** 15-W (D4, S-15W-05) · el código con el que un mayor de edad reclama su plaza de menor. */
+  codigoDeTraspaso: 'ncr:codigo-de-traspaso:v1',
 } as const;
 
 export type Proposito = (typeof PROPOSITOS)[keyof typeof PROPOSITOS];

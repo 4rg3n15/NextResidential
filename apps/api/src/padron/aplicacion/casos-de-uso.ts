@@ -14,6 +14,8 @@ import type {
 } from './puertos';
 import { totalDeHistorial } from './puertos';
 import type { LectorDeVocabulario } from './vocabulario';
+import { borrarVehiculoSinHistorial, editarVehiculoCon } from './vehiculos-compartidos';
+import type { EntradaEditarVehiculo } from './vehiculos-compartidos';
 import { VOCABULARIO_SIN_CONFIGURAR } from './vocabulario';
 
 /**
@@ -545,16 +547,9 @@ export class EditarVivienda {
   }
 }
 
-export interface EntradaEditarVehiculo {
-  readonly placa?: string;
-  readonly personaId?: string | null;
-  readonly marca?: string | null;
-  readonly modelo?: string | null;
-  readonly color?: string | null;
-  readonly tipo?: TipoDeVehiculo;
-}
+export type { EntradaEditarVehiculo } from './vehiculos-compartidos';
 
-/** HU-04 · edita un vehículo. La placa pasa por el VO, como al registrar. */
+/** HU-04 · edita un vehículo. La lógica, compartida con el residente (15-W, D5). */
 export class EditarVehiculo {
   constructor(private readonly repo: RepositorioPadron) {}
 
@@ -564,45 +559,11 @@ export class EditarVehiculo {
     entrada: EntradaEditarVehiculo,
   ): Promise<Resultado<void, ErrorDominio>> {
     if (!ctx.copropiedadId) return fallo(sinCopropiedad());
-    let placa: Placa | undefined;
-    if (entrada.placa !== undefined) {
-      const validada = Placa.crear(entrada.placa);
-      if (!validada.ok) return validada;
-      placa = validada.valor;
-    }
-    const r = await this.repo.editarVehiculo({
-      copropiedadId: ctx.copropiedadId,
-      vehiculoId,
-      ...(placa === undefined ? {} : { placa }),
-      ...(entrada.personaId === undefined ? {} : { personaId: entrada.personaId }),
-      ...(entrada.marca === undefined ? {} : { marca: entrada.marca }),
-      ...(entrada.modelo === undefined ? {} : { modelo: entrada.modelo }),
-      ...(entrada.color === undefined ? {} : { color: entrada.color }),
-      ...(entrada.tipo === undefined ? {} : { tipo: entrada.tipo }),
-      actorId: ctx.usuarioId,
-    });
-    switch (r.tipo) {
-      case 'editado':
-        return exito(undefined);
-      case 'no_encontrado':
-        return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vehículo no encontrado'));
-      default:
-        return fallo(
-          errorDominio(
-            'CONFLICTO_DE_CONCURRENCIA',
-            `La placa ${placa?.valor ?? ''} ya está activa en esta copropiedad`,
-            'RN-04',
-          ),
-        );
-    }
+    return editarVehiculoCon(this.repo, ctx.copropiedadId, vehiculoId, entrada, ctx.usuarioId);
   }
 }
 
-/**
- * O3 · el caso «lo registré mal hace un minuto». **Sólo sin historial** —ni un
- * evento con esa placa ni una autorización—, y quien lo garantiza es el
- * disparador de la base (migración 0034), también frente al dueño de la tabla.
- */
+/** O3 · borrado DEFINITIVO, sólo sin historial. La lógica, compartida (15-W, D5). */
 export class BorrarVehiculoDefinitivamente {
   constructor(private readonly repo: RepositorioPadron) {}
 
@@ -611,39 +572,6 @@ export class BorrarVehiculoDefinitivamente {
     vehiculoId: string,
   ): Promise<Resultado<{ placa: string }, ErrorDominio>> {
     if (!ctx.copropiedadId) return fallo(sinCopropiedad());
-    const historial = await this.repo.historialDeVehiculo(ctx.copropiedadId, vehiculoId);
-    if (historial === null) {
-      return fallo(errorDominio('ENTIDAD_NO_ENCONTRADA', 'Vehículo no encontrado'));
-    }
-    if (historial.eventos + historial.autorizaciones > 0) {
-      const partes = [
-        historial.eventos > 0 ? `${String(historial.eventos)} evento(s)` : null,
-        historial.autorizaciones > 0
-          ? `${String(historial.autorizaciones)} autorización(es)`
-          : null,
-      ].filter((x): x is string => x !== null);
-      return fallo(
-        errorDominio(
-          'OPERACION_NO_PERMITIDA',
-          `El vehículo ${historial.placa} tiene historial y no puede borrarse: ${partes.join(', ')}. ` +
-            'Dele de baja en vez de borrarlo (RN-19)',
-          'RN-19',
-        ),
-      );
-    }
-    const r = await this.repo.borrarVehiculoDefinitivamente(
-      ctx.copropiedadId,
-      vehiculoId,
-      ctx.usuarioId,
-    );
-    return r.borrado
-      ? exito({ placa: historial.placa })
-      : fallo(
-          errorDominio(
-            'OPERACION_NO_PERMITIDA',
-            r.motivo ?? 'La base no admitió el borrado',
-            'RN-19',
-          ),
-        );
+    return borrarVehiculoSinHistorial(this.repo, ctx.copropiedadId, vehiculoId, ctx.usuarioId);
   }
 }

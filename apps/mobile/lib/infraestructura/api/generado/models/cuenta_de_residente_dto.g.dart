@@ -16,6 +16,7 @@ CuentaDeResidenteDto _$CuentaDeResidenteDtoFromJson(
   activa: json['activa'] as bool,
   debeCambiarContrasena: json['debeCambiarContrasena'] as bool,
   creadaEn: json['creadaEn'] as String,
+  origen: CuentaDeResidenteDtoOrigen.fromJson(json['origen'] as String),
 );
 
 Map<String, dynamic> _$CuentaDeResidenteDtoToJson(
@@ -28,4 +29,5 @@ Map<String, dynamic> _$CuentaDeResidenteDtoToJson(
   'activa': instance.activa,
   'debeCambiarContrasena': instance.debeCambiarContrasena,
   'creadaEn': instance.creadaEn,
+  'origen': instance.origen,
 };

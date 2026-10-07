@@ -7,10 +7,17 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/alta_de_mi_vivienda_dto.dart';
 import '../models/aparato_registrado_dto.dart';
+import '../models/baja_de_menor_dto.dart';
 import '../models/baja_de_suscripcion_dto.dart';
+import '../models/codigo_de_traspaso_dto.dart';
 import '../models/declaracion_de_ocupantes_dto.dart';
+import '../models/edicion_de_menor_dto.dart';
+import '../models/edicion_de_vehiculo_propio_dto.dart';
 import '../models/estado_de_avisos_web_dto.dart';
 import '../models/estado_de_mi_alta_dto.dart';
+import '../models/menor_del_hogar_dto.dart';
+import '../models/menor_dto.dart';
+import '../models/menor_registrado_dto.dart';
 import '../models/mi_autorizacion_dto.dart';
 import '../models/mi_evento_dto.dart';
 import '../models/mi_inicio_dto.dart';
@@ -25,17 +32,23 @@ import '../models/nueva_visita_dto.dart';
 import '../models/perfil_del_residente_dto.dart';
 import '../models/perfil_dto.dart';
 import '../models/periodo.dart';
+import '../models/primer_ingreso_dto.dart';
 import '../models/repetir_visita_dto.dart';
 import '../models/resultado_de_alta_dto.dart';
 import '../models/resultado_de_perfil_dto.dart';
 import '../models/resultado_de_vehiculo_propio_dto.dart';
+import '../models/retiro_de_ocupante_dto.dart';
+import '../models/revocacion_de_mi_visita_dto.dart';
 import '../models/suscripcion_anulada_dto.dart';
 import '../models/suscripcion_registrada_dto.dart';
 import '../models/suscripcion_web_push_dto.dart';
 import '../models/token_de_notificacion_dto.dart';
 import '../models/vehiculo_desactivado_dto.dart';
+import '../models/vehiculo_editado_dto.dart';
+import '../models/vehiculo_eliminado_dto.dart';
 import '../models/vehiculo_propio_dto.dart';
 import '../models/visita_creada_dto.dart';
+import '../models/visita_revocada_dto.dart';
 import '../models/visitante_reciente_dto.dart';
 
 part 'residente_api.g.dart';
@@ -50,11 +63,11 @@ abstract class ResidenteApi {
     @Path('id') required String id,
   });
 
-  /// Primer ingreso: contacto, documento, vivienda y código (3.2)
+  /// Primer ingreso: nombre, documento de adulto, teléfono y fecha (D3); sin vivienda
   @POST('/copropiedades/{id}/mi/alta')
   Future<ResultadoDeAltaDto> miAltaControllerAlta({
     @Path('id') required String id,
-    @Body() required AltaDeMiViviendaDto body,
+    @Body() required PrimerIngresoDto body,
   });
 
   /// Las autorizaciones de mi vivienda (HU-07 lectura, M-1)
@@ -82,6 +95,42 @@ abstract class ResidenteApi {
     @Path('id') required String id,
     @Query('periodo') Periodo? periodo = Periodo.mes,
     @Query('limite') num? limite = 50,
+  });
+
+  /// Los menores de mi vivienda: edad, documento enmascarado y plaza
+  @GET('/copropiedades/{id}/mi/menores')
+  Future<List<MenorDelHogarDto>> misMenoresControllerListar({
+    @Path('id') required String id,
+  });
+
+  /// Registra un menor en una plaza libre de mi vivienda (D-W2)
+  @POST('/copropiedades/{id}/mi/menores')
+  Future<MenorRegistradoDto> misMenoresControllerRegistrar({
+    @Path('id') required String id,
+    @Body() required MenorDto body,
+  });
+
+  /// Edita nombre, parentesco y fecha de un menor de mi vivienda
+  @PUT('/copropiedades/{id}/mi/menores/{residenteId}')
+  Future<MenorRegistradoDto> misMenoresControllerEditar({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+    @Body() required EdicionDeMenorDto body,
+  });
+
+  /// Da de baja a un menor con motivo: su plaza queda libre (D4)
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/baja')
+  Future<MenorRegistradoDto> misMenoresControllerBaja({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+    @Body() required BajaDeMenorDto body,
+  });
+
+  /// El titular genera el código con el que un mayor de 18 crea su cuenta
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/codigo-de-traspaso')
+  Future<CodigoDeTraspasoDto> misMenoresControllerCodigoDeTraspaso({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
   });
 
   /// Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes
@@ -123,11 +172,25 @@ abstract class ResidenteApi {
     @Path('id') required String id,
   });
 
-  /// Declaro cuántos ocupantes hay: una vez y definitivo (D6)
+  /// El titular declara cuántos ocupantes hay: de 1 al tope (D6, D-W10)
   @POST('/copropiedades/{id}/mi/ocupantes')
   Future<MisOcupantesDto> miAltaControllerDeclararOcupantes({
     @Path('id') required String id,
     @Body() required DeclaracionDeOcupantesDto body,
+  });
+
+  /// El titular añade una plaza, hasta el tope de su vivienda (D-W10)
+  @POST('/copropiedades/{id}/mi/ocupantes/plazas')
+  Future<MisOcupantesDto> misPlazasControllerAnadir({
+    @Path('id') required String id,
+  });
+
+  /// El titular retira una plaza LIBRE, con motivo; nunca la suya (D-W10)
+  @POST('/copropiedades/{id}/mi/ocupantes/plazas/{plazaId}/retiro')
+  Future<MisOcupantesDto> misPlazasControllerRetirar({
+    @Path('id') required String id,
+    @Path('plazaId') required String plazaId,
+    @Body() required RetiroDeOcupanteDto body,
   });
 
   /// Mi perfil, mi copropiedad y el teléfono de portería (3.5, D7)
@@ -154,6 +217,21 @@ abstract class ResidenteApi {
   Future<ResultadoDeVehiculoPropioDto> miHogarControllerVehiculo({
     @Path('id') required String id,
     @Body() required VehiculoPropioDto body,
+  });
+
+  /// Edito un vehículo propio; la placa sólo si no tiene historial (D5)
+  @PUT('/copropiedades/{id}/mi/vehiculos/{vehiculoId}')
+  Future<VehiculoEditadoDto> miHogarControllerEditarVehiculo({
+    @Path('id') required String id,
+    @Path('vehiculoId') required String vehiculoId,
+    @Body() required EdicionDeVehiculoPropioDto body,
+  });
+
+  /// Elimino un vehículo propio: borrado sin historial, baja lógica con él (D5)
+  @DELETE('/copropiedades/{id}/mi/vehiculos/{vehiculoId}')
+  Future<VehiculoEliminadoDto> miHogarControllerEliminarVehiculo({
+    @Path('id') required String id,
+    @Path('vehiculoId') required String vehiculoId,
   });
 
   /// Doy de baja un vehículo propio de mi vivienda; libera el cupo
@@ -189,6 +267,14 @@ abstract class ResidenteApi {
     @Path('id') required String id,
     @Path('autorizacionId') required String autorizacionId,
     @Body() required RepetirVisitaDto body,
+  });
+
+  /// Revoco una visita vigente de mi vivienda, con motivo (D-W6)
+  @POST('/copropiedades/{id}/mi/visitas/{autorizacionId}/revocacion')
+  Future<VisitaRevocadaDto> misVisitasControllerRevocarVisita({
+    @Path('id') required String id,
+    @Path('autorizacionId') required String autorizacionId,
+    @Body() required RevocacionDeMiVisitaDto body,
   });
 
   /// Mi vivienda, mi vínculo y si puedo autorizar (HU-33, M-1)

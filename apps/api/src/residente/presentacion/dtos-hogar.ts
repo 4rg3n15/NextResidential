@@ -92,16 +92,18 @@ export class AltaDeMiViviendaDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
-    maxLength: 12,
-    description: 'Código de ocupante. Nulo = «no lo tengo» (sólo si la vivienda no tiene cuenta)',
+    maxLength: 24,
+    description:
+      'Código de una plaza de la vivienda de destino, con o sin el prefijo del conjunto ' +
+      '(«MIRA-K7PQ-2XWZ»). Sin él no hay cambio de vivienda (15-W, D3)',
   })
   @IsOptional()
   @IsString()
-  @MaxLength(12)
+  @MaxLength(24)
   codigo?: string | null;
 }
 
-/** D6 · la declaración, con la confirmación explícita de que es definitiva. */
+/** D6 · la declaración inicial: de 1 hasta el tope de la vivienda (15-W, ya no definitiva). */
 export class DeclaracionDeOcupantesDto {
   @ApiProperty({ minimum: 1, maximum: OCUPANTES_MAXIMO })
   @IsInt()
@@ -109,9 +111,15 @@ export class DeclaracionDeOcupantesDto {
   @Max(OCUPANTES_MAXIMO)
   numero!: number;
 
-  @ApiProperty({ description: 'El residente confirmó que el número es DEFINITIVO' })
+  @ApiPropertyOptional({
+    type: Boolean,
+    nullable: true,
+    deprecated: true,
+    description: 'Obsoleto desde la 15-W: la declaración ya no es definitiva. Se ignora',
+  })
+  @IsOptional()
   @IsBoolean()
-  confirmoQueEsDefinitivo!: boolean;
+  confirmoQueEsDefinitivo?: boolean | null;
 }
 
 /** D5 a · un vehículo propio; uno o más ocupantes de la vivienda. */
@@ -159,6 +167,11 @@ export class AltaDeCuentaDeResidenteDto {
   @IsString()
   @MaxLength(24)
   telefono?: string | null;
+
+  /** 15-W (D1, D-W9) · la vivienda de la que esta cuenta es el TITULAR. Obligatoria. */
+  @ApiProperty({ format: 'uuid', description: 'Vivienda activa y sin titular de la copropiedad' })
+  @IsUUID('4')
+  viviendaId!: string;
 }
 
 /** D6 · el superadministrador añade plazas, siempre con motivo. */

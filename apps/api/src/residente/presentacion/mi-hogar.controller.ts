@@ -12,6 +12,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -21,6 +22,7 @@ import { Aislamiento } from '../../multiempresa/aislamiento';
 import { EditarMiPerfil, VerMiPerfil } from '../aplicacion/perfil';
 import { DesactivarMiVehiculo, RegistrarMiVehiculo } from '../aplicacion/vehiculos-propios';
 import { PerfilDto, VehiculoPropioDto } from './dtos-hogar';
+import { LIMITE_DE_VEHICULOS } from './limites-del-hogar';
 import {
   PerfilDelResidenteDto,
   ResultadoDePerfilDto,
@@ -36,11 +38,13 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * PERFIL, VEHÍCULOS PROPIOS Y CONSENTIMIENTO DEL VISITANTE · ETAPA 15-I
+ * PERFIL, VEHÍCULOS PROPIOS Y CONSENTIMIENTO DEL VISITANTE · ETAPA 15-I · 15-W
  *
  * Todo con ámbito de vivienda resuelto desde la identidad (ResolverMiAmbito):
  * ninguna ruta admite nombrar la vivienda, y la que admite nombrar un vehículo
- * o un consentimiento sólo encuentra los de ESA vivienda.
+ * o un consentimiento sólo encuentra los de ESA vivienda. Desde la 15-W los
+ * vehículos tienen límite propio (D-W7); editarlos y eliminarlos (D-W5) vive en
+ * `mis-vehiculos.controller.ts`, para no pasar de cinco rutas por clase (§2.3).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 @ApiTags('residente')
@@ -94,6 +98,7 @@ export class MiHogarController {
   @Post('vehiculos')
   @HttpCode(200)
   @Roles('residente')
+  @Throttle(LIMITE_DE_VEHICULOS)
   @ApiOperation({
     summary: 'Registro un vehículo propio: activo al instante, dentro del tope (D5 a)',
   })
@@ -122,6 +127,7 @@ export class MiHogarController {
   @Post('vehiculos/:vehiculoId/desactivacion')
   @HttpCode(200)
   @Roles('residente')
+  @Throttle(LIMITE_DE_VEHICULOS)
   @ApiOperation({ summary: 'Doy de baja un vehículo propio de mi vivienda; libera el cupo' })
   @ApiOkResponse({ type: VehiculoDesactivadoDto })
   async desactivar(

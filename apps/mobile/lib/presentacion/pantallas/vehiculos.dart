@@ -10,9 +10,11 @@ import 'comunes.dart';
 /// M-3 · Mis Vehículos — HU-05, HU-06, y D5 a de la ETAPA 15-I.
 ///
 /// Desde la 15-I el residente REGISTRA sus vehículos propios (activos al
-/// instante, dentro del tope que la base cuenta) y da de baja los que registró
-/// un residente de su vivienda. Los que registró la administración sólo los da
-/// de baja la administración: el servidor contesta «no» y la pantalla lo dice.
+/// instante, dentro del tope que la base cuenta). Desde la 15-W también los
+/// EDITA —la placa sólo si no tienen historial— y los ELIMINA: sin historial se
+/// borran, con historial quedan dados de baja, y el aviso dice cuál de los dos
+/// pasó. Los que registró la administración sólo los toca la administración: el
+/// servidor contesta «no» y la pantalla enseña su texto.
 ///
 /// La placa se muestra **tal como la normalizó el objeto de valor `Placa`**, en
 /// mayúsculas y sin separadores. No se re-formatea aquí: la app mostraría una
@@ -25,7 +27,8 @@ class PantallaDeVehiculos extends StatelessWidget {
     required this.controlador,
     required this.alPedirAcceso,
     this.alRegistrar,
-    this.alDesactivar,
+    this.alEditar,
+    this.alEliminar,
   });
 
   final ControladorDeVista controlador;
@@ -33,7 +36,8 @@ class PantallaDeVehiculos extends StatelessWidget {
 
   /// `null` = sin alta desde la app (las pruebas de 11-A la montan así).
   final void Function()? alRegistrar;
-  final Future<void> Function(Vehiculo vehiculo)? alDesactivar;
+  final Future<void> Function(Vehiculo vehiculo)? alEditar;
+  final Future<void> Function(Vehiculo vehiculo)? alEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +65,7 @@ class PantallaDeVehiculos extends StatelessWidget {
                 style: const TextStyle(color: Paleta.textoSuave),
               ),
               const SizedBox(height: 16),
-              ...vehiculos.map((v) => _Vehiculo(v, alDesactivar: alDesactivar)),
+              ...vehiculos.map((v) => _Vehiculo(v, alEditar: alEditar, alEliminar: alEliminar)),
               const SizedBox(height: 72),
             ],
           ),
@@ -83,9 +87,10 @@ class PantallaDeVehiculos extends StatelessWidget {
 }
 
 class _Vehiculo extends StatelessWidget {
-  const _Vehiculo(this.v, {this.alDesactivar});
+  const _Vehiculo(this.v, {this.alEditar, this.alEliminar});
   final Vehiculo v;
-  final Future<void> Function(Vehiculo vehiculo)? alDesactivar;
+  final Future<void> Function(Vehiculo vehiculo)? alEditar;
+  final Future<void> Function(Vehiculo vehiculo)? alEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -129,13 +134,25 @@ class _Vehiculo extends StatelessWidget {
               const SizedBox(height: 10),
               Text(v.descripcion, style: const TextStyle(color: Paleta.textoSuave)),
             ],
-            if (v.activo && alDesactivar != null)
+            if (v.activo && (alEditar != null || alEliminar != null))
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: Key('vehiculos.baja.${v.placa}'),
-                  onPressed: () => alDesactivar!(v),
-                  child: const Text('Dar de baja'),
+                child: Wrap(
+                  spacing: 4,
+                  children: [
+                    if (alEditar != null)
+                      TextButton(
+                        key: Key('vehiculos.editar.${v.placa}'),
+                        onPressed: () => alEditar!(v),
+                        child: const Text('Editar'),
+                      ),
+                    if (alEliminar != null)
+                      TextButton(
+                        key: Key('vehiculos.eliminar.${v.placa}'),
+                        onPressed: () => alEliminar!(v),
+                        child: const Text('Eliminar'),
+                      ),
+                  ],
                 ),
               ),
           ],

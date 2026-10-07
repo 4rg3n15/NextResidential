@@ -1,136 +1,164 @@
-/// D6 · cuántas personas viven en la vivienda: lo declara UNA VEZ el primer
-/// residente, y es DEFINITIVO. Después, sólo el superadministrador lo cambia.
+/// Ocupantes · las plazas de la vivienda y sus códigos (ETAPA 15-I, RONDA
+/// 15-W, D-W10).
 ///
-/// El aviso que se lee antes de confirmar lo manda el servidor (sale del
-/// dominio compartido): la app y la consola dicen exactamente lo mismo, y el
-/// servidor exige la confirmación además de recibirla (`confirmoQueEsDefinitivo`).
+/// ─────────────────────────────────────────────────────────────────────────────
+/// LO QUE VE EL TITULAR
 ///
-/// Cada plaza libre trae su código de un solo uso, que el residente le da a
-/// quien vive con él para que se vincule (ADR-025): el código se DERIVA en el
-/// servidor, no se guarda en el teléfono.
+/// Cada plaza libre con su código, ya con el prefijo del conjunto
+/// («MIRA-K7PQ-2XWZ»), y un «Compartir» que copia el mensaje completo —qué
+/// hacer y el código—: con él, quien vive con el titular crea su propia cuenta
+/// en «Crear cuenta». El cupo se lee «3 de 4»; «Añadir plaza» responde hasta
+/// el tope, y en el tope se dice a quién pedir más. «Retirar» sólo aparece en
+/// las plazas libres, y pide un motivo.
+///
+/// Desde la 15-W el número ya no es DEFINITIVO: el aviso de antes se quitó. El
+/// tope y quién es el titular los dice el servidor en cada lectura, y la base
+/// vuelve a contar al escribir: dos teléfonos pulsando «Añadir» a la vez no
+/// pasan del tope. Cualquier otro adulto ve las plazas y comparte los códigos,
+/// pero no añade ni retira.
 library;
 
 import 'package:flutter/material.dart';
 
+import '../../configuracion/tema.dart';
 import '../../dominio/hogar.dart';
-import '../../dominio/puertos.dart';
-import 'campos_de_perfil.dart';
+import '../controlador.dart';
+import '../widgets/compartir.dart';
+import '../widgets/estados.dart';
+import 'comunes.dart';
 
-class PantallaDeDeclararOcupantes extends StatefulWidget {
-  const PantallaDeDeclararOcupantes({
+class PantallaDeOcupantes extends StatefulWidget {
+  const PantallaDeOcupantes({
     super.key,
-    required this.aviso,
-    required this.repositorio,
-    required this.alDeclarar,
-    required this.alSalir,
+    required this.controlador,
+    required this.alPedirAcceso,
+    required this.alAnadir,
+    required this.alRetirar,
   });
 
-  final String aviso;
-  final RepositorioDeAlta repositorio;
-  final void Function(MisOcupantes ocupantes) alDeclarar;
-  final void Function() alSalir;
+  final ControladorDeVista<MisOcupantes> controlador;
+  final void Function() alPedirAcceso;
+  final Future<void> Function() alAnadir;
+  final Future<void> Function(PlazaDeOcupante plaza) alRetirar;
 
   @override
-  State<PantallaDeDeclararOcupantes> createState() => _EstadoDeDeclaracion();
+  State<PantallaDeOcupantes> createState() => _EstadoDeOcupantes();
 }
 
-class _EstadoDeDeclaracion extends State<PantallaDeDeclararOcupantes> {
-  int _numero = 1;
-  bool _enviando = false;
-  String? _rechazo;
+class _EstadoDeOcupantes extends State<PantallaDeOcupantes> {
+  /// Una escritura en vuelo: un segundo toque no pide otra plaza.
+  bool _ocupado = false;
 
-  Future<void> _confirmar() async {
-    final confirmado = await showDialog<bool>(
-      context: context,
-      builder: (contexto) => AlertDialog(
-        title: Text('¿Confirma $_numero ${_numero == 1 ? 'ocupante' : 'ocupantes'}?'),
-        content: Text(widget.aviso),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(contexto).pop(false),
-            child: const Text('Revisar'),
-          ),
-          FilledButton(
-            key: const Key('ocupantes.confirmar'),
-            onPressed: () => Navigator.of(contexto).pop(true),
-            child: const Text('Confirmar, es definitivo'),
-          ),
-        ],
-      ),
-    );
-    if (confirmado != true || !mounted) return;
-    setState(() {
-      _enviando = true;
-      _rechazo = null;
-    });
+  Future<void> _hacer(Future<void> Function() accion) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
     try {
-      final r = await widget.repositorio.declararOcupantes(_numero);
-      if (mounted) widget.alDeclarar(r);
-    } on Fallo catch (f) {
-      if (mounted) setState(() => _rechazo = f.detalle);
+      await accion();
     } finally {
-      if (mounted) setState(() => _enviando = false);
+      if (mounted) setState(() => _ocupado = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = widget.controlador;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('¿Cuántos viven en su vivienda?'),
-        automaticallyImplyLeading: false,
-        actions: [TextButton(onPressed: widget.alSalir, child: const Text('Salir'))],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'Cuente a todas las personas que viven en la vivienda, usted incluido. Cada una '
-              'tendrá su propio código para usar la app.',
-            ),
-            const SizedBox(height: 12),
-            // El aviso se ve ANTES de elegir, no sólo en el diálogo: quien lee
-            // «definitivo» por primera vez al confirmar ya decidió.
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(widget.aviso, key: const Key('ocupantes.aviso')),
-            ),
-            const SizedBox(height: 16),
-            if (_rechazo != null) AvisoDeRechazo(_rechazo!),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      appBar: AppBar(title: const Text('Ocupantes')),
+      body: AnimatedBuilder(
+        animation: c,
+        builder: (context, _) => RefreshIndicator(
+          onRefresh: c.refrescar,
+          child: VistaConEstado<MisOcupantes>(
+            estado: c.estado,
+            alReintentar: c.cargarAhora,
+            alPedirAcceso: widget.alPedirAcceso,
+            conDatos: (o, {required desdeCache}) => ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
               children: [
-                IconButton.outlined(
-                  tooltip: 'Uno menos',
-                  onPressed: _numero > 1 ? () => setState(() => _numero -= 1) : null,
-                  icon: const Icon(Icons.remove),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    '$_numero',
-                    key: const Key('ocupantes.numero'),
-                    style: Theme.of(context).textTheme.displaySmall,
+                if (desdeCache) const MarcaDeCache(),
+                Card(
+                  child: ListTile(
+                    title: Text('Plazas: ${o.cupo}', key: const Key('ocupantes.cupo')),
+                    subtitle: Text(o.aviso),
                   ),
                 ),
-                IconButton.outlined(
-                  tooltip: 'Uno más',
-                  onPressed: _numero < 20 ? () => setState(() => _numero += 1) : null,
-                  icon: const Icon(Icons.add),
+                const SizedBox(height: 8),
+                ...o.plazas.map(
+                  (p) => _Plaza(
+                    plaza: p,
+                    retirable: o.sePuedeRetirar(p) && !_ocupado,
+                    alRetirar: () => _hacer(() => widget.alRetirar(p)),
+                  ),
                 ),
+                const SizedBox(height: 8),
+                if (o.esTitular) ...[
+                  FilledButton.icon(
+                    key: const Key('ocupantes.anadir'),
+                    onPressed: o.puedeAnadir && !_ocupado ? () => _hacer(widget.alAnadir) : null,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Añadir plaza'),
+                  ),
+                  if (o.alTope)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(avisoDelTope, key: Key('ocupantes.tope')),
+                    ),
+                ] else
+                  const Text(
+                    'Sólo el titular de la vivienda añade y retira plazas.',
+                    style: TextStyle(color: Paleta.textoSuave),
+                  ),
               ],
             ),
-            const SizedBox(height: 24),
-            FilledButton(
-              key: const Key('ocupantes.declarar'),
-              onPressed: _enviando ? null : _confirmar,
-              child: Text(_enviando ? 'Enviando…' : 'Declarar'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Plaza extends StatelessWidget {
+  const _Plaza({required this.plaza, required this.retirable, required this.alRetirar});
+  final PlazaDeOcupante plaza;
+  final bool retirable;
+  final VoidCallback alRetirar;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = plaza;
+    final codigo = p.libre ? p.codigo : null;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: CircleAvatar(radius: 16, child: Text('${p.numero}')),
+              title: Text(p.libre ? 'Plaza libre' : (p.ocupante ?? 'Ocupada')),
+              subtitle: codigo != null
+                  ? SelectableText(codigo, key: Key('ocupantes.codigo.${p.numero}'))
+                  : (p.sinCuenta ? const Text('Menor de edad, sin cuenta') : null),
+              trailing: p.sinCuenta
+                  ? const Distintivo(texto: 'Sin cuenta', pareja: Paleta.neutroSuave)
+                  : null,
             ),
+            if (codigo != null || retirable)
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 4,
+                children: [
+                  if (codigo != null) BotonCompartir(codigo: codigo),
+                  if (retirable)
+                    TextButton(
+                      key: Key('ocupantes.retirar.${p.numero}'),
+                      onPressed: alRetirar,
+                      child: const Text('Retirar'),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -138,32 +166,26 @@ class _EstadoDeDeclaracion extends State<PantallaDeDeclararOcupantes> {
   }
 }
 
-/// Las plazas en el perfil: quién ocupa cada una y el código de las libres.
+/// Las plazas en el perfil: el cupo y el camino a «Ocupantes».
 class TarjetaDeOcupantes extends StatelessWidget {
-  const TarjetaDeOcupantes({super.key, required this.ocupantes});
+  const TarjetaDeOcupantes({super.key, required this.ocupantes, this.alAbrir});
   final MisOcupantes ocupantes;
+  final VoidCallback? alAbrir;
 
   @override
   Widget build(BuildContext context) {
+    final libres = ocupantes.libres.length;
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            title: Text('Ocupantes: ${ocupantes.declarados}'),
-            subtitle: const Text('Sólo la administración cambia este número.'),
-          ),
-          ...ocupantes.plazas.map(
-            (p) => ListTile(
-              dense: true,
-              leading: CircleAvatar(radius: 14, child: Text('${p.numero}')),
-              title: Text(p.libre ? 'Plaza libre' : (p.ocupante ?? 'Ocupada')),
-              subtitle: p.libre && p.codigo != null
-                  ? SelectableText('Código: ${p.codigo}', key: Key('ocupantes.codigo.${p.numero}'))
-                  : null,
-            ),
-          ),
-        ],
+      child: ListTile(
+        key: const Key('perfil.ocupantes'),
+        leading: const Icon(Icons.groups_outlined),
+        title: const Text('Ocupantes'),
+        subtitle: Text(
+          'Plazas: ${ocupantes.cupo}'
+          '${libres == 0 ? '' : ' · $libres libre${libres == 1 ? '' : 's'} con código'}',
+        ),
+        trailing: alAbrir == null ? null : const Icon(Icons.chevron_right),
+        onTap: alAbrir,
       ),
     );
   }

@@ -12,6 +12,7 @@ AltaDeCuentaDeResidenteDto _$AltaDeCuentaDeResidenteDtoFromJson(
   usuario: json['usuario'] as String,
   contrasenaInicial: json['contrasenaInicial'] as String,
   nombre: json['nombre'] as String,
+  viviendaId: json['viviendaId'] as String,
   telefono: json['telefono'] as String?,
 );
 
@@ -22,4 +23,5 @@ Map<String, dynamic> _$AltaDeCuentaDeResidenteDtoToJson(
   'contrasenaInicial': instance.contrasenaInicial,
   'nombre': instance.nombre,
   'telefono': instance.telefono,
+  'viviendaId': instance.viviendaId,
 };

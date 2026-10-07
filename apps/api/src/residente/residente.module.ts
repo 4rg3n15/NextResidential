@@ -1,6 +1,18 @@
 import { PerfilDeResidentesController } from './presentacion/perfil-de-residentes.controller';
-import { Module } from '@nestjs/common';
-import type { DynamicModule } from '@nestjs/common';
+import { Inject, Module } from '@nestjs/common';
+import type { DynamicModule, OnModuleInit } from '@nestjs/common';
+import { REGISTRO_DE_INVITACIONES } from '../cuentas';
+import type { InvitacionesDeResidente, RegistroDeInvitaciones } from '../cuentas';
+import { INVITACIONES_DE_RESIDENTE, PROVEEDORES_DE_LA_15W } from './hogar-15w.providers';
+import { MisPlazasController } from './presentacion/mis-plazas.controller';
+import { MisVehiculosController } from './presentacion/mis-vehiculos.controller';
+import { TitularesController } from './presentacion/titulares.controller';
+import { MisMenoresController } from './presentacion/mis-menores.controller';
+import {
+  TopeDePlazasController,
+  TopeDePlazasPorOmisionController,
+} from './presentacion/tope-de-plazas.controller';
+import { RegistroDeLaCopropiedadController } from './presentacion/registro-de-la-copropiedad.controller';
 import { Pool } from 'pg';
 import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
@@ -58,7 +70,17 @@ import { MisAvisosWebController } from './presentacion/mis-avisos-web.controller
  * comparte con el resto es el ámbito del dominio, que vive en `domain-core`.
  */
 @Module({})
-export class ResidenteModule {
+export class ResidenteModule implements OnModuleInit {
+  constructor(
+    @Inject(REGISTRO_DE_INVITACIONES) private readonly registro: RegistroDeInvitaciones,
+    @Inject(INVITACIONES_DE_RESIDENTE) private readonly invitaciones: InvitacionesDeResidente,
+  ) {}
+
+  /** 15-W (D2) · «Crear cuenta» pregunta por los códigos aquí: sin esto, no está disponible. */
+  onModuleInit(): void {
+    this.registro.inscribir(this.invitaciones);
+  }
+
   static registrar(): DynamicModule {
     return {
       module: ResidenteModule,
@@ -77,15 +99,24 @@ export class ResidenteModule {
         // su supervisión por el superadministrador.
         MiAltaController,
         MiHogarController,
+        MisVehiculosController, // 15-W (D5) · editar y eliminar los propios.
         SupervisionDeResidentesController,
+        TitularesController, // 15-W (D1) · titulares de las viviendas.
         OcupantesDeViviendaController,
         // 15-L (G) · el superadministrador edita el perfil de un residente.
         PerfilDeResidentesController,
         // 15-L (F) · sus visitas con foto y casilla, y «Volver a autorizar».
         MisVisitasController,
+        // 15-W · plazas del titular, menores del hogar, tope y registro.
+        MisPlazasController,
+        MisMenoresController,
+        TopeDePlazasController,
+        TopeDePlazasPorOmisionController,
+        RegistroDeLaCopropiedadController,
       ],
       providers: [
         ...PROVEEDORES_DEL_HOGAR,
+        ...PROVEEDORES_DE_LA_15W,
         ...PROVEEDORES_DE_WEB_PUSH,
         {
           provide: DIRECTORIO_DEL_RESIDENTE,

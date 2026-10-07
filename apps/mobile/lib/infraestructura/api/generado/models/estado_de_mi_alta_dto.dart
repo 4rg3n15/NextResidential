@@ -13,22 +13,30 @@ class EstadoDeMiAltaDto {
   const EstadoDeMiAltaDto({
     required this.completa,
     required this.viviendaVinculada,
+    required this.viviendaAsignada,
     required this.debeDeclararOcupantes,
     required this.vocabulario,
     required this.pideAgrupacion,
     required this.avisoOcupantes,
+    required this.aviso,
   });
   
   factory EstadoDeMiAltaDto.fromJson(Map<String, Object?> json) => _$EstadoDeMiAltaDtoFromJson(json);
   
   final bool completa;
   final bool viviendaVinculada;
+
+  /// 15-W · la cuenta ya trae vivienda (asignada o vinculada)
+  final bool viviendaAsignada;
   final bool debeDeclararOcupantes;
   final VocabularioDeAltaDto vocabulario;
   final bool pideAgrupacion;
 
-  /// El texto que la pantalla muestra ANTES de confirmar (D6)
+  /// El texto de Ocupantes, con el tope de la vivienda (D-W10)
   final String avisoOcupantes;
+
+  /// 15-W · «La administración debe asignarle su vivienda», o null
+  final String? aviso;
 
   Map<String, Object?> toJson() => _$EstadoDeMiAltaDtoToJson(this);
 }

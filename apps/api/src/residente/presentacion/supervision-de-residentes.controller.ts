@@ -20,6 +20,7 @@ import {
   CuentasDeResidentesDelSuperadmin,
   OcupantesDelSuperadmin,
 } from '../aplicacion/supervision-de-residentes';
+import { VIVIENDA_CON_TITULAR } from '../aplicacion/titulares-y-registro';
 import {
   AltaDeCuentaDeResidenteDto,
   AnadirOcupantesDto,
@@ -68,7 +69,9 @@ export class SupervisionDeResidentesController {
   }
 
   @Post('cuentas')
-  @ApiOperation({ summary: 'Alta de un residente con usuario y contraseña inicial (3.1)' })
+  @ApiOperation({
+    summary: 'Alta del TITULAR de una vivienda, con contraseña inicial y su vivienda (D1, D-W9)',
+  })
   @ApiOkResponse({ type: CuentaDeResidenteCreadaDto })
   async alta(
     @Contexto() ctx: ContextoTenant,
@@ -81,13 +84,21 @@ export class SupervisionDeResidentesController {
       contrasenaInicial: dto.contrasenaInicial,
       nombre: dto.nombre,
       telefono: dto.telefono ?? null,
+      viviendaId: dto.viviendaId,
     });
     if (r.ok) return { usuarioId: r.usuarioId };
-    if (r.rechazo.motivo === 'DUPLICADO') {
-      throw new ConflictException('Ese usuario ya existe en la copropiedad');
+    switch (r.rechazo.motivo) {
+      case 'VIVIENDA_NO_ENCONTRADA':
+        throw new NotFoundException('Vivienda no encontrada');
+      case 'VIVIENDA_CON_TITULAR':
+        throw new ConflictException(VIVIENDA_CON_TITULAR);
+      case 'DUPLICADO':
+        throw new ConflictException('Ese usuario ya existe en la copropiedad');
+      case 'FORMATO':
+        throw new BadRequestException(r.rechazo.detalle);
+      default:
+        throw new ConflictException('El proveedor de identidad no aceptó la cuenta');
     }
-    if (r.rechazo.motivo === 'FORMATO') throw new BadRequestException(r.rechazo.detalle);
-    throw new ConflictException('El proveedor de identidad no aceptó la cuenta');
   }
 
   /**
@@ -164,6 +175,9 @@ export class OcupantesDeViviendaController {
     const destino = await this.aislamiento.exigirAlcance(ctx, id, 'viviendas/ocupantes');
     const plazas = await this.ocupantes.anadir(destino, id, viviendaId, dto.cantidad, dto.motivo);
     if (plazas === null) throw new NotFoundException('Vivienda no encontrada');
+    if (plazas === 'COTA_DE_LA_PLATAFORMA') {
+      throw new ConflictException('Una vivienda tiene como mucho 20 plazas');
+    }
     return plazas.map((p) => ({ ...p }));
   }
 

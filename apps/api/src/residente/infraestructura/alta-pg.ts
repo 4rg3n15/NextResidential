@@ -10,27 +10,45 @@ import type {
 } from '../aplicacion/puertos-hogar';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import { Deshacer, comoServicio, deshaciendo, violacion } from './con-identidad';
+import { personaDeLaCuenta, residenteEnLaVivienda } from './persona-del-residente-pg';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * ALTA DEL RESIDENTE CONTRA POSTGRESQL · ETAPA 15-I (3.2, D6)
+ * ALTA DEL RESIDENTE CONTRA POSTGRESQL · ETAPA 15-I (3.2, D6) · RONDA 15-W
  *
- * La lectura usa el servicio de la copropiedad con el propio residente como
- * actor; la vinculación, lo mismo dentro de una transacción con un BLOQUEO POR
- * VIVIENDA: dos personas que marcan «no lo tengo» a la vez para la misma casa
- * no pueden salir las dos como primer residente, y la plaza sólo la ocupa quien
- * la toma con `usuario_id IS NULL` (la base decide, ADR-04).
+ * Lecturas del alta (vocabulario, estado, búsqueda de vivienda, intentos) y el
+ * CAMBIO DE VIVIENDA con código (3.5). Desde la 15-W ya no hay «primer
+ * residente»: la cuenta del titular la crea la administración con su vivienda
+ * (D1) y las demás nacen atadas a su plaza (D2); el primer ingreso las vincula
+ * en `primer-ingreso-pg.ts`.
  *
- * La persona se busca por su documento. Si ya existe —estaba en el padrón— se
- * REUTILIZA sólo si está libre: sin otra cuenta vinculada y sin ser residente
- * de otra vivienda. Si no, `DOCUMENTO_EN_USO`: nadie se apropia de la ficha de
- * otro escribiendo su cédula.
+ * La vinculación va dentro de una transacción con un BLOQUEO POR VIVIENDA, y la
+ * plaza sólo la ocupa quien la toma LIBRE —sin cuenta y sin persona— y en su
+ * generación: la base decide (ADR-04). La persona y el residente se resuelven
+ * en `persona-del-residente-pg.ts`, compartido con el primer ingreso.
  * ═════════════════════════════════════════════════════════════════════════════
  */
+// La vivienda «tiene cuenta» —y por tanto titular— si alguien con cuenta activa
+// vive en ella, o si la administración ya le asignó su titular (15-W, D1) y
+// éste aún no hizo su primer ingreso.
 const SQL_TIENE_OTRA_CUENTA = `
-  EXISTS (SELECT 1 FROM public.residentes r
-            JOIN public.usuarios u ON u.persona_id = r.persona_id AND u.estado = 'activo'
-           WHERE r.vivienda_id = v.id AND r.estado = 'activo' AND u.id <> $2)`;
+  (EXISTS (SELECT 1 FROM public.residentes r
+             JOIN public.usuarios u ON u.persona_id = r.persona_id AND u.estado = 'activo'
+            WHERE r.vivienda_id = v.id AND r.estado = 'activo' AND u.id <> $2)
+   OR EXISTS (SELECT 1 FROM public.ocupacion_de_viviendas o
+                JOIN public.usuarios u ON u.id = o.primer_residente_id AND u.estado = 'activo'
+               WHERE o.vivienda_id = v.id AND u.id <> $2))`;
+
+/** D-W10 · el tope vigente de la vivienda: el suyo, o el de su copropiedad. */
+export const topeDe = async (c: PoolClient, viviendaId: string): Promise<number | null> => {
+  const { rows } = await c.query<{ tope: number }>(
+    `SELECT coalesce(v.tope_de_plazas, c.tope_de_plazas_por_vivienda)::int AS tope
+       FROM public.viviendas v JOIN public.copropiedades c ON c.id = v.copropiedad_id
+      WHERE v.id = $1`,
+    [viviendaId],
+  );
+  return rows[0]?.tope ?? null;
+};
 
 export class AltaDelResidentePg implements AltaDelResidente {
   constructor(private readonly pool: Pool) {}
@@ -42,8 +60,10 @@ export class AltaDelResidentePg implements AltaDelResidente {
         tipo: string | null;
         etiqueta_vivienda: string;
         etiqueta_agrupacion: string;
+        codigo_corto: string | null;
       }>(
-        `SELECT nombre, tipo::text AS tipo, etiqueta_vivienda, etiqueta_agrupacion
+        `SELECT nombre, tipo::text AS tipo, etiqueta_vivienda, etiqueta_agrupacion,
+                codigo_corto::text AS codigo_corto
            FROM public.copropiedades WHERE id = $1`,
         [copropiedadId],
       );
@@ -55,6 +75,7 @@ export class AltaDelResidentePg implements AltaDelResidente {
             tipo: f.tipo,
             etiquetaVivienda: f.etiqueta_vivienda,
             etiquetaAgrupacion: f.etiqueta_agrupacion,
+            codigoCorto: f.codigo_corto,
           };
     });
   }
@@ -75,9 +96,34 @@ export class AltaDelResidentePg implements AltaDelResidente {
         [copropiedadId, usuarioId],
       );
       const f = rows[0];
-      return f === undefined
-        ? { viviendaId: null, debeDeclararOcupantes: false }
-        : { viviendaId: f.vivienda_id, debeDeclararOcupantes: f.debe_declarar };
+      if (f !== undefined) {
+        return {
+          viviendaId: f.vivienda_id,
+          debeDeclararOcupantes: f.debe_declarar,
+          viviendaAsignada: null,
+          topeDePlazas: await topeDe(c, f.vivienda_id),
+        };
+      }
+      // 15-W (D3) · sin vínculo todavía: la vivienda que la cuenta YA trae.
+      const { rows: asignada } = await c.query<{ vivienda_id: string; titular: boolean }>(
+        `SELECT o.vivienda_id, true AS titular FROM public.ocupacion_de_viviendas o
+           JOIN public.viviendas v ON v.id = o.vivienda_id AND v.estado = 'activo'
+          WHERE o.copropiedad_id = $1 AND o.primer_residente_id = $2
+         UNION ALL
+         SELECT p.vivienda_id, false FROM public.plazas_de_ocupante p
+           JOIN public.viviendas v ON v.id = p.vivienda_id AND v.estado = 'activo'
+          WHERE p.copropiedad_id = $1 AND p.usuario_id = $2 AND p.estado = 'activo'
+          ORDER BY titular DESC LIMIT 1`,
+        [copropiedadId, usuarioId],
+      );
+      const a = asignada[0];
+      return {
+        viviendaId: null,
+        debeDeclararOcupantes: false,
+        viviendaAsignada:
+          a === undefined ? null : { viviendaId: a.vivienda_id, comoTitular: a.titular },
+        topeDePlazas: a === undefined ? null : await topeDe(c, a.vivienda_id),
+      };
     });
   }
 
@@ -128,7 +174,7 @@ export class AltaDelResidentePg implements AltaDelResidente {
       const { rows } = await c.query<{ id: string; numero: number; generacion: number }>(
         `SELECT id, numero, generacion FROM public.plazas_de_ocupante
           WHERE copropiedad_id = $1 AND vivienda_id = $2 AND estado = 'activo'
-            AND usuario_id IS NULL
+            AND usuario_id IS NULL AND persona_id IS NULL
           ORDER BY numero`,
         [copropiedadId, viviendaId],
       );
@@ -162,38 +208,9 @@ export class AltaDelResidentePg implements AltaDelResidente {
       p.viviendaId,
     ]);
 
-    // 1 · la plaza, o la condición de primer residente, bajo el bloqueo.
-    if (p.modo.tipo === 'primer_residente') {
-      const { rows } = await c.query<{ tiene: boolean }>(
-        `SELECT ${SQL_TIENE_OTRA_CUENTA} AS tiene FROM public.viviendas v WHERE v.id = $3 AND v.copropiedad_id = $1`,
-        v,
-      );
-      if (rows[0]?.tiene !== false)
-        throw new Deshacer<VinculoEscrito>({ ok: false, motivo: 'CODIGO_REQUERIDO' });
-    } else {
-      const r = await c.query(
-        `UPDATE public.plazas_de_ocupante SET usuario_id = $2, usada_en = $6
-          WHERE id = $4 AND copropiedad_id = $1 AND vivienda_id = $3 AND estado = 'activo'
-            AND usuario_id IS NULL AND generacion = $5`,
-        [...v, p.modo.plazaId, p.modo.generacion, p.ahora],
-      );
-      if ((r.rowCount ?? 0) === 0)
-        throw new Deshacer<VinculoEscrito>({ ok: false, motivo: 'CODIGO_INCORRECTO' });
-    }
-
-    // 2 · la persona: la del documento si está libre, la suya, o una nueva.
-    const personaId = await this.persona(c, p);
-    if (personaId === null)
-      throw new Deshacer<VinculoEscrito>({ ok: false, motivo: 'DOCUMENTO_EN_USO' });
-
-    // 3 · cambio de vivienda: baja del vínculo anterior y su plaza, que se regenera.
-    const baja = await c.query(
-      `UPDATE public.residentes
-          SET estado = 'inactivo', desactivado_en = $4, desactivado_por = $2,
-              motivo_desactivacion = 'cambio de vivienda desde la app (15-I)'
-        WHERE copropiedad_id = $1 AND persona_id = $5 AND estado = 'activo' AND vivienda_id <> $3`,
-      [...v, p.ahora, personaId],
-    );
+    // 0 · cambio de vivienda: la plaza que deja se suelta ANTES de tomar la
+    // nueva —una cuenta ocupa una sola plaza viva (`plazas_usuario_uk`)— y se
+    // regenera: su código anterior ya no sirve. Si lo demás falla, se deshace.
     await c.query(
       `UPDATE public.plazas_de_ocupante
           SET usuario_id = NULL, usada_en = NULL, generacion = generacion + 1
@@ -201,26 +218,40 @@ export class AltaDelResidentePg implements AltaDelResidente {
       v,
     );
 
-    // 4 · el residente en ESA vivienda (D5 b: el ocupante autoriza terceros, S-54).
-    const residenteId = await this.residente(c, p, personaId);
+    // 1 · la plaza, LIBRE y en su generación, bajo el bloqueo.
+    const r = await c.query(
+      `UPDATE public.plazas_de_ocupante SET usuario_id = $2, usada_en = $6
+        WHERE id = $4 AND copropiedad_id = $1 AND vivienda_id = $3 AND estado = 'activo'
+          AND usuario_id IS NULL AND persona_id IS NULL AND generacion = $5`,
+      [...v, p.modo.plazaId, p.modo.generacion, p.ahora],
+    );
+    if ((r.rowCount ?? 0) === 0)
+      throw new Deshacer<VinculoEscrito>({ ok: false, motivo: 'CODIGO_INCORRECTO' });
 
-    // 5 · la cuenta queda atada a la persona; 6 · la marca de primer residente.
+    // 2 · la persona: la del documento si está libre, la suya, o una nueva.
+    const personaId = await personaDeLaCuenta(c, p);
+    if (personaId === null)
+      throw new Deshacer<VinculoEscrito>({ ok: false, motivo: 'DOCUMENTO_EN_USO' });
+
+    // 3 · cambio de vivienda: baja del vínculo anterior (su plaza ya se soltó en 0).
+    const baja = await c.query(
+      `UPDATE public.residentes
+          SET estado = 'inactivo', desactivado_en = $4, desactivado_por = $2,
+              motivo_desactivacion = 'cambio de vivienda desde la app (15-I)'
+        WHERE copropiedad_id = $1 AND persona_id = $5 AND estado = 'activo' AND vivienda_id <> $3`,
+      [...v, p.ahora, personaId],
+    );
+
+    // 4 · el residente en ESA vivienda (D5 b: el ocupante autoriza terceros, S-54).
+    const residenteId = await residenteEnLaVivienda(c, p, personaId, false);
+
+    // 5 · la cuenta queda atada a la persona.
     await c.query('UPDATE public.usuarios SET persona_id = $2 WHERE id = $1', [
       p.usuarioId,
       personaId,
     ]);
-    if (p.modo.tipo === 'primer_residente') {
-      await c.query(
-        `INSERT INTO public.ocupacion_de_viviendas
-           (vivienda_id, copropiedad_id, primer_residente_id, creado_por, actualizado_por)
-         VALUES ($3, $1, $2, $2, $2)
-         ON CONFLICT (vivienda_id) DO UPDATE SET primer_residente_id = EXCLUDED.primer_residente_id
-          WHERE public.ocupacion_de_viviendas.declarada_en IS NULL`,
-        v,
-      );
-    }
 
-    // 7 · el rastro, en la misma transacción. Sin documento ni código.
+    // 6 · el rastro, en la misma transacción. Sin documento ni código.
     await c.query(
       `INSERT INTO public.bitacora_de_residentes
          (copropiedad_id, ocurrido_en, tipo, usuario_id, actor_id, vivienda_id, detalle, creado_por)
@@ -229,86 +260,9 @@ export class AltaDelResidentePg implements AltaDelResidente {
         ...v,
         p.ahora,
         (baja.rowCount ?? 0) > 0 ? 'cambio_de_vivienda' : 'vinculacion',
-        p.modo.tipo === 'primer_residente' ? 'primer residente' : 'con código de ocupante',
+        'con código de ocupante',
       ],
     );
     return { ok: true, residenteId };
-  }
-
-  /** `null` = el documento es de otra persona que no está libre. */
-  private async persona(c: PoolClient, p: VinculoPedido): Promise<string | null> {
-    const d = p.perfil;
-    const { rows: mia } = await c.query<{ persona_id: string | null }>(
-      'SELECT persona_id FROM public.usuarios WHERE id = $1',
-      [p.usuarioId],
-    );
-    const propia = mia[0]?.persona_id ?? null;
-    const { rows: delDocumento } = await c.query<{ id: string; libre: boolean }>(
-      `SELECT p.id,
-              NOT EXISTS (SELECT 1 FROM public.usuarios u
-                           WHERE u.persona_id = p.id AND u.id <> $4 AND u.estado = 'activo')
-          AND NOT EXISTS (SELECT 1 FROM public.residentes r
-                           WHERE r.persona_id = p.id AND r.estado = 'activo' AND r.vivienda_id <> $5
-                             AND p.id IS DISTINCT FROM $6::uuid) AS libre
-         FROM public.personas p
-        WHERE p.copropiedad_id = $1 AND p.tipo_documento = $2::tipo_documento
-          AND p.numero_documento = $3 AND p.estado = 'activo'`,
-      [p.copropiedadId, d.tipoDocumento, d.numeroDocumento, p.usuarioId, p.viviendaId, propia],
-    );
-    const existente = delDocumento[0];
-    if (existente !== undefined && existente.id !== propia && !existente.libre) return null;
-    const personaId = existente?.id ?? propia;
-    const valores = [
-      d.tipoDocumento,
-      d.numeroDocumento,
-      `${d.nombres} ${d.apellidos}`.slice(0, 200),
-      d.nombres,
-      d.apellidos,
-      d.fechaNacimiento,
-      d.telefono,
-      d.correo,
-    ];
-    if (personaId === null) {
-      const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO public.personas
-           (copropiedad_id, tipo_documento, numero_documento, nombre_completo, nombres, apellidos,
-            fecha_nacimiento, telefono, correo, creado_por, actualizado_por)
-         VALUES ($1, $2::tipo_documento, $3, $4, $5, $6, $7::date, $8, $9, $10, $10)
-         RETURNING id`,
-        [p.copropiedadId, ...valores, p.usuarioId],
-      );
-      return rows[0]?.id ?? null;
-    }
-    await c.query(
-      `UPDATE public.personas
-          SET tipo_documento = $2::tipo_documento, numero_documento = $3, nombre_completo = $4,
-              nombres = $5, apellidos = $6, fecha_nacimiento = $7::date, telefono = $8, correo = $9
-        WHERE id = $1`,
-      [personaId, ...valores],
-    );
-    return personaId;
-  }
-
-  private async residente(c: PoolClient, p: VinculoPedido, personaId: string): Promise<string> {
-    const { rows: ya } = await c.query<{ id: string }>(
-      `SELECT id FROM public.residentes
-        WHERE persona_id = $1 AND vivienda_id = $2 AND estado = 'activo'`,
-      [personaId, p.viviendaId],
-    );
-    if (ya[0] !== undefined) return ya[0].id;
-    const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO public.residentes
-         (copropiedad_id, vivienda_id, persona_id, es_titular, nivel_acceso_id, creado_por, actualizado_por)
-       VALUES ($1, $2, $3, $4,
-               (SELECT n.id FROM public.niveles_acceso n
-                 WHERE n.copropiedad_id = $1 AND n.estado = 'activo' AND n.permite_autorizar
-                 ORDER BY n.orden LIMIT 1),
-               $5, $5)
-       RETURNING id`,
-      [p.copropiedadId, p.viviendaId, personaId, p.modo.tipo === 'primer_residente', p.usuarioId],
-    );
-    const id = rows[0]?.id;
-    if (id === undefined) throw new Error('el alta de residente no devolvió identificador');
-    return id;
   }
 }

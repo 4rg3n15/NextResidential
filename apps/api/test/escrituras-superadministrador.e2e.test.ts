@@ -55,6 +55,11 @@ const EXENTAS = new Set([
   '/porteria/sesion/desbloqueo',
   '/auth/mfa/codigos',
   '/auth/mfa/recuperacion',
+  // 15-W (ADR-037) · «Crear cuenta»: quien llama aún no tiene sesión, así que
+  // no hay token del que sacar copropiedad ni superadministrador que la elija.
+  // La copropiedad sale del PREFIJO del código de plaza, y el código sólo se
+  // busca dentro de ella.
+  '/auth/registro',
   // Identidad de SERVICIO: la copropiedad llega en el cuerpo firmado, y su
   // alcance lo comprueba `exigirAlcanceDeServicio` (§2.7.6).
   '/ingesta/eventos',

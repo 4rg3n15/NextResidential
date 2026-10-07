@@ -33,6 +33,12 @@ import { CambiarContrasena } from './aplicacion/cambiar-contrasena';
 import { RestablecerContrasena } from './aplicacion/restablecer-contrasena';
 import { PROVEEDOR_DEL_CIERRE } from './composicion-del-cierre';
 import { CrearCuentaPorUsuario } from './aplicacion/crear-cuenta';
+import { RegistrarResidente } from './aplicacion/registrar-residente';
+import {
+  REGISTRO_DE_INVITACIONES,
+  RegistroUnicoDeInvitaciones,
+} from './aplicacion/puertos-del-registro';
+import type { RegistroDeInvitaciones } from './aplicacion/puertos-del-registro';
 import { CuentasSupabase } from './infraestructura/cuentas-supabase';
 import { LectorDeTokenVerificado } from './infraestructura/lector-de-token';
 import { IgualadorDeTiempoReal } from './infraestructura/igualador-de-tiempo';
@@ -40,6 +46,7 @@ import { RepositorioDeCuentasPg } from './infraestructura/repositorio-cuentas-pg
 import { RepositorioDeCuentasEnMemoria } from './infraestructura/repositorio-cuentas-memoria';
 import { DirectorioDeCuentasPg } from './infraestructura/directorio-de-cuentas-pg';
 import { CuentasController } from './presentacion/cuentas.controller';
+import { RegistroController } from './presentacion/registro.controller';
 
 const enBase = (c: Configuracion): boolean => c.PERSISTENCIA_DE_EVENTOS === 'postgres';
 
@@ -55,7 +62,7 @@ export class CuentasModule {
   static registrar(): DynamicModule {
     return {
       module: CuentasModule,
-      controllers: [CuentasController],
+      controllers: [CuentasController, RegistroController],
       providers: [
         RepositorioDeCuentasEnMemoria,
         { provide: GANCHOS_DE_SESION, useClass: RegistroDeGanchosDeSesion },
@@ -146,9 +153,30 @@ export class CuentasModule {
           useFactory: (a: AdministradorDeCuentas, r: RepositorioDeCuentas) =>
             new CrearCuentaPorUsuario(a, r),
         },
+        // 15-W (D2) · «Crear cuenta». El residente inscribe sus invitaciones al
+        // arrancar; sin ellas, el registro no está disponible (falla cerrado).
+        { provide: REGISTRO_DE_INVITACIONES, useClass: RegistroUnicoDeInvitaciones },
+        {
+          provide: RegistrarResidente,
+          inject: [
+            CrearCuentaPorUsuario,
+            REPOSITORIO_DE_CUENTAS,
+            REGISTRO_DE_INVITACIONES,
+            IGUALADOR_DE_TIEMPO,
+            RELOJ,
+          ],
+          useFactory: (
+            c: CrearCuentaPorUsuario,
+            r: RepositorioDeCuentas,
+            i: RegistroDeInvitaciones,
+            t: IgualadorDeTiempo,
+            reloj: Reloj,
+          ) => new RegistrarResidente(c, r, i, t, reloj),
+        },
       ],
       exports: [
         GANCHOS_DE_SESION,
+        REGISTRO_DE_INVITACIONES,
         DIRECTORIO_DE_CUENTAS,
         PROVEEDOR_DE_IDENTIDAD,
         CrearCuentaPorUsuario,

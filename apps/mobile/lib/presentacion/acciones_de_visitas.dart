@@ -1,5 +1,5 @@
 /// Las acciones de visitas que abren pantallas: crear una, volver a autorizar
-/// a quien ya vino, y vaciar la bandeja de salida.
+/// a quien ya vino, revocar una vigente (15-W) y vaciar la bandeja de salida.
 ///
 /// Viven fuera del armazón por lo mismo que `AccionesDelHogar`: el armazón
 /// gobierna la sesión, la navegación y el ciclo de recarga; esto traduce un
@@ -11,8 +11,10 @@ import 'package:flutter/material.dart';
 import '../aplicacion/envio_de_visitas.dart';
 import '../dominio/entidades.dart';
 import '../dominio/puertos.dart';
+import '../dominio/revocacion.dart';
 import 'pantallas/nuevo_visitante.dart';
 import 'pantallas/volver_a_autorizar.dart';
+import 'widgets/dialogo_de_motivo.dart';
 
 /// Ejecuta una escritura y, si la sesión murió, lleva al acceso.
 typedef ConSesion = Future<T> Function<T>(Future<T> Function() operacion);
@@ -21,6 +23,7 @@ class AccionesDeVisitas {
   AccionesDeVisitas({
     required this.envio,
     required this.repositorio,
+    required this.revocacion,
     required this.reloj,
     required this.claves,
     required this.tomarFoto,
@@ -31,6 +34,7 @@ class AccionesDeVisitas {
 
   final EnvioDeVisitas envio;
   final RepositorioDelResidente repositorio;
+  final RevocacionDeVisitas revocacion;
   final Reloj reloj;
   final String Function() claves;
   final TomarFoto tomarFoto;
@@ -93,6 +97,29 @@ class AccionesDeVisitas {
         ),
       ),
     );
+    recargarVisitas();
+  }
+
+  /// 15-W · revoca una visita propia, con motivo obligatorio. Lo que conteste
+  /// el servidor —de cuántos equipos salió la foto, o que ya estaba revocada—
+  /// se dice tal cual, y la lista se recarga en los dos casos: si ya estaba
+  /// revocada, la lista de la pantalla era la vieja.
+  Future<void> revocar(BuildContext context, Autorizacion visita) async {
+    final motivo = await pedirMotivo(
+      context,
+      titulo: '¿Revocar la visita de ${visita.visitante}?',
+      explicacion: 'Ya no podrá entrar con esta autorización, y su foto sale de los equipos.',
+      accion: 'Revocar',
+      maximo: motivoMaximoDeRevocacion,
+    );
+    if (motivo == null || !context.mounted) return;
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      final r = await conSesion(() => revocacion.revocar(visita.id, motivo: motivo));
+      mensajero.showSnackBar(SnackBar(content: Text(r.texto)));
+    } on Fallo catch (f) {
+      mensajero.showSnackBar(SnackBar(content: Text(f.detalle)));
+    }
     recargarVisitas();
   }
 

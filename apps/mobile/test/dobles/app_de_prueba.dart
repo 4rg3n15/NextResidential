@@ -9,6 +9,7 @@ import 'package:ncr_residente/infraestructura/almacen/almacen_de_texto.dart';
 import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/app.dart';
 
+import 'hogar_15w_falso.dart';
 import 'hogar_falso.dart';
 import 'sincronizacion.dart';
 import 'visitas.dart';
@@ -191,14 +192,22 @@ class Mundo {
         notificaciones = NotificacionesFalsas(),
         comprobador = ComprobadorFijo(),
         alta = AltaFalsa(),
+        registro = RegistroFalso(),
+        menores = MenoresFalsos(),
+        revocacion = RevocacionFalsa(),
         llavero = AlmacenDeTextoEnMemoria(),
         llaveroDeSesion = AlmacenEnMemoria() {
     autenticador = AutenticadorGobernado(reloj);
+    plazas = PlazasFalsas(alta);
   }
 
   final String compilada;
   final RelojMovible reloj;
   final AltaFalsa alta;
+  final RegistroFalso registro;
+  final MenoresFalsos menores;
+  late final PlazasFalsas plazas;
+  final RevocacionFalsa revocacion;
   late final AutenticadorGobernado autenticador;
   final ResidenteGobernado repo;
   final NotificacionesFalsas notificaciones;
@@ -236,6 +245,10 @@ class Mundo {
         llamador: LlamadorFalso(),
         servidor: CambioDeServidor(direccion: direccion, comprobador: comprobador, sesion: sesion),
         notificacionesDelConjunto: notificaciones,
+        registro: registro,
+        menores: menores,
+        plazas: plazas,
+        revocacion: revocacion,
         tomarFoto: (_) async => fotoTomada(medidasBuenas),
         almacen: llavero,
       ),

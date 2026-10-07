@@ -10,7 +10,7 @@ import { GuardaDeAutenticacion } from './comun/guardas/autenticacion.guard';
 import { GuardaDeRoles } from './comun/guardas/roles.guard';
 import { GuardaDeCambioDeContrasena } from './comun/guardas/cambio-de-contrasena.guard';
 import { BitacoraDeIdentidadModule } from './comun/bitacora-de-identidad';
-import { CuentasModule, limitadoresDeAcceso } from './cuentas';
+import { CuentasModule, limitadoresDeAcceso, limitadoresDeRegistro } from './cuentas';
 import { GuardaDeTurnoDePorteria, PorteriaModule } from './porteria';
 import { GuardaDeOrigen, ModoPruebas, PlataformaModule } from './plataforma';
 import { MultiempresaModule } from './multiempresa/multiempresa.module';
@@ -230,6 +230,8 @@ export class AppModule {
               // ETAPA 15-H (S-50) · el inicio de sesión cuenta también por
               // (IP, cuenta) y por IP. Sólo en su ruta (`skipIf`).
               ...limitadoresDeAcceso(factor),
+              // 15-W (§7) · «Crear cuenta» cuenta también por (IP, prefijo).
+              ...limitadoresDeRegistro(factor),
             ];
           },
         }),

@@ -167,3 +167,16 @@ export const desenvolver = <T>(respuesta: {
   }
   return respuesta.data;
 };
+
+/**
+ * 15-W · el fallo de una consulta, en una línea, para los controles que viven
+ * DENTRO de una pantalla (un desplegable, un tope) y no la ocupan entera.
+ *
+ * Si la API contestó, su mensaje —ya sin códigos—: un 403 dice «Rol no
+ * autorizado», no «algo salió mal». Si ni siquiera hubo respuesta, `fetch`
+ * rechaza con un `TypeError` en inglés que no le dice nada a quien usa la
+ * consola: eso es «sin conexión», el mismo estado que `estadoSegunCodigo`
+ * pinta a pantalla completa.
+ */
+export const mensajeDeFallo = (error: unknown): string =>
+  error instanceof ErrorDeApi ? error.message : 'Sin conexión con el servidor.';

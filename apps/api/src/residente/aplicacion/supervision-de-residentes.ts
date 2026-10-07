@@ -2,10 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { RELOJ } from '@ncr/domain-core';
 import type { Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
+import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { CrearCuentaPorUsuario, RechazoDeAlta } from '../../cuentas';
 import type { SuprimirPlantillasDeTitular } from '../../biometria';
 import { plazasVisibles } from './ocupantes';
 import type { PlazaVisible } from './ocupantes';
+import { TITULARIDAD_DE_VIVIENDAS } from './puertos-de-titularidad';
+import type { TitularidadDeViviendas } from './puertos-de-titularidad';
 import {
   BITACORA_DE_RESIDENTES,
   CODIGOS_DE_OCUPANTE,
@@ -46,7 +49,15 @@ export interface AltaDeResidente {
   readonly contrasenaInicial: string;
   readonly nombre: string;
   readonly telefono: string | null;
+  /** 15-W (D1) · la vivienda de la que esta cuenta será el TITULAR. */
+  readonly viviendaId: string;
 }
+
+/** 15-W (D1) · por qué no se crea: 404 (vivienda), 409 (titular) o lo de `crearCuenta`. */
+export type RechazoDeAltaDeTitular =
+  | RechazoDeAlta
+  | { readonly motivo: 'VIVIENDA_NO_ENCONTRADA' }
+  | { readonly motivo: 'VIVIENDA_CON_TITULAR' };
 
 @Injectable()
 export class CuentasDeResidentesDelSuperadmin {
@@ -56,6 +67,7 @@ export class CuentasDeResidentesDelSuperadmin {
     @Inject(VEHICULOS_PROPIOS) private readonly vehiculos: VehiculosPropios,
     @Inject(BITACORA_DE_RESIDENTES) private readonly bitacora: BitacoraDeResidentes,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    @Inject(TITULARIDAD_DE_VIVIENDAS) private readonly titularidad: TitularidadDeViviendas,
     /** C9 (15-M) · sin él, la baja deja las plantillas vivas hasta que venzan. */
     private readonly suprimirPlantillas: SuprimirPlantillasDeTitular | null = null,
   ) {}
@@ -86,15 +98,27 @@ export class CuentasDeResidentesDelSuperadmin {
     return { plantillasSuprimidas };
   }
 
+  /**
+   * 15-W (D1, D-W9) · la PRIMERA cuenta de una vivienda, ya asignada a ella: es
+   * su titular. La vivienda tiene que existir aquí, estar activa y no tener
+   * titular; la titularidad se escribe en la MISMA transacción que la cuenta, y
+   * si otra alta simultánea la ganó, la cuenta del proveedor se elimina.
+   */
   async alta(
     ctx: ContextoTenant,
     copropiedadId: string,
     alta: AltaDeResidente,
   ): Promise<
     | { readonly ok: true; readonly usuarioId: string }
-    | { readonly ok: false; readonly rechazo: RechazoDeAlta }
+    | { readonly ok: false; readonly rechazo: RechazoDeAltaDeTitular }
   > {
-    const r = await this.crearCuenta.ejecutar(
+    const vivienda = await this.titularidad.viviendaParaTitular(copropiedadId, alta.viviendaId);
+    if (vivienda === 'INEXISTENTE' || vivienda === 'INACTIVA') {
+      return { ok: false, rechazo: { motivo: 'VIVIENDA_NO_ENCONTRADA' } };
+    }
+    if (vivienda === 'CON_TITULAR')
+      return { ok: false, rechazo: { motivo: 'VIVIENDA_CON_TITULAR' } };
+    const r = await this.crearCuenta.ejecutarConVinculo(
       {
         copropiedadId,
         usuario: alta.usuario,
@@ -102,10 +126,19 @@ export class CuentasDeResidentesDelSuperadmin {
         telefono: alta.telefono,
         rol: 'residente',
         contrasenaInicial: alta.contrasenaInicial,
+        origen: 'administracion',
+        debeCambiarContrasena: true,
       },
+      this.titularidad.escrituraDelTitular(copropiedadId, alta.viviendaId, ctx.usuarioId),
       ctx.usuarioId,
     );
-    if (!r.ok) return { ok: false, rechazo: r.error };
+    if (!r.ok) {
+      // VINCULO: otra alta simultánea se llevó la titularidad (la base decidió).
+      return {
+        ok: false,
+        rechazo: r.error.motivo === 'VINCULO' ? { motivo: 'VIVIENDA_CON_TITULAR' } : r.error,
+      };
+    }
     await this.bitacora.anotar({
       copropiedadId,
       tipo: 'alta_de_cuenta',
@@ -131,10 +164,17 @@ export class OcupantesDelSuperadmin {
   ) {}
 
   async ver(copropiedadId: string, viviendaId: string): Promise<readonly PlazaVisible[]> {
+    // Sólo el prefijo: quien pregunta no es residente, y no importa si es el titular.
+    const { codigoCorto } = await this.ocupantes.declaracion(
+      copropiedadId,
+      viviendaId,
+      ACTOR_INGESTA,
+    );
     return plazasVisibles(
       this.codigos,
       copropiedadId,
       await this.ocupantes.plazas(copropiedadId, viviendaId),
+      codigoCorto,
     );
   }
 
@@ -144,9 +184,9 @@ export class OcupantesDelSuperadmin {
     viviendaId: string,
     cantidad: number,
     motivo: string,
-  ): Promise<readonly PlazaVisible[] | null> {
+  ): Promise<readonly PlazaVisible[] | null | 'COTA_DE_LA_PLATAFORMA'> {
     const hechas = await this.ocupantes.anadir(copropiedadId, viviendaId, cantidad, ctx.usuarioId);
-    if (hechas === null) return null;
+    if (hechas === null || hechas === 'COTA_DE_LA_PLATAFORMA') return hechas;
     await this.bitacora.anotar({
       copropiedadId,
       tipo: 'plaza_anadida',

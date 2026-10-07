@@ -5,23 +5,26 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PlazaDeOcupante } from '@ncr/contracts';
 import { useViviendas } from '@/lib/api/consultas';
-import { cliente, desenvolver } from '@/lib/api/cliente';
+import { cliente, desenvolver, mensajeDeFallo } from '@/lib/api/cliente';
 import { Boton } from '@/componentes/ui/boton';
 import { Campo } from '@/componentes/ui/campo';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { clavesDeResidentes, useOcupantes } from './consultas';
+import { TopeDePlazasDeVivienda } from './tope-de-plazas';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * OCUPANTES DE UNA VIVIENDA · D6 (3.3)
+ * OCUPANTES DE UNA VIVIENDA · D6 (3.3), revisado en la ronda 15-W
  *
- * El primer residente declara el número UNA vez desde la app y es definitivo.
- * Añadir o quitar ocupantes después lo hace el superadministrador AQUÍ, a
- * petición del residente, siempre con motivo —queda en la bitácora de
- * residentes—. Quitar una plaza ocupada da de baja el vínculo de esa persona.
- * Los códigos de las plazas libres se muestran para poder dárselos.
+ * Desde la 15-W el TITULAR crea las plazas de su hogar desde la app, hasta el
+ * tope de la vivienda, y comparte sus códigos. Esta es la ficha de plazas de
+ * UNA vivienda para el superadministrador: «Plazas: N de M» con su «Cambiar
+ * tope», y añadir o quitar plazas a petición del hogar, siempre con motivo
+ * —queda en la bitácora de residentes—. Quitar una plaza ocupada da de baja el
+ * vínculo de esa persona. Los códigos de las plazas libres se muestran para
+ * poder dárselos.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const OcupantesPorVivienda = ({
@@ -53,7 +56,7 @@ export const OcupantesPorVivienda = ({
       await refrescar();
       alTerminar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo completar.');
+      setError(mensajeDeFallo(e));
     } finally {
       setEnviando(false);
     }
@@ -66,8 +69,8 @@ export const OcupantesPorVivienda = ({
         <div>
           <h2 className="text-titulo font-semibold text-texto">Ocupantes por vivienda</h2>
           <p className="text-secundario text-texto-apagado">
-            El número lo fija el primer residente y es definitivo; aquí se añaden o quitan a
-            petición suya.
+            El titular crea las plazas de su hogar desde la app, hasta el tope de la vivienda; aquí
+            se añaden o quitan a petición suya, con motivo.
           </p>
         </div>
         <div className="flex items-end gap-2">
@@ -92,9 +95,26 @@ export const OcupantesPorVivienda = ({
           </Boton>
         </div>
       </header>
-      {viviendaId === '' ? null : lista.length === 0 && plazas.isSuccess ? (
+      {viviendaId === '' ? null : (
+        <TopeDePlazasDeVivienda copropiedadId={copropiedadId} viviendaId={viviendaId} />
+      )}
+      {viviendaId === '' ? null : plazas.isPending ? (
+        <p role="status" className="text-secundario text-texto-apagado">
+          Consultando las plazas…
+        </p>
+      ) : plazas.isError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-2 text-secundario text-peligro-texto"
+        >
+          <span>No se pudieron consultar las plazas. {mensajeDeFallo(plazas.error)}</span>
+          <Boton variante="secundario" tamano="sm" onClick={() => void plazas.refetch()}>
+            Reintentar
+          </Boton>
+        </div>
+      ) : lista.length === 0 ? (
         <p className="text-secundario text-texto-apagado">
-          Sin ocupantes declarados. El primer residente los declara desde la app.
+          Sin plazas todavía. Las crea el titular desde la app, o se añaden aquí.
         </p>
       ) : (
         <ul className="divide-y divide-borde" aria-label="Plazas de ocupante">

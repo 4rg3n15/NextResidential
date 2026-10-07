@@ -1,5 +1,6 @@
-/// Las acciones del hogar que abren pantallas (ETAPA 15-I): registrar y dar de
-/// baja vehículos, editar el perfil, cambiar de vivienda y de contraseña.
+/// Las acciones del hogar que abren pantallas (ETAPA 15-I, RONDA 15-W):
+/// registrar, editar y eliminar vehículos, editar el perfil, cambiar de
+/// vivienda y de contraseña.
 ///
 /// Viven fuera del armazón por SRP: el armazón gobierna la sesión y la
 /// navegación principal; esto traduce un toque en una pantalla y una recarga.
@@ -14,8 +15,9 @@ import '../dominio/entidades.dart';
 import '../dominio/hogar.dart';
 import '../dominio/puertos.dart';
 import 'controlador.dart';
-import 'pantallas/alta.dart';
+import 'dependencias.dart';
 import 'pantallas/cambio_de_contrasena.dart';
+import 'pantallas/cambio_de_vivienda.dart';
 import 'pantallas/editar_perfil.dart';
 import 'pantallas/nuevo_vehiculo.dart';
 
@@ -30,6 +32,24 @@ class AccionesDelHogar {
     required this.perfil,
     required this.alCambiarDeVivienda,
   });
+
+  /// Las del armazón: sus puertos y sus controladores de vista.
+  factory AccionesDelHogar.delArmazon(
+    Dependencias d, {
+    required ControladorDeVista<List<MiembroDeFamilia>> familia,
+    required ControladorDeVista<List<Vehiculo>> vehiculos,
+    required ControladorDeVista<PerfilDelResidente> perfil,
+    required void Function() alCambiarDeVivienda,
+  }) => AccionesDelHogar(
+    sesion: d.sesion,
+    alta: d.alta,
+    hogar: d.hogar,
+    cuenta: d.cuenta,
+    familia: familia,
+    vehiculos: vehiculos,
+    perfil: perfil,
+    alCambiarDeVivienda: alCambiarDeVivienda,
+  );
 
   final SesionEnUso sesion;
   final RepositorioDeAlta alta;
@@ -76,31 +96,47 @@ class AccionesDelHogar {
     return e is ConDatos<List<MiembroDeFamilia>> ? e.datos : const [];
   }
 
-  Future<void> desactivarVehiculo(BuildContext context, Vehiculo v) async {
+  /// 15-W (D5) · la placa sólo cambia si el vehículo no tiene historial: si
+  /// lo tiene, la pantalla enseña el texto del servidor.
+  Future<void> editarVehiculo(BuildContext context, Vehiculo v) => _abrir(
+    context,
+    PantallaDeNuevoVehiculo.editar(
+      repositorio: hogar,
+      vehiculo: v,
+      alRegistrar: () {
+        Navigator.of(context).pop();
+        _avisar(context, 'Vehículo ${v.placa} actualizado.');
+        vehiculos.cargarAhora();
+      },
+    ),
+  );
+
+  /// 15-W (D5) · sin historial se borra; con historial queda dado de baja y su
+  /// historial se conserva. Lo decide el servidor y se dice cuál de los dos.
+  Future<void> eliminarVehiculo(BuildContext context, Vehiculo v) async {
     final si = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('¿Dar de baja ${v.placa}?'),
-        content: const Text('Dejará de abrir la talanquera. Libera un cupo de su vivienda.'),
+        title: Text('¿Eliminar ${v.placa}?'),
+        content: const Text(
+          'Dejará de abrir la talanquera y libera un cupo de su vivienda. Si el vehículo ya '
+          'tiene historial en el conjunto, queda dado de baja y su historial se conserva.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('Cancelar')),
           FilledButton(
+            key: const Key('vehiculos.confirmarEliminar'),
             onPressed: () => Navigator.of(c).pop(true),
-            child: const Text('Dar de baja'),
+            child: const Text('Eliminar'),
           ),
         ],
       ),
     );
     if (si != true || !context.mounted) return;
     try {
-      final hecho = await hogar.desactivarVehiculo(v.id);
+      final hecho = await hogar.eliminarVehiculo(v.id);
       if (!context.mounted) return;
-      _avisar(
-        context,
-        hecho
-            ? 'Vehículo dado de baja.'
-            : 'Este vehículo lo registró la administración: sólo ella puede darlo de baja.',
-      );
+      _avisar(context, textoDeEliminacion(hecho, v.placa));
       vehiculos.cargarAhora();
     } on Fallo catch (f) {
       if (context.mounted) _avisar(context, f.detalle);
@@ -126,12 +162,11 @@ class AccionesDelHogar {
       if (!context.mounted) return;
       await _abrir(
         context,
-        PantallaDeAlta(
+        PantallaDeCambioDeVivienda(
           estado: estado,
           repositorio: alta,
-          cambio: true,
           perfil: actual,
-          alCompletar: (_) {
+          alCompletar: () {
             Navigator.of(context).pop();
             _avisar(context, 'Vivienda cambiada.');
             alCambiarDeVivienda();

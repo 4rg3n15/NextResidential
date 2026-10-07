@@ -13,6 +13,7 @@ PlazaDeOcupanteDto _$PlazaDeOcupanteDtoFromJson(Map<String, dynamic> json) =>
       libre: json['libre'] as bool,
       codigo: json['codigo'] as String?,
       ocupante: json['ocupante'] as String?,
+      sinCuenta: json['sinCuenta'] as bool,
     );
 
 Map<String, dynamic> _$PlazaDeOcupanteDtoToJson(PlazaDeOcupanteDto instance) =>
@@ -22,4 +23,5 @@ Map<String, dynamic> _$PlazaDeOcupanteDtoToJson(PlazaDeOcupanteDto instance) =>
       'libre': instance.libre,
       'codigo': instance.codigo,
       'ocupante': instance.ocupante,
+      'sinCuenta': instance.sinCuenta,
     };

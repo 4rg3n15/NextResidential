@@ -13,6 +13,7 @@ VocabularioDeAltaDto _$VocabularioDeAltaDtoFromJson(
   tipo: json['tipo'] as String?,
   etiquetaVivienda: json['etiquetaVivienda'] as String,
   etiquetaAgrupacion: json['etiquetaAgrupacion'] as String,
+  codigoCorto: json['codigoCorto'] as String?,
 );
 
 Map<String, dynamic> _$VocabularioDeAltaDtoToJson(
@@ -22,4 +23,5 @@ Map<String, dynamic> _$VocabularioDeAltaDtoToJson(
   'tipo': instance.tipo,
   'etiquetaVivienda': instance.etiquetaVivienda,
   'etiquetaAgrupacion': instance.etiquetaAgrupacion,
+  'codigoCorto': instance.codigoCorto,
 };
