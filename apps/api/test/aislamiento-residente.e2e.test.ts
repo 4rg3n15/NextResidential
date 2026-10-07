@@ -22,6 +22,8 @@ import {
   USUARIO_RB,
   USUARIO_SIN_VIVIENDA,
 } from './dobles/directorio-del-residente';
+// 15-X (D3) · las que nombran un recurso de la vivienda: las recorre su propia suite.
+import { CON_RECURSO_DE_LA_VIVIENDA } from './rutas-con-recurso-de-vivienda';
 
 /**
  * SUITE DE AISLAMIENTO · SEGUNDO EJE: RESIDENTE CONTRA RESIDENTE
@@ -264,6 +266,7 @@ describe('cobertura · la lista de rutas sale del CÓDIGO, no de esta prueba', (
         (clave) =>
           RECORRIDAS[clave] === undefined &&
           ESCRITURAS_DEL_AMBITO[clave] === undefined &&
+          CON_RECURSO_DE_LA_VIVIENDA[clave] === undefined &&
           !CUBIERTAS_APARTE.has(clave) &&
           !SIN_AMBITO_DE_VIVIENDA.has(clave),
       );

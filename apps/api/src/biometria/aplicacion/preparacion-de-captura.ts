@@ -32,14 +32,19 @@ import type { RepositorioConsentimientos } from './puertos';
  *
  * El orden sigue siendo la regla: calidad → consentimiento → plantilla.
  *
- * Tres constancias del consentimiento, y no se confunden (ADR-032, ADR-039):
+ * Cuatro constancias del consentimiento, y no se confunden (ADR-032, ADR-039):
  *  · sin nada: una SOLICITUD pendiente del titular (CU-02, lo de siempre);
  *  · `declaracion`: la casilla de quien registra la visita (F4, 15-L);
  *  · `otorgadoPorElTitular` (15-X · D2): el propio titular acepta la política
  *    en el acto, desde su cuenta. Si ya tiene uno vigente se reutiliza —la base
  *    admite uno solo, `consent_vigente_uk`—, y si aquel lo había declarado
- *    quien registró una visita, el titular lo confirma (D-10); si no hay
- *    ninguno, se solicita y él mismo lo otorga.
+ *    quien registró una visita, o lo autorizó su representante cuando era
+ *    menor, el titular lo confirma (D-10); si no hay ninguno, se solicita y él
+ *    mismo lo otorga;
+ *  · `representante` (15-X · D3): el titular del hogar autoriza el rostro de un
+ *    menor. Se reutiliza sólo la autorización vigente de ESE representante; con
+ *    otra vigente no se registra (409): si es de otro representante, se retira
+ *    primero; si es del menor o de una visita, sólo la revoca el menor.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export interface SolicitudDeCaptura {
@@ -64,6 +69,11 @@ export interface SolicitudDeCaptura {
   readonly declaracion?: { readonly declaradoPor: string };
   /** 15-X · D2 · el titular acepta la política él mismo, desde su cuenta. */
   readonly otorgadoPorElTitular?: true;
+  /**
+   * 15-X · D3 · el titular del hogar autoriza, como REPRESENTANTE LEGAL, el
+   * rostro de un menor de 15 a 17 años: su cuenta queda como autora.
+   */
+  readonly representante?: { readonly representanteId: string };
 }
 
 export type CapturaPreparada =
@@ -156,10 +166,22 @@ export class PreparacionDeCaptura {
       versionPolitica: solicitud.versionPolitica,
       canal: solicitud.canal,
     };
-    if (solicitud.declaracion === undefined && solicitud.otorgadoPorElTitular !== true) {
+    const constancia =
+      solicitud.declaracion ?? solicitud.otorgadoPorElTitular ?? solicitud.representante;
+    if (constancia === undefined) {
       return ConsentimientoBiometrico.solicitar({ ...base, solicitadoEn: ahora });
     }
     const vigente = await this.consentimientos.vigenteDe(copropiedadId, solicitud.titularId);
+    if (solicitud.representante !== undefined) {
+      const { representanteId } = solicitud.representante;
+      return vigente === null
+        ? ConsentimientoBiometrico.autorizarComoRepresentanteLegal({
+            ...base,
+            representanteId,
+            ahora,
+          })
+        : reutilizableDelRepresentante(vigente, representanteId);
+    }
     if (solicitud.otorgadoPorElTitular === true) {
       if (vigente !== null) {
         return vigente.origen === 'otorgado_por_el_titular'
@@ -179,3 +201,30 @@ export class PreparacionDeCaptura {
     });
   }
 }
+
+/** D3 · sólo la autorización vigente de ESE representante; otra vigente es un 409. */
+const reutilizableDelRepresentante = (
+  vigente: ConsentimientoBiometrico,
+  representanteId: string,
+): Resultado<ConsentimientoBiometrico, ErrorDominio> => {
+  if (vigente.origen !== 'autorizado_por_representante_legal') {
+    return fallo(
+      errorDominio(
+        'INVARIANTE_VIOLADA',
+        'Este menor tiene otro consentimiento vigente, de una visita o suyo: mientras siga ' +
+          'vigente, su representante no registra uno nuevo',
+        'RN-10',
+      ),
+    );
+  }
+  if (vigente.declaradoPor !== representanteId) {
+    return fallo(
+      errorDominio(
+        'INVARIANTE_VIOLADA',
+        'El rostro de este menor lo autorizó otro representante: retírelo y vuelva a registrarlo',
+        'RN-10',
+      ),
+    );
+  }
+  return exito(vigente);
+};

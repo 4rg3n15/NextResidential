@@ -1,18 +1,15 @@
-import type {
-  ErrorDominio,
-  MedidasDeCaptura,
-  MotivoRechazoCaptura,
-  Reloj,
-  Resultado,
-} from '@ncr/domain-core';
+import type { ErrorDominio, Reloj, Resultado } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { RostroDeResidente } from '../../biometria';
-import { revisarFoto } from '../../visitas';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import { estadoDelRostro } from './estado-del-rostro';
 import type { EstadoDeMiRostro } from './estado-del-rostro';
-import { CAPTURAS_DE_ROSTRO_POR_DIA, POLITICA_DEL_ROSTRO } from './politica-del-rostro';
+import { POLITICA_DEL_ROSTRO } from './politica-del-rostro';
+import { DIA_MS, rechazo, rechazoAntesDeCapturar } from './puerta-del-rostro';
+import type { FotoDeRostro, ResultadoDeMiRostro } from './puerta-del-rostro';
 import type { BitacoraDeResidentes } from './puertos-hogar';
+
+export type { FotoDeRostro, ResultadoDeMiRostro } from './puerta-del-rostro';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -20,40 +17,17 @@ import type { BitacoraDeResidentes } from './puertos-hogar';
  *
  * Opcional, del adulto con cuenta, y suyo: la persona sale del VÍNCULO de la
  * cuenta (`usuarios.persona_id`), nunca del cuerpo. Aquí se pone la puerta
- * —política vigente, foto (tipo real, tamaño, calidad), tope de 5 capturas en
- * 24 h contado en la base— y la bitácora; lo que toca plantillas, bóveda y
+ * (`puerta-del-rostro.ts`: política vigente, foto por tipo real, tamaño y
+ * calidad, tope de 5 capturas en 24 h contado en la base) y la bitácora; lo que toca plantillas, bóveda y
  * equipos lo hace la biometría (`RostroDeResidente`): este módulo no inyecta
  * ninguna de esas piezas. La imagen no sale nunca: ni el estado ni la bitácora
  * tienen dónde ponerla.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-export interface FotoDeRostro {
-  readonly contenidoBase64: string;
-  readonly tipoMime: string;
-  readonly medidas: MedidasDeCaptura;
-  readonly versionPolitica: string;
-}
-
-export type ResultadoDeMiRostro =
-  | { readonly hecho: true; readonly estado: EstadoDeMiRostro }
-  | {
-      readonly hecho: false;
-      readonly estado: 400 | 404 | 409 | 429;
-      readonly explicacion: string;
-      readonly motivos?: readonly MotivoRechazoCaptura[];
-      readonly reintentarEnS?: number;
-    };
-
 export type EstadoConPolitica = EstadoDeMiRostro & {
   readonly politica: typeof POLITICA_DEL_ROSTRO;
 };
 
-const DIA_MS = 24 * 3600 * 1000;
-const no = (
-  estado: 400 | 404 | 409 | 429,
-  explicacion: string,
-  extra: { motivos?: readonly MotivoRechazoCaptura[]; reintentarEnS?: number } = {},
-): ResultadoDeMiRostro => ({ hecho: false, estado, explicacion, ...extra });
 const dar = <T>(valor: T): Resultado<T, ErrorDominio> => ({ ok: true, valor });
 
 export class MiRostro {
@@ -89,10 +63,15 @@ export class MiRostro {
     const r = await this.ambito.ejecutar(ctx, cop);
     if (!r.ok) return r;
     const personaId = r.valor.vinculo.personaId;
-    const rechazo = await this.rechazoPrevio(ctx, cop, foto);
-    if (rechazo !== null) return dar(rechazo);
-
     const ahora = this.reloj.ahora();
+    const antes = await rechazoAntesDeCapturar(
+      foto,
+      POLITICA_DEL_ROSTRO.version,
+      () => this.rostro.capturasRecientes(cop, ctx.usuarioId, ahora),
+      ahora,
+    );
+    if (antes !== null) return dar<ResultadoDeMiRostro>(antes);
+
     const hecho = await this.rostro.registrar(ctx, {
       titularId: personaId,
       vector: Buffer.from(foto.contenidoBase64, 'base64'),
@@ -101,13 +80,15 @@ export class MiRostro {
       suprimirEn: new Date(ahora.getTime() + this.retencionDias * DIA_MS),
     });
     if (!hecho.ok) {
-      return dar(no(hecho.error.codigo === 'DATO_INVALIDO' ? 400 : 409, hecho.error.detalle));
+      return dar(rechazo(hecho.error.codigo === 'DATO_INVALIDO' ? 400 : 409, hecho.error.detalle));
     }
     if (!hecho.valor.registrado) {
       return dar(
         'motivos' in hecho.valor
-          ? no(400, 'La foto no sirve para reconocerle', { motivos: hecho.valor.motivos })
-          : no(409, 'Otro registro de su rostro terminó antes: vuelva a intentarlo'),
+          ? rechazo(400, 'La foto no sirve para reconocer el rostro', {
+              motivos: hecho.valor.motivos,
+            })
+          : rechazo(409, 'Otro registro de su rostro terminó antes: vuelva a intentarlo'),
       );
     }
     await this.anotar(ctx, cop, 'rostro_registrado', ahora);
@@ -123,41 +104,9 @@ export class MiRostro {
     const personaId = r.valor.vinculo.personaId;
     const habia = await this.rostro.retirar(ctx, personaId);
     if (!habia.ok) return habia;
-    if (!habia.valor) return dar(no(404, 'No tiene un rostro registrado'));
+    if (!habia.valor) return dar(rechazo(404, 'No tiene un rostro registrado'));
     await this.anotar(ctx, cop, 'rostro_retirado', this.reloj.ahora());
     return dar({ hecho: true, estado: await this.leer(ctx, personaId) } as ResultadoDeMiRostro);
-  }
-
-  /** Política vigente, foto admisible y tope de 24 h: antes de crear nada. */
-  private async rechazoPrevio(
-    ctx: ContextoTenant,
-    cop: string,
-    foto: FotoDeRostro,
-  ): Promise<ResultadoDeMiRostro | null> {
-    if (foto.versionPolitica !== POLITICA_DEL_ROSTRO.version) {
-      return no(409, 'La política del rostro cambió: léala y acéptela de nuevo');
-    }
-    const revisada = revisarFoto({
-      contenidoBase64: foto.contenidoBase64,
-      tipoMime: foto.tipoMime,
-      medidas: foto.medidas,
-    });
-    if (!revisada.ok) return no(400, revisada.error.detalle);
-    if (!revisada.valor.aceptada) {
-      return no(400, 'La foto no sirve para reconocerle', { motivos: revisada.valor.motivos });
-    }
-    const ahora = this.reloj.ahora();
-    const capturas = await this.rostro.capturasRecientes(cop, ctx.usuarioId, ahora);
-    if (capturas.length < CAPTURAS_DE_ROSTRO_POR_DIA) return null;
-    // Se libera un hueco cuando la quinta más reciente cumple 24 h.
-    const libera = capturas[capturas.length - CAPTURAS_DE_ROSTRO_POR_DIA] ?? ahora;
-    return no(
-      429,
-      `Ya registró un rostro ${String(CAPTURAS_DE_ROSTRO_POR_DIA)} veces en 24 horas`,
-      {
-        reintentarEnS: Math.max(1, Math.ceil((libera.getTime() + DIA_MS - ahora.getTime()) / 1000)),
-      },
-    );
   }
 
   private async leer(ctx: ContextoTenant, personaId: string): Promise<EstadoDeMiRostro> {

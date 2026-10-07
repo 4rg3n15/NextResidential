@@ -42,6 +42,7 @@ import '../models/resultado_de_perfil_dto.dart';
 import '../models/resultado_de_vehiculo_propio_dto.dart';
 import '../models/retiro_de_ocupante_dto.dart';
 import '../models/revocacion_de_mi_visita_dto.dart';
+import '../models/rostro_de_menor_dto.dart';
 import '../models/suscripcion_anulada_dto.dart';
 import '../models/suscripcion_registrada_dto.dart';
 import '../models/suscripcion_web_push_dto.dart';
@@ -132,6 +133,28 @@ abstract class ResidenteApi {
   /// El titular genera el código con el que un mayor de 18 crea su cuenta
   @POST('/copropiedades/{id}/mi/menores/{residenteId}/codigo-de-traspaso')
   Future<CodigoDeTraspasoDto> misMenoresControllerCodigoDeTraspaso({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+  });
+
+  /// El estado del rostro de un menor de mi hogar y la política del representante
+  @GET('/copropiedades/{id}/mi/menores/{residenteId}/rostro')
+  Future<MiRostroConPoliticaDto> rostroDeMisMenoresControllerEstado({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+  });
+
+  /// El titular registra o renueva, como representante legal, el rostro de un menor
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/rostro')
+  Future<EstadoDeMiRostroDto> rostroDeMisMenoresControllerRegistrar({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+    @Body() required RostroDeMenorDto body,
+  });
+
+  /// El titular retira el rostro de un menor: revoca y suprime en el acto, en los equipos
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/rostro/retiro')
+  Future<EstadoDeMiRostroDto> rostroDeMisMenoresControllerRetirar({
     @Path('id') required String id,
     @Path('residenteId') required String residenteId,
   });

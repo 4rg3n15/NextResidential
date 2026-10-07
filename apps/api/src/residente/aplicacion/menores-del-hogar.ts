@@ -9,7 +9,7 @@ import {
 } from '@ncr/domain-core';
 import type { ErrorDominio, Reloj, Resultado } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
-import type { SuprimirPlantillasDeTitular } from '../../biometria';
+import type { SuprimirYRetirarYa } from '../../biometria';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import { OCUPANTES_DE_LA_VIVIENDA } from './puertos-hogar';
 import type { CodigosDeOcupante, OcupantesDeLaVivienda } from './puertos-hogar';
@@ -80,7 +80,8 @@ export class MenoresDeMiHogar {
     @Inject(OCUPANTES_DE_LA_VIVIENDA) private readonly ocupantes: OcupantesDeLaVivienda,
     @Inject(TRASPASOS) private readonly traspasos: CodigosDeOcupante,
     @Inject(RELOJ) private readonly reloj: Reloj,
-    private readonly suprimirPlantillas: SuprimirPlantillasDeTitular | null = null,
+    /** 15-X · D3 · su rostro sale YA, también de los equipos (no a las 6 h del barrido). */
+    private readonly suprimirRostro: Pick<SuprimirYRetirarYa, 'deTitular'> | null = null,
   ) {}
 
   async listar(
@@ -141,7 +142,10 @@ export class MenoresDeMiHogar {
     return { ok: true, valor: traducir(hecho) };
   }
 
-  /** Baja con motivo: su plaza queda libre y sus plantillas, suprimidas (RN-11). */
+  /**
+   * Baja con motivo: su plaza queda libre y sus plantillas, suprimidas y
+   * retiradas de los equipos en el acto (RN-11, CA-11; 15-X D3).
+   */
   async darDeBaja(
     ctx: ContextoTenant,
     cop: string,
@@ -157,8 +161,8 @@ export class MenoresDeMiHogar {
       ctx.usuarioId,
       motivo,
     );
-    if (hecho.ok && this.suprimirPlantillas !== null) {
-      await this.suprimirPlantillas.ejecutar(ctx, cop, hecho.personaId);
+    if (hecho.ok && this.suprimirRostro !== null) {
+      await this.suprimirRostro.deTitular(ctx, cop, hecho.personaId);
     }
     return { ok: true, valor: traducir(hecho) };
   }

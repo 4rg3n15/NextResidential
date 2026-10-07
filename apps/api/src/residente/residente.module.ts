@@ -9,6 +9,7 @@ import { MisVehiculosController } from './presentacion/mis-vehiculos.controller'
 import { TitularesController } from './presentacion/titulares.controller';
 import { MisMenoresController } from './presentacion/mis-menores.controller';
 import { MiRostroController } from './presentacion/mi-rostro.controller';
+import { RostroDeMisMenoresController } from './presentacion/rostro-de-mis-menores.controller';
 import { PROVEEDORES_DEL_ROSTRO_DEL_RESIDENTE } from './rostro.providers';
 import {
   TopeDePlazasController,
@@ -113,6 +114,7 @@ export class ResidenteModule implements OnModuleInit {
         MisPlazasController,
         MisMenoresController,
         MiRostroController, // 15-X (D2) · mi rostro: opcional, anual y retirable.
+        RostroDeMisMenoresController, // 15-X (D3) · el de un menor, por el titular.
         TopeDePlazasController,
         TopeDePlazasPorOmisionController,
         RegistroDeLaCopropiedadController,

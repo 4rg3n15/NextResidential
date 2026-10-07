@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { errorDominio, exito, fallo } from '@ncr/domain-core';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
-import type { SuprimirPlantillasDeTitular } from '../../biometria';
+import type { SuprimirYRetirarYa } from '../../biometria';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import { MenoresDeMiHogar } from './menores-del-hogar';
 import type { MenorEscrito, MenoresDelHogar } from './puertos-de-menores';
@@ -89,14 +89,16 @@ const montar = (o: { escrito?: MenorEscrito; titular?: boolean; plaza?: object |
     })),
   };
   const traspasos = { codigoDe: vi.fn(() => 'K7PQ2XWZ'), plazaDelCodigo: vi.fn() };
-  const suprimir = { ejecutar: vi.fn(async () => exito({ suprimidas: 1 })) };
+  const suprimir = {
+    deTitular: vi.fn(async () => ({ suprimidas: 1, retiradas: 1, retiradasPendientes: 0 })),
+  };
   const caso = new MenoresDeMiHogar(
     como<ResolverMiAmbito>(resolver),
     como<MenoresDelHogar>(menores),
     como<OcupantesDeLaVivienda>(ocupantes),
     como<CodigosDeOcupante>(traspasos),
     { ahora: () => AHORA },
-    como<SuprimirPlantillasDeTitular>(suprimir),
+    como<SuprimirYRetirarYa>(suprimir),
   );
   return { caso, resolver, menores, suprimir, traspasos };
 };
@@ -182,14 +184,14 @@ describe('MenoresDeMiHogar (15-W, D4)', () => {
     expect(bien.ok && bien.valor.hecho).toBe(true);
   });
 
-  it('la baja suprime las plantillas de la persona (RN-11); si no era suya, no suprime nada', async () => {
+  it('la baja suprime y retira YA el rostro de la persona (RN-11, 15-X D3); si no era suya, nada', async () => {
     const { caso, suprimir } = montar();
     expect((await caso.darDeBaja(ctx, COP, 'r-1', 'Se mudó')).ok).toBe(true);
-    expect(suprimir.ejecutar).toHaveBeenCalledWith(ctx, COP, 'p-1');
+    expect(suprimir.deTitular).toHaveBeenCalledWith(ctx, COP, 'p-1');
     const ajeno = montar({ escrito: { ok: false, motivo: 'NO_ENCONTRADO' } });
     const r = await ajeno.caso.darDeBaja(ctx, COP, 'r-9', 'No es mío');
     expect(r.ok && !r.valor.hecho && r.valor.estado).toBe(404);
-    expect(ajeno.suprimir.ejecutar).not.toHaveBeenCalled();
+    expect(ajeno.suprimir.deTitular).not.toHaveBeenCalled();
   });
 
   it('el código de traspaso: sólo el titular, sólo de su vivienda y sólo con 18 cumplidos', async () => {

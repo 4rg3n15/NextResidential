@@ -21,7 +21,7 @@ import { Deshacer, comoServicio, deshaciendo, violacion } from './con-identidad'
  * ═════════════════════════════════════════════════════════════════════════════
  */
 /** Residente ACTIVO de esa vivienda cuya persona no tiene cuenta: un menor del hogar. */
-const SQL_SIN_CUENTA = `NOT EXISTS (SELECT 1 FROM public.usuarios u WHERE u.persona_id = r.persona_id)`;
+export const SQL_SIN_CUENTA = `NOT EXISTS (SELECT 1 FROM public.usuarios u WHERE u.persona_id = r.persona_id)`;
 
 export class MenoresDelHogarPg implements MenoresDelHogar {
   constructor(private readonly pool: Pool) {}

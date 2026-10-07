@@ -56,6 +56,27 @@ export class MiRostroDto {
   aceptaPolitica!: boolean;
 }
 
+/**
+ * 15-X · D3 · el rostro de un menor de 15 a 17 años: lo mismo que el propio y
+ * las dos declaraciones del titular como representante legal, las dos `true`
+ * (booleano llano en el contrato, como `aceptaPolitica`). Ni `personaId` ni
+ * `titularId`: el menor sale de la ruta, filtrado por la vivienda del ámbito.
+ */
+export class RostroDeMenorDto extends MiRostroDto {
+  @ApiProperty({ type: Boolean, description: 'Soy su representante legal: debe ser true' })
+  @IsBoolean()
+  @Equals(true, { message: 'Hay que declarar que es su representante legal' })
+  declaraRepresentacionLegal!: boolean;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'El menor fue informado y está de acuerdo: debe ser true',
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'El menor tiene que estar informado y de acuerdo' })
+  menorInformadoYDeAcuerdo!: boolean;
+}
+
 export class EquipoDelRostroDto {
   @ApiProperty() nombre!: string;
   @ApiProperty({ enum: ['sincronizada', 'pendiente', 'fallida'] }) estado!: string;

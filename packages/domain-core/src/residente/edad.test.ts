@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { MAYORIA_DE_EDAD, diaCivilEnBogota, edadEn, esFechaCivil, puedeTenerCuenta } from './edad';
+import {
+  EDAD_MINIMA_ROSTRO_MENOR,
+  MAYORIA_DE_EDAD,
+  aptitudDelRostroDeMenor,
+  cumpleMayoriaEn,
+  diaCivilEnBogota,
+  edadEn,
+  esFechaCivil,
+  puedeTenerCuenta,
+} from './edad';
 
 /**
  * RONDA 15-W · D-W2 · la mayoría de edad con el día de BOGOTÁ (UTC−5). Las
@@ -55,5 +64,71 @@ describe('edadEn · el día de Bogotá, con el reloj inyectado', () => {
     expect(edadEn('2026-10-07', mediodia)).toBeNull();
     expect(esFechaCivil('2026-02-29')).toBe(false);
     expect(esFechaCivil('2028-02-29')).toBe(true);
+  });
+});
+
+/**
+ * 15-X · D3 · el rostro de un menor: desde los 15 años CUMPLIDOS (S-15W-01)
+ * hasta la víspera de los 18, con el mismo día de Bogotá que la cuenta.
+ */
+describe('aptitudDelRostroDeMenor · de 15 cumplidos a 17', () => {
+  const mediodia = new Date('2026-10-06T17:00:00Z'); // 12:00 del 6 de octubre en Bogotá
+
+  it('15 cumplidos hoy: apto; con el cumpleaños mañana, todavía no', () => {
+    expect(EDAD_MINIMA_ROSTRO_MENOR).toBe(15);
+    expect(aptitudDelRostroDeMenor('2011-10-06', mediodia)).toBe('APTO');
+    expect(aptitudDelRostroDeMenor('2011-10-07', mediodia)).toBe('EDAD_INSUFICIENTE');
+    expect(aptitudDelRostroDeMenor('2020-01-01', mediodia)).toBe('EDAD_INSUFICIENTE');
+  });
+
+  it('17 todavía es apto; con 18 cumplidos ya es mayor', () => {
+    expect(aptitudDelRostroDeMenor('2008-10-07', mediodia)).toBe('APTO');
+    expect(aptitudDelRostroDeMenor('2008-10-06', mediodia)).toBe('YA_ES_MAYOR');
+    expect(aptitudDelRostroDeMenor('1990-05-17', mediodia)).toBe('YA_ES_MAYOR');
+  });
+
+  it('sin fecha, con una que no es civil o con una futura: nunca apto', () => {
+    for (const fecha of [null, '', '2011-02-30', '06/10/2011', '2030-01-01']) {
+      expect(aptitudDelRostroDeMenor(fecha, mediodia)).toBe('SIN_FECHA');
+    }
+  });
+
+  it('el día que cuenta es el de Bogotá: a las 03:00Z del cumpleaños, allí es la víspera', () => {
+    expect(aptitudDelRostroDeMenor('2011-10-07', new Date('2026-10-07T03:00:00Z'))).toBe(
+      'EDAD_INSUFICIENTE',
+    );
+    expect(aptitudDelRostroDeMenor('2011-10-07', new Date('2026-10-07T05:00:00Z'))).toBe('APTO');
+  });
+});
+
+describe('cumpleMayoriaEn · las 00:00 de Bogotá del día en que cumple 18', () => {
+  const instante = (fecha: string): Date => {
+    const t = cumpleMayoriaEn(fecha);
+    if (t === null) throw new Error(`sin instante para ${fecha}`);
+    return t;
+  };
+
+  it('es el primer instante en que edadEn dice 18; un milisegundo antes, 17', () => {
+    const t = instante('2008-10-07');
+    expect(t.toISOString()).toBe('2026-10-07T05:00:00.000Z');
+    expect(edadEn('2008-10-07', t)).toBe(MAYORIA_DE_EDAD);
+    expect(edadEn('2008-10-07', new Date(t.getTime() - 1))).toBe(17);
+  });
+
+  it('29 de febrero: el 1 de marzo (S-15W-06), igual que edadEn', () => {
+    // Nadie nacido un 29 de febrero cumple 18 en un año bisiesto.
+    const t = instante('2008-02-29');
+    expect(t.toISOString()).toBe('2026-03-01T05:00:00.000Z');
+    expect(edadEn('2008-02-29', t)).toBe(MAYORIA_DE_EDAD);
+    expect(edadEn('2008-02-29', new Date(t.getTime() - 1))).toBe(17);
+  });
+
+  it('el último día del año pasa al siguiente sin perder el día', () => {
+    expect(instante('2009-12-31').toISOString()).toBe('2027-12-31T05:00:00.000Z');
+  });
+
+  it('una fecha que no es civil no tiene instante', () => {
+    expect(cumpleMayoriaEn('2008-02-30')).toBeNull();
+    expect(cumpleMayoriaEn('')).toBeNull();
   });
 });

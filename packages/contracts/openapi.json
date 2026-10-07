@@ -5087,6 +5087,146 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/menores/{residenteId}/rostro": {
+      "get": {
+        "operationId": "RostroDeMisMenoresController_estado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiRostroConPoliticaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El estado del rostro de un menor de mi hogar y la política del representante",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "RostroDeMisMenoresController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RostroDeMenorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeMiRostroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El titular registra o renueva, como representante legal, el rostro de un menor",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/menores/{residenteId}/rostro/retiro": {
+      "post": {
+        "operationId": "RostroDeMisMenoresController_retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "residenteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeMiRostroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El titular retira el rostro de un menor: revoca y suprime en el acto, en los equipos",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/notificaciones": {
       "get": {
         "operationId": "MisNotificacionesController_notificaciones",
@@ -18459,6 +18599,52 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "RostroDeMenorDto": {
+        "type": "object",
+        "properties": {
+          "contenidoBase64": {
+            "type": "string",
+            "description": "La foto frontal, JPEG o PNG, en base64",
+            "maxLength": 2097152
+          },
+          "tipoMime": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "medidas": {
+            "$ref": "#/components/schemas/MedidasDeFotoDto"
+          },
+          "versionPolitica": {
+            "type": "string",
+            "description": "La versión de la política que la app mostró",
+            "maxLength": 60
+          },
+          "aceptaPolitica": {
+            "type": "boolean",
+            "description": "Acepta la política: debe ser true"
+          },
+          "declaraRepresentacionLegal": {
+            "type": "boolean",
+            "description": "Soy su representante legal: debe ser true"
+          },
+          "menorInformadoYDeAcuerdo": {
+            "type": "boolean",
+            "description": "El menor fue informado y está de acuerdo: debe ser true"
+          }
+        },
+        "required": [
+          "contenidoBase64",
+          "tipoMime",
+          "medidas",
+          "versionPolitica",
+          "aceptaPolitica",
+          "declaraRepresentacionLegal",
+          "menorInformadoYDeAcuerdo"
         ]
       },
       "SalidasDelEquipoDto": {

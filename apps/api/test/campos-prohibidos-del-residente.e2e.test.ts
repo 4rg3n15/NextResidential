@@ -41,8 +41,9 @@ const PROHIBIDOS: Record<string, unknown> = {
   suprimirEn: '2099-01-01T00:00:00Z',
 };
 const SIN_CUERPO = new Set([
-  // 15-X: retirar mi rostro.
+  // 15-X: retirar mi rostro y el de un menor de mi hogar.
   'POST /copropiedades/:id/mi/rostro/retiro',
+  'POST /copropiedades/:id/mi/menores/:residenteId/rostro/retiro',
   // 15-W: el traspaso, añadir una plaza y eliminar un vehículo propio.
   'POST /copropiedades/:id/mi/menores/:residenteId/codigo-de-traspaso',
   'POST /copropiedades/:id/mi/ocupantes/plazas',

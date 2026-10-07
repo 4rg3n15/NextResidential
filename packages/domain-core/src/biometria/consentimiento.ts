@@ -2,6 +2,16 @@ import type { Resultado } from '../compartido/resultado';
 import { exito, fallo } from '../compartido/resultado';
 import type { ErrorDominio } from '../compartido/errores';
 import { errorDominio } from '../compartido/errores';
+import type {
+  CanalConsentimiento,
+  DatosConsentimiento,
+  DatosDeDeclaracion,
+  DatosDeRepresentacion,
+  EstadoConsentimiento,
+  OrigenDeConsentimiento,
+} from './consentimiento-datos';
+
+export * from './consentimiento-datos';
 
 /**
  * Agregado raíz `ConsentimientoBiometrico` — RN-09, RN-10, Ley 1581 de 2012.
@@ -21,74 +31,11 @@ import { errorDominio } from '../compartido/errores';
  * plantilla apunta a su consentimiento—, porque la vida del consentimiento no
  * depende de que haya plantilla y sí al revés.
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * ETAPA 15-L (F4) · DOS ORÍGENES, Y NO SE CONFUNDEN — decisión del cliente
- *
- * El cliente decidió que la única constancia obligatoria sea una casilla en el
- * formulario de la autorización: «El visitante autorizó el uso de su foto para
- * el ingreso». Quien la marca es quien REGISTRA (residente, portero,
- * administración), no el titular. Eso no se disfraza de lo que no es: el
- * consentimiento lleva su ORIGEN, y uno `declarado_por_quien_registra` nunca
- * pasa por `otorgar()` ni se confunde con uno `otorgado_por_el_titular`. La
- * regla de titularidad sigue intacta para todo lo demás —otorgar, rechazar y
- * revocar siguen siendo del titular—; lo que se añade es una declaración con
- * autor, momento y versión del texto (ADR-032, riesgo legal aceptado por el
- * cliente). Si el titular está presente, puede CONFIRMARLO él mismo
- * (`confirmarPorElTitular`, D-10): entonces el origen pasa a ser el suyo.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Tres orígenes, y no se confunden (F4 de la 15-L; el representante legal, 15-X
+ * D3): ver `ORIGENES_DE_CONSENTIMIENTO`. El del representante no abre la
+ * delegación: es la figura que la ley pone para el dato de un menor, con su
+ * nombre, su origen y su autor; nada permite que otro cualquiera consienta.
  */
-export const ESTADOS_CONSENTIMIENTO = [
-  'pendiente',
-  'vigente',
-  'rechazado',
-  'revocado',
-  'expirado',
-] as const;
-export type EstadoConsentimiento = (typeof ESTADOS_CONSENTIMIENTO)[number];
-
-export const CANALES = ['app', 'sms', 'correo', 'whatsapp', 'presencial'] as const;
-export type CanalConsentimiento = (typeof CANALES)[number];
-
-/** F4 (15-L) · quién dejó constancia del consentimiento. */
-export const ORIGENES_DE_CONSENTIMIENTO = [
-  'otorgado_por_el_titular',
-  'declarado_por_quien_registra',
-] as const;
-export type OrigenDeConsentimiento = (typeof ORIGENES_DE_CONSENTIMIENTO)[number];
-
-/** Lo que se sabe de una declaración: quién marcó la casilla, cuándo y sobre qué texto. */
-export interface DatosDeDeclaracion {
-  readonly id: string;
-  readonly copropiedadId: string;
-  readonly titularId: string;
-  readonly finalidad: string;
-  /** La versión del TEXTO de la casilla que se marcó. */
-  readonly versionPolitica: string;
-  readonly canal: CanalConsentimiento;
-  /** La cuenta que marcó la casilla. Nunca vacía. */
-  readonly declaradoPor: string;
-  readonly ahora: Date;
-}
-
-export interface DatosConsentimiento {
-  readonly id: string;
-  readonly copropiedadId: string;
-  /** El TITULAR. No hay campo para quien lo invita: RN-10, D-08. */
-  readonly titularId: string;
-  readonly finalidad: string;
-  readonly versionPolitica: string;
-  readonly canal: CanalConsentimiento;
-  readonly solicitadoEn: Date;
-  readonly otorgadoEn?: Date | null;
-  readonly revocadoEn?: Date | null;
-  readonly evidenciaId?: string | null;
-  readonly estado?: EstadoConsentimiento;
-  /** F4 · por omisión, del titular: es lo que había antes de la 15-L. */
-  readonly origen?: OrigenDeConsentimiento;
-  /** F4 · quién marcó la casilla, si el origen es la declaración. */
-  readonly declaradoPor?: string | null;
-}
-
 export class ConsentimientoBiometrico {
   private constructor(
     readonly id: string,
@@ -160,6 +107,32 @@ export class ConsentimientoBiometrico {
         errorDominio('DATO_INVALIDO', 'La declaración necesita saber quién marcó la casilla', 'F4'),
       );
     }
+    return ConsentimientoBiometrico.vigenteCon(d, 'declarado_por_quien_registra', d.declaradoPor);
+  }
+
+  /**
+   * 15-X · D3 · el representante legal de un menor de 15 a 17 años autoriza el
+   * tratamiento de su rostro. Nace VIGENTE, con su origen y su autor: no es el
+   * menor quien acepta, y el registro lo dice.
+   */
+  static autorizarComoRepresentanteLegal(
+    d: DatosDeRepresentacion,
+  ): Resultado<ConsentimientoBiometrico, ErrorDominio> {
+    const sinAutor = ConsentimientoBiometrico.sinRepresentante(d.representanteId, d.titularId);
+    if (sinAutor !== null) return fallo(sinAutor);
+    return ConsentimientoBiometrico.vigenteCon(
+      d,
+      'autorizado_por_representante_legal',
+      d.representanteId,
+    );
+  }
+
+  /** Nace vigente desde su constancia: la casilla (F4) o el representante (D3). */
+  private static vigenteCon(
+    d: DatosDeDeclaracion | DatosDeRepresentacion,
+    origen: OrigenDeConsentimiento,
+    autor: string,
+  ): Resultado<ConsentimientoBiometrico, ErrorDominio> {
     const r = ConsentimientoBiometrico.solicitar({
       id: d.id,
       copropiedadId: d.copropiedadId,
@@ -171,12 +144,17 @@ export class ConsentimientoBiometrico {
     });
     if (!r.ok) return r;
     return exito(
-      r.valor.con({
-        estado: 'vigente',
-        otorgadoEn: d.ahora,
-        origen: 'declarado_por_quien_registra',
-        declaradoPor: d.declaradoPor,
-      }),
+      r.valor.con({ estado: 'vigente', otorgadoEn: d.ahora, origen, declaradoPor: autor }),
+    );
+  }
+
+  /** RN-10 · un representante tiene autor, y no es el propio titular. */
+  private static sinRepresentante(representanteId: string, titularId: string): ErrorDominio | null {
+    if (representanteId.trim() !== '' && representanteId !== titularId) return null;
+    return errorDominio(
+      'DATO_INVALIDO',
+      'El representante legal es una cuenta con nombre propio, distinta del titular',
+      'RN-10',
     );
   }
 
@@ -201,6 +179,8 @@ export class ConsentimientoBiometrico {
   /**
    * D-10 como OPCIÓN (15-L, F4): el titular, presente, confirma él mismo una
    * declaración vigente. El origen pasa a ser suyo; la vigencia no cambia.
+   * 15-X · D3 · también la autorización de su representante, cuando ya mayor
+   * de edad registra su rostro desde su propia cuenta.
    */
   confirmarPorElTitular(
     quienConfirma: string,
@@ -215,11 +195,11 @@ export class ConsentimientoBiometrico {
         ),
       );
     }
-    if (!this.vigente || this.origen !== 'declarado_por_quien_registra') {
+    if (!this.vigente || this.origen === 'otorgado_por_el_titular') {
       return fallo(
         errorDominio(
           'INVARIANTE_VIOLADA',
-          'Solo se confirma una declaración vigente de quien registró la visita',
+          'Solo se confirma una declaración o una autorización del representante, vigentes',
           'F4',
         ),
       );
@@ -307,6 +287,36 @@ export class ConsentimientoBiometrico {
         ),
       );
     }
+    return this.cerrar(ahora);
+  }
+
+  /**
+   * 15-X · D3 · un representante legal retira la autorización que dio un
+   * representante, sin condiciones, como el titular la suya. Sólo ésa: el
+   * consentimiento PROPIO del titular, o una casilla, no los toca nadie más.
+   * Quién es representante lo decide la aplicación —el titular del hogar,
+   * ADR-039—, así que el que sucede al que la dio también puede retirarla.
+   */
+  revocarComoRepresentanteLegal(
+    representanteId: string,
+    ahora: Date,
+  ): Resultado<ConsentimientoBiometrico, ErrorDominio> {
+    const sinAutor = ConsentimientoBiometrico.sinRepresentante(representanteId, this.titularId);
+    if (sinAutor !== null) return fallo(sinAutor);
+    if (this.origen !== 'autorizado_por_representante_legal') {
+      return fallo(
+        errorDominio(
+          'INVARIANTE_VIOLADA',
+          'Un representante legal solo retira la autorización que dio un representante legal',
+          'RN-10',
+        ),
+      );
+    }
+    return this.cerrar(ahora);
+  }
+
+  /** Lo común a toda revocación: repetirla no es un error, y sólo se cierra lo vigente. */
+  private cerrar(ahora: Date): Resultado<ConsentimientoBiometrico, ErrorDominio> {
     if (this.estado === 'revocado') return exito(this);
     if (this.estado !== 'vigente') {
       return fallo(

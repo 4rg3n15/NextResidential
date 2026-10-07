@@ -41,6 +41,13 @@ import type { SuprimirYRetirarYa } from './suprimir-y-retirar';
  *   retirar · revocar su consentimiento vigente (suprime y retira de los
  *     equipos todo lo de ese consentimiento, CA-11) y suprimir YA lo que
  *     quedara vivo con otro.
+ *
+ *   D3 · el MENOR de 15 a 17 años: lo mismo, con la cuenta del titular del
+ *   hogar como representante legal (`representanteId`): autoriza al registrar
+ *   y revoca al retirar. Quién puede serlo lo decide el módulo del residente.
+ *   La revocación del representante va por `RevocarConsentimiento`, para que
+ *   también ella suprima ANTES de revocar (lo exige la base) y retire de los
+ *   equipos en el acto.
  *   leer · lo que se pinta, sin la imagen.
  * ═════════════════════════════════════════════════════════════════════════════
  */
@@ -50,6 +57,11 @@ export interface EntradaDeRostroDeResidente {
   readonly medidas: MedidasDeCaptura;
   readonly versionPolitica: string;
   readonly suprimirEn: Date;
+  /**
+   * D3 · el rostro de un MENOR: lo autoriza la cuenta del titular del hogar
+   * como su representante legal. Sin él, lo otorga el propio titular (D2).
+   */
+  readonly representanteId?: string;
 }
 
 export type ResultadoDeRostroDeResidente =
@@ -97,7 +109,9 @@ export class RostroDeResidente {
       versionPolitica: entrada.versionPolitica,
       canal: 'app',
       suprimirEn: entrada.suprimirEn,
-      otorgadoPorElTitular: true,
+      ...(entrada.representanteId === undefined
+        ? { otorgadoPorElTitular: true as const }
+        : { representante: { representanteId: entrada.representanteId } }),
     });
     if (esFallo(preparada)) return preparada;
     if (!preparada.valor.aceptada) {
@@ -121,17 +135,32 @@ export class RostroDeResidente {
     return exito({ registrado: true, plantillaId: plantilla.id, reemplazada: r.reemplazada });
   }
 
-  /** `false` si no había nada que retirar. Quien revoca es el titular (RN-10). */
-  async retirar(ctx: ContextoTenant, titularId: string): Promise<Resultado<boolean, ErrorDominio>> {
+  /**
+   * `false` si no había nada que retirar. Quien revoca es el titular (RN-10);
+   * con `representanteId` (D3), el representante legal del menor, y sólo la
+   * autorización de un representante: otro consentimiento vigente del menor
+   * —de una visita, o suyo— no es suyo, y su rostro de residente se suprime
+   * igual.
+   */
+  async retirar(
+    ctx: ContextoTenant,
+    titularId: string,
+    representanteId?: string,
+  ): Promise<Resultado<boolean, ErrorDominio>> {
     const cop = ctx.copropiedadId;
     if (cop === null) return fallo(sinCopropiedad());
     const vigente = await this.d.consentimientos.vigenteDe(cop, titularId);
     const viva = await this.d.lectura.vivaDe(cop, titularId);
-    if (vigente === null && viva === null) return exito(false);
-    if (vigente !== null) {
+    const revocable =
+      vigente !== null &&
+      (representanteId === undefined || vigente.origen === 'autorizado_por_representante_legal');
+    if (!revocable && viva === null) return exito(false);
+    if (revocable) {
       const revocado = await this.d.revocar.ejecutar(ctx, {
         consentimientoId: vigente.id,
-        quienRevoca: titularId,
+        ...(representanteId === undefined
+          ? { quienRevoca: titularId }
+          : { quienRevoca: representanteId, comoRepresentanteLegal: true as const }),
       });
       if (esFallo(revocado)) return revocado;
     }

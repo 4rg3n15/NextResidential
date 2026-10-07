@@ -2,7 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { MAX_BASE64_FOTOGRAFIA } from '../src/visitas';
-import { POLITICA_DEL_ROSTRO } from '../src/residente/aplicacion/politica-del-rostro';
+import {
+  POLITICA_DEL_ROSTRO,
+  POLITICA_DEL_ROSTRO_DE_MENOR,
+} from '../src/residente/aplicacion/politica-del-rostro';
+import { MENOR_V1 } from './dobles/menores-para-el-rostro';
 import { ipDePrueba } from './banco-del-hogar-pg';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { USUARIO_R1 } from './dobles/directorio-del-residente';
@@ -77,6 +81,47 @@ describe('15-X · D2 · la forma del cuerpo de «Mi rostro»', () => {
 
   it('la forma correcta pasa la validación (lo que siga lo decide la biometría)', async () => {
     const r = await enviar(valido);
+    expect(r.status, JSON.stringify(r.body)).not.toBe(400);
+  });
+});
+
+/**
+ * 15-X · D3 · el rostro de un menor: el mismo cuerpo y las dos declaraciones
+ * del titular, las dos en `true`; un `:residenteId` que no es UUID, 400.
+ */
+const delMenor = {
+  ...valido,
+  versionPolitica: POLITICA_DEL_ROSTRO_DE_MENOR.version,
+  declaraRepresentacionLegal: true,
+  menorInformadoYDeAcuerdo: true,
+};
+const enviarDelMenor = (cuerpo: Record<string, unknown>, residenteId: string = MENOR_V1) =>
+  request(app.getHttpServer())
+    .post(`/copropiedades/${COP_A}/mi/menores/${residenteId}/rostro`)
+    .set('Authorization', `Bearer ${token}`)
+    .set('x-forwarded-for', ipDePrueba())
+    .send(cuerpo);
+
+describe('15-X · D3 · la forma del cuerpo del rostro de un menor', () => {
+  it.each(['declaraRepresentacionLegal', 'menorInformadoYDeAcuerdo', 'aceptaPolitica'])(
+    'sin %s —false o ausente—: 400, y lo nombra',
+    async (campo) => {
+      const falsa = await enviarDelMenor({ ...delMenor, [campo]: false });
+      expect(falsa.status).toBe(400);
+      const sin: Record<string, unknown> = { ...delMenor };
+      delete sin[campo];
+      const ausente = await enviarDelMenor(sin);
+      expect(ausente.status).toBe(400);
+      expect(JSON.stringify(ausente.body)).toContain(campo);
+    },
+  );
+
+  it('un :residenteId que no es UUID: 400 antes de buscar nada', async () => {
+    expect((await enviarDelMenor(delMenor, 'no-es-un-uuid')).status).toBe(400);
+  });
+
+  it('la forma correcta pasa la validación (lo que siga lo decide el caso de uso)', async () => {
+    const r = await enviarDelMenor(delMenor);
     expect(r.status, JSON.stringify(r.body)).not.toBe(400);
   });
 });

@@ -1,14 +1,10 @@
 import {
-  BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
   Header,
   HttpCode,
-  HttpException,
-  HttpStatus,
   Inject,
   NotFoundException,
   Param,
@@ -30,10 +26,9 @@ import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
-import { MiRostro } from '../aplicacion/mi-rostro';
-import type { RechazoDelRostro } from '../aplicacion/puerta-del-rostro';
-import type { EstadoDeMiRostro } from '../aplicacion/estado-del-rostro';
-import { EstadoDeMiRostroDto, MiRostroConPoliticaDto, MiRostroDto } from './dtos-rostro';
+import { RostroDeMisMenores } from '../aplicacion/rostro-de-mis-menores';
+import { EstadoDeMiRostroDto, MiRostroConPoliticaDto, RostroDeMenorDto } from './dtos-rostro';
+import { exigirRostro } from './mi-rostro.controller';
 
 const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
   if (r.ok) return r.valor;
@@ -42,82 +37,69 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
 };
 
 /**
- * 429 con `Retry-After` (§2.7.5); 400 con los motivos de la foto, para guiar la
- * siguiente, o con el código de la edad del menor (D3); 403 si no es el titular.
- */
-export const exigirRostro = <E = EstadoDeMiRostro>(
-  r: { readonly hecho: true; readonly estado: E } | RechazoDelRostro,
-  respuesta: Response,
-): E => {
-  if (r.hecho) return r.estado;
-  if (r.estado === 400) {
-    throw new BadRequestException({
-      message: r.explicacion,
-      motivos: r.motivos ?? [],
-      ...(r.codigo === undefined ? {} : { codigo: r.codigo }),
-    });
-  }
-  if (r.estado === 403) throw new ForbiddenException(r.explicacion);
-  if (r.estado === 404) throw new NotFoundException(r.explicacion);
-  if (r.estado === 429) {
-    respuesta.setHeader('Retry-After', String(r.reintentarEnS ?? 60));
-    throw new HttpException(r.explicacion, HttpStatus.TOO_MANY_REQUESTS);
-  }
-  throw new ConflictException(r.explicacion);
-};
-
-/**
  * ═════════════════════════════════════════════════════════════════════════════
- * MI ROSTRO · RONDA 15-X (D2, ADR-039, D-W3)
+ * EL ROSTRO DE MIS MENORES · RONDA 15-X (D3, ADR-039, Ley 1581 art. 7)
  *
- * El rostro propio del adulto con cuenta: opcional, renovable cada año y
- * retirable en el acto. Ámbito por `exigirAlcance` y `ResolverMiAmbito`: la
- * persona sale del vínculo de la cuenta, nunca del cuerpo. 10 por minuto por
- * IP; el tope de 5 capturas en 24 h por cuenta lo cuenta la base. Sin caché:
- * el estado cambia con cada envío y retiro.
+ * El titular del hogar, como representante legal, registra, lee y retira el
+ * rostro de un menor de 15 a 17 años de SU vivienda. Otro adulto: 403. Un
+ * `:residenteId` ajeno —otra vivienda, otra copropiedad, un adulto con cuenta—:
+ * 404, filtrado en el SQL. Mismos límites que «Mi rostro»: 10 por minuto por IP
+ * y 5 capturas en 24 h por CUENTA, contadas en la base (429 con Retry-After).
+ * Sin caché, y nunca la imagen.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 @ApiTags('residente')
 @ApiBearerAuth()
 @Roles('residente')
 @Throttle({ default: { limit: 10, ttl: 60_000 } })
-@Controller('copropiedades/:id/mi/rostro')
-export class MiRostroController {
+@Controller('copropiedades/:id/mi/menores/:residenteId/rostro')
+export class RostroDeMisMenoresController {
   constructor(
-    @Inject(MiRostro) private readonly rostro: MiRostro,
+    @Inject(RostroDeMisMenores) private readonly rostro: RostroDeMisMenores,
     @Inject(Aislamiento) private readonly aislamiento: Aislamiento,
   ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'El estado de mi rostro y la política vigente; nunca la imagen' })
+  @ApiOperation({
+    summary: 'El estado del rostro de un menor de mi hogar y la política del representante',
+  })
   @ApiOkResponse({ type: MiRostroConPoliticaDto })
   async estado(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) id: string,
+    @Param('residenteId', ParseUUIDPipe) residenteId: string,
+    @Res({ passthrough: true }) respuesta: Response,
   ): Promise<MiRostroConPoliticaDto> {
-    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/rostro');
-    const e = desenvolver(await this.rostro.estado(destino, id));
+    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/menores/rostro');
+    const r = desenvolver(await this.rostro.estado(destino, id, residenteId));
+    const e = exigirRostro(r, respuesta);
     return { ...e, equipos: [...e.equipos], politica: { ...e.politica } };
   }
 
   @Post()
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'Registra o renueva mi rostro (opcional, con la política aceptada)' })
+  @ApiOperation({
+    summary: 'El titular registra o renueva, como representante legal, el rostro de un menor',
+  })
   @ApiCreatedResponse({ type: EstadoDeMiRostroDto })
   async registrar(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: MiRostroDto,
+    @Param('residenteId', ParseUUIDPipe) residenteId: string,
+    @Body() dto: RostroDeMenorDto,
     @Res({ passthrough: true }) respuesta: Response,
   ): Promise<EstadoDeMiRostroDto> {
-    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/rostro');
+    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/menores/rostro');
     const r = desenvolver(
-      await this.rostro.registrar(destino, id, {
+      await this.rostro.registrar(destino, id, residenteId, {
         contenidoBase64: dto.contenidoBase64,
         tipoMime: dto.tipoMime,
         medidas: { ...dto.medidas },
         versionPolitica: dto.versionPolitica,
+        // El DTO ya exigió `true` en las dos (`@Equals(true)`).
+        declaraRepresentacionLegal: true,
+        menorInformadoYDeAcuerdo: true,
       }),
     );
     const e = exigirRostro(r, respuesta);
@@ -128,16 +110,20 @@ export class MiRostroController {
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
-    summary: 'Retira mi rostro: revoca y suprime en el acto, también en los equipos',
+    summary: 'El titular retira el rostro de un menor: revoca y suprime en el acto, en los equipos',
   })
   @ApiOkResponse({ type: EstadoDeMiRostroDto })
   async retirar(
     @Contexto() ctx: ContextoTenant,
     @Param('id', ParseUUIDPipe) id: string,
+    @Param('residenteId', ParseUUIDPipe) residenteId: string,
     @Res({ passthrough: true }) respuesta: Response,
   ): Promise<EstadoDeMiRostroDto> {
-    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/rostro');
-    const e = exigirRostro(desenvolver(await this.rostro.retirar(destino, id)), respuesta);
+    const destino = await this.aislamiento.exigirAlcance(ctx, id, 'mi/menores/rostro');
+    const e = exigirRostro(
+      desenvolver(await this.rostro.retirar(destino, id, residenteId)),
+      respuesta,
+    );
     return { ...e, equipos: [...e.equipos] };
   }
 }

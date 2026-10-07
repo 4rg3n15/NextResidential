@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { FACE_TEMPLATE_PROVIDER } from '@ncr/domain-core';
-import type { FaceTemplateProvider } from '@ncr/domain-core';
-import { capacidadesDescubiertas } from '@ncr/providers';
-import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { POLITICA_DEL_ROSTRO } from '../src/residente/aplicacion/politica-del-rostro';
-import { bancoDelHogar, ipDePrueba } from './banco-del-hogar-pg';
+import { ipDePrueba } from './banco-del-hogar-pg';
+import { bancoConTerminales } from './terminales-de-rostro-pg';
 import type { Sesion } from './banco-del-hogar-pg';
 
 /**
@@ -21,29 +18,11 @@ import type { Sesion } from './banco-del-hogar-pg';
  * y nunca la imagen.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-class TerminalesEspia implements FaceTemplateProvider {
-  readonly recibidas: string[] = [];
-  readonly retiradas: string[] = [];
-  async sincronizar(dispositivoId: string, plantillaId: string): Promise<void> {
-    this.recibidas.push(`${dispositivoId}/${plantillaId}`);
-  }
-  async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
-    this.retiradas.push(`${dispositivoId}/${plantillaId}`);
-  }
-}
-const espia = new TerminalesEspia();
-let equipos: RepositorioDeEquiposPg | undefined;
-const banco = bancoDelHogar('sin DATABASE_URL_PRUEBAS o sin la migración 0057', {
-  montar: async (pool) => {
-    equipos = new RepositorioDeEquiposPg(
-      pool,
-      'llave-de-equipos-solo-para-pruebas-32+',
-      'env:EQUIPOS_LLAVE',
-    );
-    return { repositorio: equipos };
-  },
-  sustituir: (b) => b.overrideProvider(FACE_TEMPLATE_PROVIDER).useValue(espia),
-});
+const {
+  banco,
+  espia,
+  terminales: altaDeTerminales,
+} = bancoConTerminales('sin DATABASE_URL_PRUEBAS o sin la migración 0057');
 const omitida = (): boolean => !banco.disponible;
 
 const jpeg = (): string =>
@@ -127,40 +106,7 @@ describe('15-X · D2 · mi rostro', () => {
     await banco.completarAlta(cop.id, yo.token, banco.perfil(1));
     vecino = await banco.titular(cop.id, await banco.vivienda(cop.id, '2'), `vro.${s}`);
     await banco.completarAlta(cop.id, vecino.token, banco.perfil(2));
-    const ctx = {
-      usuarioId: '00000000-0000-4000-8000-000000000001',
-      rol: 'superadministrador' as const,
-      copropiedadId: cop.id,
-      copropiedadesAtendidas: [],
-      mfaVerificado: true,
-    };
-    for (const nombre of ['Terminal A', 'Videoportero B']) {
-      const e = await (equipos as RepositorioDeEquiposPg).crear(
-        ctx,
-        cop.id,
-        {
-          nombre: `${nombre} ${s}`,
-          tipo: 'terminal_facial',
-          host: `${nombre.replace(' ', '-').toLowerCase()}-${s}.invalid`,
-          puerto: 80,
-          protocolo: 'http',
-          usuario: 'servicio',
-          secreto: 'clave-de-pruebas-1',
-        },
-        {
-          clase: 'alcanzado',
-          detalle: 'responde',
-          modelo: 'M',
-          firmware: 'V0',
-          latenciaMs: 1,
-          verificado: true,
-          capacidades: capacidadesDescubiertas({
-            bibliotecaDeRostros: { estado: 'si', maximo: 100, almacenadas: 0 },
-          }),
-        },
-      );
-      terminales.push(e.id);
-    }
+    terminales.push(...(await altaDeTerminales(cop.id, ['Terminal A', 'Videoportero B'])));
   });
 
   it('sin rostro: el estado y la política vigente, y ni rastro de imagen', async () => {
