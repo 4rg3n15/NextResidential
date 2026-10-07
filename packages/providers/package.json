@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "typecheck": "tsc -b tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.pruebas.json",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run",
     "test:cobertura": "vitest run --coverage"
