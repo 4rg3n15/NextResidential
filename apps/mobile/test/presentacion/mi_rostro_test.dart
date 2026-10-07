@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
+import 'package:ncr_residente/dominio/rostro.dart';
 import 'package:ncr_residente/presentacion/pantallas/mi_rostro.dart';
 
 import '../dobles/rostro_falso.dart';
@@ -95,6 +96,27 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('La política del rostro cambió'), findsOneWidget);
     expect(rostro.lecturas, 2);
+  });
+
+  testWidgets('con la política nueva, la casilla vuelve sin marcar: se acepta lo que se leyó', (
+    t,
+  ) async {
+    final rostro = RostroFalso();
+    await montar(t, rostro);
+    await tomarYAceptar(t);
+    rostro
+      ..politicaVigente = const PoliticaDelRostro(version: 'rostro-de-prueba-2', texto: 'Nueva…')
+      ..falloSiguiente = const Fallo(ClaseDeFallo.servidor, 'La política del rostro cambió');
+    await t.tap(find.byKey(const Key('rostro.registrar')));
+    await t.pumpAndSettle();
+    expect(find.text('Nueva…'), findsOneWidget);
+    expect(habilitado(t), isFalse, reason: 'la aceptación era del texto anterior');
+    expect(rostro.registros, isEmpty);
+    await t.tap(find.byKey(const Key('rostro.acepto')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('rostro.registrar')));
+    await t.pumpAndSettle();
+    expect(rostro.registros.single.$2, 'rostro-de-prueba-2');
   });
 
   testWidgets('retirar pide confirmación; cancelar no retira, confirmar sí', (t) async {

@@ -40,6 +40,9 @@ class RostroFalso implements RostroDelResidente {
 
   EstadoDeMiRostro estado;
 
+  /// La que manda el servidor en cada lectura: la prueba la cambia entre medias.
+  PoliticaDelRostro politicaVigente = politica;
+
   /// Si no es `null`, el SIGUIENTE registro o retiro lo lanza (una vez).
   Fallo? falloSiguiente;
 
@@ -55,7 +58,7 @@ class RostroFalso implements RostroDelResidente {
     lecturas += 1;
     final f = falloAlLeer;
     if (f != null) throw f;
-    return estado.conPolitica(politica);
+    return estado.conPolitica(politicaVigente);
   }
 
   @override

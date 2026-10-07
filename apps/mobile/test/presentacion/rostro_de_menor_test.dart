@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncr_residente/dominio/hogar.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
+import 'package:ncr_residente/dominio/rostro.dart';
 import 'package:ncr_residente/presentacion/pantallas/mi_rostro.dart';
 import 'package:ncr_residente/presentacion/textos_del_rostro.dart';
 
@@ -88,9 +89,9 @@ void main() {
     expect(find.byKey(const Key('menor.rostro')), findsNothing);
   });
 
-  testWidgets('sin foto nueva, las declaraciones se descartan con la foto (sin conexión)', (
-    t,
-  ) async {
+  /// La pantalla del rostro de Sofía, con la foto, la política y las dos
+  /// declaraciones marcadas: lista para registrar.
+  Future<RostroFalso> todoMarcado(WidgetTester t) async {
     final rostro = RostroFalso();
     t.view.physicalSize = const Size(1000, 2800);
     t.view.devicePixelRatio = 1.0;
@@ -112,11 +113,34 @@ void main() {
     await t.tap(find.byKey(const Key('rostro.declaracion.1')));
     await t.pumpAndSettle();
     expect(habilitado(t), isTrue);
+    return rostro;
+  }
+
+  bool nadaMarcado(WidgetTester t) =>
+      t.widgetList<CheckboxListTile>(find.byType(CheckboxListTile)).every((c) => c.value == false);
+
+  testWidgets('sin foto nueva, las declaraciones se descartan con la foto (sin conexión)', (
+    t,
+  ) async {
+    final rostro = await todoMarcado(t);
     rostro.falloSiguiente = const Fallo(ClaseDeFallo.sinConexion, 'x');
     await t.tap(find.byKey(const Key('rostro.registrar')));
     await t.pumpAndSettle();
-    final casillas = t.widgetList<CheckboxListTile>(find.byType(CheckboxListTile));
-    expect(casillas.every((c) => c.value == false), isTrue, reason: 'hay que declarar de nuevo');
+    expect(nadaMarcado(t), isTrue, reason: 'hay que declarar de nuevo');
+  });
+
+  testWidgets('con la política nueva (409), la aceptación y las dos declaraciones, sin marcar', (
+    t,
+  ) async {
+    final rostro = await todoMarcado(t);
+    rostro
+      ..politicaVigente = const PoliticaDelRostro(version: 'rostro-de-prueba-2', texto: 'Nueva…')
+      ..falloSiguiente = const Fallo(ClaseDeFallo.servidor, 'La política del rostro cambió');
+    await t.tap(find.byKey(const Key('rostro.registrar')));
+    await t.pumpAndSettle();
+    expect(find.text('Nueva…'), findsOneWidget);
+    expect(nadaMarcado(t), isTrue, reason: 'se declara sobre el texto que se leyó');
+    expect(rostro.registros, isEmpty);
   });
 
   testWidgets('«Mi rostro» sigue sin declaraciones: sólo la política', (t) async {

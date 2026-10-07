@@ -11,7 +11,7 @@
 ///    imagen: el servidor no la devuelve y aquí no hay dónde ponerla.
 ///  · La POLÍTICA tal cual la mandó el servidor, con su versión: es la que se
 ///    acepta, y la que viaja. Si cambió entre medias, el servidor contesta 409
-///    y la pantalla vuelve a leerla.
+///    y la pantalla vuelve a leerla, con la casilla SIN marcar.
 ///  · Sin la casilla marcada y sin una foto que sirva, el botón no se habilita;
 ///    el servidor lo exige igual.
 ///
@@ -78,7 +78,16 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
     setState(() => _falloDeCarga = null);
     try {
       final e = await widget.rostro.miRostro();
-      if (mounted) setState(() => _estado = e);
+      if (!mounted) return;
+      setState(() {
+        // Una política NUEVA no se da por aceptada: la casilla era para otro
+        // texto (el 409 de la política que cambió). Hay que leerla y marcarla.
+        if (e.politica?.version != _estado?.politica?.version) {
+          _acepta = false;
+          _declarado = _sinDeclarar();
+        }
+        _estado = e;
+      });
     } on Fallo catch (f) {
       if (mounted) setState(() => _falloDeCarga = f);
     }
