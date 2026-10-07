@@ -4771,11 +4771,8 @@ export interface components {
             medidas: components["schemas"]["MedidasDeFotoDto"];
             /** @description La versión de la política que la app mostró */
             versionPolitica: string;
-            /**
-             * @description Acepta la política: sin ella no hay rostro
-             * @enum {boolean}
-             */
-            aceptaPolitica: true;
+            /** @description Acepta la política: debe ser true */
+            aceptaPolitica: boolean;
         };
         MiVehiculoDto: {
             /** Format: uuid */

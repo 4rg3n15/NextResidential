@@ -11,9 +11,7 @@ MiRostroDto _$MiRostroDtoFromJson(Map<String, dynamic> json) => MiRostroDto(
   tipoMime: MiRostroDtoTipoMime.fromJson(json['tipoMime'] as String),
   medidas: MedidasDeFotoDto.fromJson(json['medidas'] as Map<String, dynamic>),
   versionPolitica: json['versionPolitica'] as String,
-  aceptaPolitica: MiRostroDtoAceptaPolitica.fromJson(
-    json['aceptaPolitica'] as bool,
-  ),
+  aceptaPolitica: json['aceptaPolitica'] as bool,
 );
 
 Map<String, dynamic> _$MiRostroDtoToJson(MiRostroDto instance) =>

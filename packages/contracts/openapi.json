@@ -15900,10 +15900,7 @@
           },
           "aceptaPolitica": {
             "type": "boolean",
-            "enum": [
-              true
-            ],
-            "description": "Acepta la política: sin ella no hay rostro"
+            "description": "Acepta la política: debe ser true"
           }
         },
         "required": [

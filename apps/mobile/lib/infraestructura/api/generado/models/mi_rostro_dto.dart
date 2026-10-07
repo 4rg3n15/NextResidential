@@ -5,7 +5,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
 import 'medidas_de_foto_dto.dart';
-import 'mi_rostro_dto_acepta_politica.dart';
 import 'mi_rostro_dto_tipo_mime.dart';
 
 part 'mi_rostro_dto.g.dart';
@@ -30,8 +29,8 @@ class MiRostroDto {
   /// La versión de la política que la app mostró
   final String versionPolitica;
 
-  /// Acepta la política: sin ella no hay rostro
-  final MiRostroDtoAceptaPolitica aceptaPolitica;
+  /// Acepta la política: debe ser true
+  final bool aceptaPolitica;
 
   Map<String, Object?> toJson() => _$MiRostroDtoToJson(this);
 }

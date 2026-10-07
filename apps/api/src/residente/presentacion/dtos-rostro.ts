@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Equals, IsIn, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import {
+  Equals,
+  IsBoolean,
+  IsIn,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { MAX_BASE64_FOTOGRAFIA, MedidasDeFotoDto } from '../../visitas';
 
@@ -39,13 +47,13 @@ export class MiRostroDto {
   @MaxLength(60)
   versionPolitica!: string;
 
-  @ApiProperty({
-    type: Boolean,
-    enum: [true],
-    description: 'Acepta la política: sin ella no hay rostro',
-  })
+  // Booleano llano en el contrato, sin `enum: [true]`: el generador de Dart no
+  // sabe emitir un enum booleano y el cliente no compilaría (como en la 15-W).
+  // La verdad la pone `@Equals(true)`: un `false` es un 400.
+  @ApiProperty({ type: Boolean, description: 'Acepta la política: debe ser true' })
+  @IsBoolean()
   @Equals(true, { message: 'Hay que aceptar la política del rostro para registrarlo' })
-  aceptaPolitica!: true;
+  aceptaPolitica!: boolean;
 }
 
 export class EquipoDelRostroDto {

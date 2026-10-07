@@ -446,7 +446,6 @@ export 'models/mi_autorizacion_dto_situacion.dart';
 export 'models/mi_notificacion_dto_tipo.dart';
 export 'models/mi_rostro_con_politica_dto_estado.dart';
 export 'models/mi_rostro_dto_tipo_mime.dart';
-export 'models/mi_rostro_dto_acepta_politica.dart';
 export 'models/mi_visita_generada_dto_motivo.dart';
 export 'models/modo_vigente_dto_modo.dart';
 export 'models/modo_vigente_dto_resultado.dart';
