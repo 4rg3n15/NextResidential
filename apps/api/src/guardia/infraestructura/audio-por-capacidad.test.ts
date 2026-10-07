@@ -22,6 +22,8 @@ const CREDENCIAL = { usuario: 'servicio', clave: 'clave-de-prueba' } as const;
 const reloj: Reloj = { ahora: () => new Date('2026-10-07T12:00:00Z') };
 const silencio: Bitacora = { registrar: () => undefined };
 const CANAL_REAL = [{ id: 1, habilitado: false, codec: 'G.711ulaw' }] as const;
+const ABRIR = 'abrir el canal de audio bidireccional';
+const CONTESTAR = 'contestar o rechazar una llamada del videoportero';
 
 const montar = (
   tipo: 'terminal_facial' | 'intercom',
@@ -29,18 +31,15 @@ const montar = (
   canales: readonly { id: number; habilitado: boolean; codec?: string }[] = CANAL_REAL,
   senalizaLlamadas = false,
 ) => {
-  const pedidas: string[] = [];
-  const equipo = equipoSimulado({
+  // Lo que el equipo atiende, por PROPÓSITO del catálogo: sin el protocolo (KPI-11).
+  const atendidas: (string | null)[] = [];
+  const peticion = equipoSimulado({
     familia: tipo === 'terminal_facial' ? 'terminal' : 'videoportero',
     ...CREDENCIAL,
     canalesDeAudio: canales,
     senalizaLlamadas,
+    alAtender: (proposito) => atendidas.push(proposito),
   });
-  const peticion: typeof fetch = async (entrada, opciones) => {
-    const url = new URL(typeof entrada === 'string' ? entrada : String(entrada));
-    pedidas.push(`${opciones?.method ?? 'GET'} ${url.pathname}`);
-    return equipo(entrada, opciones);
-  };
   const proveedor = crearProveedorDeEquipos({
     clase: 'hikvision', // kpi-11-exento · es el nombre del adaptador, no protocolo
     reloj,
@@ -62,10 +61,11 @@ const montar = (
     proveedor,
     silencio,
   );
-  const aperturas = (): string[] =>
-    pedidas.filter((p) => /TwoWayAudio\/channels\/1\/open$/.test(p));
-  const senales = (): string[] => pedidas.filter((p) => /VideoIntercom\/callSignal/.test(p));
-  return { canal, aperturas, senales };
+  const aperturas = () => atendidas.filter((p) => p === ABRIR);
+  const senales = () => atendidas.filter((p) => p === CONTESTAR);
+  /** Peticiones que el catálogo de SU familia no tiene: el equipo contesta 404. */
+  const ajenas = () => atendidas.filter((p) => p === null);
+  return { canal, aperturas, senales, ajenas };
 };
 
 describe('15-S1 · B · la terminal facial habla, por capacidad', () => {
@@ -77,7 +77,7 @@ describe('15-S1 · B · la terminal facial habla, por capacidad', () => {
       transporte: 'equipo',
       formatoDeAudio: 'g711u',
     });
-    expect(aperturas()).toEqual(['PUT /ISAPI/System/TwoWayAudio/channels/1/open']);
+    expect(aperturas()).toEqual([ABRIR]);
   });
 
   it('la misma terminal SIN la casilla: turno sin transporte, con el motivo, y nada hacia el canal', async () => {
@@ -96,18 +96,19 @@ describe('15-S1 · B · la terminal facial habla, por capacidad', () => {
    * catalogada. La de la llamada es del videoportero: a una terminal que la
    * declarase no se le manda la ruta del videoportero —nunca por analogía—.
    * Es también lo que distingue en la red que las rutas salen de la familia
-   * DEL EQUIPO (B.3): las de TwoWayAudio son idénticas en las dos familias.
+   * DEL EQUIPO (B.3): las del audio bidireccional son idénticas en las dos.
    */
   it('la terminal que declara señalización NO recibe la del videoportero: nunca por analogía', async () => {
-    const { canal, senales } = montar('terminal_facial', true, CANAL_REAL, true);
+    const { canal, senales, ajenas } = montar('terminal_facial', true, CANAL_REAL, true);
     expect((await canal.pedir(COP, 'equipo-1', 'op-1')).transporte).toBe('equipo');
     expect(senales()).toEqual([]);
+    expect(ajenas()).toEqual([]);
   });
 
   it('el videoportero que la declara SÍ contesta la llamada al abrir el audio', async () => {
     const { canal, senales } = montar('intercom', true, CANAL_REAL, true);
     expect((await canal.pedir(COP, 'equipo-1', 'op-1')).transporte).toBe('equipo');
-    expect(senales()).toEqual(['PUT /ISAPI/VideoIntercom/callSignal']);
+    expect(senales()).toEqual([CONTESTAR]);
   });
 
   it('una terminal que no declara ningún canal: turno sin transporte, «no tiene audio»', async () => {
@@ -128,7 +129,7 @@ describe('15-S1 · A · H-15S1-C07 · el videoportero real: enabled=false no es 
       transporte: 'equipo',
       formatoDeAudio: 'g711u',
     });
-    expect(aperturas()).toEqual(['PUT /ISAPI/System/TwoWayAudio/channels/1/open']);
+    expect(aperturas()).toEqual([ABRIR]);
   });
 
   it('sin la casilla, turno sin transporte y el motivo dice qué marcar', async () => {

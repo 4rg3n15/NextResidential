@@ -76,7 +76,7 @@ const ESPECIFICO: Readonly<
 
 /** C2/D2 (15-L) · los tipos que tienen video, y la forma del canal (canal×100+flujo). */
 const CON_VIDEO: ReadonlySet<TipoDeEquipo> = new Set(['camara_lpr', 'terminal_facial', 'intercom']);
-/** 15-S1 · B · la guardia habla por el videoportero y por la terminal (TwoWayAudio). */
+/** 15-S1 · B · la guardia habla por el videoportero y por la terminal (audio bidireccional). */
 const CON_AUDIO: ReadonlySet<TipoDeEquipo> = new Set(['intercom', 'terminal_facial']);
 const CANAL_DE_VIDEO = /^[1-9][0-9]{2,3}$/;
 

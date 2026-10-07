@@ -251,6 +251,13 @@ export interface GuionDeEquipo {
    * `post,delete,put,get` — sin `setUp`, así que `FDSetUp` le es `notSupport`.
    */
   readonly operacionesDeBiblioteca?: string;
+  /**
+   * 15-S1 · cada petición autenticada, por propósito del catálogo y verbo;
+   * `null` si la ruta no está en el catálogo de SU familia (contesta 404). Las
+   * pruebas de fuera de este paquete comprueban así qué se le pidió sin
+   * escribir el protocolo del fabricante (KPI-11).
+   */
+  readonly alAtender?: (proposito: string | null, metodo: string) => void;
   /** J2 (15-L) · la serie que declara: un respaldo de otro equipo no se aplica. */
   readonly serie?: string;
   /** C2 (15-L) · a dónde publica la cámara. Lo escrito después se lee (tiene estado). */
@@ -492,6 +499,7 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
 
     // Una ruta que el adaptador pide y el catálogo no conoce es un error de
     // programación: el equipo contesta 404, igual que el de verdad.
+    guion.alAtender?.(catalogada?.proposito ?? null, metodo);
     if (catalogada === undefined) return respuestaDe(404, 'not found');
     if (sinSoporte.has(catalogada.proposito)) return respuestaDe(200, NO_SOPORTA);
     if (
