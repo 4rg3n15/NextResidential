@@ -749,6 +749,9 @@ function rutasDeAudioDeLaTerminal(base: readonly RutaDeEquipo[]): readonly RutaD
       confirmarEnSitio:
         '[SUPUESTO] S-15S1-02 · no medido aún en la K1T344: se mide en sitio el 07/10 ' +
         `(${r.confirmarEnSitio ?? 'que conteste en esta familia'})`,
+      // Por CAPACIDAD: una terminal sin audio no desmiente el catálogo, dice que
+      // no lo trae. El guion de sitio la informa como «no declarada» (paso 12e).
+      soloSiLaDeclara: 'audio bidireccional',
     }));
 }
 
