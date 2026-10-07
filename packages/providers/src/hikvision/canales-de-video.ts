@@ -65,17 +65,23 @@ export interface CanalesDescubiertos {
 
 export const descubrirCanalesDeVideo = async (
   consultar: ConsultaDeCapacidad,
+  /**
+   * C.3 (15-S1) · la lista NO se pudo leer —o llegó sin ningún canal—, nunca
+   * «el equipo no la admite» (NO APLICA): el diagnóstico lo lleva a la ficha,
+   * que dice que el canal guardado va sin contrastar. Antes, sólo a la bitácora.
+   */
+  alNoLeer?: (motivo: string) => void,
 ): Promise<CanalesDescubiertos> => {
   const r = await consultar(PREGUNTA_DE_CANALES_DE_VIDEO);
   if (r.cuerpo === null) {
+    if (!r.noAdmite) alNoLeer?.(r.motivo ?? 'no se pudo leer');
     return {
       canales: [],
       motivo: r.noAdmite ? 'el equipo no lista sus canales de video' : r.motivo,
     };
   }
   const canales = canalesDeVideoDesde(r.cuerpo);
-  return {
-    canales,
-    motivo: canales.length === 0 ? 'el equipo contestó sin ningún canal habilitado' : null,
-  };
+  const motivo = canales.length === 0 ? 'el equipo contestó sin ningún canal habilitado' : null;
+  if (motivo !== null) alNoLeer?.(motivo);
+  return { canales, motivo };
 };

@@ -56,9 +56,11 @@ export interface EquipoRegistrado {
    */
   readonly modoDeTerminal?: ModoDeTerminal;
   /**
-   * El canal de audio del equipo viene **deshabilitado de fábrica**. Mientras
-   * sea `false`, el adaptador no emite una sola petición hacia él: encender por
-   * nuestra cuenta una vía de audio hacia la calle sería una decisión de
+   * La ATESTACIÓN de una persona: «comprobé en sitio que el equipo abre el
+   * canal de audio». H-15S1-C07: el equipo declara su canal con `enabled=false`
+   * y no deja escribirlo, así que no hay interruptor que leer. Mientras sea
+   * `false`, el adaptador no emite una sola petición hacia el canal: encender
+   * por nuestra cuenta una vía de audio hacia la calle sería una decisión de
    * seguridad tomada por el código.
    */
   readonly canalDeAudioHabilitado?: boolean;

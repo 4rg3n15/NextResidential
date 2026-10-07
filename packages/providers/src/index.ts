@@ -38,6 +38,8 @@
  */
 export * from './nucleo/capacidades';
 export * from './nucleo/errores';
+// H-15S1-C07 · nadie atestó que el equipo abra su canal: la guardia lo distingue de un fallo.
+export { CanalDeEquipoNoHabilitado } from './videoportero/intercom-equipo';
 // 15-P · P3 · el árbol de salidas de un equipo (equipo → módulo → salida).
 export * from './nucleo/salidas';
 // R2 (15-N) · el motivo del dominio con que el equipo negó, por su código.

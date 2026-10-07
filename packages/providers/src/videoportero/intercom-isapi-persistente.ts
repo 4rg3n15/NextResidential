@@ -121,7 +121,8 @@ export class IntercomIsapiPersistente implements IntercomProvider {
       throw new CanalDeAudioSinDescubrir(this.opciones.dispositivoId ?? '(sin identificador)');
     }
     const proposito = metodo === 'PUT' ? 'enviar audio al equipo' : 'recibir audio del equipo';
-    return rutaPara(proposito, 'videoportero', this.opciones.canal).ruta;
+    // B (15-S1) · la familia del equipo: videoportero o terminal.
+    return rutaPara(proposito, this.opciones.familia ?? 'videoportero', this.opciones.canal).ruta;
   }
 
   /**

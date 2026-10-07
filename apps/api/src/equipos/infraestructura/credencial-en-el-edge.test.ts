@@ -4,7 +4,12 @@ import type { ContextoTenant } from '../../autenticacion';
 import { esClaveEnElEdge } from '../../comun/credenciales-en-el-edge';
 import type { CredencialesEnElEdge } from '../../comun/credenciales-en-el-edge';
 import { SIN_PROBAR } from '../aplicacion/puertos';
-import type { AltaDeEquipo, DatosDeEquipo, RepositorioDeEquipos } from '../aplicacion/puertos';
+import type {
+  AltaDeEquipo,
+  DatosDeEquipo,
+  RepositorioDeEquipos,
+  ResultadoDeSondeo,
+} from '../aplicacion/puertos';
 import { SecretosDeAlarmServerEnMemoria } from '../aplicacion/secretos-de-alarm-server';
 import { RepositorioConCredencialEnElEdge, SecretosConEdge } from './credencial-en-el-edge';
 
@@ -186,6 +191,33 @@ describe('RepositorioConCredencialEnElEdge (15-Q2, D2)', () => {
     const clave = await puente.repo.credencialPara(ctx, COP, EQUIPO);
     expect(clave).toBe(`edge:${EQUIPO}`);
     expect(esClaveEnElEdge(clave ?? '')).toBe(true);
+  });
+
+  /**
+   * C.1 (corrección 15-S1) · con puente, el Edge decide el video con SU copia
+   * del equipo: si «Probar conexión» guarda capacidades o canal nuevos en la
+   * nube y no se los entrega, el Edge sigue pidiendo el 102 de la ficha.
+   */
+  it('C.1 · con puente, un sondeo con capacidades o canal nuevos se entrega al Edge, sin clave', async () => {
+    const m = montar({ puente: true });
+    const sondeado: ResultadoDeSondeo = {
+      clase: 'alcanzado',
+      detalle: 'El equipo responde y acepta la credencial',
+      modelo: null,
+      firmware: null,
+      latenciaMs: 30,
+      verificado: true,
+      canalDeVideo: '101',
+    };
+    await m.repo.registrarSondeo(ctx, COP, EQUIPO, sondeado);
+    expect(m.historia).toEqual(['base:registrarSondeo', 'edge:puenteDe', 'edge:entregar']);
+    expect(m.args['edge:entregar']).toEqual([ctx, COP, EQUIPO, null]);
+  });
+
+  it('C.1 · sin puente, el mismo sondeo no avisa a nadie', async () => {
+    const m = montar();
+    await m.repo.registrarSondeo(ctx, COP, EQUIPO, { ...SIN_PROBAR, canalDeVideo: '101' });
+    expect(m.historia).toEqual(['base:registrarSondeo', 'edge:puenteDe']);
   });
 
   it('el resto delega tal cual, sin preguntar por el puente', async () => {

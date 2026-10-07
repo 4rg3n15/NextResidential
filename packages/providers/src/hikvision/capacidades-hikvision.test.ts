@@ -101,8 +101,34 @@ describe('los canales de audio · D4, el canal se LEE', () => {
     expect(canalDeAudioUtilizable(canalesDeAudioDesde(XML))?.id).toBe(2);
   });
 
-  it('sin ninguno habilitado no hay canal utilizable', () => {
+  it('sin canales declarados no hay canal utilizable', () => {
     expect(canalDeAudioUtilizable(canalesDeAudioDesde('<TwoWayAudioChannelList/>'))).toBeNull();
+  });
+
+  /**
+   * H-15S1-C07 · el DS-KD9633-WBE6 (V2.3.9) declara su canal con
+   * `enabled=false`, rechaza escribirlo (400 badXmlContent) y AUN ASÍ abre
+   * (`open` → 200 con sesión). `enabled` no es el interruptor: sin uno
+   * habilitado, vale el primero declarado con id > 0 ([SUPUESTO] S-15S1-01).
+   */
+  it('H-15S1-C07 · sin ninguno habilitado, el primero declarado con id > 0', () => {
+    const soloDeshabilitados =
+      '<TwoWayAudioChannelList><TwoWayAudioChannel><id>0</id><enabled>false</enabled>' +
+      '</TwoWayAudioChannel><TwoWayAudioChannel><id>1</id><enabled>false</enabled>' +
+      '<audioCompressionType>G.711ulaw</audioCompressionType></TwoWayAudioChannel>' +
+      '</TwoWayAudioChannelList>';
+    expect(canalDeAudioUtilizable(canalesDeAudioDesde(soloDeshabilitados))).toMatchObject({
+      id: 1,
+      habilitado: false,
+      formato: 'g711u',
+    });
+  });
+
+  it('H-15S1-C07 · un id 0 no es un canal: sin otro, ninguno', () => {
+    const soloCero =
+      '<TwoWayAudioChannelList><TwoWayAudioChannel><id>0</id><enabled>true</enabled>' +
+      '</TwoWayAudioChannel></TwoWayAudioChannelList>';
+    expect(canalDeAudioUtilizable(canalesDeAudioDesde(soloCero))).toBeNull();
   });
 });
 
@@ -167,7 +193,13 @@ describe('descubrir contra el equipo simulado, familia por familia', () => {
     expect(c.senalizacionDeLlamada).toBe('no');
   });
 
-  it('videoportero con el canal DESHABILITADO —como el real—: audio `no` y sin canal', async () => {
+  /**
+   * H-15S1-C07 · esta prueba fijaba «canal deshabilitado → audio `no`», y es
+   * lo que dejó mudo al videoportero real el 06/10: declara `enabled=false`,
+   * no deja escribirlo y abre igual. El canal declarado ES la capacidad; la
+   * prueba de verdad es abrirlo, tras la casilla de atestación.
+   */
+  it('videoportero con el canal en enabled=false —como el real—: audio `si`, canal 1, µ-law', async () => {
     const c = await descubrirCapacidades({
       cliente: cliente({
         familia: 'videoportero',
@@ -176,9 +208,15 @@ describe('descubrir contra el equipo simulado, familia por familia', () => {
       }),
       familia: 'videoportero',
     });
-    expect(c.audioBidireccional.estado).toBe('no');
-    expect(c.audioBidireccional.canal).toBeNull();
-    expect(c.audioBidireccional.formato).toBe('g711u');
+    expect(c.audioBidireccional).toEqual({ estado: 'si', canal: 1, formato: 'g711u' });
+  });
+
+  it('videoportero que no declara ningún canal: audio `no`, sin canal', async () => {
+    const c = await descubrirCapacidades({
+      cliente: cliente({ familia: 'videoportero', ...CRED, canalesDeAudio: [] }),
+      familia: 'videoportero',
+    });
+    expect(c.audioBidireccional).toEqual({ estado: 'no', canal: null, formato: null });
   });
 
   it('terminal: verificación remota, biblioteca con máximo, personas y puerta', async () => {

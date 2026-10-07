@@ -3090,7 +3090,10 @@ export interface components {
             fabricante?: string;
             /** @enum {string} */
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
-            /** @default false */
+            /**
+             * @description Comprobé en sitio que el equipo abre el canal de audio (atestación)
+             * @default false
+             */
             canalDeAudioHabilitado: boolean;
             /** @example 102 */
             canalDeVideo?: string;
@@ -3888,7 +3891,10 @@ export interface components {
             fabricante?: string;
             /** @enum {string} */
             modoDeTerminal?: "reporta_y_espera" | "decide_el_equipo";
-            /** @default false */
+            /**
+             * @description Comprobé en sitio que el equipo abre el canal de audio (atestación)
+             * @default false
+             */
             canalDeAudioHabilitado: boolean;
             /** @example 102 */
             canalDeVideo?: string;

@@ -82,9 +82,10 @@ describe('V5 (15-N) · el título nombra la causa, no sólo el código', () => {
 
 describe('15-P · 0.5 · H.265: la consola dice CÓMO pasar a H.264, entero', () => {
   it('el texto del equipo con los pasos llega sin recortar', () => {
-    // El 409 tal como lo arma la API (`VideoNoReproducible` del proveedor).
+    // El 409 tal como lo arma la API (`VideoNoReproducible` del proveedor; C.2, 15-S1).
     const mensaje =
-      'Este equipo entrega H.265 en el canal 101 y el navegador no lo reproduce. Para verlo: ' +
+      'El equipo entrega H.265 en el canal 101; el navegador no lo reproduce por WebRTC: ' +
+      'cambie ese flujo a H.264 en el equipo (requiere autorización del cliente). Para verlo: ' +
       'en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» elija el ' +
       'principal (canal 101); en «Codificación de video» ponga H.264 y pulse Guardar; o elija ' +
       'otro canal en su ficha que ya entregue H.264.';

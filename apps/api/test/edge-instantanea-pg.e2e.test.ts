@@ -90,8 +90,26 @@ describe.skipIf(URL_BASE === undefined)('la instantánea del Edge contra la base
     for (const a of r.body.acompanantes ?? []) expect(a.nombre).toBe('');
   });
 
+  /**
+   * 15-S1 · LA BASE ES COMPARTIDA. En paralelo con este fichero,
+   * `edge-misma-decision-pg` y `edge-en-sitio-pg` PUBLICAN versiones de MIRA, y
+   * `mis-visitas-revocacion`, `corte-de-postgres` y `regresion-camara-28-09`
+   * cambian su contenido. Exigir «sin cambios» a la primera y la versión
+   * siguiente EXACTA dependía del orden de los ficheros: el verificador lo vio
+   * el 07/10 en el paso 7 («expected 7 to be 6»), tras pasar en el paso 5.
+   *
+   * La propiedad no cambia: con el contenido quieto, «sin cambios» con ESA
+   * versión; si otro fichero lo movió entre medias, la respuesta trae una
+   * versión NUEVA —nunca la misma— y se vuelve a preguntar. Acotado: un
+   * servidor que nunca dijera «sin cambios» sigue en rojo.
+   */
   it('mientras nada cambie, «sin cambios» con la versión vigente', async () => {
-    const r = await pedir(COP_A, version).expect(200);
+    let r = await pedir(COP_A, version).expect(200);
+    for (let intento = 1; r.body.sinCambios !== true && intento < 10; intento += 1) {
+      expect(r.body.version).toBeGreaterThan(version);
+      version = r.body.version;
+      r = await pedir(COP_A, version).expect(200);
+    }
     expect(r.body).toMatchObject({ copropiedadId: COP_A, version, sinCambios: true });
   });
 
@@ -104,8 +122,15 @@ describe.skipIf(URL_BASE === undefined)('la instantánea del Edge contra la base
       [COP_A, placa],
     );
     const r = await pedir(COP_A, version).expect(200);
-    expect(r.body.version).toBe(version + 1);
+    // NUEVA y posterior; no necesariamente la siguiente: otro fichero puede
+    // haber publicado entre medias (arriba). Y es la publicada, con su hash.
+    expect(r.body.version).toBeGreaterThan(version);
     expect(r.body.placasEnListaNegra).toContain(placa);
+    const { rows } = await (pool as Pool).query<{ hash: string }>(
+      'SELECT hash FROM public.versiones_de_reglas WHERE copropiedad_id = $1 AND numero = $2',
+      [COP_A, r.body.version],
+    );
+    expect(rows[0]?.hash).toBe(r.body.hash);
     version = r.body.version;
   });
 

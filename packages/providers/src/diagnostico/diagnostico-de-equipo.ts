@@ -151,6 +151,12 @@ export interface VideoDelEquipo extends ResultadoRtsp {
    */
   readonly origenDelCanal?: OrigenDelCanal;
   readonly sustituido?: string | null;
+  /**
+   * C.3 (15-S1) · por qué no hubo lista de canales con la que contrastar el de
+   * la ficha —no se pudo leer, o llegó sin canales—. Nunca «el equipo no la
+   * admite»: eso es NO APLICA y no se pinta como un «sin comprobar».
+   */
+  readonly listaSinLeer?: string;
 }
 
 const estadoDelVideo = (r: ResultadoRtsp): EstadoDeCapacidad =>
@@ -260,6 +266,8 @@ export const diagnosticarEquipo = async (
    * contacto ya la aceptó—, y si ocurriera se anota igual, sin reintentar.
    */
   let capacidadesDelEquipo: CapacidadesDeEquipo | null = null;
+  // C.3 (15-S1) · por qué no hubo lista de canales con la que contrastar la ficha.
+  const listaDeCanales: { sinLeer: string | null } = { sinLeer: null };
   try {
     capacidadesDelEquipo = await descubrirCapacidades({
       cliente,
@@ -268,12 +276,14 @@ export const diagnosticarEquipo = async (
       // H-SITIO-05 · cada ruta de capacidad y su respuesta, a la bitácora.
       ...(opciones.traza === undefined ? {} : { traza: opciones.traza }),
       ...(opciones.dispositivoId === undefined ? {} : { dispositivoId: opciones.dispositivoId }),
+      alNoLeerCanalesDeVideo: (motivo) => {
+        listaDeCanales.sinLeer = motivo;
+      },
     });
   } catch (error) {
-    sinRespuesta.push({
-      que: 'descubrir lo que el equipo declara poder hacer',
-      motivo: error instanceof Error ? error.message : 'no se pudo consultar',
-    });
+    const motivo = error instanceof Error ? error.message : 'no se pudo consultar';
+    sinRespuesta.push({ que: 'descubrir lo que el equipo declara poder hacer', motivo });
+    listaDeCanales.sinLeer = `no se pudo leer lo que el equipo declara: ${motivo}`;
   }
 
   /**
@@ -284,7 +294,12 @@ export const diagnosticarEquipo = async (
   const video: VideoDelEquipo | undefined =
     opciones.video === undefined || opciones.familia === 'comun'
       ? undefined
-      : await sondearVideoDelEquipo(opciones, opciones.video, capacidadesDelEquipo);
+      : await sondearVideoDelEquipo(
+          opciones,
+          opciones.video,
+          capacidadesDelEquipo,
+          listaDeCanales.sinLeer,
+        );
   if (video !== undefined && capacidadesDelEquipo !== null) {
     capacidadesDelEquipo = {
       ...capacidadesDelEquipo,

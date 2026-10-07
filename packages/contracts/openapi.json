@@ -10537,7 +10537,8 @@
           },
           "canalDeAudioHabilitado": {
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Comprobé en sitio que el equipo abre el canal de audio (atestación)"
           },
           "canalDeVideo": {
             "type": "string",
@@ -12958,7 +12959,8 @@
           },
           "canalDeAudioHabilitado": {
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Comprobé en sitio que el equipo abre el canal de audio (atestación)"
           },
           "canalDeVideo": {
             "type": "string",

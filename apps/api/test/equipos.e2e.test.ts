@@ -614,10 +614,14 @@ describe('O4 · la ficha es por tipo y el sondeo posterior usa la clave guardada
   });
 
   it('el videoportero trae apertura, audio, llamada y suscripción; sin audio es aviso, no bloqueo', async () => {
+    // H-15S1-C07 · «sin audio» es NINGÚN canal declarado. Hasta la 15-S1 era un
+    // canal con `enabled=false` (S-176), y el DS-KD9633-WBE6 real refutó eso el
+    // 06/10: lo declara así, no deja escribirlo y abre igual. Ese caso es
+    // `conforme` con la atestación humana como compuerta (audio-por-capacidad).
     const { app: a, firmante } = await conEquipos(
       sondaCon('videoportero', {
         aperturaRemota: true,
-        canalesDeAudio: [{ id: 1, habilitado: false }],
+        canalesDeAudio: [],
       }),
     );
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_B });
