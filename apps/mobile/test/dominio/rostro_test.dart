@@ -27,11 +27,11 @@ void main() {
       ofrecerRostro: ofrecer,
     );
 
-    test('recién dado de alta: antes de la app, el rostro', () {
+    test('sin rostro y sin «Ahora no»: antes de la app, el rostro', () {
       expect(paso(), PasoDePrimerIngreso.ofrecerRostro);
     });
 
-    test('sin ofrecerlo (ya respondió, o ya estaba dado de alta): la app', () {
+    test('sin ofrecerlo (tiene rostro, dijo «Ahora no» o no hay red): la app', () {
       expect(paso(ofrecer: false), PasoDePrimerIngreso.listo);
     });
 

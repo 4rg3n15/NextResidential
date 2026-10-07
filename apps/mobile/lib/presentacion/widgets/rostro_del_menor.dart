@@ -52,7 +52,7 @@ class SeccionDelRostroDelMenor extends StatelessWidget {
               FilledButton.tonal(
                 key: const Key('menor.rostro.abrir'),
                 onPressed: alAbrir,
-                child: Text(menor.tieneRostro ? 'Ver su rostro' : 'Registrar su rostro'),
+                child: Text(menor.tieneRostro ? 'Ver su rostro' : 'Registrar rostro'),
               ),
             ],
           ],

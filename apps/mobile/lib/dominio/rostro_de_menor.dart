@@ -49,10 +49,8 @@ RostroDelMenorEnLaApp rostroDelMenorEnLaApp(MenorDelHogar m, {required bool esTi
 /// decir (lo gestiona, o ya es mayor y su ficha ofrece el código de traspaso).
 String? explicacionDelRostroDelMenor(RostroDelMenorEnLaApp r) => switch (r) {
   RostroDelMenorEnLaApp.gestionar || RostroDelMenorEnLaApp.yaEsMayor => null,
-  RostroDelMenorEnLaApp.soloElTitular =>
-    'Su rostro lo registra el titular del hogar, como su representante legal.',
-  RostroDelMenorEnLaApp.desdeLos15 =>
-    'El rostro de un menor se registra desde los 15 años cumplidos.',
+  RostroDelMenorEnLaApp.soloElTitular => 'Lo registra el titular del hogar.',
+  RostroDelMenorEnLaApp.desdeLos15 => 'No se registra el rostro de menores de 15 años.',
   RostroDelMenorEnLaApp.sinFecha =>
     'Registre su fecha de nacimiento para poder registrar su rostro.',
 };

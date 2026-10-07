@@ -209,7 +209,9 @@ class Mundo {
   final MenoresFalsos menores;
   late final PlazasFalsas plazas;
   final RevocacionFalsa revocacion;
-  final RostroFalso rostro = RostroFalso();
+  /// 15-X · con rostro: el primer ingreso no lo ofrece y la app entra derecha.
+  /// La invitación tiene sus pruebas (`oferta_del_rostro_test.dart`).
+  final RostroFalso rostro = RostroFalso(inicial: RostroFalso.activo);
   final RostroDeMenoresFalso rostroDeMenores = RostroDeMenoresFalso();
   late final AutenticadorGobernado autenticador;
   final ResidenteGobernado repo;

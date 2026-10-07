@@ -219,7 +219,8 @@ void main() {
       servidor: cambioDeServidor(sesion),
       notificacionesDelConjunto: NotificacionesQueAnotan(),
       registro: RegistroFalso(), menores: MenoresFalsos(),
-      plazas: PlazasFalsas(alta), revocacion: RevocacionFalsa(), rostro: RostroFalso(),
+      plazas: PlazasFalsas(alta), revocacion: RevocacionFalsa(),
+      rostro: RostroFalso(inicial: RostroFalso.activo),
       rostroDeMenores: RostroDeMenoresFalso(),
     );
   });

@@ -1,6 +1,7 @@
-/// 15-X (D2) · Recién dado de alta, se le ofrece al residente registrar su
-/// rostro. Una vez, con «Ahora no»: es opcional, y «Mi perfil → Mi rostro»
-/// sigue a mano. No es un paso que haya que cumplir: es una invitación.
+/// 15-X (D2) · Antes de la app se le ofrece al residente registrar su rostro,
+/// mientras no lo tenga y no haya dicho «Ahora no» (`OfertaDelRostro`, que lo
+/// recuerda por cuenta). Es opcional, y «Mi perfil → Mi rostro» sigue a mano:
+/// no es un paso que haya que cumplir, es una invitación.
 library;
 
 import 'package:flutter/material.dart';
@@ -22,8 +23,8 @@ class PantallaDeOfrecerRostro extends StatelessWidget {
   final TomarFoto tomarFoto;
 
   /// Respondida la invitación —con «Ahora no», o al volver de «Mi rostro»—,
-  /// sigue el primer ingreso.
-  final void Function() alSeguir;
+  /// sigue el primer ingreso. `ahoraNo` es la respuesta que se recuerda.
+  final Future<void> Function({required bool ahoraNo}) alSeguir;
 
   Future<void> _registrar(BuildContext context) async {
     await Navigator.of(context).push(
@@ -31,7 +32,7 @@ class PantallaDeOfrecerRostro extends StatelessWidget {
         builder: (_) => PantallaDeMiRostro(rostro: rostro, tomarFoto: tomarFoto),
       ),
     );
-    alSeguir();
+    await alSeguir(ahoraNo: false);
   }
 
   @override
@@ -66,7 +67,7 @@ class PantallaDeOfrecerRostro extends StatelessWidget {
                 const SizedBox(height: 8),
                 TextButton(
                   key: const Key('rostro.ofrecer.ahoraNo'),
-                  onPressed: alSeguir,
+                  onPressed: () => alSeguir(ahoraNo: true),
                   child: const Text('Ahora no'),
                 ),
               ],

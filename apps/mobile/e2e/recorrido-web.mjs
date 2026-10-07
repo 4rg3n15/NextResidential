@@ -138,6 +138,18 @@ const DATOS = {
   },
   // 15-W · «Mi familia» lee también los menores del hogar (aquí, ninguno).
   menores: [],
+  // 15-X · la cuenta todavía no tiene rostro: el primer ingreso lo ofrece.
+  rostro: {
+    estado: 'sin_rostro',
+    calidad: null,
+    registradoEn: null,
+    venceEn: null,
+    diasParaVencer: null,
+    equiposConRostro: 1,
+    equiposConMiRostro: 0,
+    equipos: [{ nombre: 'Terminal de la portería', estado: 'pendiente' }],
+    politica: { version: 'rostro-de-recorrido-1', texto: 'Autorizo el tratamiento de mi rostro.' },
+  },
   vivienda: {
     vivienda: {
       id: 'viv-1',
@@ -694,6 +706,12 @@ try {
   pedido.codigo === CODIGO && pedido.usuario === USUARIO && !pedido.correo
     ? ok('el acceso lleva código y usuario, sin correo')
     : mal(`el acceso llevó ${JSON.stringify({ ...pedido, contrasena: undefined })}`);
+
+  // ── 1b · la invitación del rostro (15-X): sin rostro, antes de la app ────────
+  (await hay('Entre con su rostro'))
+    ? ok('sin rostro, el primer ingreso ofrece registrarlo, con «Ahora no» (15-X)')
+    : mal('no se ofrece el rostro a una cuenta que no lo tiene');
+  await pulsar('Ahora no');
 
   // ── 2 · inicio ────────────────────────────────────────────────────────────
   (await hay('Casa 42 · Manzana B'))

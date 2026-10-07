@@ -49,7 +49,7 @@ void main() {
 
   testWidgets('el titular, con un menor de 16: lo registra con las dos declaraciones', (t) async {
     final rostros = await fichaDelMenor(t);
-    expect(find.text('Registrar su rostro'), findsOneWidget);
+    expect(find.text('Registrar rostro'), findsOneWidget);
     await t.tap(find.byKey(const Key('menor.rostro.abrir')));
     await t.pumpAndSettle();
     expect(find.text('Rostro de Sofía Pérez'), findsOneWidget);
@@ -73,13 +73,13 @@ void main() {
 
   testWidgets('otro adulto del hogar: se le explica, y no hay botón', (t) async {
     await fichaDelMenor(t, titular: false);
-    expect(find.textContaining('lo registra el titular del hogar'), findsOneWidget);
+    expect(find.text('Lo registra el titular del hogar.'), findsOneWidget);
     expect(find.byKey(const Key('menor.rostro.abrir')), findsNothing);
   });
 
-  testWidgets('con 14 años: desde los 15, para nadie', (t) async {
+  testWidgets('con 14 años: no se registra, para nadie', (t) async {
     await fichaDelMenor(t, edad: 14);
-    expect(find.textContaining('desde los 15 años cumplidos'), findsOneWidget);
+    expect(find.text('No se registra el rostro de menores de 15 años.'), findsOneWidget);
     expect(find.byKey(const Key('menor.rostro.abrir')), findsNothing);
   });
 

@@ -326,7 +326,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         recuperada: _recuperada,
         reloj: _d.reloj,
         correoDeContacto: _correoDelRegistro,
-        rostro: _d.rostro,
+        oferta: OfertaDelRostro(rostro: _d.rostro, almacen: _almacen),
         tomarFoto: _tomarFoto,
         alSalir: _cerrarSesion,
         alTerminar: () {

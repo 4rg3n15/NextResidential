@@ -1,21 +1,16 @@
 /// 15-X (D2) · «Mi rostro»: lo que se ve, lo que hace falta para registrar,
 /// el retiro con confirmación y lo que pasa sin conexión —la foto se descarta
-/// y no se guarda nada—. Y el primer ingreso, que lo ofrece con «Ahora no».
+/// y no se guarda nada—. La invitación del primer ingreso, en
+/// `oferta_del_rostro_test.dart`.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ncr_residente/aplicacion/sesion_en_uso.dart';
-import 'package:ncr_residente/dominio/acceso.dart';
 import 'package:ncr_residente/dominio/puertos.dart';
-import 'package:ncr_residente/infraestructura/sesion/almacen_seguro.dart';
 import 'package:ncr_residente/presentacion/pantallas/mi_rostro.dart';
-import 'package:ncr_residente/presentacion/pantallas/primer_ingreso.dart';
 
-import '../dobles/hogar_falso.dart';
 import '../dobles/rostro_falso.dart';
 import '../dobles/visitas.dart';
-import 'alta_15w_test.dart' show AutenticadorSimple, RelojReal;
 
 void main() {
   void lienzoGrande(WidgetTester t) {
@@ -117,76 +112,5 @@ void main() {
     expect(rostro.retiros, 1);
     expect(find.text('Su rostro se retiró.'), findsOneWidget);
     expect(find.byKey(const Key('rostro.retirar')), findsNothing);
-  });
-
-  group('el primer ingreso lo ofrece, una vez, con «Ahora no»', () {
-    Future<(int Function(), AltaFalsa)> puerta(WidgetTester t, RostroFalso rostro) async {
-      lienzoGrande(t);
-      final sesion = SesionEnUso(
-        almacen: AlmacenEnMemoria(),
-        autenticador: AutenticadorSimple(),
-        reloj: RelojReal(),
-      );
-      await sesion.iniciar(
-        identificador: const PorUsuario(codigo: 'MIRA', usuario: 'a'),
-        clave: 'x',
-      );
-      // Primero sin alta; tras completarla, vinculada y sin ocupantes por declarar.
-      final alta = AltaFalsa(estados: [estadoDeAlta(vinculada: false), estadoDeAlta()]);
-      var terminado = 0;
-      await t.pumpWidget(
-        MaterialApp(
-          home: PuertaDePrimerIngreso(
-            sesion: sesion,
-            alta: alta,
-            cuenta: CuentaFalsa(),
-            rostro: rostro,
-            tomarFoto: (_) async => fotoTomada(medidasBuenas),
-            alTerminar: () => terminado += 1,
-            alSalir: () {},
-          ),
-        ),
-      );
-      await t.pumpAndSettle();
-      return (() => terminado, alta);
-    }
-
-    Future<void> completarAlta(WidgetTester t) async {
-      await t.enterText(find.byKey(const Key('perfil.nombres')), 'Ana');
-      await t.enterText(find.byKey(const Key('perfil.apellidos')), 'Pérez');
-      await t.enterText(find.byKey(const Key('perfil.fechaNacimiento')), '1990-05-17');
-      await t.enterText(find.byKey(const Key('perfil.numeroDocumento')), '1000000001');
-      await t.enterText(find.byKey(const Key('perfil.telefono')), '+573000000001');
-      await t.tap(find.byKey(const Key('alta.enviar')));
-      await t.pumpAndSettle();
-    }
-
-    testWidgets('«Ahora no»: a la app, sin registrar nada', (t) async {
-      final rostro = RostroFalso();
-      final (terminado, _) = await puerta(t, rostro);
-      await completarAlta(t);
-      expect(find.byKey(const Key('rostro.ofrecer.ahoraNo')), findsOneWidget);
-      expect(terminado(), 0, reason: 'la invitación va antes de la app');
-      await t.tap(find.byKey(const Key('rostro.ofrecer.ahoraNo')));
-      // Sin `pumpAndSettle`: con la puerta terminada, el armazón la quitaría; aquí
-      // queda su indicador de espera, que no se asienta nunca.
-      await t.pump();
-      expect(terminado(), 1);
-      expect(rostro.lecturas, 0);
-    });
-
-    testWidgets('«Registrar mi rostro» abre la pantalla; al volver, a la app', (t) async {
-      final rostro = RostroFalso();
-      final (terminado, _) = await puerta(t, rostro);
-      await completarAlta(t);
-      await t.tap(find.byKey(const Key('rostro.ofrecer.registrar')));
-      await t.pumpAndSettle();
-      expect(find.text('Mi rostro'), findsOneWidget);
-      expect(rostro.lecturas, 1);
-      await t.pageBack();
-      await t.pump();
-      await t.pump(const Duration(seconds: 1));
-      expect(terminado(), 1);
-    });
   });
 }

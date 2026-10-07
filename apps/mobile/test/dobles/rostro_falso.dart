@@ -43,6 +43,9 @@ class RostroFalso implements RostroDelResidente {
   /// Si no es `null`, el SIGUIENTE registro o retiro lo lanza (una vez).
   Fallo? falloSiguiente;
 
+  /// Si no es `null`, toda lectura lo lanza (sin red, por ejemplo).
+  Fallo? falloAlLeer;
+
   final registros = <(FotoDeRostro, String)>[];
   int retiros = 0;
   int lecturas = 0;
@@ -50,6 +53,8 @@ class RostroFalso implements RostroDelResidente {
   @override
   Future<EstadoDeMiRostro> miRostro() async {
     lecturas += 1;
+    final f = falloAlLeer;
+    if (f != null) throw f;
     return estado.conPolitica(politica);
   }
 

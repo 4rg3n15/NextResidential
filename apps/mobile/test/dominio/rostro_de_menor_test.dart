@@ -20,13 +20,19 @@ void main() {
 
   test('otro adulto del hogar: se le explica que lo registra el titular', () {
     expect(para(16, titular: false), RostroDelMenorEnLaApp.soloElTitular);
-    expect(explicacionDelRostroDelMenor(RostroDelMenorEnLaApp.soloElTitular), contains('titular'));
+    expect(
+      explicacionDelRostroDelMenor(RostroDelMenorEnLaApp.soloElTitular),
+      'Lo registra el titular del hogar.',
+    );
   });
 
   test('con 14 años, para nadie: desde los 15', () {
     expect(para(14), RostroDelMenorEnLaApp.desdeLos15);
     expect(para(14, titular: false), RostroDelMenorEnLaApp.desdeLos15);
-    expect(explicacionDelRostroDelMenor(RostroDelMenorEnLaApp.desdeLos15), contains('15 años'));
+    expect(
+      explicacionDelRostroDelMenor(RostroDelMenorEnLaApp.desdeLos15),
+      'No se registra el rostro de menores de 15 años.',
+    );
   });
 
   test('con 18 cumplidos, ya es mayor: nada que explicar aquí', () {
