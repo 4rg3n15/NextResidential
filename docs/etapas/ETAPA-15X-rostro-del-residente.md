@@ -448,6 +448,45 @@ paso 12b, que es quien las ejecuta.
 - 57 migraciones aplicables con `supabase db push`.
 - 202 de 208 operaciones con respuesta tipada; las 6 exentas, con etapa declarada.
 
+**Tras fusionar `develop` con el PR #52** (15-S1, audio y video en sitio). La
+fusión que está en la rama es la suya, `904ab97`, hecha en GitHub con los mismos
+dos padres que la mía, `523d2f4`, que por eso no se subió. El código de las dos
+es idéntico: sólo difieren los dos documentos que chocaron, y en ambos la
+resolución de GitHub tenía un defecto, que corrige el commit siguiente:
+
+- **El registro se quedó con el lado de la 15-X** y perdió S-15S1-01, S-15S1-02
+  y la refutación de S-176. Al fusionar este PR, esas filas habrían salido
+  también de `develop`.
+- **`ESTADO_ETAPAS.md` conservó los dos lados tal cual**: dos «Última
+  actualización» y dos tablas de resumen que se contradecían (55 frente a 52
+  contradicciones; 182 frente a 177 supuestos vigentes).
+- La corrección restaura la resolución de `523d2f4`: las dos rondas en la
+  cabecera, la 15-X delante, y las filas de las dos en el registro, recontadas
+  por fila.
+
+El contrato y los clientes, regenerados con `pnpm contrato && pnpm
+contrato:cliente` y `swagger_parser` + `build_runner`, salieron idénticos a lo
+fusionado.
+
+- **Una primera corrida sobre `523d2f4` salió FALLIDA, y no cuenta:** el
+  PostgreSQL de pruebas se había caído entre medias —su registro acaba en un
+  checkpoint normal y no había proceso—, y sin base la API dio 292 rojas, las
+  mismas en las tres corridas del paso 14.
+- **Con la base arrancada de nuevo y rehecha de 0001 a 0057, la segunda, en
+  42 min 53 s** —sobre `523d2f4`, cuyo árbol de código es el de esta rama—:
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+- 31 de 31 pasos y 546 de 546 ficheros de prueba.
+- 5565 pruebas de TypeScript, 5560 en verde y las 5 saltadas de D-112: API
+  2522, proveedores 1265, consola 815, dominio 483, Edge 331, config 144.
+  Tres corridas idénticas.
+- 508 de Dart.
+- Dominio 96,41 %, aplicación 97,74 %, global 88,33 % de líneas.
+- KPI-25: p50 6 ms · p95 30 ms · p99 36 ms.
+
 ### Cobertura por capa
 
 | Capa                            | Líneas  | Ramas   | Funciones | Umbral |
@@ -598,7 +637,9 @@ Rama `etapa-15x-rostro-del-residente`, desde `develop` (`8ee5cd9`) · PR hacia
 - `2044fc9` docs(etapa-15x): ADR-039, ciclo de vida biométrico y modelo de datos de la 0057
 - `b75b652` fix(etapa-15x/movil): con una política nueva, la aceptación y las declaraciones vuelven sin marcar
 - `afd98e1` docs(etapa-15x): manual del residente y registro de la ronda
-- cierre: `chore(etapa-15x): cierre de etapa` — este informe y la ficha y la cabecera de `docs/ESTADO_ETAPAS.md`
+- `744886c` chore(etapa-15x): cierre de etapa — este informe y la ficha y la cabecera de `docs/ESTADO_ETAPAS.md`
+- `904ab97` Merge branch 'develop' into etapa-15x-rostro-del-residente — la fusión del PR #52, hecha por usted en GitHub
+- `fix(etapa-15x)`: restaura la resolución completa del registro y de `ESTADO_ETAPAS.md`, con el veredicto tras la fusión
 
 El orden del encargo —D0 → D1 → 0057 → D2 → móvil de D2 → D3 → móvil de D3 →
 docs— se respetó en los bloques. Las correcciones posteriores (`673649f`,
