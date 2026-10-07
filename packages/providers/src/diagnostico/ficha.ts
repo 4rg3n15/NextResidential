@@ -4,6 +4,7 @@ import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { hallazgoDeRostros } from './hallazgo-de-rostros';
+import { hallazgoDelCanalDeVideo } from './hallazgo-del-canal-de-video';
 import { comoPasarAH264 } from '../nucleo/errores';
 
 /**
@@ -345,6 +346,13 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
   );
 };
 
+/** El video y, C.3 (15-S1), su canal contrastado con lo que el equipo declara. */
+const hallazgosDelVideo = (d: DiagnosticoDeEquipo): HallazgoDelEquipo[] => {
+  if (d.video === undefined) return [];
+  const canal = hallazgoDelCanalDeVideo(d.video, d.capacidadesDelEquipo?.video.canales);
+  return canal === null ? [hallazgoDeVideo(d.video)] : [canal, hallazgoDeVideo(d.video)];
+};
+
 /** `/alarm-server/<secreto>` → `/alarm-server/••••`: nada después del primer tramo sale. */
 const rutaOculta = (url: string | null): string => {
   if (url === null) return '(sin ruta)';
@@ -422,7 +430,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
           : hallazgosDeVideoportero(c)),
       );
     }
-    if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
+    hallazgos.push(...hallazgosDelVideo(diagnostico));
     hallazgos.push(hallazgoDelReloj(diagnostico));
     hallazgos.push(hallazgoDelReceptorHuerfano(diagnostico.receptor));
     return {
@@ -595,7 +603,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   }
 
   // ── 6 · El reloj, invisible hasta que corrompe la trazabilidad ────────────
-  if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
+  hallazgos.push(...hallazgosDelVideo(diagnostico));
   hallazgos.push(hallazgoDelReloj(diagnostico));
 
   if (diagnostico.reportaEstadoDeBarrera === false) {

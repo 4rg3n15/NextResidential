@@ -84,9 +84,12 @@ export class VideoNoReproducible extends ErrorDeEquipo {
     readonly canal: string,
   ) {
     // Sin el identificador: esta frase la lee el operador en la consola de video.
+    // C.2 (15-S1) · el cambio de códec es del equipo y lo autoriza el cliente:
+    // el sistema no lo hace por su cuenta.
     super(
       dispositivoId,
-      `Este equipo entrega ${codec} en el canal ${canal} y el navegador no lo reproduce. ` +
+      `El equipo entrega ${codec} en el canal ${canal}; el navegador no lo reproduce por ` +
+        'WebRTC: cambie ese flujo a H.264 en el equipo (requiere autorización del cliente). ' +
         comoPasarAH264(canal),
     );
   }

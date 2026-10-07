@@ -19,8 +19,11 @@ export const sondearVideoDelEquipo = async (
   opciones: Pick<OpcionesDeDiagnostico, 'host' | 'usuario' | 'clave'>,
   video: { readonly puerto: number; readonly canal: string | null },
   capacidades: CapacidadesDeEquipo | null,
+  /** C.3 (15-S1) · por qué no hay lista con la que contrastar la ficha. */
+  listaSinLeer: string | null = null,
 ): Promise<VideoDelEquipo> => {
   const eleccion = elegirCanalDeVideo(video.canal, capacidades?.video?.canales);
+  const sinLista = listaSinLeer === null ? {} : { listaSinLeer };
   if (eleccion.canal === null) {
     return {
       clase: 'rechazo',
@@ -32,6 +35,7 @@ export const sondearVideoDelEquipo = async (
       puerto: video.puerto,
       origenDelCanal: 'sin_canal',
       sustituido: null,
+      ...sinLista,
     };
   }
   const r = await describirRtsp({
@@ -47,5 +51,6 @@ export const sondearVideoDelEquipo = async (
     puerto: video.puerto,
     origenDelCanal: eleccion.origen,
     sustituido: eleccion.sustituido,
+    ...sinLista,
   };
 };

@@ -61,13 +61,30 @@ export class RepositorioConCredencialEnElEdge implements RepositorioDeEquipos {
   auditarCorreccion(ctx: ContextoTenant, copropiedadId: string, detalle: string) {
     return this.base.auditarCorreccion(ctx, copropiedadId, detalle);
   }
-  registrarSondeo(
+  /**
+   * C.1 (corrección 15-S1) · con puente, el Edge decide el video y el audio
+   * con SU copia del equipo. Si el sondeo trae capacidades o canal de video
+   * nuevos, se le vuelve a entregar el equipo (sin clave: conserva la suya);
+   * si no, seguiría pidiendo el 102 de la ficha aunque la nube ya sepa el 101.
+   * Un sondeo sin nada de eso (`SIN_PROBAR`) ni pregunta por el puente.
+   */
+  async registrarSondeo(
     ctx: ContextoTenant,
     copropiedadId: string,
     equipoId: string,
     veredicto: ResultadoDeSondeo,
   ) {
-    return this.base.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    const equipo = await this.base.registrarSondeo(ctx, copropiedadId, equipoId, veredicto);
+    const cambiaLoQueUsaElEdge =
+      veredicto.capacidades !== undefined || veredicto.canalDeVideo !== undefined;
+    if (
+      equipo !== null &&
+      cambiaLoQueUsaElEdge &&
+      (await this.edge.puenteDe(copropiedadId)) !== null
+    ) {
+      await this.edge.entregar(ctx, copropiedadId, equipoId, null);
+    }
+    return equipo;
   }
 
   async crear(

@@ -208,6 +208,8 @@ export interface OpcionesDeDescubrimiento {
   readonly dispositivoId?: string;
   /** Carril de la cámara. Si no se declaró, el VERIFICADO (`camara/carril.ts`). */
   readonly canal?: number;
+  /** C.3 (15-S1) · la lista de canales de video no se pudo leer: la ficha lo dice. */
+  readonly alNoLeerCanalesDeVideo?: (motivo: string) => void;
 }
 
 const rechazado = (cuerpo: string): boolean =>
@@ -289,7 +291,10 @@ export const descubrirCapacidades = async (
   if (familia !== 'comun') {
     // E2/C1 (15-M) · qué flujos lista el equipo: la ficha los ofrece; el
     // códec y el estado los pone la sonda RTSP del canal elegido (diagnóstico).
-    const { canales, motivo } = await descubrirCanalesDeVideo((p) => consultar(p, 'comun'));
+    const { canales, motivo } = await descubrirCanalesDeVideo(
+      (p) => consultar(p, 'comun'),
+      opciones.alNoLeerCanalesDeVideo,
+    );
     parciales.video = {
       estado: base.video?.estado ?? 'desconocida',
       codec: null,

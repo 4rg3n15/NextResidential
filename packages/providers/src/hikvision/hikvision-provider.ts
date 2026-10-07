@@ -436,10 +436,19 @@ export class HikvisionProvider
         motivo: fraseDeEleccion(eleccion),
       });
     }
+    const canal = eleccion.canal;
+    // C.2 (corrección 15-S1) · el códec que el equipo DECLARA para el canal
+    // elegido: si no es H.264, se dice ANTES de llamar al puente. Antes sólo se
+    // miraba el de la última sonda RTSP, y la cámara del 06/10 (101 en H.265)
+    // llegaba al puente para fallar allí. El códec del equipo NO se toca.
+    const declarado =
+      canal === null ? null : (declarados?.find((c) => c.id === canal)?.codec ?? null);
+    if (canal !== null && declarado !== null && declarado !== 'H.264') {
+      throw new VideoNoReproducible(dispositivoId, declarado, canal);
+    }
     // D2 (15-L) · si la última respuesta RTSP del equipo, en ESTE canal, fue un
     // códec que el navegador no reproduce, se dice ahora y no con un negro.
     const video = equipo.capacidades?.video;
-    const canal = eleccion.canal;
     if (
       canal !== null &&
       video !== undefined &&
