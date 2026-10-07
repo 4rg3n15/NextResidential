@@ -1,6 +1,6 @@
 /**
  * ═════════════════════════════════════════════════════════════════════════════
- * LOS HECHOS DE LA BITÁCORA DE RESIDENTES · ETAPA 15-I (0038) · RONDA 15-W (0055)
+ * LOS HECHOS DE LA BITÁCORA DE RESIDENTES · 15-I (0038) · 15-W (0055) · 15-X (0057)
  *
  * Uno por fila de la restricción `bitacora_residentes_tipo`: si se añade aquí y
  * no allí, la base lo rechaza; si se añade allí y no aquí, nadie lo escribe.
@@ -41,7 +41,12 @@ export type TipoDeHechoDeResidente =
   | 'tope_de_plazas_cambiado'
   | 'vehiculo_propio_editado'
   | 'vehiculo_propio_borrado'
-  | 'visita_revocada_por_residente';
+  | 'visita_revocada_por_residente'
+  // 0057 (15-X) · sin bytes ni documento: a lo sumo la versión de la política
+  | 'rostro_registrado'
+  | 'rostro_retirado'
+  | 'rostro_de_menor_registrado'
+  | 'rostro_de_menor_retirado';
 
 export interface HechoDeResidente {
   readonly copropiedadId: string;

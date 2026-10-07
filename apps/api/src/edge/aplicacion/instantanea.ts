@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Autorizacion } from '@ncr/domain-core';
-import { derechoDelResidente } from '../../autorizaciones';
+import { derechoDelResidente, derechoDelResidentePorPersona } from '../../autorizaciones';
 import type { LecturasDeReglas, PlantillaLeida, VehiculoDelPadron, ZonaLeida } from './puertos';
 
 /**
@@ -126,10 +126,12 @@ export const contenidoDe = (
   ahora: Date,
 ): ContenidoDeReglas => {
   // El derecho del residente entra como autorización sintética, con la MISMA
-  // función que usa el cargador de la nube (RN-16).
-  const sinteticas = lecturas.vehiculos
-    .map((v) => derechoDelResidente(copropiedadId, v))
-    .filter((a): a is Autorizacion => a !== null);
+  // función que usa el cargador de la nube (RN-16): el del vehículo y, desde
+  // la 15-X (D1), el de la persona por su rostro (`residente:persona:`).
+  const sinteticas = [
+    ...lecturas.vehiculos.map((v) => derechoDelResidente(copropiedadId, v)),
+    ...lecturas.residentesConRostro.map((r) => derechoDelResidentePorPersona(copropiedadId, r)),
+  ].filter((a): a is Autorizacion => a !== null);
   return {
     autorizaciones: [...sinteticas, ...lecturas.autorizaciones]
       .map(autorizacionParaElEdge)

@@ -15,6 +15,7 @@ import 'package:ncr_residente/presentacion/widgets/foto_del_visitante.dart';
 
 import '../dobles/hogar_15w_falso.dart';
 import '../dobles/hogar_falso.dart';
+import '../dobles/rostro_falso.dart';
 import '../dobles/sincronizacion.dart';
 import '../dobles/visitas.dart';
 
@@ -219,6 +220,8 @@ void main() {
       notificacionesDelConjunto: NotificacionesQueAnotan(),
       registro: RegistroFalso(), menores: MenoresFalsos(),
       plazas: PlazasFalsas(alta), revocacion: RevocacionFalsa(),
+      rostro: RostroFalso(inicial: RostroFalso.activo),
+      rostroDeMenores: RostroDeMenoresFalso(),
     );
   });
 

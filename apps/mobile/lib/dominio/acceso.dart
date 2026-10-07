@@ -16,10 +16,11 @@
 /// EL PRIMER INGRESO, COMO UNA FUNCIÓN PURA
 ///
 /// Hasta completarlo no se ve ninguna otra pantalla (3.2). Qué pantalla toca es
-/// una decisión de cuatro hechos —el cambio de contraseña pendiente que viaja
+/// una decisión de cinco hechos —el cambio de contraseña pendiente que viaja
 /// en el token, si hay vivienda vinculada, si la cuenta al menos trae una
-/// asignada (15-W) y si el titular aún no declaró sus ocupantes—, y se decide
-/// aquí para poder probar todos los casos sin montar la app.
+/// asignada (15-W), si el titular aún no declaró sus ocupantes y si hay que
+/// ofrecerle su rostro (15-X)—, y se decide aquí para
+/// poder probar todos los casos sin montar la app.
 library;
 
 sealed class IdentificadorDeAcceso {
@@ -81,6 +82,10 @@ enum PasoDePrimerIngreso {
   /// D6 · el titular declara cuántos ocupantes hay, de 1 al tope.
   declararOcupantes,
 
+  /// 15-X (D2) · se le ofrece registrar su rostro mientras no lo tenga y no
+  /// haya dicho «Ahora no»: es opcional, y desde «Mi perfil» sigue a mano.
+  ofrecerRostro,
+
   /// Todo listo: la app normal.
   listo,
 }
@@ -90,6 +95,7 @@ PasoDePrimerIngreso pasoDePrimerIngreso({
   required bool? viviendaVinculada,
   required bool debeDeclararOcupantes,
   bool viviendaAsignada = true,
+  bool ofrecerRostro = false,
 }) {
   if (debeCambiarContrasena) return PasoDePrimerIngreso.cambiarContrasena;
   if (viviendaVinculada == null) return PasoDePrimerIngreso.consultarAlta;
@@ -99,6 +105,7 @@ PasoDePrimerIngreso pasoDePrimerIngreso({
         : PasoDePrimerIngreso.esperarVivienda;
   }
   if (debeDeclararOcupantes) return PasoDePrimerIngreso.declararOcupantes;
+  if (ofrecerRostro) return PasoDePrimerIngreso.ofrecerRostro;
   return PasoDePrimerIngreso.listo;
 }
 

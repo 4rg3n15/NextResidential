@@ -51,6 +51,13 @@ export { RepositorioListaNegraPg } from './infraestructura/repositorio-lista-neg
 // 15-Q · la instantánea del Edge lee y compone EXACTAMENTE como el cargador (RN-16).
 export { derechoDelResidente } from './aplicacion/derecho-del-residente';
 export { autorizacionesVigentesEn } from './infraestructura/lectura-de-autorizaciones-pg';
+// 15-X · D1 · el derecho del residente por su rostro, con la MISMA lectura en los dos caminos.
+export { derechoDelResidentePorPersona } from './aplicacion/derecho-del-residente';
+export {
+  ResidentesPorPersonaPg,
+  residentesDePersonasEn,
+} from './infraestructura/residentes-por-persona-pg';
+export type { ResidenteResuelto } from './aplicacion/residentes-por-persona';
 export { EventoReconciliadoDto, LoteReconciliadoDto } from './presentacion/dtos';
 /**
  * F (15-L) · «Generar autorización» desde la consola la orquesta el módulo de

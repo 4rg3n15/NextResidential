@@ -5,7 +5,7 @@ import type { Reloj } from '@ncr/domain-core';
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import type { Configuracion } from '../configuracion/esquema';
 import { RevocarAutorizacion } from '../autorizaciones';
-import { SuprimirPlantillasDeTitular, SuprimirRostroDeAutorizacion } from '../biometria';
+import { SuprimirRostroDeAutorizacion, SuprimirYRetirarYa } from '../biometria';
 import { PROPOSITOS } from '../comun/cripto/sobre-aes-gcm';
 import { ResolverMiAmbito } from './aplicacion/casos-de-uso';
 import {
@@ -148,7 +148,7 @@ export const PROVEEDORES_DE_LA_15W: Provider[] = [
       OCUPANTES_DE_LA_VIVIENDA,
       TRASPASOS,
       RELOJ,
-      SuprimirPlantillasDeTitular,
+      SuprimirYRetirarYa,
     ],
     useFactory: (
       a: ResolverMiAmbito,
@@ -156,7 +156,7 @@ export const PROVEEDORES_DE_LA_15W: Provider[] = [
       o: OcupantesDeLaVivienda,
       t: CodigosDeOcupante,
       r: Reloj,
-      s: SuprimirPlantillasDeTitular,
+      s: SuprimirYRetirarYa,
     ) => new MenoresDeMiHogar(a, m, o, t, r, s),
   },
   {

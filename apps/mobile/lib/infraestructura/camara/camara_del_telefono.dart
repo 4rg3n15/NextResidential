@@ -13,7 +13,8 @@
 /// pueda descodificar —un HEIC que el sistema no convirtió— se dice.
 /// Lo que el sistema guarda no es legible —entra cifrado y ninguna ruta lo
 /// devuelve— y en el teléfono no queda nada: la foto vive en memoria mientras
-/// el formulario está abierto.
+/// el formulario está abierto, y la copia que el selector escribió en la
+/// carpeta temporal se borra en cuanto se lee (15-X, `copia_temporal.dart`).
 ///
 /// Minimización (Ley 1581, art. 4): el selector del sistema entrega la foto ya
 /// reducida a 640 px de lado; si aun así pasa de 180 KB, se recomprime aquí.
@@ -46,6 +47,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../dominio/medidas_de_imagen.dart';
 import '../../dominio/origen_de_la_foto.dart';
 import '../../dominio/puertos.dart';
+import 'copia_temporal.dart';
 
 /// Lado mayor de lo que se envía, y techo del JPEG. Los de la consola.
 const ladoMaximo = 640;
@@ -70,6 +72,9 @@ class CamaraDelTelefono {
       bytes = await archivo.readAsBytes();
     } on Exception {
       throw const FotoNoObtenida(MotivoSinFoto.ilegible);
+    } finally {
+      // 15-X · la copia que dejó el selector no se queda en el teléfono.
+      await borrarCopiaDelSelector(archivo.path);
     }
     // Lo que no se descodifica (un HEIC que el sistema no convirtió, algo
     // que no es una imagen) se dice; callarlo parecería una cancelación.

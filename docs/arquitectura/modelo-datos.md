@@ -27,6 +27,17 @@
 > y las fichas de `plazas_de_ocupante` y `bitacora_de_residentes`, que vienen de
 > la `0038`), §7, §8.2 (nota 8), §10 y las decisiones **D-15W-01** y **D-15W-02**.
 > Ninguna de las dos migraciones crea tablas.
+>
+> **Actualización del 2026-10-07 · ronda 15-X, migración `0057`.** El rostro del
+> residente: a lo sumo uno vivo por persona, un tercer origen del consentimiento
+> —el representante legal de un menor de 15 a 17 años— y los cuatro hechos del
+> rostro en la bitácora de residentes
+> ([ADR-039](../decisiones/ADR-039-rostro-del-residente-y-del-menor.md)): §3.4
+> (diagrama), §6.2 (`bitacora_de_residentes`), §6.5 (las dos fichas), §7.1, §10
+> y las decisiones **D-08** (enmendada), **D-15X-01** y **D-15X-02**. Corrige
+> además un desfase anterior a la ronda: desde la `0043` (ADR-032) la ficha del
+> consentimiento no recogía `origen` ni `declarado_por`, y D-08 seguía diciendo
+> que no había dónde escribirlo. La migración no crea tablas.
 
 - **Rama:** `etapa-01-modelo-datos-supabase` · **Base:** `develop`
 - **Fecha de diseño:** 2026-09-06 · **Aprobado e implementado:** 2026-09-06
@@ -355,6 +366,8 @@ erDiagram
         uuid id PK
         uuid copropiedad_id FK
         uuid persona_id FK "EL TITULAR · RN-10"
+        text origen "quién dejó constancia · 0043 · representante legal desde 0057"
+        uuid declarado_por FK "la cuenta que declaró o representó · 0043"
         text finalidad
         text version_politica
         canal_consentimiento canal
@@ -369,6 +382,7 @@ erDiagram
         uuid copropiedad_id FK
         uuid persona_id FK
         uuid consentimiento_id FK "NOT NULL · RN-09"
+        uuid autorizacion_id FK "nulo = rostro de residente · uno vivo por persona, 0057"
         numeric calidad
         bytea vector_cifrado
         text llave_ref "referencia a bóveda"
@@ -823,7 +837,7 @@ la administración al dar de alta al titular (ADR-037). Disparadores:
 | `tg_tope_de_plazas` (0056)                                     | Al nacer o al revivir una plaza activa: bloqueo consultivo por vivienda (`ncr:tope-plazas:<vivienda>`), cuenta las activas y, si llegan al tope de la vivienda —el propio o el de su copropiedad—, lanza `plazas_tope`. Sin tope legible, niega. Vale también para el superadministrador (`[CONTRADICCIÓN]` C-59, **D-15W-02**)                                                                                                                                                                                                                                                                      |
 | `tg_prohibir_delete` y `tg_auditoria` (0038)                   | Sin borrado físico (RN-19) y auditoría de cada cambio (KPI-05)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-#### `bitacora_de_residentes` — tenant ✔ · **solo inserción** (las tres capas de ADR-005) · **0038, ampliada por la 0055**
+#### `bitacora_de_residentes` — tenant ✔ · **solo inserción** (las tres capas de ADR-005) · **0038, ampliada por la 0055 y la 0057**
 
 El rastro de altas, vinculaciones —y de los códigos equivocados, que cuentan
 para los límites—, ocupantes, menores y vehículos propios. **El documento de
@@ -832,7 +846,7 @@ identidad y la IP en claro nunca se escriben aquí.**
 | Columna                      | Tipo                                | Restricción          | Justificación                                                                                                                          |
 | ---------------------------- | ----------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `ocurrido_en`                | `timestamptz NOT NULL`              |                      |                                                                                                                                        |
-| `tipo`                       | `text NOT NULL`                     | `CHECK` con la lista | 13 tipos de la 0038 y 15 de la 0055 (abajo)                                                                                            |
+| `tipo`                       | `text NOT NULL`                     | `CHECK` con la lista | 13 tipos de la 0038, 15 de la 0055 y 4 de la 0057 (abajo)                                                                              |
 | `usuario_id`                 | `uuid NULL REFERENCES usuarios(id)` |                      | **Nulo** en los fallos de «Crear cuenta»: se anotan antes de que exista la cuenta                                                      |
 | `actor_id`                   | `uuid NULL REFERENCES usuarios(id)` |                      | Quién lo hizo                                                                                                                          |
 | `vivienda_id`, `vehiculo_id` | `uuid NULL`, **sin** clave ajena    |                      | El rastro sobrevive al borrado de una vivienda o un vehículo sin historial                                                             |
@@ -854,6 +868,14 @@ cuenta sin recorrer la bitácora entera.
 La reversión de la 0055 no borra filas de esta tabla, que es de solo inserción:
 vuelve a la lista de la 0038 como `NOT VALID`, que rechaza los tipos de la 15-W
 desde ese momento sin exigir borrar los que ya existen.
+
+**Los 4 tipos de la 0057** (15-X, ADR-039): `rostro_registrado` y
+`rostro_retirado` —el rostro propio— y `rostro_de_menor_registrado` y
+`rostro_de_menor_retirado` —el que el titular gestiona como representante
+legal—. En `detalle`, nunca bytes ni documento: al registrar, la versión de la
+política aceptada (`politica:<versión>`); en los del menor, además, a quién
+(`residente:<id>`). La reversión de la 0057 conserva la lista si ya hay algún
+hecho del rostro y, si no, vuelve a la de la 0055.
 
 ### 6.3 Contexto · Autorizaciones
 
@@ -958,25 +980,39 @@ HU-19. Su ausencia produce motivo `ZONA_NO_AUTORIZADA` (CU-05 2a).
 
 #### `consentimientos_biometricos` — tenant ✔ · auditoría ✔
 
-| Columna            | Tipo                                                 | Restricción | Justificación                                  |
-| ------------------ | ---------------------------------------------------- | ----------- | ---------------------------------------------- |
-| `persona_id`       | `uuid NOT NULL REFERENCES personas(id)`              |             | **El titular** · RN-10                         |
-| `finalidad`        | `text NOT NULL DEFAULT 'control_acceso'`             |             | Principio de finalidad, Ley 1581               |
-| `version_politica` | `text NOT NULL`                                      |             | «Consentimiento verificable» (PDF del reto §9) |
-| `canal`            | `canal_consentimiento NOT NULL`                      |             | CU-02 paso 3                                   |
-| `solicitado_en`    | `timestamptz NOT NULL`                               |             | Base del plazo **S-04**                        |
-| `otorgado_en`      | `timestamptz NULL`                                   |             |                                                |
-| `revocado_en`      | `timestamptz NULL`                                   |             | HU-15                                          |
-| `evidencia_id`     | `uuid NULL REFERENCES evidencias(id)`                |             | Evidencia de la aceptación                     |
-| `estado`           | `estado_consentimiento NOT NULL DEFAULT 'pendiente'` |             |                                                |
+| Columna            | Tipo                                                         | Restricción                                             | Justificación                                  |
+| ------------------ | ------------------------------------------------------------ | ------------------------------------------------------- | ---------------------------------------------- |
+| `persona_id`       | `uuid NOT NULL REFERENCES personas(id)`                      |                                                         | **El titular** · RN-10                         |
+| `origen`           | `text NOT NULL DEFAULT 'otorgado_por_el_titular'` · **0043** | `CHECK` con tres valores (abajo) · el tercero, **0057** | Quién dejó constancia · ADR-032, **ADR-039**   |
+| `declarado_por`    | `uuid NULL REFERENCES usuarios(id)` · **0043**               | Obligatorio en los dos orígenes que no son del titular  | La cuenta que declaró o representó             |
+| `finalidad`        | `text NOT NULL DEFAULT 'control_acceso'`                     |                                                         | Principio de finalidad, Ley 1581               |
+| `version_politica` | `text NOT NULL`                                              |                                                         | «Consentimiento verificable» (PDF del reto §9) |
+| `canal`            | `canal_consentimiento NOT NULL`                              |                                                         | CU-02 paso 3                                   |
+| `solicitado_en`    | `timestamptz NOT NULL`                                       |                                                         | Base del plazo **S-04**                        |
+| `otorgado_en`      | `timestamptz NULL`                                           |                                                         |                                                |
+| `revocado_en`      | `timestamptz NULL`                                           |                                                         | HU-15                                          |
+| `evidencia_id`     | `uuid NULL REFERENCES evidencias(id)`                        |                                                         | Evidencia de la aceptación                     |
+| `estado`           | `estado_consentimiento NOT NULL DEFAULT 'pendiente'`         |                                                         |                                                |
 
 ```
 CHECK ( (estado = 'vigente')  = (otorgado_en IS NOT NULL AND revocado_en IS NULL) )
 CHECK ( (estado = 'revocado') = (revocado_en IS NOT NULL) )
 UNIQUE (copropiedad_id, persona_id) WHERE estado = 'vigente'
+CHECK ( origen IN ('otorgado_por_el_titular', 'declarado_por_quien_registra',
+                   'autorizado_por_representante_legal') )                     -- consent_origen_valores · 0057
+CHECK ( origen <> 'declarado_por_quien_registra'       OR declarado_por IS NOT NULL )  -- 0043
+CHECK ( origen <> 'autorizado_por_representante_legal' OR declarado_por IS NOT NULL )  -- 0057
 ```
 
-**No existe columna que vincule el consentimiento a un residente.** Es deliberado y es la expresión estructural de RN-10: el esquema hace **imposible** registrar «el residente consintió por el visitante», porque no hay dónde escribirlo. Ver decisión **D-08**.
+**El titular es siempre `persona_id`.** `origen` dice quién dejó constancia del consentimiento, y `declarado_por`, con qué cuenta:
+
+- `otorgado_por_el_titular` — lo dio el titular; `declarado_por` queda nulo.
+- `declarado_por_quien_registra` (**0043**, ADR-032) — quien registró la visita marcó la casilla de que el visitante consintió.
+- `autorizado_por_representante_legal` (**0057**, ADR-039) — el titular del hogar lo autorizó, como representante legal, para un menor de 15 a 17 años.
+
+Cuando el titular confirma uno de los dos últimos, pasa a `otorgado_por_el_titular`. La base exige el autor (`consent_declaracion_con_autor`, `consent_representante_con_autor`); que ese autor sea el titular del hogar del menor, y que el menor tenga de 15 a 17 años, lo comprueba la aplicación (nivel 3): la edad depende del día y la titularidad vive en otra tabla. Escribe sólo la identidad de servicio de la copropiedad (`99m` §3).
+
+> **Corrección del 2026-10-07.** Esta ficha decía que no existía columna que vinculara el consentimiento a quien lo registra. Dejó de ser cierto con la `0043` y no se corrigió entonces. Ver **D-08**, enmendada.
 
 #### `plantillas_biometricas` — tenant ✔ · auditoría ✔
 
@@ -998,6 +1034,17 @@ CHECK ( estado <> 'suprimida' OR (vector_cifrado IS NULL AND suprimida_en IS NOT
 ```
 
 La supresión **borra el vector** además de marcar el estado. Una plantilla «suprimida» que conserve el vector no es una supresión: es una etiqueta.
+
+**15-X · migración 0057.** El rostro de un residente es una plantilla **sin** autorización (`autorizacion_id` nulo), y de esas hay a lo sumo **una viva por persona**:
+
+```
+UNIQUE (copropiedad_id, persona_id)
+  WHERE autorizacion_id IS NULL
+    AND estado IN ('pendiente_consentimiento', 'pendiente_sincronizacion', 'activa')
+                                                        -- plantillas_residente_viva_uk · 0057
+```
+
+Su `suprimir_en` lo fija la aplicación: un año (`ROSTRO_RESIDENTE_RETENCION_DIAS`, 365 por omisión) o, para un menor, el día en que cumple 18 si llega antes. El tope de 5 capturas en 24 h por cuenta se cuenta sobre esta tabla —las plantillas de residente con `creado_por` de la cuenta—, sin índice propio. Ver **D-15X-01**.
 
 #### `plantilla_sincronizaciones` — tenant ✔ · auditoría ✔
 
@@ -1215,6 +1262,7 @@ Sin este libro la retención sería **indemostrable**: pasado el plazo no quedar
 | `(plantilla_id, dispositivo_id)`                                           | `plantilla_sincronizaciones`  | Una fila por terminal      | CA-10                     |
 | `(bucket, ruta)`                                                           | `evidencias`                  | Sin objetos duplicados     | —                         |
 | `(persona_id) WHERE estado='activo' AND persona_id IS NOT NULL` · **0056** | `plazas_de_ocupante`          | Una plaza viva por persona | **D-W2** · `99l`          |
+| `(copropiedad_id, persona_id)` sin autorización y viva · **0057**          | `plantillas_biometricas`      | Un rostro vivo por persona | **D-15X-01** · `99m`      |
 
 ### 7.2 Índices de consulta, derivados de los filtros reales de las pantallas
 
@@ -1430,6 +1478,9 @@ RN-10 —«el consentimiento del visitante lo otorga el visitante, no el residen
 
 No es posible escribir en la base «el residente consintió por el visitante» porque no existe la columna. Es la forma más fuerte de cumplir una regla: no prohibirla, sino hacerla inexpresable.
 
+> **Enmienda del 2026-10-07 (ronda 15-X) · D-08 ya no se cumple tal como está escrita.**
+> Desde la `0043` (ADR-032) la columna existe: `declarado_por`, la cuenta que marcó la casilla de que el visitante consintió. La `0057` (ADR-039) le da un tercer uso: la cuenta del titular del hogar que autoriza el rostro de un menor de 15 a 17 años como su representante legal (`[CONTRADICCIÓN]` C-64). Lo que se conserva es lo que RN-10 protege: **el titular sigue siendo siempre `persona_id`**, y `origen` deja escrito, a nivel 1, que la constancia no la dio él. Ninguna fila dice «el residente consintió por el visitante»: dice «declaró que consintió» o «autorizó como representante legal», que es la figura con la que la Ley 1581 (art. 7) admite el dato de un menor. Ver §6.5 y **D-15X-02**.
+
 ### D-09 · `plantillas_biometricas.consentimiento_id` es `NOT NULL` desde el primer instante
 
 Parece contradictorio con CA-09, que describe un registro «pendiente de consentimiento». No lo es, y el matiz importa.
@@ -1591,7 +1642,7 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 | **RN-07** solo admin u operador gestionan lista negra   | Política RLS de `INSERT`/`UPDATE` restringida a esos dos roles                                      | 1     |
 | **RN-08** apertura manual con motivo y atribución       | `CHECK` de `tipo='manual'` en `eventos` (**D-13**)                                                  | 1     |
 | **RN-09** consentimiento previo a sincronizar           | `consentimiento_id NOT NULL` (**D-09**) + trigger de estado vigente                                 | 1+2   |
-| **RN-10** el titular es el visitante                    | **Ausencia** de columna que vincule a un residente (**D-08**)                                       | 1     |
+| **RN-10** el titular es el visitante                    | `persona_id` = el titular; `origen` + `declarado_por` con autor obligatorio (**D-08**, enmendada)   | 1     |
 | **RN-11** supresión en 24 h                             | `suprimir_en NOT NULL` + índice del barrido + `CHECK` de vector nulo                                | 1+2   |
 | **RN-12** la UI no invoca hardware                      | `dispositivos.credencial_ref` inaccesible por RLS a roles de interfaz                               | 1     |
 | **RN-13** vivienda inactiva no genera autorizaciones    | Trigger sobre `INSERT` en `autorizaciones`                                                          | 2     |
@@ -1621,6 +1672,8 @@ El coste es que corregir un dato erróneo exige un procedimiento explícito con 
 | **D-W2** una plaza: cuenta o persona, nunca las dos     | `CHECK plazas_cuenta_o_persona` + `plazas_persona_uk` + clave ajena compuesta (0056)                | 1     |
 | **D-W2** sin cuenta, sólo ocupa plaza un menor          | `tg_plazas_solo_superadministrador` (`plazas_persona_menor`)                                        | 2     |
 | **D-W10** tope de plazas por vivienda                   | `CHECK BETWEEN 1 AND 20` + `tg_tope_de_plazas` bajo bloqueo por vivienda (**D-15W-02**)             | 1+2   |
+| **D-W3** un rostro vivo de residente por persona (15-X) | `plantillas_residente_viva_uk` + aserción previa de la 0057 (**D-15X-01**)                          | 1     |
+| **D-W4** el representante legal deja autor              | `consent_representante_con_autor`; edad y titularidad, en la aplicación (**D-15X-02**)              | 1+3   |
 
 **Las trece invariantes que `CLAUDE.md` §6 marca como no negociables tienen contraparte de nivel 1**, salvo RN-13 y las dos coherencias que cruzan tablas, que son nivel 2 por imposibilidad de expresarlas como restricción declarativa. Cada una está señalada arriba.
 
@@ -1767,3 +1820,36 @@ Lo no obvio:
 - **Nadie pierde plazas.** Antes de crear el disparador del tope, la migración da un tope propio igual a sus plazas activas a toda vivienda que ya supera el de su copropiedad, y la misma función (`app.conservar_plazas_sobre_el_tope`) corre cada vez que el tope de una copropiedad baja. Una vivienda con más de 20 conserva sus plazas, pero no suma más: 20 es la cota de la restricción.
 
 Prueba: `supabase/policies/tests/99l_autorregistro_y_menores.sql` §2 a §7 · `supabase/policies/tests/99l_plazas_concurrentes.sh` · `apps/api/test/plazas-del-titular-pg.test.ts`.
+
+### D-15X-01 · Un rostro vivo de residente por persona, con un índice y no con una consulta previa; la migración no decide cuál sobra
+
+**Ronda 15-X · migración 0057 · D-W3 ·
+[ADR-039](../decisiones/ADR-039-rostro-del-residente-y-del-menor.md) · ADR-04.**
+
+Dos registros a la vez —dos teléfonos de la misma cuenta, o un reintento sobre una respuesta perdida— leerían los dos «sin rostro» y crearían dos. Es el caso de ADR-04: sólo la base lo impide. `plantillas_residente_viva_uk` cubre las plantillas **sin** autorización —el rostro de un residente— en los tres estados vivos; las de visitante cuelgan de su autorización y no cambian.
+
+Lo no obvio:
+
+- **Reemplazar cabe en el índice porque es una transacción**: la anterior pasa a `pendiente_supresion` —fuera del índice— y la nueva entra, en la misma. De dos reemplazos simultáneos, uno gana y el otro choca y recibe 409, sin dejar un consentimiento vigente huérfano.
+- **La migración no elige.** Si una persona ya tiene dos rostros vivos, se detiene y la nombra. Quedarse «con el más reciente» en silencio podría suprimir justo el que la terminal reconoce; pasarlo a `pendiente_supresion` es una decisión de quien opera, y la supresión lo retira de los equipos.
+- **El tope de 5 capturas en 24 h se cuenta aquí**, por `creado_por`, sin índice propio: las plantillas de residente de una copropiedad son pocas.
+
+Prueba: `supabase/policies/tests/99m_rostro_del_residente.sql` §1 · `supabase/policies/tests/99m_asercion_previa_0057.sh` (con el fichero de la migración) · `apps/api/test/rostro-del-residente-pg.test.ts` (reemplazo, dos registros y dos primeras capturas a la vez, el tope).
+
+### D-15X-02 · El representante legal es un origen del consentimiento, no una columna ni una tabla
+
+**Ronda 15-X · migración 0057 · D-W4 ·
+[ADR-039](../decisiones/ADR-039-rostro-del-residente-y-del-menor.md) · `[CONTRADICCIÓN]` C-64.**
+
+El rostro de un menor de 15 a 17 años lo autoriza el titular del hogar como su representante legal. El esquema ya tenía dónde escribir «quién dejó constancia» (`origen`, `declarado_por`, 0043); la 0057 le añade un valor y exige el autor. Una tabla de representaciones habría dado una segunda fuente de verdad sobre el mismo consentimiento.
+
+Lo no obvio:
+
+- **La base exige el autor, no que sea el titular.** Quién es titular del hogar del menor vive en otra tabla y la edad depende del día: lo comprueba la aplicación, con la escritura limitada a la identidad de servicio de la copropiedad. Es nivel 3, y se dice.
+- **Un representante revoca sólo lo que autorizó un representante.** Si el consentimiento vigente
+  del menor es suyo o de una visita, el titular del hogar retira el rostro de residente —de la base
+  y de los equipos— pero no revoca ese consentimiento, que no dio él. El que autorizó un titular
+  anterior sí lo revoca el actual (`[SUPUESTO]` S-15X-04): retirar nunca expone el dato.
+- **La reversión no borra historia.** Con consentimientos de representante vivos, se niega; con algunos ya revocados, conserva el origen en el `CHECK`, como los valores de enumerado que la 0056 no puede retirar.
+
+Prueba: `supabase/policies/tests/99m_rostro_del_residente.sql` §2 y §3 · `packages/domain-core/src/biometria/consentimiento-representante.test.ts` · `apps/api/test/rostro-de-menores-pg.test.ts`.

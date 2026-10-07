@@ -58,6 +58,7 @@ import 'dependencias.dart';
 import 'material_de_la_app.dart';
 import 'pantallas/acceso.dart';
 import 'pantallas/historial.dart';
+import 'pantallas/mi_rostro.dart';
 import 'pantallas/notificaciones.dart';
 import 'pantallas/primer_ingreso.dart';
 import 'pantallas/registro.dart';
@@ -104,13 +105,16 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     perfil: _c.perfil,
     alCambiarDeVivienda: _cargarTodo,
   );
-  late final _familia = AccionesDeLaFamilia.delArmazon(_d, _c, abrir: _abrir);
+  late final _familia = AccionesDeLaFamilia.delArmazon(_d, _c, abrir: _abrir, foto: _tomarFoto);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
     fuente: _d.notificaciones,
     repositorio: _repo,
     reloj: _d.reloj,
   );
   late final AlmacenDeTexto _almacen = _d.almacen ?? AlmacenDeTextoEnMemoria();
+
+  /// La cámara real si la hay; si no, la simulada y declarada como tal.
+  late final TomarFoto _tomarFoto = _d.tomarFoto ?? CamaraSimulada().tomar;
   late final ContadorDeNotificaciones _sinVer = ContadorDeNotificaciones(
     controlador: _c.notificaciones,
     vistas: NotificacionesVistas(almacen: _almacen),
@@ -127,8 +131,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     revocacion: _d.revocacion,
     reloj: _d.reloj,
     claves: _d.claves,
-    // La cámara real si la hay; si no, la simulada y declarada como tal.
-    tomarFoto: _d.tomarFoto ?? CamaraSimulada().tomar,
+    tomarFoto: _tomarFoto,
     conSesion: _conSesion,
     alCambiarLaBandeja: () => mounted ? setState(() {}) : null,
     recargarVisitas: () {
@@ -323,6 +326,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         recuperada: _recuperada,
         reloj: _d.reloj,
         correoDeContacto: _correoDelRegistro,
+        oferta: OfertaDelRostro(rostro: _d.rostro, almacen: _almacen),
+        tomarFoto: _tomarFoto,
         alSalir: _cerrarSesion,
         alTerminar: () {
           setState(() => _primerIngresoHecho = true);
@@ -358,6 +363,8 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
         [_c.historial],
       ),
       alAbrirNotificaciones: _abrirNotificaciones,
+      alAbrirMiRostro: () =>
+          _abrir(PantallaDeMiRostro(rostro: _d.rostro, tomarFoto: _tomarFoto), const []),
       acciones: _acciones,
     );
   }

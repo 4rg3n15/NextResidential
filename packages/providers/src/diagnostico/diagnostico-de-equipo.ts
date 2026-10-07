@@ -1,5 +1,5 @@
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
-import { desvioEnPalabras } from '../nucleo/reloj-del-equipo';
+import { desvioDelReloj, desvioEnPalabras } from '../nucleo/reloj-del-equipo';
 import { CredencialRechazada } from '../nucleo/errores';
 import { recortado, sinSecretos } from '../equipo/intercambio';
 import type { OpcionesDeEquipo } from '../equipo/cliente';
@@ -481,15 +481,22 @@ export const juzgarHora = (
   toleranciaSegundos: number = DESVIO_TOLERABLE_SEGUNDOS,
 ): HoraDelEquipo => {
   const leida = etiqueta(cuerpo, 'localTime') ?? etiqueta(cuerpo, 'time');
-  if (leida === null || Number.isNaN(Date.parse(leida))) {
+  // 15-X · D0 · el MISMO juicio que la compuerta de altas: lo que ella no puede
+  // juzgar —una hora sin zona— no se lee aquí en la zona del proceso.
+  const desvio = desvioDelReloj(cuerpo, ahoraDelServidor);
+  if (desvio === null) {
     return {
       leida,
       desvioSegundos: null,
       excesiva: false,
-      detalle: 'El equipo no declaró su hora en un formato utilizable',
+      detalle:
+        leida === null || Number.isNaN(Date.parse(leida))
+          ? 'El equipo no declaró su hora en un formato utilizable'
+          : `El equipo da su hora sin zona («${leida}»): no se puede comparar con la del ` +
+            'servidor, y por eso no frena las altas con vigencia. Compruebe en el equipo que ' +
+            'su hora y su zona son las de la copropiedad (Configuración → Sistema → Hora, con NTP)',
     };
   }
-  const desvio = Math.round((Date.parse(leida) - ahoraDelServidor.getTime()) / 1000);
   const excesiva = Math.abs(desvio) > toleranciaSegundos;
   return {
     leida,

@@ -14,6 +14,8 @@ import '../dominio/notificaciones.dart';
 import '../dominio/puertos.dart';
 import '../dominio/registro.dart';
 import '../dominio/revocacion.dart';
+import '../dominio/rostro.dart';
+import '../dominio/rostro_de_menor.dart';
 
 class Dependencias {
   const Dependencias({
@@ -33,6 +35,8 @@ class Dependencias {
     required this.menores,
     required this.plazas,
     required this.revocacion,
+    required this.rostro,
+    required this.rostroDeMenores,
     this.tomarFoto,
     this.almacen,
     this.cambiosDeRed,
@@ -67,6 +71,12 @@ class Dependencias {
   final RepositorioDeMenores menores;
   final RepositorioDePlazas plazas;
   final RevocacionDeVisitas revocacion;
+
+  /// 15-X (D2) · «Mi rostro»: registrar, renovar y retirar el rostro propio.
+  final RostroDelResidente rostro;
+
+  /// 15-X (D3) · el de un menor de 15 a 17 años del hogar, por el titular.
+  final RostroDeMenores rostroDeMenores;
 
   /// 15-I (hito 3) · la cámara REAL del teléfono, y su galería. `null` = la
   /// simulada (web, recorrido y pruebas), declarada en `fuente_de_fotos.dart`.

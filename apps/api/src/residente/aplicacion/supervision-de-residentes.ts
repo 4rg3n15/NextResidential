@@ -4,7 +4,7 @@ import type { Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import { ACTOR_INGESTA } from '../../comun/actores-de-servicio';
 import type { CrearCuentaPorUsuario, RechazoDeAlta } from '../../cuentas';
-import type { SuprimirPlantillasDeTitular } from '../../biometria';
+import type { SuprimirYRetirarYa } from '../../biometria';
 import { plazasVisibles } from './ocupantes';
 import type { PlazaVisible } from './ocupantes';
 import { TITULARIDAD_DE_VIVIENDAS } from './puertos-de-titularidad';
@@ -68,8 +68,11 @@ export class CuentasDeResidentesDelSuperadmin {
     @Inject(BITACORA_DE_RESIDENTES) private readonly bitacora: BitacoraDeResidentes,
     @Inject(RELOJ) private readonly reloj: Reloj,
     @Inject(TITULARIDAD_DE_VIVIENDAS) private readonly titularidad: TitularidadDeViviendas,
-    /** C9 (15-M) · sin él, la baja deja las plantillas vivas hasta que venzan. */
-    private readonly suprimirPlantillas: SuprimirPlantillasDeTitular | null = null,
+    /**
+     * C9 (15-M) · sin él, la baja deja las plantillas vivas hasta que venzan.
+     * 15-X · y las saca de los equipos en el acto, no a las 6 h del barrido.
+     */
+    private readonly suprimirPlantillas: Pick<SuprimirYRetirarYa, 'deTitular'> | null = null,
   ) {}
 
   listar(copropiedadId: string): Promise<readonly CuentaDeResidente[]> {
@@ -92,7 +95,7 @@ export class CuentasDeResidentesDelSuperadmin {
     if (hecha === null) return null;
     let plantillasSuprimidas = 0;
     if (hecha.personaId !== null && this.suprimirPlantillas !== null) {
-      const r = await this.suprimirPlantillas.ejecutar(ctx, copropiedadId, hecha.personaId);
+      const r = await this.suprimirPlantillas.deTitular(ctx, copropiedadId, hecha.personaId);
       plantillasSuprimidas = r.suprimidas;
     }
     return { plantillasSuprimidas };

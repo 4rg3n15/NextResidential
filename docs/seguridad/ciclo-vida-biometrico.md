@@ -1,7 +1,7 @@
 # Ciclo de vida del dato biométrico
 
 **Next Control Residencial · Ley 1581 de 2012 (Colombia)**
-Vigente desde la ETAPA 08 · última revisión 2026-09-27 (ETAPA 15-L, ADR-032)
+Vigente desde la ETAPA 08 · última revisión 2026-10-07 (ronda 15-X, ADR-039)
 
 > Este documento describe qué le pasa a la cara de una persona desde que una
 > cámara la mide hasta que no queda rastro de ella, y **dónde está escrito cada
@@ -47,6 +47,47 @@ servidor. El enlace del titular, su página pública y el QR **ya no existen**.
 
 ---
 
+## 0 bis · Lo que cambió en la ronda 15-X (ADR-039): el rostro de quien VIVE en el conjunto
+
+Hasta la 15-X el rostro sólo entraba con una visita. Desde ella, también el de
+un residente, y por dos caminos que no se confunden:
+
+| Camino                               | Quién lo registra                                                 | Constancia del consentimiento                                                                                                                                 | Cuánto vive                                                       |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **El propio** (D-W3, «Mi rostro»)    | El adulto con cuenta, para sí, desde la app                       | `otorgado_por_el_titular`: él mismo acepta la política, con su versión                                                                                        | 365 días (`ROSTRO_RESIDENTE_RETENCION_DIAS`), renovables          |
+| **El de un menor de 15 a 17** (D-W4) | **Sólo el titular del hogar**, como representante legal del menor | `autorizado_por_representante_legal`, con la cuenta del titular como autora y dos declaraciones: que lo representa y que el menor está informado y de acuerdo | 365 días **o hasta el día en que cumple 18**, lo que llegue antes |
+
+Lo que esto añade al ciclo:
+
+- **Opcional.** Nadie necesita su rostro para entrar. La app lo ofrece al
+  entrar mientras no lo tenga y no haya dicho «Ahora no» (recordado por cuenta
+  en el teléfono); nunca bloquea.
+- **Uno vivo por persona** (`plantillas_residente_viva_uk`, 0057). Renovar
+  reemplaza en UNA transacción: el anterior pasa a `pendiente_supresion` y sale
+  de los equipos en el acto.
+- **Menores de 15 años: no se trata su rostro**, ni con representante
+  (`[SUPUESTO]` S-15W-01). Con 18 cumplidos, la persona decide desde su propia
+  cuenta, y su primer registro **confirma** la autorización del representante
+  (D-10): el origen pasa a ser el suyo.
+- **Retirar es revocar en el acto**, también en los equipos: el adulto el suyo;
+  el titular del hogar el del menor, sea el que lo autorizó o el que lo
+  sucede. Ningún representante toca el consentimiento **propio** de un menor
+  ni la casilla de una visita.
+- **La baja** de una cuenta o de un menor saca su rostro de los equipos en el
+  acto (`SuprimirYRetirarYa`), sin esperar al barrido de 6 h.
+- **Decide la plataforma**, igual en la nube y en el Edge: el rostro de un
+  residente lleva su derecho de residente (D1, `residente:persona:<id>`), con
+  la precedencia de siempre. Sin consentimiento vigente, `SIN_CONSENTIMIENTO`.
+- **Sin conexión no hay rostro en el teléfono:** la foto no entra en la bandeja
+  de salida, se descarta, y la cámara borra en el acto la copia temporal del
+  selector (`[SUPUESTO]` S-15X-03).
+
+La política que se acepta es provisional y conservadora hasta que el área legal
+de Grupo Control la redacte (P-39): una para el rostro propio y otra, con
+versión propia, para el del representante.
+
+---
+
 ## 1 · Qué dato se trata, y cuál no
 
 | Se trata                                                         | NO se trata                                         |
@@ -59,10 +100,15 @@ La plantilla **no es reversible a una fotografía**, pero sigue siendo dato
 sensible: identifica de forma única a una persona y su tratamiento exige
 autorización previa, expresa e informada (Ley 1581, art. 5 y 6, lit. a).
 
-La imagen de la que se deriva **no viaja al servidor**. La medición de calidad
-—encuadre, nitidez, iluminación, rostro único— la hace el dispositivo que
-captura y envía números, no la foto. Es minimización (art. 4, lit. c) aplicada
-antes de que el dato exista: lo que no se sube no se puede filtrar.
+La medición de calidad —encuadre, nitidez, iluminación, rostro único— la hace
+el dispositivo que captura, y envía números.
+
+> **Corregido en la 15-X.** Este párrafo decía que la imagen «no viaja al
+> servidor». Desde la 15-L sí viaja: la terminal facial necesita la foto para
+> dar de alta el rostro, y ésa es la plantilla que se cifra al entrar
+> (`BovedaAesGcm`) y sólo sale descifrada hacia la terminal. Ninguna ruta la
+> devuelve a una app ni a la consola. La minimización está en lo que no se
+> conserva fuera de la bóveda, no en no subirla.
 
 ---
 
@@ -84,7 +130,8 @@ antes de que el dato exista: lo que no se sube no se puede filtrar.
 
 ### 3.1 Captura (CU-02, pasos 1 a 3)
 
-1. El dispositivo mide la captura y envía **medidas, no imagen**.
+1. El dispositivo mide la captura y envía sus **medidas** con la foto (ver la
+   corrección de §1).
 2. `evaluarCaptura` decide. Si rechaza, devuelve **todos** los motivos a la vez
    —encuadre, nitidez, iluminación, rostros— para que el visitante corrija una
    sola vez en lugar de repetir la foto una vez por defecto.
@@ -254,27 +301,38 @@ Revocar **no admite condiciones**: no se exige motivo, ni que la autorización
 haya vencido, ni que un administrador lo apruebe. Por eso el agregado no tiene
 más comprobación que la de titularidad.
 
+**El rostro de un residente (15-X).** El adulto retira el suyo con
+`POST …/mi/rostro/retiro`; el titular del hogar, el de un menor con
+`POST …/mi/menores/:residenteId/rostro/retiro`. Los dos revocan y suprimen en
+el acto, también en los equipos. El menor ejerce sus derechos por medio de su
+representante (Ley 1581, art. 7) hasta los 18; desde entonces, desde su cuenta.
+
 ---
 
 ## 5 · Qué se puede demostrar hoy, y cómo
 
-| Compromiso                                               | Prueba                                           | Verificado por mutación |
-| -------------------------------------------------------- | ------------------------------------------------ | ----------------------- |
-| Sin fila de consentimiento no hay plantilla              | `50_consentimiento_biometrico.sql` (nivel 1)     | Sí                      |
-| Sin consentimiento vigente no se pasa a sincronizable    | `50_…sql` (nivel 2)                              | Sí                      |
-| Sin consentimiento vigente no se registra en la terminal | `50_…sql` (nivel 3)                              | **Sí — cerrojo nuevo**  |
-| Revocar borra el vector en la misma transacción          | `50_…sql` · `casos-de-uso.test.ts`               | Sí                      |
-| El plazo de conservación tiene cota estructural          | `50_…sql`                                        | Sí                      |
-| El margen configurable no puede exceder 24 h             | `50_…sql`                                        | Sí                      |
-| El vector se guarda cifrado, nunca en claro              | `casos-de-uso.test.ts`                           | —                       |
-| Una plantilla manipulada no llega a la terminal          | `casos-de-uso.test.ts` (etiqueta GCM)            | —                       |
-| Ninguna ruta expone un vector                            | `biometria.e2e.test.ts`, enumerando el enrutador | —                       |
-| Nadie consiente por otro                                 | dominio, aplicación y HTTP                       | —                       |
-| CU-02 entero por los adaptadores PostgreSQL de la API    | `biometria-pg.test.ts` (15-E)                    | —                       |
-| El titular responde por su enlace, sin sesión            | `consentimiento-publico.e2e.test.ts` (15-E)      | —                       |
-| Aceptar propaga a todo equipo con biblioteca de rostros  | `sincronizacion-total.test.ts` · e2e (15-E)      | —                       |
-| Revocar retira de las terminales en la misma llamada     | `casos-de-uso.test.ts` · `biometria-pg.test.ts`  | —                       |
-| La carga se acredita por búsqueda o recuento, no por 200 | `terminal-facial.test.ts` (15-E)                 | —                       |
+| Compromiso                                               | Prueba                                                             | Verificado por mutación |
+| -------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------- |
+| Sin fila de consentimiento no hay plantilla              | `50_consentimiento_biometrico.sql` (nivel 1)                       | Sí                      |
+| Sin consentimiento vigente no se pasa a sincronizable    | `50_…sql` (nivel 2)                                                | Sí                      |
+| Sin consentimiento vigente no se registra en la terminal | `50_…sql` (nivel 3)                                                | **Sí — cerrojo nuevo**  |
+| Revocar borra el vector en la misma transacción          | `50_…sql` · `casos-de-uso.test.ts`                                 | Sí                      |
+| El plazo de conservación tiene cota estructural          | `50_…sql`                                                          | Sí                      |
+| El margen configurable no puede exceder 24 h             | `50_…sql`                                                          | Sí                      |
+| El vector se guarda cifrado, nunca en claro              | `casos-de-uso.test.ts`                                             | —                       |
+| Una plantilla manipulada no llega a la terminal          | `casos-de-uso.test.ts` (etiqueta GCM)                              | —                       |
+| Ninguna ruta expone un vector                            | `biometria.e2e.test.ts`, enumerando el enrutador                   | —                       |
+| Nadie consiente por otro                                 | dominio, aplicación y HTTP                                         | —                       |
+| CU-02 entero por los adaptadores PostgreSQL de la API    | `biometria-pg.test.ts` (15-E)                                      | —                       |
+| El titular responde por su enlace, sin sesión            | `consentimiento-publico.e2e.test.ts` (15-E)                        | —                       |
+| Aceptar propaga a todo equipo con biblioteca de rostros  | `sincronizacion-total.test.ts` · e2e (15-E)                        | —                       |
+| Revocar retira de las terminales en la misma llamada     | `casos-de-uso.test.ts` · `biometria-pg.test.ts`                    | —                       |
+| La carga se acredita por búsqueda o recuento, no por 200 | `terminal-facial.test.ts` (15-E)                                   | —                       |
+| Un rostro vivo de residente por persona (15-X)           | `99m_rostro_del_residente.sql` · aserción previa                   | Sí (Q1, Q5)             |
+| Dos registros a la vez: uno gana, el otro 409 (15-X)     | `rostro-del-residente-pg.test.ts`                                  | Sí (M9, M10)            |
+| El menor: sólo el titular, de 15 a 17, hasta los 18      | `rostro-de-menores-pg.test.ts`                                     | Sí (M3-11 a M3-17)      |
+| El representante no consiente ni revoca por otro         | `consentimiento-representante.test.ts`                             | Sí (M3-1 a M3-4)        |
+| La baja saca el rostro de los equipos en el acto (15-X)  | `rostro-de-menores-pg.test.ts` · `rostro-del-residente-pg.test.ts` | Sí (M3-18, MB-1 a MB-3) |
 
 **Verificado por mutación** significa que se desactivó la garantía y se comprobó
 que la prueba se pone roja. Un control que nadie ha visto fallar no está
@@ -311,14 +369,18 @@ Ninguna de estas es una decisión de ingeniería, y ninguna se ha inventado:
 
 1. **Versión y texto de la política de tratamiento** que se le muestra al
    titular. El sistema persiste la versión aceptada; el texto no lo escribe el
-   equipo de desarrollo.
+   equipo de desarrollo. Desde la 15-X, también las dos del rostro de un
+   residente —la propia y la del representante de un menor—, hoy provisionales
+   (P-39).
 2. **Procedimiento de reclamación ante la SIC** y responsable designado.
 3. **Registro de la base de datos ante el RNBD**, si aplica por volumen.
 4. **Plazo de respuesta al consentimiento** (`[SUPUESTO]` S-03: 24 h) y **margen
    de supresión** por copropiedad (por defecto 24 h, que es también el máximo).
-5. **Menores de edad**: hoy el sistema no distingue. Tratar datos biométricos de
-   un menor exige el consentimiento de su representante legal, y eso es un
-   requisito nuevo, no un ajuste — se anota como riesgo abierto.
+5. ~~**Menores de edad**: hoy el sistema no distingue.~~ **Resuelto en la
+   15-X** (D-W4, ADR-039): de 15 a 17 años, con la autorización del titular del
+   hogar como su representante legal y el menor informado y de acuerdo; por
+   debajo de 15, no se trata. Queda por definir el texto de esa autorización
+   (P-39).
 6. **Canal del consentimiento** (P-15, superado por ADR-032 en la 15-L). Ya no
    hay enlace que entregar: la constancia es la casilla que marca quien
    registra, y el canal anotado es `app` (residente) o `presencial` (consola).
@@ -328,6 +390,7 @@ Ninguna de estas es una decisión de ingeniería, y ninguna se ha inventado:
 ## 8 · Resumen en una línea
 
 El dato biométrico entra cifrado, sale solo hacia una terminal y solo con
-consentimiento vigente del titular, se borra —no se etiqueta— al revocar o al
-vencer el plazo, y todo lo anterior lo sostienen claves ajenas, disparadores y
+consentimiento vigente del titular —o, para un menor de 15 a 17, de su
+representante legal—, se borra —no se etiqueta— al revocar o al vencer el
+plazo, y todo lo anterior lo sostienen claves ajenas, disparadores y
 restricciones CHECK de PostgreSQL, no la buena voluntad del código que las usa.

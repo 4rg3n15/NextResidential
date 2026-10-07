@@ -22,6 +22,8 @@ import type { Vigencia } from '@ncr/domain-core';
  *     trabaja por segundos y no dice si su fin es inclusivo, así que se escribe
  *     `hasta − 1 s`: nunca un segundo de más.
  *
+ *  4. **El inicio va con margen** (15-X · D0). Ver `MARGEN_DE_INICIO_S`.
+ *
  * Sin vigencia, el registro es BYTE A BYTE el de antes de la 15-L
  * (`userType: "normal"`, `Valid.enable: false`), salvo `doorRight`/`RightPlan`
  * cuando la terminal tiene puerta declarada, que no dependen de la vigencia.
@@ -32,6 +34,28 @@ import type { Vigencia } from '@ncr/domain-core';
 export const ZONA_POR_OMISION = 'America/Bogota';
 /** Plantilla horaria de la puerta cuando nadie la declara: la 1 de la terminal. */
 export const PLAN_POR_OMISION = '1';
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * 15-X · D0 · EL INICIO, CON MARGEN: «PERMISO VENCIDO» A QUIEN LLEGA A SU HORA
+ *
+ * El 06/10 la DS-K1T344MBFWX-E1 (V4.61.0) negó rostros POR SU CUENTA con
+ * «permiso vencido» (5/8), y la ficha avisaba de relojes desfasados. El 5/8 sale
+ * también cuando la vigencia todavía NO empezó en el reloj del equipo (visto el
+ * 29/09, `nucleo/reloj-del-equipo.ts`). `desde` es la hora que eligió el
+ * navegador o el teléfono, con SU reloj y al minuto, y la compuerta de reloj
+ * admite un equipo hasta `EQUIPOS_DESVIO_DE_RELOJ_S` atrasado: sin margen, un
+ * cliente un poco adelantado o un equipo un poco atrasado dejan el inicio en el
+ * FUTURO del equipo, y la terminal niega antes de preguntar.
+ *
+ * Se escribe `beginTime` este margen ANTES de `desde`. No abre de más cuando la
+ * terminal espera el veredicto (`reporta_y_espera`): la plataforma decide con la
+ * vigencia verdadera, en su reloj. Con `decide_el_equipo` el equipo acepta hasta
+ * este margen antes de `desde`: [SUPUESTO] S-15X-01, declarado en el informe.
+ * El fin no lleva margen: `endTime` sigue siendo `hasta − 1 s`.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export const MARGEN_DE_INICIO_S = 300;
 
 /** El rango que admite el equipo, en hora local (guía: 1970-01-01 a 2037-12-31). */
 const PRIMERO = '1970-01-01T00:00:00';
@@ -47,6 +71,8 @@ export interface AjustesDePersona {
    * (`forma-del-alta.ts`). `visitor` por omisión, que es lo de siempre.
    */
   readonly tipoConVigencia?: 'visitor' | 'normal';
+  /** 15-X · D0 · segundos antes de `desde`. `MARGEN_DE_INICIO_S` por omisión. */
+  readonly margenDeInicioS?: number;
 }
 
 export interface PersonaEnElEquipo {
@@ -127,7 +153,8 @@ export const personaEnElEquipo = (
       ...puerta,
     };
   }
-  const beginTime = horaLocalSinDesfase(vigencia.desde, zona);
+  const margenMs = (ajustes.margenDeInicioS ?? MARGEN_DE_INICIO_S) * 1000;
+  const beginTime = horaLocalSinDesfase(new Date(vigencia.desde.getTime() - margenMs), zona);
   const ultimo = horaLocalSinDesfase(new Date(vigencia.hasta.getTime() - 1000), zona);
   return {
     employeeNo: identificador,

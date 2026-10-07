@@ -15,6 +15,7 @@ import '../models/edicion_de_menor_dto.dart';
 import '../models/edicion_de_vehiculo_propio_dto.dart';
 import '../models/estado_de_avisos_web_dto.dart';
 import '../models/estado_de_mi_alta_dto.dart';
+import '../models/estado_de_mi_rostro_dto.dart';
 import '../models/menor_del_hogar_dto.dart';
 import '../models/menor_dto.dart';
 import '../models/menor_registrado_dto.dart';
@@ -22,6 +23,8 @@ import '../models/mi_autorizacion_dto.dart';
 import '../models/mi_evento_dto.dart';
 import '../models/mi_inicio_dto.dart';
 import '../models/mi_notificacion_dto.dart';
+import '../models/mi_rostro_con_politica_dto.dart';
+import '../models/mi_rostro_dto.dart';
 import '../models/mi_vehiculo_dto.dart';
 import '../models/mi_visita_dto.dart';
 import '../models/mi_visita_generada_dto.dart';
@@ -39,6 +42,7 @@ import '../models/resultado_de_perfil_dto.dart';
 import '../models/resultado_de_vehiculo_propio_dto.dart';
 import '../models/retiro_de_ocupante_dto.dart';
 import '../models/revocacion_de_mi_visita_dto.dart';
+import '../models/rostro_de_menor_dto.dart';
 import '../models/suscripcion_anulada_dto.dart';
 import '../models/suscripcion_registrada_dto.dart';
 import '../models/suscripcion_web_push_dto.dart';
@@ -133,6 +137,28 @@ abstract class ResidenteApi {
     @Path('residenteId') required String residenteId,
   });
 
+  /// El estado del rostro de un menor de mi hogar y la política del representante
+  @GET('/copropiedades/{id}/mi/menores/{residenteId}/rostro')
+  Future<MiRostroConPoliticaDto> rostroDeMisMenoresControllerEstado({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+  });
+
+  /// El titular registra o renueva, como representante legal, el rostro de un menor
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/rostro')
+  Future<EstadoDeMiRostroDto> rostroDeMisMenoresControllerRegistrar({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+    @Body() required RostroDeMenorDto body,
+  });
+
+  /// El titular retira el rostro de un menor: revoca y suprime en el acto, en los equipos
+  @POST('/copropiedades/{id}/mi/menores/{residenteId}/rostro/retiro')
+  Future<EstadoDeMiRostroDto> rostroDeMisMenoresControllerRetirar({
+    @Path('id') required String id,
+    @Path('residenteId') required String residenteId,
+  });
+
   /// Mis notificaciones: visitas rechazadas con su motivo e ingresos de mis visitantes
   @GET('/copropiedades/{id}/mi/notificaciones')
   Future<List<MiNotificacionDto>> misNotificacionesControllerNotificaciones({
@@ -204,6 +230,25 @@ abstract class ResidenteApi {
   Future<ResultadoDePerfilDto> miHogarControllerEditar({
     @Path('id') required String id,
     @Body() required PerfilDto body,
+  });
+
+  /// El estado de mi rostro y la política vigente; nunca la imagen
+  @GET('/copropiedades/{id}/mi/rostro')
+  Future<MiRostroConPoliticaDto> miRostroControllerEstado({
+    @Path('id') required String id,
+  });
+
+  /// Registra o renueva mi rostro (opcional, con la política aceptada)
+  @POST('/copropiedades/{id}/mi/rostro')
+  Future<EstadoDeMiRostroDto> miRostroControllerRegistrar({
+    @Path('id') required String id,
+    @Body() required MiRostroDto body,
+  });
+
+  /// Retira mi rostro: revoca y suprime en el acto, también en los equipos
+  @POST('/copropiedades/{id}/mi/rostro/retiro')
+  Future<EstadoDeMiRostroDto> miRostroControllerRetirar({
+    @Path('id') required String id,
   });
 
   /// Los vehículos de mi vivienda (HU-05, HU-06 lectura, M-3)

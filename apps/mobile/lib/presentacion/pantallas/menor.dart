@@ -18,6 +18,7 @@ import '../../dominio/menores.dart';
 import '../../dominio/plazas.dart';
 import '../../dominio/puertos.dart';
 import '../widgets/campo_de_fecha.dart';
+import '../widgets/rostro_del_menor.dart';
 import 'campos_de_perfil.dart' show AvisoDeRechazo;
 
 class PantallaDeMenor extends StatefulWidget {
@@ -28,15 +29,20 @@ class PantallaDeMenor extends StatefulWidget {
     required this.hoy,
     required List<PlazaDeOcupante> this.libres,
     required this.alGuardar,
-  }) : menor = null;
+  }) : menor = null,
+       esTitular = false,
+       alAbrirRostro = null;
 
-  /// Editar uno ya registrado.
+  /// Editar uno ya registrado. 15-X (D3) · con `alAbrirRostro`, su rostro
+  /// según su edad y si quien mira es el titular.
   const PantallaDeMenor.editar({
     super.key,
     required this.repositorio,
     required this.hoy,
     required MenorDelHogar this.menor,
     required this.alGuardar,
+    this.esTitular = false,
+    this.alAbrirRostro,
   }) : libres = null;
 
   final RepositorioDeMenores repositorio;
@@ -44,6 +50,8 @@ class PantallaDeMenor extends StatefulWidget {
   final List<PlazaDeOcupante>? libres;
   final MenorDelHogar? menor;
   final void Function() alGuardar;
+  final bool esTitular;
+  final void Function(MenorDelHogar menor)? alAbrirRostro;
 
   @override
   State<PantallaDeMenor> createState() => _EstadoDelMenor();
@@ -200,6 +208,12 @@ class _EstadoDelMenor extends State<PantallaDeMenor> {
                 onPressed: _enviando ? null : _guardar,
                 child: Text(_enviando ? 'Guardando…' : (_nuevo ? 'Registrar' : 'Guardar')),
               ),
+              if (widget.menor case final m? when widget.alAbrirRostro != null)
+                SeccionDelRostroDelMenor(
+                  menor: m,
+                  esTitular: widget.esTitular,
+                  alAbrir: () => widget.alAbrirRostro!(m),
+                ),
             ],
           ),
         ),

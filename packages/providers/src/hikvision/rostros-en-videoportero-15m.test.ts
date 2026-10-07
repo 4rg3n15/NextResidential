@@ -91,10 +91,10 @@ describe('E3 · el videoportero da de alta como DECLARA', () => {
     await proveedor.sincronizar('equipo-1', 'visita-e3-1', jpegConMedidas(), VIGENCIA);
 
     const id = identificadorEnElEquipo('visita-e3-1');
-    // En la hora de Bogotá: 14:00–17:59:59, sin desfase.
+    // En la hora de Bogotá: 14:00–17:59:59, sin desfase; el inicio, con 5 min de margen (15-X · D0).
     expect(personasPor.get(host)?.get(id)).toEqual({
       tipo: 'normal',
-      desde: '2026-09-29T14:00:00',
+      desde: '2026-09-29T13:55:00',
       hasta: '2026-09-29T17:59:59',
       puertas: [1],
     });

@@ -1400,6 +1400,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/menores/{residenteId}/rostro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El estado del rostro de un menor de mi hogar y la política del representante */
+        get: operations["RostroDeMisMenoresController_estado"];
+        put?: never;
+        /** El titular registra o renueva, como representante legal, el rostro de un menor */
+        post: operations["RostroDeMisMenoresController_registrar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/menores/{residenteId}/rostro/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** El titular retira el rostro de un menor: revoca y suprime en el acto, en los equipos */
+        post: operations["RostroDeMisMenoresController_retirar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/notificaciones": {
         parameters: {
             query?: never;
@@ -1533,6 +1568,41 @@ export interface paths {
         /** Edito mis datos personales y de contacto (3.5) */
         put: operations["MiHogarController_editar"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/rostro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El estado de mi rostro y la política vigente; nunca la imagen */
+        get: operations["MiRostroController_estado"];
+        put?: never;
+        /** Registra o renueva mi rostro (opcional, con la política aceptada) */
+        post: operations["MiRostroController_registrar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/rostro/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retira mi rostro: revoca y suprime en el acto, también en los equipos */
+        post: operations["MiRostroController_retirar"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3977,6 +4047,11 @@ export interface components {
             sincronizada: boolean;
             detalle: string;
         };
+        EquipoDelRostroDto: {
+            nombre: string;
+            /** @enum {string} */
+            estado: "sincronizada" | "pendiente" | "fallida";
+        };
         EquipoDto: {
             id: string;
             nombre: string;
@@ -4105,6 +4180,19 @@ export interface components {
             avisoOcupantes: string;
             /** @description 15-W · «La administración debe asignarle su vivienda», o null */
             aviso: string | null;
+        };
+        EstadoDeMiRostroDto: {
+            /** @enum {string} */
+            estado: "sin_rostro" | "pendiente" | "activa" | "parcial" | "por_vencer" | "en_retiro";
+            calidad: number | null;
+            /** Format: date-time */
+            registradoEn: string | null;
+            /** Format: date-time */
+            venceEn: string | null;
+            diasParaVencer: number | null;
+            equiposConRostro: number;
+            equiposConMiRostro: number;
+            equipos: components["schemas"]["EquipoDelRostroDto"][];
         };
         EstadoDeSesionDto: {
             /** @enum {string} */
@@ -4702,6 +4790,31 @@ export interface components {
             /** Format: uuid */
             autorizacionId: string | null;
         };
+        MiRostroConPoliticaDto: {
+            /** @enum {string} */
+            estado: "sin_rostro" | "pendiente" | "activa" | "parcial" | "por_vencer" | "en_retiro";
+            calidad: number | null;
+            /** Format: date-time */
+            registradoEn: string | null;
+            /** Format: date-time */
+            venceEn: string | null;
+            diasParaVencer: number | null;
+            equiposConRostro: number;
+            equiposConMiRostro: number;
+            equipos: components["schemas"]["EquipoDelRostroDto"][];
+            politica: components["schemas"]["PoliticaDelRostroDto"];
+        };
+        MiRostroDto: {
+            /** @description La foto frontal, JPEG o PNG, en base64 */
+            contenidoBase64: string;
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            medidas: components["schemas"]["MedidasDeFotoDto"];
+            /** @description La versión de la política que la app mostró */
+            versionPolitica: string;
+            /** @description Acepta la política: debe ser true */
+            aceptaPolitica: boolean;
+        };
         MiVehiculoDto: {
             /** Format: uuid */
             id: string;
@@ -5105,6 +5218,10 @@ export interface components {
         PlazaRetiradaDto: {
             retirada: boolean;
         };
+        PoliticaDelRostroDto: {
+            version: string;
+            texto: string;
+        };
         PoolDePorterosDto: {
             inicio: number;
             fin: number;
@@ -5455,6 +5572,21 @@ export interface components {
         };
         RevocarAutorizacionDto: {
             motivo: string;
+        };
+        RostroDeMenorDto: {
+            /** @description La foto frontal, JPEG o PNG, en base64 */
+            contenidoBase64: string;
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            medidas: components["schemas"]["MedidasDeFotoDto"];
+            /** @description La versión de la política que la app mostró */
+            versionPolitica: string;
+            /** @description Acepta la política: debe ser true */
+            aceptaPolitica: boolean;
+            /** @description Soy su representante legal: debe ser true */
+            declaraRepresentacionLegal: boolean;
+            /** @description El menor fue informado y está de acuerdo: debe ser true */
+            menorInformadoYDeAcuerdo: boolean;
         };
         SalidasDelEquipoDto: {
             /** @description Vacío si no se pudo leer el equipo */
@@ -8685,6 +8817,76 @@ export interface operations {
             };
         };
     };
+    RostroDeMisMenoresController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiRostroConPoliticaDto"];
+                };
+            };
+        };
+    };
+    RostroDeMisMenoresController_registrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RostroDeMenorDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
+                };
+            };
+        };
+    };
+    RostroDeMisMenoresController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                residenteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
+                };
+            };
+        };
+    };
     MisNotificacionesController_notificaciones: {
         parameters: {
             query?: never;
@@ -8946,6 +9148,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDePerfilDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiRostroConPoliticaDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_registrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MiRostroDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
                 };
             };
         };

@@ -8,6 +8,9 @@ import { MisPlazasController } from './presentacion/mis-plazas.controller';
 import { MisVehiculosController } from './presentacion/mis-vehiculos.controller';
 import { TitularesController } from './presentacion/titulares.controller';
 import { MisMenoresController } from './presentacion/mis-menores.controller';
+import { MiRostroController } from './presentacion/mi-rostro.controller';
+import { RostroDeMisMenoresController } from './presentacion/rostro-de-mis-menores.controller';
+import { PROVEEDORES_DEL_ROSTRO_DEL_RESIDENTE } from './rostro.providers';
 import {
   TopeDePlazasController,
   TopeDePlazasPorOmisionController,
@@ -110,6 +113,8 @@ export class ResidenteModule implements OnModuleInit {
         // 15-W · plazas del titular, menores del hogar, tope y registro.
         MisPlazasController,
         MisMenoresController,
+        MiRostroController, // 15-X (D2) · mi rostro: opcional, anual y retirable.
+        RostroDeMisMenoresController, // 15-X (D3) · el de un menor, por el titular.
         TopeDePlazasController,
         TopeDePlazasPorOmisionController,
         RegistroDeLaCopropiedadController,
@@ -118,6 +123,7 @@ export class ResidenteModule implements OnModuleInit {
         ...PROVEEDORES_DEL_HOGAR,
         ...PROVEEDORES_DE_LA_15W,
         ...PROVEEDORES_DE_WEB_PUSH,
+        ...PROVEEDORES_DEL_ROSTRO_DEL_RESIDENTE,
         {
           provide: DIRECTORIO_DEL_RESIDENTE,
           inject: [Pool],

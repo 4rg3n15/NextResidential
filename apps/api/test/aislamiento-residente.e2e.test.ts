@@ -22,6 +22,8 @@ import {
   USUARIO_RB,
   USUARIO_SIN_VIVIENDA,
 } from './dobles/directorio-del-residente';
+// 15-X (D3) · las que nombran un recurso de la vivienda: las recorre su propia suite.
+import { CON_RECURSO_DE_LA_VIVIENDA } from './rutas-con-recurso-de-vivienda';
 
 /**
  * SUITE DE AISLAMIENTO · SEGUNDO EJE: RESIDENTE CONTRA RESIDENTE
@@ -160,6 +162,12 @@ const CUBIERTAS_APARTE = new Set([
   // Revocar una visita (D6): `mis-visitas-revocacion.e2e` —la del vecino y la
   // de otra copropiedad, 404—.
   'POST /copropiedades/:id/mi/visitas/:autorizacionId/revocacion',
+  // 15-X (D2) · mi rostro: no nombran recurso —la persona sale del vínculo de la
+  // cuenta— y su adaptador es de PostgreSQL. `rostro-del-residente-pg`: el de
+  // un vecino no se ve ni se toca; otra copropiedad, por `aislamiento.e2e`.
+  'GET /copropiedades/:id/mi/rostro',
+  'POST /copropiedades/:id/mi/rostro',
+  'POST /copropiedades/:id/mi/rostro/retiro',
 ]);
 
 /**
@@ -258,6 +266,7 @@ describe('cobertura · la lista de rutas sale del CÓDIGO, no de esta prueba', (
         (clave) =>
           RECORRIDAS[clave] === undefined &&
           ESCRITURAS_DEL_AMBITO[clave] === undefined &&
+          CON_RECURSO_DE_LA_VIVIENDA[clave] === undefined &&
           !CUBIERTAS_APARTE.has(clave) &&
           !SIN_AMBITO_DE_VIVIENDA.has(clave),
       );

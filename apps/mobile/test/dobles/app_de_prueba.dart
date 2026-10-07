@@ -11,6 +11,7 @@ import 'package:ncr_residente/presentacion/app.dart';
 
 import 'hogar_15w_falso.dart';
 import 'hogar_falso.dart';
+import 'rostro_falso.dart';
 import 'sincronizacion.dart';
 import 'visitas.dart';
 
@@ -208,6 +209,10 @@ class Mundo {
   final MenoresFalsos menores;
   late final PlazasFalsas plazas;
   final RevocacionFalsa revocacion;
+  /// 15-X · con rostro: el primer ingreso no lo ofrece y la app entra derecha.
+  /// La invitación tiene sus pruebas (`oferta_del_rostro_test.dart`).
+  final RostroFalso rostro = RostroFalso(inicial: RostroFalso.activo);
+  final RostroDeMenoresFalso rostroDeMenores = RostroDeMenoresFalso();
   late final AutenticadorGobernado autenticador;
   final ResidenteGobernado repo;
   final NotificacionesFalsas notificaciones;
@@ -249,6 +254,8 @@ class Mundo {
         menores: menores,
         plazas: plazas,
         revocacion: revocacion,
+        rostro: rostro,
+        rostroDeMenores: rostroDeMenores,
         tomarFoto: (_) async => fotoTomada(medidasBuenas),
         almacen: llavero,
       ),

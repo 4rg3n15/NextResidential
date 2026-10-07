@@ -1,20 +1,7 @@
-import {
-  CalidadDeCaptura,
-  ConsentimientoBiometrico,
-  PlantillaBiometrica,
-  errorDominio,
-  esFallo,
-  evaluarCaptura,
-  exito,
-  fallo,
-  puedeSincronizar,
-} from '@ncr/domain-core';
+import { errorDominio, esFallo, exito, fallo, puedeSincronizar } from '@ncr/domain-core';
 import type {
-  CanalConsentimiento,
   ErrorDominio,
-  EvaluacionDeCaptura,
   GeneradorDeId,
-  MedidasDeCaptura,
   MotivoRechazoCaptura,
   Reloj,
   Resultado,
@@ -22,6 +9,8 @@ import type {
   Vigencia,
 } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
+import { PreparacionDeCaptura } from './preparacion-de-captura';
+import type { SolicitudDeCaptura } from './preparacion-de-captura';
 import type {
   BovedaDePlantillas,
   RepositorioConsentimientos,
@@ -55,40 +44,23 @@ export type ResultadoCaptura =
     }
   | { readonly aceptada: false; readonly motivos: readonly MotivoRechazoCaptura[] };
 
-export interface SolicitudDeCaptura {
-  readonly titularId: string;
-  readonly autorizacionId?: string;
-  /** Las medidas de ESTA captura. Obligatorias salvo con `calidadPrevia`. */
-  readonly medidas?: MedidasDeCaptura;
-  /**
-   * F6 (15-L) · «Volver a autorizar» reutiliza una foto que YA se evaluó: su
-   * calidad es la que se midió entonces y quedó en la plantilla original. No
-   * se inventan medidas nuevas para una foto que nadie volvió a tomar.
-   */
-  readonly calidadPrevia?: number;
-  readonly vector: Uint8Array;
-  readonly versionPolitica: string;
-  readonly canal: CanalConsentimiento;
-  readonly suprimirEn: Date;
-  /**
-   * F4 (15-L, ADR-032) · la casilla del formulario: quien registra declara que
-   * el visitante autorizó el uso de su foto. Con ella el consentimiento nace
-   * vigente —o se reutiliza el que el titular ya tenga vigente— y la plantilla
-   * queda lista para sincronizar. Sin ella, el camino de siempre: solicitud
-   * pendiente del titular.
-   */
-  readonly declaracion?: { readonly declaradoPor: string };
-}
+/** 15-X · la solicitud vive con la preparación que la usa; aquí se reexporta. */
+export type { SolicitudDeCaptura } from './preparacion-de-captura';
 
 export class CapturarRostro {
+  /** 15-X · calidad → consentimiento → plantilla, compartido con `MiRostro`. */
+  private readonly preparacion: PreparacionDeCaptura;
+
   constructor(
     private readonly consentimientos: RepositorioConsentimientos,
     private readonly plantillas: RepositorioPlantillas,
     private readonly boveda: BovedaDePlantillas,
-    private readonly reloj: Reloj,
-    private readonly ids: GeneradorDeId,
-    private readonly umbrales?: UmbralesDeCalidad,
-  ) {}
+    reloj: Reloj,
+    ids: GeneradorDeId,
+    umbrales?: UmbralesDeCalidad,
+  ) {
+    this.preparacion = new PreparacionDeCaptura(consentimientos, reloj, ids, umbrales);
+  }
 
   async ejecutar(
     ctx: ContextoTenant,
@@ -97,178 +69,31 @@ export class CapturarRostro {
     const copropiedadId = ctx.copropiedadId;
     if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
 
-    const evaluacion = this.evaluar(solicitud);
-    if (esFallo(evaluacion)) return evaluacion;
-    if (!evaluacion.valor.aceptada) {
-      return exito({ aceptada: false, motivos: evaluacion.valor.motivos });
+    const preparada = await this.preparacion.preparar(copropiedadId, solicitud);
+    if (esFallo(preparada)) return preparada;
+    if (!preparada.valor.aceptada) {
+      return exito({ aceptada: false, motivos: preparada.valor.motivos });
     }
+    const { consentimiento, plantilla, calidad } = preparada.valor;
 
-    const ahora = this.reloj.ahora();
-    const consentimiento = await this.consentimientoPara(copropiedadId, solicitud, ahora);
-    if (esFallo(consentimiento)) return consentimiento;
-
-    const creada = PlantillaBiometrica.crear({
-      id: this.ids.nuevo(),
-      copropiedadId,
-      titularId: solicitud.titularId,
-      consentimientoId: consentimiento.valor.id,
-      ...(solicitud.autorizacionId === undefined
-        ? {}
-        : { autorizacionId: solicitud.autorizacionId }),
-      calidad: evaluacion.valor.calidad,
-      creadoEn: ahora,
-      suprimirEn: solicitud.suprimirEn,
-    });
-    if (esFallo(creada)) return creada;
-    // Con el consentimiento ya vigente (declarado o previo), la plantilla nace
-    // habilitada: el agregado comprueba que sea de este titular y vigente.
-    const plantilla = consentimiento.valor.vigente
-      ? creada.valor.habilitarSincronizacion(consentimiento.valor)
-      : creada;
-    if (esFallo(plantilla)) return plantilla;
-
-    await this.consentimientos.guardar(consentimiento.valor, ctx.usuarioId);
-    await this.plantillas.guardar(plantilla.valor, ctx.usuarioId);
+    await this.consentimientos.guardar(consentimiento, ctx.usuarioId);
+    await this.plantillas.guardar(plantilla, ctx.usuarioId);
     // El vector se cifra al entrar y no vuelve a salir hacia la aplicación.
-    await this.boveda.guardar(copropiedadId, plantilla.valor.id, solicitud.vector);
+    await this.boveda.guardar(copropiedadId, plantilla.id, solicitud.vector);
 
     return exito({
       aceptada: true,
-      plantillaId: plantilla.valor.id,
-      consentimientoId: consentimiento.valor.id,
-      calidad: evaluacion.valor.calidad.valor,
-      lista: plantilla.valor.estado === 'pendiente_sincronizacion',
-    });
-  }
-
-  /** Las medidas de esta captura, o la calidad ya medida de la foto que se reutiliza. */
-  private evaluar(solicitud: SolicitudDeCaptura): Resultado<EvaluacionDeCaptura, ErrorDominio> {
-    if (solicitud.calidadPrevia !== undefined) {
-      const calidad = CalidadDeCaptura.crear(solicitud.calidadPrevia);
-      if (esFallo(calidad)) return calidad;
-      return exito({ aceptada: true, calidad: calidad.valor });
-    }
-    if (solicitud.medidas === undefined) {
-      return fallo(
-        errorDominio('DATO_INVALIDO', 'Faltan las medidas de calidad de la foto', 'KPI-16'),
-      );
-    }
-    return exito(
-      this.umbrales === undefined
-        ? evaluarCaptura(solicitud.medidas)
-        : evaluarCaptura(solicitud.medidas, this.umbrales),
-    );
-  }
-
-  /**
-   * Sin casilla: una solicitud nueva, pendiente del titular. Con casilla
-   * (F4): el consentimiento vigente del titular si ya lo tiene —la base admite
-   * uno solo vigente por persona— y, si no, uno DECLARADO por quien registra.
-   */
-  private async consentimientoPara(
-    copropiedadId: string,
-    solicitud: SolicitudDeCaptura,
-    ahora: Date,
-  ): Promise<Resultado<ConsentimientoBiometrico, ErrorDominio>> {
-    const base = {
-      id: this.ids.nuevo(),
-      copropiedadId,
-      titularId: solicitud.titularId,
-      finalidad: 'control_acceso',
-      versionPolitica: solicitud.versionPolitica,
-      canal: solicitud.canal,
-    };
-    if (solicitud.declaracion === undefined) {
-      return ConsentimientoBiometrico.solicitar({ ...base, solicitadoEn: ahora });
-    }
-    const vigente = await this.consentimientos.vigenteDe(copropiedadId, solicitud.titularId);
-    if (vigente !== null) return exito(vigente);
-    return ConsentimientoBiometrico.declarar({
-      ...base,
-      declaradoPor: solicitud.declaracion.declaradoPor,
-      ahora,
+      plantillaId: plantilla.id,
+      consentimientoId: consentimiento.id,
+      calidad,
+      lista: plantilla.estado === 'pendiente_sincronizacion',
     });
   }
 }
 
-/**
- * `RevocarConsentimiento` — RN-11, CA-11.
- *
- * Suprime **antes** de guardar la revocación, y el orden importa: si se
- * guardara primero y el borrado fallara, quedaría un consentimiento revocado
- * con el dato todavía en la base. Al revés, un fallo deja el consentimiento
- * vigente y el dato borrado — que es el error que se puede vivir.
- *
- * A3 (15-E) · **y retira de las terminales en el acto**. CA-11 dice «de
- * inmediato», y hasta aquí «inmediato» era el vector en la base: la retirada
- * del equipo esperaba al barrido. Ahora se intenta aquí mismo, terminal por
- * terminal; la que no responda queda en la cola derivada de CA-10 y el
- * barrido la reintenta. Se devuelven las dos cuentas por separado, porque
- * «suprimida en base» y «retirada del equipo» son hechos distintos y la hoja
- * de resultados en sitio los coteja por separado.
- */
-export interface ResultadoDeRevocacion {
-  readonly plantillasSuprimidas: number;
-  /** Retiradas de terminal confirmadas por el proveedor en esta llamada. */
-  readonly retiradas: number;
-  /** Terminales que no respondieron: siguen en la cola de CA-10. */
-  readonly retiradasPendientes: number;
-}
-
-export class RevocarConsentimiento {
-  constructor(
-    private readonly consentimientos: RepositorioConsentimientos,
-    private readonly plantillas: RepositorioPlantillas,
-    private readonly boveda: BovedaDePlantillas,
-    private readonly reloj: Reloj,
-  ) {}
-
-  async ejecutar(
-    ctx: ContextoTenant,
-    entrada: { readonly consentimientoId: string; readonly quienRevoca: string },
-  ): Promise<Resultado<ResultadoDeRevocacion, ErrorDominio>> {
-    const copropiedadId = ctx.copropiedadId;
-    if (copropiedadId === null) return fallo(noEncontrado('La copropiedad'));
-
-    const actual = await this.consentimientos.porId(copropiedadId, entrada.consentimientoId);
-    if (actual === null) return fallo(noEncontrado('El consentimiento'));
-
-    const ahora = this.reloj.ahora();
-    const revocado = actual.revocar(entrada.quienRevoca, ahora);
-    if (esFallo(revocado)) return revocado;
-
-    const afectadas = await this.plantillas.deConsentimiento(copropiedadId, actual.id);
-    const suprimidasAhora = new Set<string>();
-    for (const p of afectadas) {
-      if (p.suprimida) continue;
-      await this.boveda.olvidar(copropiedadId, p.id);
-      await this.plantillas.suprimirVector(copropiedadId, p.id, ctx.usuarioId);
-      await this.plantillas.guardar(p.suprimirPorRevocacion(ahora), ctx.usuarioId);
-      suprimidasAhora.add(p.id);
-    }
-
-    await this.consentimientos.guardar(revocado.valor, ctx.usuarioId);
-
-    // La retirada inmediata: sólo de las plantillas de ESTE consentimiento.
-    let retiradas = 0;
-    let retiradasPendientes = 0;
-    const propias = new Set(afectadas.map((p) => p.id));
-    for (const destino of await this.plantillas.porRetirar(copropiedadId)) {
-      if (!propias.has(destino.plantillaId)) continue;
-      try {
-        await this.boveda.retirarDeTerminal(destino.plantillaId, destino.dispositivoId);
-        await this.plantillas.registrarRetirada(destino, ctx.usuarioId);
-        retiradas += 1;
-      } catch {
-        // La terminal no respondió: la fila sigue en la cola y el barrido
-        // lo reintenta. No se marca retirada lo que no se retiró.
-        retiradasPendientes += 1;
-      }
-    }
-
-    return exito({ plantillasSuprimidas: suprimidasAhora.size, retiradas, retiradasPendientes });
-  }
-}
+/** 15-X · D3 · la revocación vive en su fichero, con la del representante legal. */
+export { RevocarConsentimiento } from './revocar-consentimiento';
+export type { EntradaDeRevocacion, ResultadoDeRevocacion } from './revocar-consentimiento';
 
 /**
  * `SincronizarPlantilla` — RN-09, CA-09.

@@ -7,6 +7,10 @@
 /// sus ocupantes. Esta pieza sólo pide a la API lo que falta saber y monta la
 /// pantalla del paso.
 ///
+/// 15-X (D2) · antes de la app se le ofrece su rostro mientras no lo tenga y no
+/// haya dicho «Ahora no» (`OfertaDelRostro`); lo tiene siempre en «Mi perfil →
+/// Mi rostro». Sin red no se ofrece: nunca bloquea.
+///
 /// 15-W · una cuenta sin vivienda asignada no tiene formulario que llenar: ve
 /// el aviso del servidor («La administración debe asignarle su vivienda») y
 /// puede volver a consultar. El correo escrito en «Crear cuenta», si se acaba
@@ -17,8 +21,11 @@
 /// que el residente vea esas respuestas como errores.
 library;
 
+export '../../aplicacion/oferta_del_rostro.dart' show OfertaDelRostro;
+
 import 'package:flutter/material.dart';
 
+import '../../aplicacion/oferta_del_rostro.dart';
 import '../../aplicacion/sesion_en_uso.dart';
 import '../../dominio/acceso.dart';
 import '../../dominio/hogar.dart';
@@ -26,7 +33,8 @@ import '../../dominio/puertos.dart';
 import 'alta.dart';
 import 'cambio_de_contrasena.dart';
 import 'declarar_ocupantes.dart';
-import '../widgets/servidor.dart';
+import 'ofrecer_rostro.dart';
+import '../widgets/esperas_del_ingreso.dart';
 
 class PuertaDePrimerIngreso extends StatefulWidget {
   const PuertaDePrimerIngreso({
@@ -39,6 +47,8 @@ class PuertaDePrimerIngreso extends StatefulWidget {
     this.recuperada = false,
     this.reloj = const RelojDelSistema(),
     this.correoDeContacto,
+    this.oferta,
+    this.tomarFoto,
   });
 
   final SesionEnUso sesion;
@@ -52,6 +62,10 @@ class PuertaDePrimerIngreso extends StatefulWidget {
 
   /// 15-W · el correo escrito en «Crear cuenta», si se acaba de crear.
   final String? correoDeContacto;
+
+  /// 15-X · sin las dos no se ofrece el rostro (pruebas de otras pantallas).
+  final OfertaDelRostro? oferta;
+  final TomarFoto? tomarFoto;
 
   /// La sesión se recuperó del llavero al arrancar, en vez de abrirse ahora.
   /// `[SUPUESTO]` S-59 · sin red al arrancar con una sesión así, se deja pasar
@@ -68,6 +82,10 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
   Fallo? _fallo;
   bool _consultando = false;
 
+  /// 15-X · `null` mientras no se sabe si se ofrece el rostro (se pregunta al
+  /// llegar al final); `false` si no, o si ya se respondió.
+  bool? _ofrecer;
+
   bool get _debeCambiar => widget.sesion.sesion?.debeCambiarContrasena ?? false;
 
   PasoDePrimerIngreso get _paso => pasoDePrimerIngreso(
@@ -75,6 +93,7 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
     viviendaVinculada: _estado?.viviendaVinculada,
     viviendaAsignada: _estado?.viviendaAsignada ?? true,
     debeDeclararOcupantes: _estado?.debeDeclararOcupantes ?? false,
+    ofrecerRostro: _ofrecer ?? false,
   );
 
   @override
@@ -88,15 +107,32 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
     if (!mounted) return;
     switch (_paso) {
       case PasoDePrimerIngreso.listo:
-        widget.alTerminar();
+        final (oferta, foto) = (widget.oferta, widget.tomarFoto);
+        if (_ofrecer != null || oferta == null || foto == null) return widget.alTerminar();
+        final ofrecer = await oferta.seOfrece(_cuenta);
+        if (!mounted) return;
+        setState(() => _ofrecer = ofrecer);
+        await _avanzar();
       case PasoDePrimerIngreso.consultarAlta:
         await _consultar();
       case PasoDePrimerIngreso.cambiarContrasena:
       case PasoDePrimerIngreso.esperarVivienda:
       case PasoDePrimerIngreso.completarAlta:
       case PasoDePrimerIngreso.declararOcupantes:
+      case PasoDePrimerIngreso.ofrecerRostro:
         setState(() {});
     }
+  }
+
+  String get _cuenta => widget.sesion.sesion?.usuarioId ?? '';
+
+  /// 15-X · respondida la invitación —con su rostro o sin él—, se sigue; un
+  /// «Ahora no» se recuerda para esta cuenta.
+  Future<void> _trasOfrecer({required bool ahoraNo}) async {
+    if (ahoraNo) await widget.oferta?.ahoraNo(_cuenta);
+    if (!mounted) return;
+    setState(() => _ofrecer = false);
+    await _avanzar();
   }
 
   Future<void> _consultar() async {
@@ -147,7 +183,7 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
           alSalir: widget.alSalir,
         );
       case PasoDePrimerIngreso.esperarVivienda when estado != null && !_consultando:
-        return _SinVivienda(
+        return SinViviendaAsignada(
           aviso: estado.aviso ?? avisoSinVivienda,
           alConsultar: _consultar,
           alSalir: widget.alSalir,
@@ -174,92 +210,22 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
             _consultar();
           },
         );
-      default:
-        return _Consultando(
-          consultando: _consultando,
-          fallo: _fallo,
-          alReintentar: _consultar,
-          alSalir: widget.alSalir,
+      case PasoDePrimerIngreso.ofrecerRostro:
+        final (oferta, foto) = (widget.oferta, widget.tomarFoto);
+        if (oferta == null || foto == null) break;
+        return PantallaDeOfrecerRostro(
+          rostro: oferta.rostro,
+          tomarFoto: foto,
+          alSeguir: _trasOfrecer,
         );
+      default:
+        break;
     }
-  }
-}
-
-class _Consultando extends StatelessWidget {
-  const _Consultando({
-    required this.consultando,
-    required this.fallo,
-    required this.alReintentar,
-    required this.alSalir,
-  });
-
-  final bool consultando;
-  final Fallo? fallo;
-  final Future<void> Function() alReintentar;
-  final void Function() alSalir;
-
-  @override
-  Widget build(BuildContext context) {
-    final f = fallo;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: f == null || consultando
-                ? const CircularProgressIndicator()
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cloud_off_outlined, size: 48),
-                      const SizedBox(height: 12),
-                      Text(f.detalle, textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      FilledButton(onPressed: alReintentar, child: const Text('Reintentar')),
-                      // 15-L · sin servidor, la salida está aquí mismo.
-                      if (esFalloDeConexion(f)) ...[
-                        const SizedBox(height: 8),
-                        const BotonCambiarServidor(),
-                      ],
-                      TextButton(onPressed: alSalir, child: const Text('Salir')),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 15-W · la cuenta no trae vivienda: no hay nada que llenar hasta que la
-/// administración se la asigne. Se dice con el texto del servidor.
-class _SinVivienda extends StatelessWidget {
-  const _SinVivienda({required this.aviso, required this.alConsultar, required this.alSalir});
-  final String aviso;
-  final Future<void> Function() alConsultar;
-  final void Function() alSalir;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.home_work_outlined, size: 48),
-                const SizedBox(height: 12),
-                Text(aviso, key: const Key('alta.sinVivienda'), textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: alConsultar, child: const Text('Volver a consultar')),
-                TextButton(onPressed: alSalir, child: const Text('Salir')),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return ConsultandoElIngreso(
+      consultando: _consultando,
+      fallo: _fallo,
+      alReintentar: _consultar,
+      alSalir: widget.alSalir,
     );
   }
 }

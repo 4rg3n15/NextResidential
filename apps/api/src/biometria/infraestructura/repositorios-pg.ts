@@ -15,6 +15,8 @@ import type {
 } from '../aplicacion/puertos';
 import type { AlmacenDeBytes, ReferenciaDeCifrado } from './boveda-cifrada';
 import { conCliente } from '../../persistencia/con-cliente';
+import { GUARDAR_CONSENTIMIENTO, parametrosDeConsentimiento } from './consentimiento-sql';
+import { INSERTAR_PLANTILLA, parametrosDePlantilla } from './plantilla-sql';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -157,50 +159,10 @@ export class RepositorioConsentimientosPg implements RepositorioConsentimientos 
     });
   }
 
-  /**
-   * Alta o cambio de estado en UNA sentencia: la fila nace `pendiente` en la
-   * captura y la misma llamada la lleva a `vigente`, `rechazado`, `revocado` o
-   * `expirado`. Lo que NO cambia nunca tras nacer —titular, finalidad, versión,
-   * canal, solicitado_en— no está en el `UPDATE`, así que tampoco puede
-   * cambiar por un descuido del llamador.
-   *
-   * F4 (15-L) · el ORIGEN sí se actualiza: una declaración que el titular
-   * confirma en persona pasa a ser suya. Quién la declaró, no: se escribe al
-   * nacer y se conserva.
-   */
+  /** Alta o cambio de estado en UNA sentencia: ver `consentimiento-sql.ts`. */
   async guardar(consentimiento: ConsentimientoBiometrico, actorId: string): Promise<void> {
     await conServicio(this.pool, consentimiento.copropiedadId, async (c) => {
-      await c.query(
-        `INSERT INTO public.consentimientos_biometricos
-           (id, copropiedad_id, persona_id, finalidad, version_politica, canal, solicitado_en,
-            otorgado_en, revocado_en, evidencia_id, estado, origen, declarado_por,
-            creado_por, actualizado_por)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $14, $12, $12)
-         ON CONFLICT (id) DO UPDATE SET
-           origen          = EXCLUDED.origen,
-           otorgado_en     = EXCLUDED.otorgado_en,
-           revocado_en     = EXCLUDED.revocado_en,
-           evidencia_id    = EXCLUDED.evidencia_id,
-           estado          = EXCLUDED.estado,
-           actualizado_en  = now(),
-           actualizado_por = EXCLUDED.actualizado_por`,
-        [
-          consentimiento.id,
-          consentimiento.copropiedadId,
-          consentimiento.titularId,
-          consentimiento.finalidad,
-          consentimiento.versionPolitica,
-          consentimiento.canal,
-          consentimiento.solicitadoEn,
-          consentimiento.otorgadoEn,
-          consentimiento.revocadoEn,
-          consentimiento.evidenciaId,
-          consentimiento.estado,
-          actorId,
-          consentimiento.origen,
-          consentimiento.declaradoPor,
-        ],
-      );
+      await c.query(GUARDAR_CONSENTIMIENTO, parametrosDeConsentimiento(consentimiento, actorId));
     });
   }
 }
@@ -402,13 +364,7 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
   async guardar(plantilla: PlantillaBiometrica, actorId: string): Promise<void> {
     await conServicio(this.pool, plantilla.copropiedadId, async (c) => {
       await c.query(
-        `INSERT INTO public.plantillas_biometricas
-           (id, copropiedad_id, persona_id, consentimiento_id, autorizacion_id, calidad,
-            suprimir_en, creado_en, sincronizada_en, suprimida_en, estado,
-            creado_por, actualizado_por)
-         VALUES ($1, $2, $3, $4, $5, $6,
-                 GREATEST($7::timestamptz, $8::timestamptz + interval '1 millisecond'),
-                 $8, $9, $10, $11, $12, $12)
+        `${INSERTAR_PLANTILLA}
          ON CONFLICT (id) DO UPDATE SET
            estado          = EXCLUDED.estado,
            suprimir_en     = EXCLUDED.suprimir_en,
@@ -416,20 +372,7 @@ export class RepositorioPlantillasPg implements RepositorioPlantillas {
            suprimida_en    = EXCLUDED.suprimida_en,
            actualizado_en  = now(),
            actualizado_por = EXCLUDED.actualizado_por`,
-        [
-          plantilla.id,
-          plantilla.copropiedadId,
-          plantilla.titularId,
-          plantilla.consentimientoId,
-          plantilla.autorizacionId,
-          plantilla.calidad.valor,
-          plantilla.suprimirEn,
-          plantilla.creadoEn,
-          plantilla.sincronizadaEn,
-          plantilla.suprimidaEn,
-          plantilla.estado,
-          actorId,
-        ],
+        parametrosDePlantilla(plantilla, actorId),
       );
     });
   }

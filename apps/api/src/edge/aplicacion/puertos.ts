@@ -1,5 +1,6 @@
 import type { Autorizacion } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
+import type { ResidenteResuelto } from '../../autorizaciones';
 
 /**
  * Los puertos del módulo `edge` (15-Q). La aplicación declara; la
@@ -81,6 +82,11 @@ export interface LecturasDeReglas {
   readonly vetos: readonly { readonly personaId: string | null; readonly placa: string | null }[];
   readonly zonas: readonly ZonaLeida[];
   readonly plantillas: readonly PlantillaLeida[];
+  /**
+   * 15-X · D1 · el residente de cada persona con plantilla, con la MISMA
+   * lectura que el cargador de la nube (`residentesDePersonasEn`).
+   */
+  readonly residentesConRostro: readonly ResidenteResuelto[];
   readonly umbralDeConfianza: number;
 }
 

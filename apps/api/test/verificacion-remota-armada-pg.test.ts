@@ -252,11 +252,12 @@ describe('verificación remota ARMADA · la terminal pregunta por el flujo y act
     const enElEquipo = plantillaId.replace(/-/g, '').toLowerCase();
 
     // A2 (15-L) · la persona llegó al equipo como VISITANTE con la vigencia de
-    // su autorización (14–18 Z), escrita en hora de Bogotá y sin desfase.
+    // su autorización (14–18 Z), escrita en hora de Bogotá y sin desfase; desde
+    // la 15-X (D0) el inicio entra con 5 min de margen: 09:00 → 08:55.
     const fecha = DIA.toISOString().slice(0, 10);
     expect(personasPor.get(HOST)?.get(enElEquipo)).toEqual({
       tipo: 'visitor',
-      desde: `${fecha}T09:00:00`,
+      desde: `${fecha}T08:55:00`,
       hasta: `${fecha}T12:59:59`,
       puertas: [1],
     });

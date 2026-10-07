@@ -55,6 +55,8 @@ import {
   ZonasDelResidenteEnMemoria,
 } from './dobles/directorio-del-residente';
 import { HogarEnMemoria } from './dobles/hogar-en-memoria';
+import { MenoresParaElRostroEnMemoria } from './dobles/menores-para-el-rostro';
+import { MENORES_PARA_EL_ROSTRO } from '../src/residente/aplicacion/rostro-de-mis-menores';
 import {
   ALTA_DEL_RESIDENTE,
   BITACORA_DE_RESIDENTES,
@@ -133,6 +135,7 @@ export const configuracionDePrueba: Configuracion = {
   GUARDIA_VIGENCIA_EN_COLA_S: 300,
   GUARDIA_AUDIO_TRANSPORTE: 'websocket',
   EQUIPOS_DESVIO_DE_RELOJ_S: 30,
+  ROSTRO_RESIDENTE_RETENCION_DIAS: 365,
   THROTTLE_TTL_SEGUNDOS: 60,
   THROTTLE_LIMITE: 100000, // el límite se prueba aparte; aquí estorbaría
   THROTTLE_DISPOSITIVO_LIMITE: 120,
@@ -263,6 +266,7 @@ export const conSesionDePorteriaDeLaSuite = (b: TestingModuleBuilder): TestingMo
  */
 const conDoblesDelResidente = (b: TestingModuleBuilder): TestingModuleBuilder => {
   const hogar = new HogarEnMemoria();
+  // 15-X (D3) · y un menor en cada vivienda: el del vecino responde 404.
   return b
     .overrideProvider(DIRECTORIO_DEL_RESIDENTE)
     .useFactory({ factory: () => new DirectorioDelResidenteEnMemoria() })
@@ -283,7 +287,9 @@ const conDoblesDelResidente = (b: TestingModuleBuilder): TestingModuleBuilder =>
     .overrideProvider(BITACORA_DE_RESIDENTES)
     .useValue(hogar)
     .overrideProvider(CUENTAS_DE_RESIDENTES)
-    .useValue(hogar);
+    .useValue(hogar)
+    .overrideProvider(MENORES_PARA_EL_ROSTRO)
+    .useFactory({ factory: () => new MenoresParaElRostroEnMemoria() });
 };
 
 /** 15-L · el registro de equipos del banco sin base, cada uno en su copropiedad. */

@@ -27,6 +27,13 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     globals: false,
     setupFiles: ['./src/pruebas/preparacion.ts'],
+    // 15-X · `preparacion.ts` da 5 s a CADA consulta asíncrona; con el tope de
+    // la PRUEBA en los 5 s por omisión, una prueba que encadena tres esperas se
+    // cortaba antes que su propia espera —Vitest lo informa como
+    // `STACK_TRACE_ERROR`— bajo la carga del paso 14 en macOS. Una prueba sana
+    // no espera el tope; una rota sigue fallando, sólo que más tarde.
+    // `src/pruebas/tiempos.test.ts` vigila que alcance para tres esperas.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       // Se mide `src/`, que es el código de la aplicación. Quedan fuera la

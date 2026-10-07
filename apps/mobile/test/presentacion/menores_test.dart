@@ -15,6 +15,8 @@ import 'package:ncr_residente/presentacion/controlador.dart';
 
 import '../dobles/hogar_15w_falso.dart';
 import '../dobles/hogar_falso.dart';
+import '../dobles/rostro_falso.dart';
+import '../dobles/visitas.dart';
 
 class RelojFijo implements Reloj {
   @override
@@ -36,6 +38,7 @@ Future<void> abrirFamilia(
   WidgetTester t, {
   required MenoresFalsos menores,
   required AltaFalsa alta,
+  RostroDeMenoresFalso? rostros,
 }) async {
   t.view.physicalSize = const Size(1000, 2400);
   t.view.devicePixelRatio = 1.0;
@@ -64,6 +67,8 @@ Future<void> abrirFamilia(
             reloj: RelojFijo(),
             abrir: (pantalla, _) =>
                 Navigator.of(contexto).push(MaterialPageRoute<void>(builder: (_) => pantalla)),
+            rostroDeMenores: rostros ?? RostroDeMenoresFalso(),
+            tomarFoto: (_) async => fotoTomada(medidasBuenas),
           );
           return Scaffold(
             body: TextButton(

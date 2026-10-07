@@ -135,6 +135,7 @@ class PestanasDelArmazon extends StatelessWidget {
     required this.alAbrirNotificaciones,
     required this.alAbrirOcupantes,
     required this.alRevocarVisita,
+    this.alAbrirMiRostro,
   });
 
   final int pestana;
@@ -155,6 +156,9 @@ class PestanasDelArmazon extends StatelessWidget {
   final void Function() alAbrirNotificaciones;
   final void Function() alAbrirOcupantes;
   final void Function(Autorizacion visita) alRevocarVisita;
+
+  /// 15-X (D2) · «Mi perfil → Mi rostro».
+  final void Function()? alAbrirMiRostro;
 
   Widget _pantalla(BuildContext context) {
     final c = controladores;
@@ -208,6 +212,7 @@ class PestanasDelArmazon extends StatelessWidget {
         alCambiarVivienda: (p) => acciones.cambiarVivienda(context, p),
         alCambiarContrasena: () => acciones.cambiarContrasena(context),
         alAbrirOcupantes: alAbrirOcupantes,
+        alAbrirMiRostro: alAbrirMiRostro,
         alRecargar: alRecargar,
       ),
     };

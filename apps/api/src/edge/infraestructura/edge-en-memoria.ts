@@ -93,6 +93,7 @@ export class FuenteDeReglasVacia implements FuenteDeReglas {
       vetos: [],
       zonas: [],
       plantillas: [],
+      residentesConRostro: [],
       umbralDeConfianza: UMBRAL_CONFIANZA_PLACA_FRACCION,
     };
   }
