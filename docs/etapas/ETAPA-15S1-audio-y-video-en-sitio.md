@@ -3,7 +3,7 @@
 **Rama:** `etapa-15s1-audio-y-video-en-sitio` · **Base:** `develop` (`8ee5cd9`, merge del PR #51, que ya traía el #50) ·
 **PR:** hacia `develop`, sin fusionar · **Fecha:** 2026-10-07 ·
 **Encargo:** `CORRIGE ETAPA 15` con los hallazgos A a E de la visita del 06/10 ·
-**Cierra:** H-15S1-C07 a H-15S1-C11 · **Abre:** DT-15S1-C05 a DT-15S1-C12 · S-15S1-01 y S-15S1-02 · **Refuta:** S-176
+**Cierra:** H-15S1-C07 a H-15S1-C11 · **Abre:** DT-15S1-C05 a DT-15S1-C13 · S-15S1-01 y S-15S1-02 · **Refuta:** S-176
 
 > **Esta corrección NO cierra la ETAPA 15, que sigue BLOQUEADA sólo por `BE-02`.**
 > Se cumplió la regla dura de la etapa: sólo adaptadores (`packages/providers`,
@@ -306,17 +306,19 @@ Toda prueba nueva se vio **fallar primero**: en rojo antes de la corrección, o
 con una sonda de mutación que reintroduce el defecto y exige el rojo. Las sondas
 restauran siempre el fichero.
 
-| Sonda     | Qué reintroduce                                                                                | Resultado                                           |
-| --------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| A1        | La regla vieja: sólo `enabled=true` es canal                                                   | Rojo (proveedores y API)                            |
-| B1        | La API restringe la casilla al videoportero                                                    | Rojo (e2e)                                          |
-| B2        | Sin las rutas de audio de la terminal                                                          | Rojo (API: 2 pruebas)                               |
-| B3        | Familia fija `videoportero` para el intercom                                                   | Rojo (API: «nunca por analogía», por la ruta ajena) |
-| B4        | Sin la entrada 5/51 del catálogo de eventos                                                    | Rojo (e2e de la llamada de la terminal)             |
-| C1-edge   | El repositorio no entrega al Edge                                                              | Rojo                                                |
-| C2        | Sin la comprobación del códec declarado                                                        | Rojo                                                |
-| C3a a C3d | Sin hallazgo; sin motivo; «no admite» como «no leído»; sin motivo del descubrimiento que lanza | Rojo, las cuatro                                    |
-| D1a, D1b  | Filtro sin la condición; `servidor.mjs` sin el filtro                                          | Rojo, las dos                                       |
+| Sonda     | Qué reintroduce                                                                                | Resultado                                                                                   |
+| --------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| A1        | La regla vieja: sólo `enabled=true` es canal                                                   | Rojo (proveedores y API)                                                                    |
+| B1        | La API restringe la casilla al videoportero                                                    | Rojo (e2e)                                                                                  |
+| B2        | Sin las rutas de audio de la terminal                                                          | Rojo (API: 2 pruebas)                                                                       |
+| B3        | Familia fija `videoportero` para el intercom                                                   | Rojo (API: «nunca por analogía», por la ruta ajena)                                         |
+| B4        | Sin la entrada 5/51 del catálogo de eventos                                                    | Rojo (e2e de la llamada de la terminal)                                                     |
+| C1-edge   | El repositorio no entrega al Edge                                                              | Rojo                                                                                        |
+| C2        | Sin la comprobación del códec declarado                                                        | Rojo                                                                                        |
+| C3a a C3d | Sin hallazgo; sin motivo; «no admite» como «no leído»; sin motivo del descubrimiento que lanza | Rojo, las cuatro                                                                            |
+| D1a, D1b  | Filtro sin la condición; `servidor.mjs` sin el filtro                                          | Rojo, las dos                                                                               |
+| G1        | El arnés de go2rtc de antes (listo con el primer `GET /api`)                                   | Rojo: el doble, 400 «source not supported»; el binario real con el arranque ensanchado, 404 |
+| G2        | El arnés espera sólo el primer esquema                                                         | Rojo («no espera los tres»)                                                                 |
 
 **Dos sondas no son observables, y se dice.**
 
@@ -334,8 +336,43 @@ restauran siempre el fichero.
 
 ### Veredicto literal de `./scripts/verificar-etapa.sh --con-base` (§2.8.0)
 
-_Se escribe con la salida de la corrida sobre el commit de documentación de esta
-corrección. Si sale FALLIDA, la corrección no se cierra._
+Sobre `ab48efa`, desde cero (sin `dist/`, `.turbo/` ni `coverage/`, instalación
+con `--frozen-lockfile`), con `--con-base` —el paso 12 reconstruye la base `ncr`
+de 0001 a 0056 y corre la suite SQL—, en 43 min 9 s:
+
+```
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+El control declarado no ejercido es **D-112**: las cinco pruebas del arranque en frío que el paso 5 salta porque necesitan los claims que escribe el paso 12b, que es quien las ejecuta y exige que no se salten.
+
+**Pasos y recuentos.** 31 de 31 pasos. Cobertura (paso 7): dominio 96,30 %, aplicación 97,61 %, global 88,16 %. App: 455 pruebas de Dart (paso 5c).
+
+- **Paso 5, TypeScript.** Ninguna omisión por falta de base.
+
+  | Paquete            | Pruebas                         |
+  | ------------------ | ------------------------------- |
+  | `@ncr/api`         | 2404 passed \| 5 skipped (2409) |
+  | `@ncr/providers`   | 1248 passed (1248)              |
+  | `@ncr/web`         | 814 passed (814)                |
+  | `@ncr/domain-core` | 463 passed (463)                |
+  | `@ncr/edge`        | 325 passed (325)                |
+  | `@ncr/config`      | 144 passed (144)                |
+
+- **Ficheros de prueba:** 525 de 525 recogidos (paso 6); los dos recuentos coinciden (paso 7b).
+- **Paso 14, tres corridas sin caché:**
+  - corrida 1/3: codigo 0 · @ncr/api:test: Tests 2409 passed (2409) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 463 passed (463) · @ncr/edge:test: Tests 325 passed (325) · @ncr/providers:test: Tests 1248 passed (1248) · @ncr/web:test: Tests 814 passed (814)
+  - corrida 2/3: codigo 0 · @ncr/api:test: Tests 2409 passed (2409) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 463 passed (463) · @ncr/edge:test: Tests 325 passed (325) · @ncr/providers:test: Tests 1248 passed (1248) · @ncr/web:test: Tests 814 passed (814)
+  - corrida 3/3: codigo 0 · @ncr/api:test: Tests 2409 passed (2409) · @ncr/config:test: Tests 144 passed (144) · @ncr/domain-core:test: Tests 463 passed (463) · @ncr/edge:test: Tests 325 passed (325) · @ncr/providers:test: Tests 1248 passed (1248) · @ncr/web:test: Tests 814 passed (814)
+
+**Las cuatro corridas, y por qué hubo cuatro.** Ninguna se dio por buena a medias.
+
+| Corrida | Commit    | Resultado                              | Causa y corrección                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------- | --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.ª     | `9b28293` | FALLIDA, paso 12e                      | El guion de sitio contaba como «desmentida» la lista de audio de una terminal simulada sin audio: lo introdujo B. `5964ece`: las rutas de audio de la terminal pasan a módulo opcional                                                                                                                                                                                                                              |
+| 2.ª     | `5964ece` | FALLIDA, pasos 7 y 7b                  | Anterior a esta ronda: tres pruebas de `edge-instantanea-pg` suponían que nadie más publicaba versiones de COP_A. `1087d57`: la misma propiedad sin depender del orden, reproducida antes con una sonda                                                                                                                                                                                                             |
+| 3.ª     | `1087d57` | FALLIDA, paso 5 (y 6, 7b por arrastre) | El primer `PATCH` de la prueba de go2rtc real recibió 400 bajo carga. **Causa leída en el fuente de go2rtc v1.9.14 y medida con el binario real**: la API contesta `GET /api` antes de registrar `rtsp`, y entre medias el `PATCH` recorre 404 → 400 «source not supported» → 200. El arnés daba go2rtc por listo con el primer `GET /api`. `ab48efa`: espera a que `/api/schemes` liste `rtsp`, `webrtc` e `isapi` |
+| 4.ª     | `ab48efa` | **correcta**                           | —                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ---
 
@@ -372,16 +409,17 @@ una persona atestó que abre.
 
 **Deuda nueva (DT)**
 
-| ID          | Qué                                                                                                                                                                                                                                                                                       | Por qué no se cerró aquí                                                                                                                                                                |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DT-15S1-C05 | **D2.** El videoportero contestó varias veces `400 «Device hardware error»` (`errorCode 805306369`) a `POST /ISAPI/Event/notification/subscribeEvent` antes de conectar. [Probable]: hueco de suscripción ocupado por una instancia anterior de la API                                    | Encargo: «solo DT». Se mide mañana: reiniciar la API y ver si el primer intento falla                                                                                                   |
-| DT-15S1-C06 | **D3.** El diagnóstico en sitio se hizo con `admin` por `curl`. Las guías insisten ya en el usuario de servicio (§8.4 fila 1, 4 bis, «Qué medir mañana»), pero ninguna cifra de esta ronda sale de él                                                                                     | Encargo: «solo DT». Se cierra cuando la medición de mañana se haga con el usuario de servicio                                                                                           |
-| DT-15S1-C07 | La reversión del canal de audio del ensayo (`configurar un canal de audio bidireccional`) recibiría `400 badXmlContent` en este firmware si tuviera que escribir. Hoy queda en `fallo` honesto, nunca en «restaurado»                                                                     | Falta saber si el firmware rechaza también un `PUT` **sin cambios**: se mide                                                                                                            |
-| DT-15S1-C08 | Textos de `aplicacion/` que nombran al videoportero en la llamada: «Llamada en el videoportero» (`cola-de-atencion.ts`, título por omisión) y «llamada del videoportero recibida» (bitácora del ingestor). La cola de la terminal ya muestra el título del evento, «Llamada a la central» | Regla dura de la ETAPA 15: `aplicacion/` no se toca en esta etapa                                                                                                                       |
-| DT-15S1-C09 | La señalización de llamada (contestar o colgar) de la terminal no está catalogada. Si la K1T344 la declara, la consola no la envía                                                                                                                                                        | Sin documento que la respalde; se observa mañana (S-15S1-02)                                                                                                                            |
-| DT-15S1-C10 | Un `403` **sin cuerpo** del fabricante en cualquier ruta de capacidad se trata como credencial rechazada y **tumba el descubrimiento entero** (H-SITIO-12). Si el usuario de servicio recibe eso en la lista de flujos, no se guarda ninguna capacidad. La ficha ya lo dice (C.3)         | Cambiar esa semántica es decisión de diseño (no reintentar una credencial). Recomendación: tratar el `403` sin cuerpo de una ruta de capacidad, no del contacto, como «no se pudo leer» |
-| DT-15S1-C11 | Ocho ficheros que ya pasaban de 300 líneas crecieron: `hikvision-provider` 1039→1057, `equipo-simulado` 944→957, `catalogo-de-rutas` 779→829, `ficha` 641→653, `alta-de-equipo.tsx` 577→580, `diagnostico-de-equipo` 491→506, `intercom-equipo` 395→425, `capacidades-hikvision` 396→420  | Partirlos excede el encargo; lo nuevo va en módulos propios                                                                                                                             |
-| DT-15S1-C12 | Los `.mjs` de la raíz de la consola (`servidor`, `ip-del-cliente`, `reenvio-de-audio` y ahora `cancelaciones-del-cliente`) quedan fuera del lint (`eslint src`); un `eslint` directo los rechaza por los globales de Node                                                                 | Anterior a esta ronda; el nuevo sigue la convención existente                                                                                                                           |
+| ID          | Qué                                                                                                                                                                                                                                                                                                                                                                                             | Por qué no se cerró aquí                                                                                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DT-15S1-C05 | **D2.** El videoportero contestó varias veces `400 «Device hardware error»` (`errorCode 805306369`) a `POST /ISAPI/Event/notification/subscribeEvent` antes de conectar. [Probable]: hueco de suscripción ocupado por una instancia anterior de la API                                                                                                                                          | Encargo: «solo DT». Se mide mañana: reiniciar la API y ver si el primer intento falla                                                                                                   |
+| DT-15S1-C06 | **D3.** El diagnóstico en sitio se hizo con `admin` por `curl`. Las guías insisten ya en el usuario de servicio (§8.4 fila 1, 4 bis, «Qué medir mañana»), pero ninguna cifra de esta ronda sale de él                                                                                                                                                                                           | Encargo: «solo DT». Se cierra cuando la medición de mañana se haga con el usuario de servicio                                                                                           |
+| DT-15S1-C07 | La reversión del canal de audio del ensayo (`configurar un canal de audio bidireccional`) recibiría `400 badXmlContent` en este firmware si tuviera que escribir. Hoy queda en `fallo` honesto, nunca en «restaurado»                                                                                                                                                                           | Falta saber si el firmware rechaza también un `PUT` **sin cambios**: se mide                                                                                                            |
+| DT-15S1-C08 | Textos de `aplicacion/` que nombran al videoportero en la llamada: «Llamada en el videoportero» (`cola-de-atencion.ts`, título por omisión) y «llamada del videoportero recibida» (bitácora del ingestor). La cola de la terminal ya muestra el título del evento, «Llamada a la central»                                                                                                       | Regla dura de la ETAPA 15: `aplicacion/` no se toca en esta etapa                                                                                                                       |
+| DT-15S1-C09 | La señalización de llamada (contestar o colgar) de la terminal no está catalogada. Si la K1T344 la declara, la consola no la envía                                                                                                                                                                                                                                                              | Sin documento que la respalde; se observa mañana (S-15S1-02)                                                                                                                            |
+| DT-15S1-C10 | Un `403` **sin cuerpo** del fabricante en cualquier ruta de capacidad se trata como credencial rechazada y **tumba el descubrimiento entero** (H-SITIO-12). Si el usuario de servicio recibe eso en la lista de flujos, no se guarda ninguna capacidad. La ficha ya lo dice (C.3)                                                                                                               | Cambiar esa semántica es decisión de diseño (no reintentar una credencial). Recomendación: tratar el `403` sin cuerpo de una ruta de capacidad, no del contacto, como «no se pudo leer» |
+| DT-15S1-C11 | Ocho ficheros que ya pasaban de 300 líneas crecieron: `hikvision-provider` 1039→1057, `equipo-simulado` 944→957, `catalogo-de-rutas` 779→829, `ficha` 641→653, `alta-de-equipo.tsx` 577→580, `diagnostico-de-equipo` 491→506, `intercom-equipo` 395→425, `capacidades-hikvision` 396→420                                                                                                        | Partirlos excede el encargo; lo nuevo va en módulos propios                                                                                                                             |
+| DT-15S1-C12 | Los `.mjs` de la raíz de la consola (`servidor`, `ip-del-cliente`, `reenvio-de-audio` y ahora `cancelaciones-del-cliente`) quedan fuera del lint (`eslint src`); un `eslint` directo los rechaza por los globales de Node                                                                                                                                                                       | Anterior a esta ronda; el nuevo sigue la convención existente                                                                                                                           |
+| DT-15S1-C13 | El Edge lanza `tic()` con `setInterval` sin protección contra solapes (`apps/edge/src/main.ts:69`, 15 s por omisión). Con la WAN degradada una vuelta puede pasar de 15 s, y dos `Reconciliacion.ejecutar()` tomarían las mismas filas: dos intentos por envío y la cuarentena adelantada. Señalado por la revisión de Codex en el PR [#52](https://github.com/4rg3n15/NextResidential/pull/52) | Fuera del diff de este PR. Propuesta: un candado `enCurso` que salte la vuelta con aviso, o `setTimeout` encadenado, extraído a una función con prueba propia                           |
 
 **Supuestos.**
 
@@ -424,8 +462,11 @@ Rama `etapa-15s1-audio-y-video-en-sitio`, desde `develop` en `8ee5cd9`.
 | `9590588` | `fix(etapa-15s1/video)`: el canal declarado manda, H.265 se dice antes del puente y la ficha avisa del canal guardado (C)            |
 | `24ec82e` | `test(etapa-15s1/audio)`: «sin audio» es ningún canal declarado y las pruebas de fuera del paquete no escriben el protocolo (KPI-11) |
 | `c492ecb` | `fix(etapa-15s1/consola)`: una cancelación del navegador no es una excepción no capturada (D1)                                       |
-| siguiente | `docs(etapa-15s1)`: guías, registro, este informe y la ficha                                                                         |
-| siguiente | `chore(etapa-15s1)`: cierre, con el veredicto del verificador                                                                        |
+| `9b28293` | `docs(etapa-15s1)`: guías, registro, informe y ficha de la corrección de audio y video en sitio                                      |
+| `5964ece` | `fix(etapa-15s1/audio)`: el audio de la terminal es de módulo opcional en el catálogo (paso 12e del verificador)                     |
+| `1087d57` | `test(etapa-15s1/edge)`: la instantánea del Edge no supone que nadie más toque MIRA (paso 7 del verificador)                         |
+| `ab48efa` | `fix(etapa-15s1/proveedores)`: el arnés de go2rtc espera a que el puente admita las fuentes                                          |
+| siguiente | `chore(etapa-15s1)`: cierre, con el veredicto de la 4.ª corrida                                                                      |
 
 ---
 
