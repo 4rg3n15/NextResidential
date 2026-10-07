@@ -58,3 +58,16 @@ export type {
 } from './aplicacion/puertos';
 // R1 (15-N) · el equipo que empieza a recibir plantillas recibe las que le faltan.
 export { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';
+/**
+ * 15-X · el rostro del RESIDENTE («Mi rostro», D2; el del menor, D3): lo que
+ * toca plantillas, bóveda y equipos se queda aquí; el residente pone la puerta.
+ * `SuprimirYRetirarYa` saca del equipo, en el acto, el rostro del menor dado
+ * de baja.
+ */
+export { RostroDeResidente } from './aplicacion/rostro-de-residente';
+export type {
+  EntradaDeRostroDeResidente,
+  ResultadoDeRostroDeResidente,
+  RostroLeidoDeResidente,
+} from './aplicacion/rostro-de-residente';
+export { SuprimirYRetirarYa } from './aplicacion/suprimir-y-retirar';

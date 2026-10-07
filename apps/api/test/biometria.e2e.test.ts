@@ -151,8 +151,13 @@ describe('biometría · lo que no existe', () => {
   });
 
   it('F4 · el flujo anterior ya no existe: ni enlace, ni página pública, ni captura suelta', () => {
-    const anteriores = rutas().filter((r) =>
-      /\/consentimiento\/|\/enlace$|\/respuesta$|biometria\/capturas|\/rostro$/.test(r),
+    // 15-X (ADR-039) · la única `…/rostro` que vuelve es la del propio residente
+    // y la del menor a su cargo, con su cuenta: no es la captura suelta de una visita.
+    const delResidente = /\/mi\/(menores\/:[^/]+\/)?rostro$/;
+    const anteriores = rutas().filter(
+      (r) =>
+        /\/consentimiento\/|\/enlace$|\/respuesta$|biometria\/capturas|\/rostro$/.test(r) &&
+        !delResidente.test(r),
     );
     expect(anteriores).toEqual([]);
   });

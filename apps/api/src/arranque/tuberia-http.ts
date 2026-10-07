@@ -8,6 +8,7 @@ import {
   RUTA_DE_FOTOGRAFIA_DE_VISITANTE,
 } from '../autorizaciones';
 import { RUTAS_CON_FOTO_DE_VISITA } from '../visitas';
+import { RUTAS_CON_FOTO_DE_ROSTRO } from '../residente';
 import { acumularSobreCrudo, RUTA_DE_ALARM_SERVER } from '../comun/sobre-de-equipo';
 import { LIMITE_DE_TROZO_DE_AUDIO, RUTA_DE_AUDIO_DE_INTERCOM } from '../comun/ruta-de-audio';
 import { LIMITE_DE_OFERTA_SDP, RUTA_DE_WHEP_DE_VIDEO, TIPO_SDP } from '../comun/ruta-de-video';
@@ -66,7 +67,8 @@ export const montarTuberiaHttp = (app: INestApplication, config: Configuracion):
     express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }),
   );
   // F (15-L) · «Generar autorización» lleva la foto en el cuerpo: mismo tope.
-  for (const ruta of RUTAS_CON_FOTO_DE_VISITA) {
+  // 15-X · y el rostro del residente y el del menor.
+  for (const ruta of [...RUTAS_CON_FOTO_DE_VISITA, ...RUTAS_CON_FOTO_DE_ROSTRO]) {
     app.use(ruta, express.json({ limit: LIMITE_DE_FOTOGRAFIA, verify: guardarCuerpoCrudo }));
   }
   app.use(express.json({ limit: config.LIMITE_PAYLOAD, verify: guardarCuerpoCrudo }));

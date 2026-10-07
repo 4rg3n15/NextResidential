@@ -1539,6 +1539,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/mi/rostro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El estado de mi rostro y la política vigente; nunca la imagen */
+        get: operations["MiRostroController_estado"];
+        put?: never;
+        /** Registra o renueva mi rostro (opcional, con la política aceptada) */
+        post: operations["MiRostroController_registrar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/mi/rostro/retiro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retira mi rostro: revoca y suprime en el acto, también en los equipos */
+        post: operations["MiRostroController_retirar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/mi/vehiculos": {
         parameters: {
             query?: never;
@@ -3971,6 +4006,11 @@ export interface components {
             sincronizada: boolean;
             detalle: string;
         };
+        EquipoDelRostroDto: {
+            nombre: string;
+            /** @enum {string} */
+            estado: "sincronizada" | "pendiente" | "fallida";
+        };
         EquipoDto: {
             id: string;
             nombre: string;
@@ -4099,6 +4139,19 @@ export interface components {
             avisoOcupantes: string;
             /** @description 15-W · «La administración debe asignarle su vivienda», o null */
             aviso: string | null;
+        };
+        EstadoDeMiRostroDto: {
+            /** @enum {string} */
+            estado: "sin_rostro" | "pendiente" | "activa" | "parcial" | "por_vencer" | "en_retiro";
+            calidad: number | null;
+            /** Format: date-time */
+            registradoEn: string | null;
+            /** Format: date-time */
+            venceEn: string | null;
+            diasParaVencer: number | null;
+            equiposConRostro: number;
+            equiposConMiRostro: number;
+            equipos: components["schemas"]["EquipoDelRostroDto"][];
         };
         EstadoDeSesionDto: {
             /** @enum {string} */
@@ -4696,6 +4749,34 @@ export interface components {
             /** Format: uuid */
             autorizacionId: string | null;
         };
+        MiRostroConPoliticaDto: {
+            /** @enum {string} */
+            estado: "sin_rostro" | "pendiente" | "activa" | "parcial" | "por_vencer" | "en_retiro";
+            calidad: number | null;
+            /** Format: date-time */
+            registradoEn: string | null;
+            /** Format: date-time */
+            venceEn: string | null;
+            diasParaVencer: number | null;
+            equiposConRostro: number;
+            equiposConMiRostro: number;
+            equipos: components["schemas"]["EquipoDelRostroDto"][];
+            politica: components["schemas"]["PoliticaDelRostroDto"];
+        };
+        MiRostroDto: {
+            /** @description La foto frontal, JPEG o PNG, en base64 */
+            contenidoBase64: string;
+            /** @enum {string} */
+            tipoMime: "image/jpeg" | "image/png";
+            medidas: components["schemas"]["MedidasDeFotoDto"];
+            /** @description La versión de la política que la app mostró */
+            versionPolitica: string;
+            /**
+             * @description Acepta la política: sin ella no hay rostro
+             * @enum {boolean}
+             */
+            aceptaPolitica: true;
+        };
         MiVehiculoDto: {
             /** Format: uuid */
             id: string;
@@ -5098,6 +5179,10 @@ export interface components {
         };
         PlazaRetiradaDto: {
             retirada: boolean;
+        };
+        PoliticaDelRostroDto: {
+            version: string;
+            texto: string;
         };
         PoolDePorterosDto: {
             inicio: number;
@@ -8940,6 +9025,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResultadoDePerfilDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_estado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MiRostroConPoliticaDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_registrar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MiRostroDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
+                };
+            };
+        };
+    };
+    MiRostroController_retirar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoDeMiRostroDto"];
                 };
             };
         };

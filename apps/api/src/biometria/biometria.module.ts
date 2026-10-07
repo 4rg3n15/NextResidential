@@ -24,13 +24,15 @@ import {
   BarrerPlantillasVencidas,
   CapturarRostro,
   SuprimirRostroDeAutorizacion,
-  RevocarConsentimiento,
   SincronizarPlantilla,
 } from './aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
 import { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';
 import { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
 import { RetirarPlantillasDeEquipo } from './aplicacion/retirar-de-equipo';
+import { RostroDeResidente } from './aplicacion/rostro-de-residente';
+import { SuprimirYRetirarYa } from './aplicacion/suprimir-y-retirar';
+import { PROVEEDORES_DEL_ROSTRO } from './rostro.providers';
 import { AlmacenEnMemoria, BovedaAesGcm } from './infraestructura/boveda-cifrada';
 import type { AlmacenDeBytes } from './infraestructura/boveda-cifrada';
 import {
@@ -178,21 +180,6 @@ export class BiometriaModule {
           ) => new CapturarRostro(consentimientos, plantillas, boveda, reloj, ids),
         },
         {
-          provide: RevocarConsentimiento,
-          inject: [
-            REPOSITORIO_CONSENTIMIENTOS,
-            REPOSITORIO_PLANTILLAS,
-            BOVEDA_DE_PLANTILLAS,
-            RELOJ,
-          ],
-          useFactory: (
-            consentimientos: RepositorioConsentimientos,
-            plantillas: RepositorioPlantillas,
-            boveda: BovedaDePlantillas,
-            reloj: Reloj,
-          ) => new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj),
-        },
-        {
           provide: SincronizarPlantilla,
           inject: [
             REPOSITORIO_CONSENTIMIENTOS,
@@ -257,16 +244,6 @@ export class BiometriaModule {
           ) => new BarrerPlantillasVencidas(plantillas, boveda, reloj),
         },
         {
-          // C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11).
-          provide: SuprimirPlantillasDeTitular,
-          inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, RELOJ],
-          useFactory: (
-            plantillas: RepositorioPlantillas,
-            boveda: BovedaDePlantillas,
-            reloj: Reloj,
-          ) => new SuprimirPlantillasDeTitular(plantillas, boveda, reloj),
-        },
-        {
           // C4 (15-M) · la baja de un equipo retira de él sus rostros (RN-11).
           provide: RETIRO_DE_PLANTILLAS_DE_EQUIPO,
           inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, BITACORA],
@@ -276,6 +253,8 @@ export class BiometriaModule {
             bitacora: Bitacora,
           ) => new RetirarPlantillasDeEquipo(plantillas, boveda, bitacora),
         },
+        // 15-X · revocación, supresión y el rostro del residente (`rostro.providers.ts`).
+        ...PROVEEDORES_DEL_ROSTRO,
       ],
       exports: [
         // F (15-L) · lo consume el módulo de visitas: la foto de la visita.
@@ -292,6 +271,9 @@ export class BiometriaModule {
         SuprimirRostroDeAutorizacion,
         // C9 (15-M) · lo consume el módulo del residente al dar de baja una cuenta.
         SuprimirPlantillasDeTitular,
+        // 15-X · «Mi rostro» y el rostro del menor; la baja del menor, en el acto.
+        RostroDeResidente,
+        SuprimirYRetirarYa,
         // C4 (15-M) · lo resuelve la baja de un equipo (sin importar este módulo).
         RETIRO_DE_PLANTILLAS_DE_EQUIPO,
         REPOSITORIO_CONSENTIMIENTOS,

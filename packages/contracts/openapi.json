@@ -5558,6 +5558,122 @@
         ]
       }
     },
+    "/copropiedades/{id}/mi/rostro": {
+      "get": {
+        "operationId": "MiRostroController_estado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiRostroConPoliticaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "El estado de mi rostro y la política vigente; nunca la imagen",
+        "tags": [
+          "residente"
+        ]
+      },
+      "post": {
+        "operationId": "MiRostroController_registrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiRostroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeMiRostroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra o renueva mi rostro (opcional, con la política aceptada)",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
+    "/copropiedades/{id}/mi/rostro/retiro": {
+      "post": {
+        "operationId": "MiRostroController_retirar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoDeMiRostroDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retira mi rostro: revoca y suprime en el acto, también en los equipos",
+        "tags": [
+          "residente"
+        ]
+      }
+    },
     "/copropiedades/{id}/mi/vehiculos": {
       "get": {
         "operationId": "MiController_vehiculos",
@@ -13214,6 +13330,26 @@
           "detalle"
         ]
       },
+      "EquipoDelRostroDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "sincronizada",
+              "pendiente",
+              "fallida"
+            ]
+          }
+        },
+        "required": [
+          "nombre",
+          "estado"
+        ]
+      },
       "EquipoDto": {
         "type": "object",
         "properties": {
@@ -13620,6 +13756,62 @@
           "pideAgrupacion",
           "avisoOcupantes",
           "aviso"
+        ]
+      },
+      "EstadoDeMiRostroDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "sin_rostro",
+              "pendiente",
+              "activa",
+              "parcial",
+              "por_vencer",
+              "en_retiro"
+            ]
+          },
+          "calidad": {
+            "type": "number",
+            "nullable": true
+          },
+          "registradoEn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "venceEn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "diasParaVencer": {
+            "type": "number",
+            "nullable": true
+          },
+          "equiposConRostro": {
+            "type": "number"
+          },
+          "equiposConMiRostro": {
+            "type": "number"
+          },
+          "equipos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipoDelRostroDto"
+            }
+          }
+        },
+        "required": [
+          "estado",
+          "calidad",
+          "registradoEn",
+          "venceEn",
+          "diasParaVencer",
+          "equiposConRostro",
+          "equiposConMiRostro",
+          "equipos"
         ]
       },
       "EstadoDeSesionDto": {
@@ -15623,6 +15815,105 @@
           "autorizacionId"
         ]
       },
+      "MiRostroConPoliticaDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "sin_rostro",
+              "pendiente",
+              "activa",
+              "parcial",
+              "por_vencer",
+              "en_retiro"
+            ]
+          },
+          "calidad": {
+            "type": "number",
+            "nullable": true
+          },
+          "registradoEn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "venceEn": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "diasParaVencer": {
+            "type": "number",
+            "nullable": true
+          },
+          "equiposConRostro": {
+            "type": "number"
+          },
+          "equiposConMiRostro": {
+            "type": "number"
+          },
+          "equipos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipoDelRostroDto"
+            }
+          },
+          "politica": {
+            "$ref": "#/components/schemas/PoliticaDelRostroDto"
+          }
+        },
+        "required": [
+          "estado",
+          "calidad",
+          "registradoEn",
+          "venceEn",
+          "diasParaVencer",
+          "equiposConRostro",
+          "equiposConMiRostro",
+          "equipos",
+          "politica"
+        ]
+      },
+      "MiRostroDto": {
+        "type": "object",
+        "properties": {
+          "contenidoBase64": {
+            "type": "string",
+            "description": "La foto frontal, JPEG o PNG, en base64",
+            "maxLength": 2097152
+          },
+          "tipoMime": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "medidas": {
+            "$ref": "#/components/schemas/MedidasDeFotoDto"
+          },
+          "versionPolitica": {
+            "type": "string",
+            "description": "La versión de la política que la app mostró",
+            "maxLength": 60
+          },
+          "aceptaPolitica": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Acepta la política: sin ella no hay rostro"
+          }
+        },
+        "required": [
+          "contenidoBase64",
+          "tipoMime",
+          "medidas",
+          "versionPolitica",
+          "aceptaPolitica"
+        ]
+      },
       "MiVehiculoDto": {
         "type": "object",
         "properties": {
@@ -16972,6 +17263,21 @@
         },
         "required": [
           "retirada"
+        ]
+      },
+      "PoliticaDelRostroDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "texto": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "texto"
         ]
       },
       "PoolDePorterosDto": {

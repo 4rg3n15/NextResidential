@@ -14,7 +14,8 @@ import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
  *
  * «Ninguna ruta del residente acepta `viviendaId`, `personaId`, `titularId`,
  * `rol`, `estado`, `origen` ni `es_titular` en el cuerpo. Las pruebas que los
- * envían deben recibir 400.» La vivienda, la persona y el rol los pone el
+ * envían deben recibir 400.» Desde la 15-X, tampoco `suprimirEn`: el plazo del
+ * rostro lo pone el servidor. La vivienda, la persona y el rol los pone el
  * ámbito que resuelve la API; si una ruta los aceptara, el residente podría
  * escribir en la casa de otro con una petición bien formada.
  *
@@ -36,8 +37,12 @@ const PROHIBIDOS: Record<string, unknown> = {
   estado: 'activo',
   origen: 'administracion',
   es_titular: true,
+  // 15-X (D2) · el plazo del rostro lo pone el servidor (365 días o los 18 del menor).
+  suprimirEn: '2099-01-01T00:00:00Z',
 };
 const SIN_CUERPO = new Set([
+  // 15-X: retirar mi rostro.
+  'POST /copropiedades/:id/mi/rostro/retiro',
   // 15-W: el traspaso, añadir una plaza y eliminar un vehículo propio.
   'POST /copropiedades/:id/mi/menores/:residenteId/codigo-de-traspaso',
   'POST /copropiedades/:id/mi/ocupantes/plazas',

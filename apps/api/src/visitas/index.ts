@@ -19,8 +19,11 @@ export { hastaDe, revisarForma } from './aplicacion/generar-visita';
 export { confirmacionDePlaca, momentoCorto } from './aplicacion/confirmacion-de-placa';
 export type { VisitanteReciente } from './aplicacion/puertos';
 export { RUTAS_CON_FOTO_DE_VISITA } from './presentacion/limites';
+// 15-X · el rostro del residente lleva la MISMA foto: tipo, tope y medidas.
+export { MAX_BASE64_FOTOGRAFIA } from './aplicacion/foto';
 export {
   FotoDeVisitaDto,
+  MedidasDeFotoDto,
   MiVisitaDto,
   RepetirVisitaDto,
   VisitaGeneradaDto,
