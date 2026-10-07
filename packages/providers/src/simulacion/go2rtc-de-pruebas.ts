@@ -13,9 +13,10 @@ import { join } from 'node:path';
  * go2rtc no se versiona ni se descarga aquí: la prueba lo toma de `GO2RTC_BIN`
  * y, si no está, se OMITE con nombre («OMITIDA: sin GO2RTC_BIN»). Con él, se
  * arranca con un fichero de configuración temporal —la API en un puerto libre
- * del bucle local, sin RTSP ni WebRTC a la escucha— y se espera a que `GET
- * /api` conteste. Es lo que permitió reproducir en el escritorio, sin equipo,
- * el `HTTP 500 · EOF` visto en sitio el 28/09.
+ * del bucle local, sin RTSP ni WebRTC a la escucha— y se espera a que haya
+ * registrado los esquemas de fuente que se usan (`ESQUEMAS_QUE_SE_ESPERAN`).
+ * Es lo que permitió reproducir en el escritorio, sin equipo, el `HTTP 500 ·
+ * EOF` visto en sitio el 28/09.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export interface Go2rtcDePruebas {
@@ -43,21 +44,50 @@ const puertoLibre = async (): Promise<number> => {
   return port;
 };
 
-const esperarApi = async (url: string, proceso: ChildProcess, plazoMs: number): Promise<void> => {
+/**
+ * 15-S1 · LISTO NO ES «LA API CONTESTA». go2rtc v1.9.14 abre su API antes de
+ * registrar los esquemas de fuente: `main.go` inicia los módulos en orden
+ * (`api.Init` → `streams.Init` → … → `rtsp.Init` → `webrtc.Init` → … →
+ * `isapi.Init`), y `rtsp` entra en `internal/rtsp/rtsp.go:39`. Entre medias,
+ * `GET /api` ya da 200 y un `PATCH /api/streams` con una fuente `rtsp://`
+ * recibe 400 «streams: source not supported» (`internal/streams/streams.go:98`).
+ * Bajo carga ese hueco se ensancha: fue el 400 de la tercera corrida del
+ * verificador de la 15-S1. Se espera a que `GET /api/schemes` liste los
+ * esquemas que usan las pruebas; `isapi` es el último módulo que se inicia de
+ * los tres, y `webrtc` registra `/api/webrtc` antes que su esquema.
+ */
+export const ESQUEMAS_QUE_SE_ESPERAN = ['rtsp', 'webrtc', 'isapi'] as const;
+
+const esquemasRegistrados = async (url: string): Promise<readonly string[]> => {
+  try {
+    const r = await fetch(`${url}/api/schemes`, { signal: AbortSignal.timeout(500) });
+    if (!r.ok) return [];
+    const cuerpo: unknown = await r.json();
+    return Array.isArray(cuerpo) ? cuerpo.filter((e): e is string => typeof e === 'string') : [];
+  } catch {
+    return []; // aún no escucha
+  }
+};
+
+const esperarEsquemas = async (
+  url: string,
+  proceso: ChildProcess,
+  plazoMs: number,
+): Promise<void> => {
   const limite = Date.now() + plazoMs;
+  let faltan: readonly string[] = ESQUEMAS_QUE_SE_ESPERAN;
   while (Date.now() < limite) {
     if (proceso.exitCode !== null) {
       throw new Error(`go2rtc terminó con código ${String(proceso.exitCode)} antes de escuchar`);
     }
-    try {
-      const r = await fetch(`${url}/api`, { signal: AbortSignal.timeout(500) });
-      if (r.ok) return;
-    } catch {
-      // aún no escucha
-    }
-    await new Promise((listo) => setTimeout(listo, 100));
+    const registrados = await esquemasRegistrados(url);
+    faltan = ESQUEMAS_QUE_SE_ESPERAN.filter((e) => !registrados.includes(e));
+    if (faltan.length === 0) return;
+    await new Promise((listo) => setTimeout(listo, 50));
   }
-  throw new Error(`go2rtc no contestó en ${url}/api en ${String(plazoMs)} ms`);
+  throw new Error(
+    `go2rtc no registró ${faltan.join(', ')} en ${url}/api/schemes en ${String(plazoMs)} ms`,
+  );
 };
 
 /**
@@ -102,7 +132,7 @@ export const arrancarGo2rtc = async (
     rmSync(carpeta, { recursive: true, force: true });
   };
   try {
-    await esperarApi(url, proceso, 10_000);
+    await esperarEsquemas(url, proceso, 10_000);
   } catch (error) {
     await cerrar();
     throw error;
