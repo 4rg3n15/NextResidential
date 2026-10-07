@@ -45,6 +45,8 @@ class AltaDeEquipoDto {
   final num? canalDeAudio;
   final String? fabricante;
   final AltaDeEquipoDtoModoDeTerminal? modoDeTerminal;
+
+  /// Comprobé en sitio que el equipo abre el canal de audio (atestación)
   final bool canalDeAudioHabilitado;
   final String? canalDeVideo;
   final String? zonaId;

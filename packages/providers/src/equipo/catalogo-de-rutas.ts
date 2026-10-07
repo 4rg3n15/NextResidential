@@ -711,19 +711,69 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
 ];
 
 /**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * B (corrección 15-S1, 07/10/2026) · LA TERMINAL FACIAL TAMBIÉN HABLA
+ *
+ * Requisito del cliente: la guardia habla por la terminal igual que por el
+ * videoportero. Una ruta del catálogo es de UNA familia (`familia`), y la misma
+ * intención se declara otra vez para otra familia: es lo que el catálogo
+ * prevé —`rutaPara` busca por propósito Y familia—, sin relajar la comprobación
+ * de familia de nadie. Son las cinco de TwoWayAudio: la lista de canales,
+ * abrir, cerrar y el `audioData` de subida y de bajada; la señalización de
+ * llamada NO, que es del videoportero y ninguna terminal la ha declarado.
+ *
+ * `[SUPUESTO]` S-15S1-02 · que la DS-K1T344MBFWX-E1 (V4.61.0) conteste estas
+ * rutas como el videoportero: no medido aún en la K1T344; se mide en sitio el
+ * 07/10. Que la API registrara para ella «el equipo declara que no tiene audio
+ * bidireccional» es, [Probable], la misma causa que H-15S1-C07.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const PROPOSITOS_DE_AUDIO = new Set([
+  'leer los canales de audio bidireccional del equipo',
+  'abrir el canal de audio bidireccional',
+  'cerrar el canal de audio bidireccional',
+  'enviar audio al equipo',
+  'recibir audio del equipo',
+]);
+
+function rutasDeAudioDeLaTerminal(base: readonly RutaDeEquipo[]): readonly RutaDeEquipo[] {
+  return base
+    .filter((r) => r.familia === 'videoportero' && PROPOSITOS_DE_AUDIO.has(r.proposito))
+    .map((r) => ({
+      ...r,
+      familia: 'terminal' as const,
+      procedencia: 'documentada' as const,
+      fuente:
+        'Corrección 15-S1 (B): las mismas rutas TwoWayAudio que el videoportero, declaradas ' +
+        `para la terminal. Origen en el videoportero: ${r.fuente}`,
+      confirmarEnSitio:
+        '[SUPUESTO] S-15S1-02 · no medido aún en la K1T344: se mide en sitio el 07/10 ' +
+        `(${r.confirmarEnSitio ?? 'que conteste en esta familia'})`,
+    }));
+}
+
+/**
  * El catálogo completo: lo que había más lo que la guía integral añade.
  *
  * Se concatena y no se fusiona: una ruta nueva **no sustituye** a una
  * verificada. La de la barrera lo está contra este firmware, y cambiarla por
  * una que sólo está documentada sería retroceder.
  */
-export const RUTAS: readonly RutaDeEquipo[] = [...RUTAS_BASE, ...RUTAS_DE_LA_GUIA];
+export const RUTAS: readonly RutaDeEquipo[] = [
+  ...RUTAS_BASE,
+  ...rutasDeAudioDeLaTerminal(RUTAS_BASE),
+  ...RUTAS_DE_LA_GUIA,
+];
 
 export const rutasPor = (procedencia: Procedencia): readonly RutaDeEquipo[] =>
   RUTAS.filter((r) => r.procedencia === procedencia);
 
 export const rutasDeFamilia = (familia: RutaDeEquipo['familia']): readonly RutaDeEquipo[] =>
   RUTAS.filter((r) => r.familia === familia || r.familia === 'comun');
+
+/** B (15-S1) · ¿está catalogada esta intención para esta familia? No lanza. */
+export const tieneRuta = (proposito: string, familia: RutaDeEquipo['familia']): boolean =>
+  RUTAS.some((r) => r.proposito === proposito && (r.familia === familia || r.familia === 'comun'));
 
 /**
  * Busca por propósito, que es como la nombra el resto del sistema. Lanza si no

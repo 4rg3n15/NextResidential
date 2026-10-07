@@ -1,7 +1,9 @@
 import { soporta } from '../nucleo/capacidades';
 import type { CapacidadesDeEquipo } from '../nucleo/capacidades';
 import { motivoLegible } from '../nucleo/motivo-legible';
+import { tieneRuta } from '../equipo/catalogo-de-rutas';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
+import type { FamiliaDeAudio } from '../videoportero/intercom-equipo';
 import { resultado } from './tipos';
 import type { OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
@@ -11,7 +13,10 @@ import type { OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
  *
  * Se abre la sesión con `IntercomDeEquipo` —el de producción, ADR-01—, se
  * manda UN SEGUNDO DE PITIDO en el formato que el equipo declara y se cierra.
- * La persona delante del videoportero dice si lo oyó: es la mitad «hablar»
+ * B (15-S1) · vale para el videoportero y para la terminal que DECLARA audio
+ * (la guardia habla por las dos, ADR-019: por capacidad, no por tipo).
+ *
+ * La persona delante del equipo dice si lo oyó: es la mitad «hablar»
  * del audio bidireccional, comprobada por un oído y no por un `200`. La mitad
  * «escuchar» se prueba en la consola de guardia, con el micrófono del operador.
  *
@@ -68,35 +73,51 @@ export const pasoDeAudio = async (
 ): Promise<ResultadoDePaso> => {
   const audio = capacidades?.audioBidireccional ?? null;
   const declara = capacidades !== null && soporta(capacidades, 'audioBidireccional');
-  if (o.equipo.familia !== 'videoportero') {
+  const familia = o.equipo.familia;
+  // B (15-S1) · la terminal sólo si DECLARA un canal (su `AudioCap` de
+  // micrófono y altavoz no es audio bidireccional); el videoportero siempre
+  // —si no lo declara es un fallo: la guardia virtual habla por él—; el resto, no.
+  const terminalConCanal =
+    familia === 'terminal' && declara && audio !== null && audio.canal !== null;
+  if (familia !== 'videoportero' && !terminalConCanal) {
     return resultado(
       'audio',
       'no_aplica',
       declara
-        ? 'La guardia virtual habla por el videoportero; el audio de este equipo no se usa'
+        ? 'La guardia habla por el videoportero o por la terminal; el audio de este equipo no se usa'
         : 'Este equipo no declara audio bidireccional',
     );
   }
+  const nombre = familia === 'terminal' ? 'la terminal' : 'el videoportero';
   if (!declara || audio === null || audio.canal === null) {
     return resultado(
       'audio',
       'fallo',
       audio?.estado === 'no'
-        ? 'El videoportero declara el audio bidireccional deshabilitado'
-        : 'No se pudo leer el canal de audio del videoportero',
-      'En su panel web: Configuración → Audio → Audio bidireccional, habilitado; en la consola, ' +
-        '«Probar conexión» en su ficha; y repita el ensayo',
+        ? `${nombre === 'la terminal' ? 'La terminal' : 'El videoportero'} no declara ningún canal de audio bidireccional`
+        : `No se pudo leer el canal de audio de ${nombre}`,
+      // H-15S1-C07 · no hay interruptor que habilitar: el firmware declara
+      // `enabled=false` y abre igual; lo que vale es que liste su canal.
+      'En la consola, «Probar conexión» en su ficha debe listar su canal de audio ' +
+        '(GET …/TwoWayAudio/channels con el usuario de servicio); si el modelo no lo trae, ' +
+        'es la contingencia del ADR-01. Luego repita el ensayo',
     );
   }
   if (o.soloLectura) {
     return resultado('audio', 'omitido', 'Modo solo lectura: no se abre el canal de audio');
   }
+  const deAudio: FamiliaDeAudio = familia;
   const intercom = new IntercomDeEquipo({
     ...o.equipo,
+    // B (15-S1) · las rutas de SU familia: la terminal por las suyas.
+    familia: deAudio,
     reloj: { ahora: o.ahora },
+    // El ensayo ES la comprobación en sitio: abre sin esperar la atestación.
     canalHabilitado: true,
     canal: audio.canal,
-    senalizacion: soporta(capacidades, 'senalizacionDeLlamada'),
+    senalizacion:
+      soporta(capacidades, 'senalizacionDeLlamada') &&
+      tieneRuta('contestar o rechazar una llamada del videoportero', deAudio),
   });
   const tono = tonoDePrueba(audio.formato);
   const inicio = performance.now();
@@ -104,7 +125,7 @@ export const pasoDeAudio = async (
     await intercom.abrirSesion('ensayo-en-sitio', 'ensayo-en-sitio');
     const abrirMs = Math.round(performance.now() - inicio);
     if (tono !== null) {
-      await o.interlocutor.indicar('Escuche el videoportero: va a sonar un pitido de un segundo');
+      await o.interlocutor.indicar(`Escuche ${nombre}: va a sonar un pitido de un segundo`);
       await intercom.enviarAudio(tono);
       await esperar(1200);
     }
@@ -118,7 +139,7 @@ export const pasoDeAudio = async (
         'audio',
         'fallo',
         `El canal tardó ${String(abrirMs)} ms en abrirse (límite 2 s)`,
-        'Revise la red entre el Mac y el videoportero',
+        `Revise la red entre el Mac y ${nombre}`,
         detalle,
       );
     }
@@ -131,7 +152,7 @@ export const pasoDeAudio = async (
         detalle,
       );
     }
-    const oyo = await o.interlocutor.confirmar('¿Se oyó el pitido en el videoportero?');
+    const oyo = await o.interlocutor.confirmar(`¿Se oyó el pitido en ${nombre}?`);
     return oyo === true
       ? resultado(
           'audio',

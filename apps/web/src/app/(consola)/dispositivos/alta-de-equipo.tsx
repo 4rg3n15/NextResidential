@@ -76,6 +76,8 @@ const ESPECIFICO: Readonly<
 
 /** C2/D2 (15-L) · los tipos que tienen video, y la forma del canal (canal×100+flujo). */
 const CON_VIDEO: ReadonlySet<TipoDeEquipo> = new Set(['camara_lpr', 'terminal_facial', 'intercom']);
+/** 15-S1 · B · la guardia habla por el videoportero y por la terminal (TwoWayAudio). */
+const CON_AUDIO: ReadonlySet<TipoDeEquipo> = new Set(['intercom', 'terminal_facial']);
 const CANAL_DE_VIDEO = /^[1-9][0-9]{2,3}$/;
 
 const VERDE = 'border-exito bg-exito-suave text-exito-texto';
@@ -189,7 +191,7 @@ export const AltaDeEquipo = ({
     ...(campoEspecifico === null ? {} : { [campoEspecifico.clave]: numero(especifico) ?? 1 }),
     ...(fabricante.trim() === '' ? {} : { fabricante: fabricante.trim() }),
     ...(tipo === 'terminal_facial' ? { modoDeTerminal } : {}),
-    ...(tipo === 'intercom' ? { canalDeAudioHabilitado } : {}),
+    ...(CON_AUDIO.has(tipo) ? { canalDeAudioHabilitado } : {}),
     ...(tipo === 'intercom' ? { numeroDePuerta: numero(puertaDelVideoportero) ?? 1 } : {}),
     ...(CON_VIDEO.has(tipo) && canalDeVideo.trim() !== ''
       ? { canalDeVideo: canalDeVideo.trim() }
@@ -441,7 +443,7 @@ export const AltaDeEquipo = ({
           ))}
         </fieldset>
       ) : null}
-      {tipo === 'intercom' ? (
+      {CON_AUDIO.has(tipo) ? (
         <label className="flex items-start gap-2 text-secundario text-texto">
           <input
             type="checkbox"
@@ -450,9 +452,10 @@ export const AltaDeEquipo = ({
             className="mt-1 h-4 w-4 accent-marca"
           />
           <span>
-            Una persona habilitó el canal de audio EN EL APARATO
+            Comprobé en sitio que el equipo abre el canal de audio (atestación)
             <span className="block text-texto-apagado">
-              El sistema no lo habilita solo; el sondeo comprueba si el equipo lo declara.
+              El equipo lo declara sin un interruptor que el sistema lea: sin esta casilla, no
+              habla.
             </span>
           </span>
         </label>

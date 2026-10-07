@@ -112,10 +112,9 @@ const formatoNeutro = (codec: string | null): string | null => {
 /**
  * La lista de canales de audio bidireccional, tal como el equipo la declara.
  *
- * **Es la corrección de D4.** El canal NO es 1 por omisión: se lee de aquí y
- * se usa el primero habilitado. Un `channels/1/open` escrito a mano contra un
- * equipo cuyo canal es el 2 contesta `notSupport` y el diagnóstico apunta al
- * firmware.
+ * **Es la corrección de D4.** El canal NO es 1 por omisión: se lee de aquí.
+ * Un `channels/1/open` escrito a mano contra un equipo cuyo canal es el 2
+ * contesta `notSupport` y el diagnóstico apunta al firmware.
  */
 export const canalesDeAudioDesde = (xml: string): readonly CanalDeAudioDeclarado[] =>
   bloques(xml, 'TwoWayAudioChannel').map((canal) => ({
@@ -126,10 +125,31 @@ export const canalesDeAudioDesde = (xml: string): readonly CanalDeAudioDeclarado
     formato: formatoNeutro(etiqueta(canal, 'audioCompressionType')),
   }));
 
-/** El canal con el que se abre el audio: el primero habilitado, si lo hay. */
+/**
+ * El canal con el que se abre el audio: el primero habilitado y, si ninguno
+ * lo está, el primero DECLARADO con id > 0.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * H-15S1-C07 · `enabled` NO ES UN INTERRUPTOR EN ESTA FAMILIA · sitio, 06/10/2026
+ *
+ * El DS-KD9633-WBE6 (V2.3.9), con `curl --digest`:
+ *  · `GET  …/TwoWayAudio/channels/1` → `<id>1</id><enabled>false</enabled>`, G.711ulaw;
+ *  · `PUT  …/TwoWayAudio/channels/1` con `enabled=true` → 400 · statusCode 6 ·
+ *    badXmlContent: el firmware no deja escribirlo;
+ *  · `PUT  …/channels/1/open` → 200 con `<sessionId>`, y `…/close` → OK.
+ *
+ * Exigir `enabled=true` dejaba la capacidad en `no` y la guardia sin voz en
+ * cada «Hablar»: el «paso de puesta en marcha» que lo habilitaba no existe en
+ * este firmware. `[SUPUESTO]` S-15S1-01: `enabled` no es un interruptor
+ * configurable en esta familia; la prueba real es `abrirSesion`, que suelta el
+ * turno y falla de forma honesta si el equipo no abre. La compuerta humana
+ * sigue: la casilla de atestación de la ficha (`canalDeAudioHabilitado`).
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
 export const canalDeAudioUtilizable = (
   canales: readonly CanalDeAudioDeclarado[],
-): CanalDeAudioDeclarado | null => canales.find((c) => c.habilitado === true && c.id > 0) ?? null;
+): CanalDeAudioDeclarado | null =>
+  canales.find((c) => c.habilitado === true && c.id > 0) ?? canales.find((c) => c.id > 0) ?? null;
 
 /**
  * Verificación remota de la terminal: ¿espera al veredicto de la plataforma?
@@ -285,21 +305,20 @@ export const descubrirCapacidades = async (
   }
 
   if (familia === 'videoportero' || familia === 'terminal') {
-    const canales = await pedir(
-      'leer los canales de audio bidireccional del equipo',
-      'videoportero',
-    );
+    // B (15-S1) · con la ruta de SU familia: la terminal ya no pregunta por la
+    // del videoportero (que es lo que la dejaba sin audio a ojos de la guardia).
+    const canales = await pedir('leer los canales de audio bidireccional del equipo');
     const lista = canales === null ? [] : canalesDeAudioDesde(canales);
+    // H-15S1-C07 · `si` con un canal DECLARADO (id > 0), habilitado o no; `no`
+    // sólo con la lista vacía o sin ningún id > 0.
     const util = canalDeAudioUtilizable(lista);
     parciales.audioBidireccional = {
       estado:
         canales === null
           ? (base.audioBidireccional?.estado ?? 'desconocida')
-          : lista.length === 0
+          : util === null
             ? 'no'
-            : util === null
-              ? 'no'
-              : 'si',
+            : 'si',
       canal: util?.id ?? null,
       formato: util?.formato ?? lista[0]?.formato ?? null,
     };

@@ -519,6 +519,11 @@ export const equipoSimulado = (guion: GuionDeEquipo): typeof fetch => {
         : respuestaDe(200, listaDeFlujos(guion.canalesDeVideo));
     }
     if (catalogada.proposito === 'leer los canales de audio bidireccional del equipo') {
+      // B (15-S1) · la terminal simulada no tiene audio salvo que el guion lo
+      // pida: hasta la 15-S1 la ruta no existía para su familia y contestaba 404.
+      if (guion.familia === 'terminal' && guion.canalesDeAudio === undefined) {
+        return respuestaDe(404, 'not found');
+      }
       return respuestaDe(200, canalesDeAudio(canales));
     }
     if (catalogada.proposito === 'configurar un canal de audio bidireccional') {

@@ -45,6 +45,8 @@ class EdicionDeEquipoDto {
   final num? canalDeAudio;
   final String? fabricante;
   final EdicionDeEquipoDtoModoDeTerminal? modoDeTerminal;
+
+  /// Comprobé en sitio que el equipo abre el canal de audio (atestación)
   final bool canalDeAudioHabilitado;
   final String? canalDeVideo;
   final bool probarConexion;

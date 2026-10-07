@@ -14,7 +14,7 @@ import type {
 import { ordenInalcanzable, vigenciaDeAtestacion } from '@ncr/domain-core';
 import { etiqueta } from '../equipo/xml';
 import { ClienteDeEquipo, EquipoInalcanzable } from '../equipo/cliente';
-import { rutaPara } from '../equipo/catalogo-de-rutas';
+import { rutaPara, tieneRuta } from '../equipo/catalogo-de-rutas';
 import { FuenteDePlacas } from '../equipo/fuente-de-placas';
 import { ControlDeBarreraVehicular } from '../barrera/control-barrera';
 import { TerminalFacial } from '../terminal/terminal-facial';
@@ -25,6 +25,7 @@ import { Videoportero, VideoporteroSinOperador } from '../videoportero/videoport
 import { fijarModoDePuerta } from '../equipo/modo-de-puerta';
 import type { ModoDeSalida } from '../nucleo/proveedor';
 import { IntercomDeEquipo } from '../videoportero/intercom-equipo';
+import type { FamiliaDeAudio } from '../videoportero/intercom-equipo';
 import { IntercomIsapiPersistente } from '../videoportero/intercom-isapi-persistente';
 import { construirArbolDeSalidas } from '../videoportero/arbol-de-salidas';
 import { leerSalidasDelEquipo } from '../videoportero/salidas-del-equipo';
@@ -1011,14 +1012,22 @@ export class HikvisionProvider
     const capacidades = await this.exigirCapacidad(dispositivoId, 'audioBidireccional');
     const Adaptador =
       this.opciones.audioDelEquipo === 'persistente' ? IntercomIsapiPersistente : IntercomDeEquipo;
+    // B (15-S1) · las rutas son de la familia DEL EQUIPO: la terminal habla por
+    // las suyas, no por las del videoportero.
+    const familia: FamiliaDeAudio = equipo.tipo === 'terminal_facial' ? 'terminal' : 'videoportero';
     const creado = new Adaptador({
       ...this.conexionDe(equipo),
       reloj: this.opciones.reloj,
+      familia,
+      // H-15S1-C07 · la casilla de la ficha: una persona atesta que el equipo abre.
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
       canal: capacidades.audioBidireccional.canal ?? equipo.canalDeAudio ?? null,
       // A4 · contestar y colgar por señalización SÓLO si el equipo la declara
-      // (el DS-KD9633 del proyecto declara que no: NO APLICA POR CAPACIDAD).
-      senalizacion: soporta(capacidades, 'senalizacionDeLlamada'),
+      // (el DS-KD9633 del proyecto declara que no: NO APLICA POR CAPACIDAD). B
+      // (15-S1) · y si su familia la tiene catalogada: la terminal, no.
+      senalizacion:
+        soporta(capacidades, 'senalizacionDeLlamada') &&
+        tieneRuta('contestar o rechazar una llamada del videoportero', familia),
     });
     this.intercomos.set(dispositivoId, creado);
     return creado;

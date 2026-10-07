@@ -22,9 +22,10 @@ import type { PeticionRtsp } from './rtsp-mensajes';
  *
  * · Un `open` con la sesión ya abierta —por otro cliente o por la nuestra—
  *   contesta 403 con `twoWayAudioInProgressPleaseWait` (0x40002068).
- * · Un canal deshabilitado contesta 403 `notSupport` [SUPUESTO] S-176: el
- *   manual no dice qué devuelve; el producto no llega a pedirlo, porque lee
- *   `enabled` antes.
+ * · Un canal DECLARADO abre aunque diga `enabled=false`: así abrió el
+ *   DS-KD9633-WBE6 real (V2.3.9) el 06/10/2026 —`open` → 200 con sesión—, lo
+ *   que desmiente el [SUPUESTO] S-176 (H-15S1-C07). Sólo un canal que el
+ *   equipo NO declara contesta 403 `notSupport`.
  * · La subida se lee CRUDA, como la lee el equipo; si llega con
  *   `Transfer-Encoding: chunked` se decodifica y se APUNTA: un equipo real
  *   oiría las cabeceras de trozo como ruido, y la medida tiene que verlo.
@@ -121,7 +122,7 @@ export const videoporteroDeAudioEnRed = async (
       socket.write(
         respuestaHttp('403 Forbidden', estadoIsapi(ruta, 4, 'Invalid Operation', 'notSupport')),
       );
-    } else if (canales.find((c) => String(c.id) === audio[1])?.habilitado !== true) {
+    } else if (canales.find((c) => String(c.id) === audio[1]) === undefined) {
       socket.write(
         respuestaHttp('403 Forbidden', estadoIsapi(ruta, 4, 'Invalid Operation', 'notSupport')),
       );

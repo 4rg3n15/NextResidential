@@ -24,18 +24,24 @@ import { CODIGO_CANAL_OCUPADO, esCanalOcupado } from './errores-de-audio';
  * AUDIO BIDIRECCIONAL CONTRA EL EQUIPO · ADR-01.
  *
  * ═════════════════════════════════════════════════════════════════════════════
- * ESTÁ ESCRITO Y **NO ESTÁ HABILITADO**. LAS DOS COSAS A LA VEZ
+ * EL EQUIPO DECLARA EL CANAL; UNA PERSONA ATESTA QUE ABRE
  *
- * El canal del equipo está **deshabilitado de fábrica** en el aparato: se midió
- * el 18/09/2026, junto con que lo soporta con G.711 µ-law. Habilitarlo es un
- * cambio de configuración **del equipo**, lo hace el usuario, y el
- * procedimiento está en la guía de validación. Este adaptador no lo habilita ni
- * lo intenta: un adaptador que encendiera por su cuenta una vía de audio hacia
- * la calle sería una decisión de seguridad tomada por el código.
+ * H-15S1-C07 (sitio, 06/10/2026): el DS-KD9633-WBE6 (V2.3.9) declara su canal
+ * con `enabled=false`, contesta 400 badXmlContent a quien intenta escribirlo y
+ * aun así ABRE (`open` → 200 con sesión). El «paso de puesta en marcha» que lo
+ * habilitaba no existe en este firmware: `enabled` no es un interruptor
+ * (`[SUPUESTO]` S-15S1-01). Este adaptador no toca la configuración del equipo:
+ * un adaptador que encendiera por su cuenta una vía de audio hacia la calle
+ * sería una decisión de seguridad tomada por el código.
  *
- * `disponible()` lo dice sin rodeos, y `abrirSesion` falla con un motivo que
- * distingue «el equipo no puede» de «el canal está ocupado». Son dos cosas
- * distintas y el operador las resuelve distinto.
+ * La compuerta es humana y queda: la casilla de la ficha «comprobé en sitio
+ * que el equipo abre el canal de audio (atestación)» (`canalHabilitado`). Sin
+ * ella no sale una sola petición hacia el canal. Con ella, la prueba real es
+ * `abrirSesion`: si el equipo no abre, se suelta el turno y falla con un
+ * motivo que distingue «el equipo no puede» de «el canal está ocupado».
+ *
+ * B (15-S1) · la terminal facial habla por las MISMAS rutas, declaradas para
+ * su familia (`familia`): la ruta sale del equipo, no se fija aquí.
  *
  * ═════════════════════════════════════════════════════════════════════════════
  * LA EXCLUSIVIDAD NO LA APLICA EL EQUIPO: LA APLICAMOS NOSOTROS
@@ -47,15 +53,25 @@ import { CODIGO_CANAL_OCUPADO, esCanalOcupado } from './errores-de-audio';
  * con hardware. Lo que cambia es el transporte, no las reglas.
  */
 
+/**
+ * Nadie ha atestado que el equipo abra su canal. H-15S1-C07: el equipo lo
+ * DECLARA y no expone un interruptor que el sistema pueda leer, así que lo
+ * atesta el operador con la casilla de la ficha, tras comprobarlo en sitio.
+ */
 export class CanalDeEquipoNoHabilitado extends Error {
   constructor(readonly dispositivoId: string) {
     super(
-      `El canal de audio del equipo ${dispositivoId} está deshabilitado. Es un ajuste DEL ` +
-        'EQUIPO y lo activa un operador: docs/guias/VALIDACION_HIKVISION_EN_SITIO.md §8.4',
+      `El canal de audio del equipo ${dispositivoId} está deshabilitado para la guardia: nadie ` +
+        'ha atestado que el equipo lo abra. El equipo lo declara, pero no expone un interruptor ' +
+        'que el sistema pueda leer; compruébelo en sitio y marque en su ficha «comprobé en sitio ' +
+        'que el equipo abre el canal de audio» (docs/guias/VALIDACION_HIKVISION_EN_SITIO.md §8.4)',
     );
     this.name = 'CanalDeEquipoNoHabilitado';
   }
 }
+
+/** B (15-S1) · las familias que hablan por TwoWayAudio. */
+export type FamiliaDeAudio = 'videoportero' | 'terminal';
 
 export interface OpcionesDeIntercom extends OpcionesDeEquipo {
   readonly reloj: Reloj;
@@ -67,10 +83,17 @@ export interface OpcionesDeIntercom extends OpcionesDeEquipo {
    */
   readonly senalizacion?: boolean;
   /**
-   * Se **declara**, no se descubre. Mientras sea `false`, este adaptador no
-   * emite una sola petición hacia el canal de audio del equipo.
+   * La ATESTACIÓN de una persona (casilla de la ficha), no un dato del equipo:
+   * H-15S1-C07. Mientras sea `false`, este adaptador no emite una sola
+   * petición hacia el canal de audio del equipo.
    */
   readonly canalHabilitado: boolean;
+  /**
+   * B (15-S1) · de qué familia son las rutas TwoWayAudio: la del EQUIPO
+   * (videoportero o terminal). Por omisión, la del videoportero, que es lo que
+   * era antes de que la terminal hablara.
+   */
+  readonly familia?: FamiliaDeAudio;
   /**
    * El canal, **leído de la lista que el equipo declara** (D4). `null` mientras
    * no se haya descubierto: entonces abrir la sesión falla diciendo que falta
@@ -167,9 +190,14 @@ export class IntercomDeEquipo implements IntercomProvider {
     this.cliente = new ClienteDeEquipo(opciones);
   }
 
-  /** `false` mientras el equipo no tenga el canal activado. */
+  /** `false` mientras nadie haya atestado que el equipo abre su canal. */
   disponible(): boolean {
     return this.opciones.canalHabilitado;
+  }
+
+  /** B (15-S1) · la familia de las rutas: la del equipo. */
+  private get familia(): FamiliaDeAudio {
+    return this.opciones.familia ?? 'videoportero';
   }
 
   private estado(dispositivoId: string): EstadoDelCanal {
@@ -201,7 +229,7 @@ export class IntercomDeEquipo implements IntercomProvider {
     }
     const ruta = rutaPara(
       'abrir el canal de audio bidireccional',
-      'videoportero',
+      this.familia,
       this.opciones.canal,
     );
     // TwoWayAudio `open` no lleva cuerpo en la guía: lo declara el catálogo
@@ -258,8 +286,10 @@ export class IntercomDeEquipo implements IntercomProvider {
    */
   private async senalizar(orden: 'answer' | 'hangUp'): Promise<void> {
     if (this.opciones.senalizacion !== true) return;
-    const ruta = rutaPara('contestar o rechazar una llamada del videoportero', 'videoportero');
     try {
+      // B (15-S1) · con la familia del equipo: sin ruta catalogada para ella
+      // (la terminal), `rutaPara` lanza y no se envía nada —nunca por analogía—.
+      const ruta = rutaPara('contestar o rechazar una llamada del videoportero', this.familia);
       await this.cliente.pedir(ruta.metodo, ruta.ruta, {
         tipo: 'application/json',
         contenido: JSON.stringify({ CallSignal: { cmdType: orden } }),
@@ -303,7 +333,7 @@ export class IntercomDeEquipo implements IntercomProvider {
   private abrirSalida(canal: number): { readonly cola: ColaDeSalida; fallo: Error | null } {
     const cola = new ColaDeSalida();
     const salida: { readonly cola: ColaDeSalida; fallo: Error | null } = { cola, fallo: null };
-    const ruta = rutaPara('enviar audio al equipo', 'videoportero', canal);
+    const ruta = rutaPara('enviar audio al equipo', this.familia, canal);
     void this.cliente
       .subirFlujo(ruta.ruta, () => cola.flujo(), 'application/octet-stream')
       .then((respuesta) => {
@@ -325,7 +355,7 @@ export class IntercomDeEquipo implements IntercomProvider {
     const dispositivoId = this.abierto;
     if (dispositivoId === null) throw new Error('No hay ninguna sesión de audio abierta');
     if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
-    const ruta = rutaPara('recibir audio del equipo', 'videoportero', this.opciones.canal);
+    const ruta = rutaPara('recibir audio del equipo', this.familia, this.opciones.canal);
     for await (const trozo of this.cliente.flujoBinario(ruta.ruta)) yield trozo;
   }
 
@@ -356,7 +386,7 @@ export class IntercomDeEquipo implements IntercomProvider {
     if (this.opciones.canal === null) return;
     const ruta = rutaPara(
       'cerrar el canal de audio bidireccional',
-      'videoportero',
+      this.familia,
       this.opciones.canal,
     );
     try {
