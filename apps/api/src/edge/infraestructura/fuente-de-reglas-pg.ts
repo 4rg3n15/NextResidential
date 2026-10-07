@@ -1,6 +1,10 @@
 import type { Pool, PoolClient } from 'pg';
 import type { Bitacora, Zona } from '@ncr/domain-core';
-import { RepositorioListaNegraPg, autorizacionesVigentesEn } from '../../autorizaciones';
+import {
+  RepositorioListaNegraPg,
+  autorizacionesVigentesEn,
+  residentesDePersonasEn,
+} from '../../autorizaciones';
 import type { RepositorioZonas } from '../../zonas';
 import type { RepositorioCopropiedades } from '../../multiempresa/repositorio-copropiedades';
 import { UMBRAL_CONFIANZA_PLACA_FRACCION } from '../../multiempresa/configuracion';
@@ -106,7 +110,10 @@ export class FuenteDeReglasPg implements FuenteDeReglas {
     });
   }
 
-  /** Lo que se lee con el MISMO cliente: autorizaciones, padrón y plantillas. */
+  /**
+   * Lo que se lee con el MISMO cliente: autorizaciones, padrón, plantillas y,
+   * desde la 15-X (D1), el residente de cada persona con plantilla.
+   */
   private async propias(c: PoolClient, copropiedadId: string, ahora: Date) {
     const autorizaciones = await autorizacionesVigentesEn(c, copropiedadId, ahora);
     const vehiculos = await c.query<{
@@ -127,6 +134,11 @@ export class FuenteDeReglasPg implements FuenteDeReglas {
       persona_id: string;
       reconocible_hasta: Date | null;
     }>(PLANTILLAS, [copropiedadId]);
+    // 15-X · D1 · la misma lectura que el cargador de la nube, para las personas
+    // cuyo rostro alguna terminal puede reconocer.
+    const residentesConRostro = await residentesDePersonasEn(c, copropiedadId, [
+      ...new Set(plantillas.rows.map((f) => f.persona_id)),
+    ]);
     return {
       autorizaciones,
       vehiculos: vehiculos.rows.map(
@@ -148,6 +160,7 @@ export class FuenteDeReglasPg implements FuenteDeReglas {
           reconocibleHasta: f.reconocible_hasta,
         }),
       ),
+      residentesConRostro,
     };
   }
 

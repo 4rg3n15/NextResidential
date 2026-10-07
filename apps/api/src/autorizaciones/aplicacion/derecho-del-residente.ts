@@ -1,5 +1,6 @@
 import { Autorizacion, Vigencia, esExito } from '@ncr/domain-core';
 import type { PlacaResuelta } from './puertos';
+import type { ResidenteResuelto } from './residentes-por-persona';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -26,23 +27,50 @@ import type { PlacaResuelta } from './puertos';
 /** Cien años: «mientras la vivienda esté en servicio», sin fecha de caducidad. */
 const SIN_CADUCIDAD_MS = 100 * 365 * 24 * 3600 * 1000;
 
+/**
+ * La autorización sintética, para el vehículo y para la persona: desde el alta
+ * y sin caducidad, o hasta la baja. Una sola función para los dos derechos, y
+ * los dos caminos —nube e instantánea del Edge— la llaman (RN-16).
+ */
+const derechoSintetico = (
+  datos: { readonly id: string; readonly copropiedadId: string; readonly viviendaId: string },
+  personaId: string,
+  desde: Date,
+  baja: Date | null,
+): Autorizacion | null => {
+  const vigencia = Vigencia.crear(desde, baja ?? new Date(desde.getTime() + SIN_CADUCIDAD_MS));
+  if (!esExito(vigencia)) return null;
+  const derecho = Autorizacion.crear({ ...datos, personaId, vigencia: vigencia.valor });
+  return esExito(derecho) ? derecho.valor : null;
+};
+
 export const derechoDelResidente = (
   copropiedadId: string,
   vehiculo: PlacaResuelta,
-): Autorizacion | null => {
-  const desde = vehiculo.registradoEn;
-  const hasta =
-    vehiculo.viviendaActiva || vehiculo.viviendaDesactivadaEn === null
-      ? new Date(desde.getTime() + SIN_CADUCIDAD_MS)
-      : vehiculo.viviendaDesactivadaEn;
-  const vigencia = Vigencia.crear(desde, hasta);
-  if (!esExito(vigencia)) return null;
-  const derecho = Autorizacion.crear({
-    id: `residente:${vehiculo.vehiculoId}`,
-    copropiedadId,
-    viviendaId: vehiculo.viviendaId,
-    personaId: vehiculo.personaId ?? `vehiculo:${vehiculo.vehiculoId}`,
-    vigencia: vigencia.valor,
-  });
-  return esExito(derecho) ? derecho.valor : null;
-};
+): Autorizacion | null =>
+  derechoSintetico(
+    { id: `residente:${vehiculo.vehiculoId}`, copropiedadId, viviendaId: vehiculo.viviendaId },
+    vehiculo.personaId ?? `vehiculo:${vehiculo.vehiculoId}`,
+    vehiculo.registradoEn,
+    vehiculo.viviendaActiva ? null : vehiculo.viviendaDesactivadaEn,
+  );
+
+/**
+ * 15-X · D1 · el derecho del residente por su ROSTRO. El prefijo
+ * `residente:persona:` lo distingue del del vehículo: el Edge y la nube lo
+ * aplican SÓLO a un acceso facial de esa persona.
+ */
+export const derechoDelResidentePorPersona = (
+  copropiedadId: string,
+  residente: ResidenteResuelto,
+): Autorizacion | null =>
+  derechoSintetico(
+    {
+      id: `residente:persona:${residente.residenteId}`,
+      copropiedadId,
+      viviendaId: residente.viviendaId,
+    },
+    residente.personaId,
+    residente.registradoEn,
+    residente.bajaEn,
+  );

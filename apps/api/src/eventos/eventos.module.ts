@@ -30,6 +30,7 @@ import {
   RESOLUTOR_DE_PLACA,
   RESOLUTOR_DE_ZONA,
   RepositorioListaNegraPg,
+  ResidentesPorPersonaPg,
   VersionDeReglasFija,
 } from '../autorizaciones';
 import type {
@@ -317,6 +318,8 @@ export class EventosModule {
                     bitacora,
                     zonas,
                     identidad,
+                    // 15-X · D1 · el rostro de un residente llega con su vivienda.
+                    new ResidentesPorPersonaPg(pool),
                   )
                 : new CargadorDeContextoConservador(
                     new VersionDeReglasFija(),

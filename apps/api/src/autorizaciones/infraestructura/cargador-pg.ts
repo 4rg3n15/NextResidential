@@ -12,7 +12,11 @@ import type {
   SolicitudDeAcceso,
 } from '../aplicacion/puertos';
 import { UMBRAL_CONFIANZA_PLACA_FRACCION } from '../../multiempresa/configuracion';
-import { derechoDelResidente } from '../aplicacion/derecho-del-residente';
+import {
+  derechoDelResidente,
+  derechoDelResidentePorPersona,
+} from '../aplicacion/derecho-del-residente';
+import type { ResidentesPorPersona } from '../aplicacion/residentes-por-persona';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -29,6 +33,7 @@ import { derechoDelResidente } from '../aplicacion/derecho-del-residente';
  * DE DÓNDE SALE CADA COSA, Y CUÁNTO CUESTA
  *
  *   placa → vivienda           ResolutorDePlaca        (padrón)        1 consulta
+ *   rostro → residente         ResidentesPorPersona    (15-X · D1)     0 ó 1
  *   autorizaciones activas     RepositorioAutorizaciones                1 consulta
  *   vetos vigentes             RepositorioListaNegra                    1 consulta
  *   zona (sólo si se nombra)   ResolutorDeZona          (zonas)         0 ó 1
@@ -56,12 +61,22 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
      * es exactamente lo que S-34 dejaba y lo que la suite sin biometría espera.
      */
     private readonly consentimientos?: LectorDeConsentimientoBiometrico,
+    /**
+     * 15-X · D1 · el residente de un ROSTRO. Opcional por la misma razón que el
+     * consentimiento: sin él, el rostro de un residente sigue sin vivienda.
+     */
+    private readonly residentes?: ResidentesPorPersona,
   ) {}
 
   async cargar(solicitud: SolicitudDeAcceso, ahora: Date): Promise<ContextoDeAcceso> {
     const placa = this.placaNormalizada(solicitud.placaLeida);
-    const [vehiculo, veto, umbral, version] = await Promise.all([
+    // 15-X · D1 · en la MISMA ronda: el residente sólo para un rostro con persona.
+    const rostroDe = solicitud.metodo === 'facial' ? solicitud.personaId : null;
+    const [vehiculo, residente, veto, umbral, version] = await Promise.all([
       placa === null ? Promise.resolve(null) : this.placas.resolver(solicitud.copropiedadId, placa),
+      rostroDe === null || this.residentes === undefined
+        ? Promise.resolve(null)
+        : this.residentes.resolver(solicitud.copropiedadId, rostroDe),
       this.vetos(solicitud.copropiedadId),
       this.umbral(solicitud.copropiedadId),
       this.versiones.vigenteDe(solicitud.copropiedadId),
@@ -73,13 +88,16 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
       placa,
       personaId,
     });
-    const sintetica =
-      vehiculo === null ? null : derechoDelResidente(solicitud.copropiedadId, vehiculo);
+    const sinteticas = [
+      vehiculo === null ? null : derechoDelResidente(solicitud.copropiedadId, vehiculo),
+      residente === null ? null : derechoDelResidentePorPersona(solicitud.copropiedadId, residente),
+    ].filter((a) => a !== null);
 
-    // La vivienda de destino: la del vehículo del padrón, o la de la
-    // autorización de visitante que trae esa placa. En ese orden, porque el
-    // vehículo registrado es el hecho más fuerte que hay.
-    const viviendaId = vehiculo?.viviendaId ?? autorizaciones[0]?.viviendaId ?? null;
+    // La vivienda de destino: la del vehículo del padrón, la del residente del
+    // rostro, o la de la autorización de visitante. En ese orden: el padrón es
+    // el hecho más fuerte que hay.
+    const viviendaId =
+      vehiculo?.viviendaId ?? residente?.viviendaId ?? autorizaciones[0]?.viviendaId ?? null;
 
     return {
       ahora,
@@ -88,14 +106,15 @@ export class CargadorDeContextoPg implements CargadorDeContexto {
       personaId,
       viviendaId,
       metodo: solicitud.metodo,
-      autorizaciones: sintetica === null ? autorizaciones : [sintetica, ...autorizaciones],
+      autorizaciones: [...sinteticas, ...autorizaciones],
       personasEnListaNegra: veto.personas,
       placasEnListaNegra: veto.placas,
       placaLeida: placa,
       // Conocida = del padrón, o con una autorización de visitante (aunque
       // esté vencida: eso lo decide el motor con otro motivo).
       placaConocida: placa !== null && (vehiculo !== null || autorizaciones.length > 0),
-      viviendaActiva: vehiculo?.viviendaActiva ?? autorizaciones.length > 0,
+      viviendaActiva:
+        vehiculo?.viviendaActiva ?? residente?.viviendaActiva ?? autorizaciones.length > 0,
       zona: await this.zona(solicitud, ahora),
       confianza: solicitud.confianza,
       umbralDeConfianza: umbral,

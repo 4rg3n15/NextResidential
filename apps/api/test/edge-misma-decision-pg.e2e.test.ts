@@ -33,12 +33,14 @@ const CAMARA = '90000000-0000-4000-8000-000000000001';
 const ACTOR = '00000000-0000-4000-8000-000000000002';
 let app: INestApplication | undefined;
 let plantillaPropia = '';
+let residentes: Readonly<Record<MotivoDeResidente, string>> | undefined;
 let instantanea: InstantaneaDeReglas | undefined;
 let disponible = false;
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
   plantillaPropia = await sembrarRostroReconocible(URL_BASE);
+  residentes = await sembrarResidentesConRostro(URL_BASE);
   const firmante = await crearFirmante();
   app = await crearApp(firmante, undefined, {
     PROVEEDOR_DE_EQUIPOS: 'simulado',
@@ -102,6 +104,64 @@ const sembrarRostroReconocible = async (url: string): Promise<string> => {
       [COP_A, `PAR${randomBytes(4).toString('hex').toUpperCase()}`, ACTOR],
     );
     return rows[0]?.id ?? '';
+  } finally {
+    await pool.end();
+  }
+};
+
+/**
+ * 15-X · D1 · tres RESIDENTES con rostro de esta corrida, cada uno con su
+ * motivo. Antes de la 15-X los tres salían FALLO_TECNICO en los dos lados:
+ * iguales, y la comparación no probaba nada. Devuelve la plantilla de cada uno.
+ */
+type MotivoDeResidente = 'PERMITIDO' | 'SIN_CONSENTIMIENTO' | 'LISTA_NEGRA';
+const sembrarResidentesConRostro = async (
+  url: string,
+): Promise<Record<MotivoDeResidente, string>> => {
+  const pool = new Pool({ connectionString: url, max: 1 });
+  const uno = async (motivo: MotivoDeResidente): Promise<string> => {
+    const { rows } = await pool.query<{ id: string }>(
+      `WITH p AS (
+         INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
+                                      nombre_completo, creado_por, actualizado_por)
+         VALUES ($1, 'cedula', $2, 'Residente con rostro', $3, $3) RETURNING id
+       ), r AS (
+         INSERT INTO public.residentes (copropiedad_id, vivienda_id, persona_id, creado_por,
+                                        actualizado_por)
+         SELECT $1, '30000000-0000-4000-8000-000000000001', p.id, $3, $3 FROM p
+         RETURNING persona_id
+       ), v AS (
+         INSERT INTO public.listas_negras (copropiedad_id, persona_id, motivo, creado_por,
+                                           actualizado_por)
+         SELECT $1, r.persona_id, 'Paridad 15-X', $3, $3 FROM r WHERE $4 = 'LISTA_NEGRA'
+         RETURNING persona_id
+       ), c AS (
+         INSERT INTO public.consentimientos_biometricos (copropiedad_id, persona_id,
+                version_politica, canal, estado, otorgado_en, creado_por, actualizado_por)
+         SELECT $1, r.persona_id, 'v1.0', 'presencial',
+                CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN 'pendiente' ELSE 'vigente' END::estado_consentimiento,
+                CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN NULL ELSE now() END, $3, $3 FROM r
+         RETURNING id, persona_id
+       )
+       INSERT INTO public.plantillas_biometricas (copropiedad_id, persona_id, consentimiento_id,
+              calidad, vector_cifrado, llave_ref, algoritmo, suprimir_en, sincronizada_en,
+              estado, creado_por, actualizado_por)
+       SELECT $1, c.persona_id, c.id, 0.9, '\\x0102'::bytea, 'vault:ncr/plantillas/v1',
+              'AES-256-GCM', now() + interval '1 day',
+              CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN NULL ELSE now() END,
+              CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN 'pendiente_consentimiento'
+                   ELSE 'activa' END::estado_plantilla, $3, $3 FROM c
+       RETURNING id`,
+      [COP_A, `RES${randomBytes(4).toString('hex').toUpperCase()}`, ACTOR, motivo],
+    );
+    return rows[0]?.id ?? '';
+  };
+  try {
+    return {
+      PERMITIDO: await uno('PERMITIDO'),
+      SIN_CONSENTIMIENTO: await uno('SIN_CONSENTIMIENTO'),
+      LISTA_NEGRA: await uno('LISTA_NEGRA'),
+    };
   } finally {
     await pool.end();
   }
@@ -195,6 +255,40 @@ describe.skipIf(URL_BASE === undefined)('RN-16 · nube y Edge deciden igual (15-
         ...solicitud,
       });
       expect(esencia(edge.resultado), p.plantillaId).toEqual(esencia(nube));
+    }
+  });
+
+  it('15-X · D1 · el rostro de un residente: su motivo, y el mismo en los dos', async () => {
+    const motor = (app as INestApplication).get<MotorDeDecision>(MOTOR_DE_DECISION);
+    const cache = { vigente: () => instantanea ?? null, guardar: () => false };
+    for (const [motivo, plantillaId] of Object.entries(residentes ?? {})) {
+      const plantilla = instantanea?.plantillas?.find((p) => p.plantillaId === plantillaId);
+      expect(plantilla, motivo).toBeDefined();
+      const solicitud = {
+        personaId: plantilla?.personaId ?? null,
+        placaLeida: null,
+        zonaId: null,
+        confianza: 1,
+      };
+      const nube = await motor.decidir({
+        copropiedadId: COP_A,
+        dispositivoId: CAMARA,
+        metodo: 'facial',
+        ...solicitud,
+      });
+      const edge = new DecidirLocalmente(cache, {
+        copropiedadId: COP_A,
+        contingencia: 'denegar',
+        cacheObsoletaMinutos: 1440,
+      }).decidir({
+        dispositivoId: CAMARA,
+        metodo: 'facial',
+        referenciaExterna: `residente-${plantillaId}`,
+        ocurridoEn: new Date(),
+        ...solicitud,
+      });
+      expect(nube.permitido ? 'PERMITIDO' : nube.motivo, motivo).toBe(motivo);
+      expect(esencia(edge.resultado), motivo).toEqual(esencia(nube));
     }
   });
 

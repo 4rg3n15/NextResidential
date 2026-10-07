@@ -57,6 +57,22 @@ const placaNormalizada = (leida: string | null): string | null => {
 const esDerechoDeResidente = (a: AutorizacionEnCache): boolean => a.id.startsWith('residente:');
 
 /**
+ * 15-X · D1 · el derecho del residente por su ROSTRO (`residente:persona:`):
+ * sólo para un acceso FACIAL de esa persona, como la nube lo pide a
+ * `ResidentesPorPersona`. La instantánea trae a lo sumo uno por persona: la
+ * nube y el Edge lo leen con la misma consulta.
+ */
+const derechoPorRostro = (
+  i: InstantaneaDeReglas,
+  hecho: HechoLocal,
+): AutorizacionEnCache | undefined =>
+  hecho.metodo !== 'facial' || hecho.personaId === null
+    ? undefined
+    : i.autorizaciones.find(
+        (a) => a.id.startsWith('residente:persona:') && a.personaId === hecho.personaId,
+      );
+
+/**
  * Las autorizaciones que la nube leería con `activasParaLectura({placa, persona})`:
  * las de visitante con esa placa o de esa persona, la de vencimiento más tardío
  * primero (el `ORDER BY upper(vigencia) DESC` de la nube).
@@ -94,7 +110,8 @@ export const resolverIdentidad = (
   const visitas = deVisita(instantanea, placa, hecho.personaId);
   return {
     personaId: hecho.personaId,
-    viviendaId: visitas[0]?.viviendaId ?? null,
+    // Como la nube: el residente del rostro antes que la visita.
+    viviendaId: derechoPorRostro(instantanea, hecho)?.viviendaId ?? visitas[0]?.viviendaId ?? null,
     placaConocida: placa !== null && visitas.length > 0,
   };
 };
@@ -196,10 +213,13 @@ export const contextoDesde = (
       ? null
       : identidad.personaId;
   const visitas = deVisita(instantanea, placa, identidad.personaId);
-  const derecho =
-    vehiculo?.vehiculoId === undefined
+  const porRostro = derechoPorRostro(instantanea, hecho);
+  const derecho = [
+    ...(vehiculo?.vehiculoId === undefined
       ? []
-      : instantanea.autorizaciones.filter((a) => a.id === `residente:${vehiculo.vehiculoId}`);
+      : instantanea.autorizaciones.filter((a) => a.id === `residente:${vehiculo.vehiculoId}`)),
+    ...(porRostro === undefined ? [] : [porRostro]),
+  ];
   const autorizaciones = [...derecho, ...visitas]
     .map((a) => autorizacionDesde(a, instantanea.copropiedadId))
     .filter((a): a is Autorizacion => a !== null);
@@ -221,7 +241,9 @@ export const contextoDesde = (
     viviendaActiva:
       vehiculo !== undefined
         ? instantanea.viviendasActivas.includes(vehiculo.viviendaId)
-        : visitas.length > 0,
+        : porRostro !== undefined
+          ? instantanea.viviendasActivas.includes(porRostro.viviendaId)
+          : visitas.length > 0,
     zona:
       hecho.zonaId === null
         ? null

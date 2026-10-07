@@ -75,6 +75,7 @@ const lecturas = (cambios: Partial<LecturasDeReglas> = {}): LecturasDeReglas => 
     { plantillaId: 'p-2', personaId: PERSONA, reconocibleHasta: new Date('2026-10-03T00:00:00Z') },
     { plantillaId: 'p-1', personaId: 'otra', reconocibleHasta: null },
   ],
+  residentesConRostro: [],
   umbralDeConfianza: 0.8,
   ...cambios,
 });
