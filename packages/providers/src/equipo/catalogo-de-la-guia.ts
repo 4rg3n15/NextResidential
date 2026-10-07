@@ -404,6 +404,12 @@ export const RUTAS_DE_LA_GUIA: readonly RutaDeEquipo[] = [
      * J2 (15-L) · la REVERSIÓN del canal de audio. La guía lo llama «Set the
      * audio parameters of one two-way audio channel», paso opcional del flujo;
      * aquí sólo se usa para devolver el canal a como estaba antes de la visita.
+     *
+     * DT-15S1-C07 · el 06/10 el DS-KD9633-WBE6 V2.3.9 contestó `400 · statusCode
+     * 6 · badXmlContent` a este PUT con `enabled=true` (H-15S1-C07): `enabled` no
+     * se escribe en esta familia. La restauración sólo escribe si el documento
+     * cambió; si el equipo lo rechaza queda en `fallo` con su motivo, nunca en un
+     * «restaurado» falso. Falta medir si rechaza también un PUT SIN cambios.
      */
     proposito: 'configurar un canal de audio bidireccional',
     metodo: 'PUT',
