@@ -145,10 +145,10 @@ describe('3 · los ajustes llegan al equipo por el proveedor del Edge', () => {
   it('EQUIPOS_ZONA_HORARIA: la vigencia se escribe en la hora local de ESA zona', async () => {
     const bogota = await altaEnUnaTerminal({});
     await bogota.alta;
-    expect(bogota.persona()?.desde).toBe('2026-10-03T08:00:00');
+    expect(bogota.persona()?.desde).toBe('2026-10-03T07:55:00'); // 15-X · D0 · margen de inicio
     const mexico = await altaEnUnaTerminal({ EQUIPOS_ZONA_HORARIA: 'America/Mexico_City' });
     await mexico.alta;
-    expect(mexico.persona()?.desde).toBe('2026-10-03T07:00:00');
+    expect(mexico.persona()?.desde).toBe('2026-10-03T06:55:00');
   });
 
   it('TERMINAL_PLAN_DE_HORARIO: la puerta de la persona lleva esa plantilla', async () => {

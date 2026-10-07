@@ -69,7 +69,7 @@ describe('el registro UserInfo', () => {
     expect(p.userType).toBe('visitor');
     expect(p.Valid).toEqual({
       enable: true,
-      beginTime: '2026-09-27T09:00:00',
+      beginTime: '2026-09-27T08:55:00', // 15-X · D0 · 5 min de margen (MARGEN_DE_INICIO_S)
       // La vigencia es [desde, hasta): 13:00:00 ya está fuera.
       endTime: '2026-09-27T12:59:59',
       timeType: 'local',
@@ -78,7 +78,7 @@ describe('el registro UserInfo', () => {
 
   it('una vigencia de menos de un segundo no termina antes de empezar', () => {
     const corta = vigencia('2026-09-27T14:00:00.200Z', '2026-09-27T14:00:00.700Z');
-    const p = personaEnElEquipo('p7', corta, null);
+    const p = personaEnElEquipo('p7', corta, null, { margenDeInicioS: 0 });
     expect(p.Valid.enable && p.Valid.endTime).toBe('2026-09-27T09:00:00');
   });
 
@@ -91,7 +91,7 @@ describe('el registro UserInfo', () => {
       personaEnElEquipo('p7', VISITA, 1, { planDeHorario: '65535', zonaHoraria: 'UTC' }),
     ).toMatchObject({
       RightPlan: [{ doorNo: 1, planTemplateNo: '65535' }],
-      Valid: { beginTime: '2026-09-27T14:00:00' },
+      Valid: { beginTime: '2026-09-27T13:55:00' },
     });
   });
 });
@@ -156,7 +156,7 @@ describe('A2 contra el equipo simulado', () => {
     await terminal.sincronizar('t', PLANTILLA, jpegConMedidas(), VISITA);
     expect(personasPor.get('203.0.113.52')?.get(EN_EL_EQUIPO)).toEqual({
       tipo: 'visitor',
-      desde: '2026-09-27T09:00:00',
+      desde: '2026-09-27T08:55:00',
       hasta: '2026-09-27T12:59:59',
       puertas: [1],
     });
