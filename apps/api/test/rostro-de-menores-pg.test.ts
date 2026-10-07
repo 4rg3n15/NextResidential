@@ -11,10 +11,11 @@ import type { Sesion } from './banco-del-hogar-pg';
  * 15-X · D3 · EL ROSTRO DE UN MENOR CONTRA LA BASE REAL (ADR-039, Ley 1581 art. 7)
  *
  * Sólo el titular del hogar (otro adulto, 403) y sólo un menor de SU vivienda
- * (el del vecino, 404) · de 15 a 17 años (14, 400) · consentimiento con el
- * origen del representante y su cuenta como autora · vence al año o a los 18 ·
- * retiro que revoca y retira de los equipos · la baja del menor lo saca de los
- * equipos EN EL ACTO · la bitácora sin bytes ni documento.
+ * (el del vecino, 404) · de 15 a 17 años (14, 400; 15 cumplidos, sí) · sin
+ * una casilla del representante, 400 · consentimiento con el origen del
+ * representante y su cuenta como autora · vence al año o a los 18 · retiro que
+ * revoca y retira de los equipos · la baja del menor lo saca de los equipos EN
+ * EL ACTO · la bitácora sin bytes ni documento.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const {
@@ -54,8 +55,8 @@ describe('15-X · D3 · el rostro de un menor', () => {
   let titular: Sesion = { usuarioId: '', token: '' };
   let adulto: Sesion = { usuarioId: '', token: '' };
   let vecino: Sesion = { usuarioId: '', token: '' };
-  const menores: Record<'de16' | 'de14' | 'de17' | 'delVecino', string> = {
-    de16: '',
+  const menores: Record<'de15' | 'de14' | 'de17' | 'delVecino', string> = {
+    de15: '',
     de14: '',
     de17: '',
     delVecino: '',
@@ -108,7 +109,7 @@ describe('15-X · D3 · el rostro de un menor', () => {
       `arm.${s}`,
       banco.perfil(2),
     );
-    menores.de16 = await registrarMenor(titular.token, nacidoHace(16, 60), 1);
+    menores.de15 = await registrarMenor(titular.token, nacidoHace(15, 30), 1);
     menores.de14 = await registrarMenor(titular.token, nacidoHace(14, 60), 2);
     vecino = await banco.titular(cop.id, await banco.vivienda(cop.id, '12'), `vrm.${s}`);
     await banco.completarAlta(cop.id, vecino.token, banco.perfil(3));
@@ -119,7 +120,7 @@ describe('15-X · D3 · el rostro de un menor', () => {
 
   it('el titular lee el estado con la política del representante; sin caché y sin imagen', async () => {
     if (omitida()) return;
-    const r = await pedir(titular.token, 'get', ruta(menores.de16));
+    const r = await pedir(titular.token, 'get', ruta(menores.de15));
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.headers['cache-control']).toBe('no-store');
     expect(r.body).toMatchObject({
@@ -131,16 +132,16 @@ describe('15-X · D3 · el rostro de un menor', () => {
 
   it('otro adulto del MISMO hogar: 403 en las tres rutas, y no se crea nada', async () => {
     if (omitida()) return;
-    expect((await pedir(adulto.token, 'get', ruta(menores.de16))).status).toBe(403);
-    expect((await pedir(adulto.token, 'post', ruta(menores.de16), cuerpo())).status).toBe(403);
-    expect((await pedir(adulto.token, 'post', `${ruta(menores.de16)}/retiro`)).status).toBe(403);
-    expect(await vivas(menores.de16)).toEqual([]);
+    expect((await pedir(adulto.token, 'get', ruta(menores.de15))).status).toBe(403);
+    expect((await pedir(adulto.token, 'post', ruta(menores.de15), cuerpo())).status).toBe(403);
+    expect((await pedir(adulto.token, 'post', `${ruta(menores.de15)}/retiro`)).status).toBe(403);
+    expect(await vivas(menores.de15)).toEqual([]);
   });
 
   it('el menor de OTRA vivienda no existe para esta ruta: 404 en los dos sentidos', async () => {
     if (omitida()) return;
-    expect((await pedir(vecino.token, 'get', ruta(menores.de16))).status).toBe(404);
-    expect((await pedir(vecino.token, 'post', ruta(menores.de16), cuerpo())).status).toBe(404);
+    expect((await pedir(vecino.token, 'get', ruta(menores.de15))).status).toBe(404);
+    expect((await pedir(vecino.token, 'post', ruta(menores.de15), cuerpo())).status).toBe(404);
     expect((await pedir(titular.token, 'post', ruta(menores.delVecino), cuerpo())).status).toBe(
       404,
     );
@@ -154,7 +155,7 @@ describe('15-X · D3 · el rostro de un menor', () => {
       [adulto.usuarioId],
     );
     expect((await pedir(titular.token, 'get', ruta(String(delAdulto?.id)))).status).toBe(404);
-    expect(await vivas(menores.de16)).toEqual([]);
+    expect(await vivas(menores.de15)).toEqual([]);
     expect(await vivas(menores.delVecino)).toEqual([]);
   });
 
@@ -167,14 +168,25 @@ describe('15-X · D3 · el rostro de un menor', () => {
   });
 
   let plantilla = '';
-  it('con 16: 201, en los equipos, autorizado por el representante, al año, en la bitácora', async () => {
+  it('sin una de las dos casillas del representante: 400, y nada se crea', async () => {
+    if (omitida()) return;
+    for (const campo of ['declaraRepresentacionLegal', 'menorInformadoYDeAcuerdo']) {
+      const sin: Record<string, unknown> = cuerpo();
+      delete sin[campo];
+      const r = await pedir(titular.token, 'post', ruta(menores.de15), sin);
+      expect(r.status, campo).toBe(400);
+    }
+    expect(await vivas(menores.de15)).toEqual([]);
+  });
+
+  it('con 15 cumplidos: 201, en los equipos, autorizado por el representante, al año, en la bitácora', async () => {
     if (omitida()) return;
     const foto = cuerpo();
-    const r = await pedir(titular.token, 'post', ruta(menores.de16), foto);
+    const r = await pedir(titular.token, 'post', ruta(menores.de15), foto);
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(r.body).toMatchObject({ estado: 'activa', equiposConMiRostro: 2 });
     expect(JSON.stringify(r.body)).not.toContain(foto.contenidoBase64.slice(0, 24));
-    const [viva] = await vivas(menores.de16);
+    const [viva] = await vivas(menores.de15);
     plantilla = viva?.id ?? '';
     const dias = ((viva?.suprimir_en.getTime() ?? 0) - Date.now()) / 86_400_000;
     expect(dias).toBeGreaterThan(364);
@@ -200,17 +212,17 @@ describe('15-X · D3 · el rostro de un menor', () => {
       [cop.id],
     );
     expect(hecho).toEqual({
-      detalle: `residente:${menores.de16} politica:${POLITICA_DEL_ROSTRO_DE_MENOR.version}`,
+      detalle: `residente:${menores.de15} politica:${POLITICA_DEL_ROSTRO_DE_MENOR.version}`,
       actor_id: titular.usuarioId,
     });
   });
 
   it('retiro: revoca la autorización y lo saca de los dos equipos en el acto', async () => {
     if (omitida()) return;
-    const r = await pedir(titular.token, 'post', `${ruta(menores.de16)}/retiro`);
+    const r = await pedir(titular.token, 'post', `${ruta(menores.de15)}/retiro`);
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body.estado).toBe('sin_rostro');
-    expect(await vivas(menores.de16)).toEqual([]);
+    expect(await vivas(menores.de15)).toEqual([]);
     expect(terminales.map((t) => espia.retiradas.includes(`${t}/${plantilla}`))).toEqual([
       true,
       true,
@@ -222,7 +234,7 @@ describe('15-X · D3 · el rostro de un menor', () => {
         [plantilla],
       ),
     ).toEqual({ estado: 'revocado' });
-    expect((await pedir(titular.token, 'post', `${ruta(menores.de16)}/retiro`)).status).toBe(404);
+    expect((await pedir(titular.token, 'post', `${ruta(menores.de15)}/retiro`)).status).toBe(404);
   });
 
   it('a punto de cumplir 18: vence ese día, a las 00:00 de Bogotá', async () => {
