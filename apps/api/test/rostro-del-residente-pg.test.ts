@@ -231,9 +231,10 @@ describe('15-X · D2 · mi rostro', () => {
     expect(vigentes.rowCount).toBe(1);
   });
 
-  it('la baja de la cuenta suprime su rostro', async () => {
+  it('la baja de la cuenta suprime su rostro y lo saca de los equipos en el acto', async () => {
     if (omitida()) return;
-    expect(await vivas(vecino.usuarioId)).toHaveLength(1);
+    const [viva] = await vivas(vecino.usuarioId);
+    expect(viva).toBeDefined();
     const baja = await banco.comoSuper(
       'post',
       `/copropiedades/${cop.id}/residentes/cuentas/${vecino.usuarioId}/baja`,
@@ -241,5 +242,10 @@ describe('15-X · D2 · mi rostro', () => {
     );
     expect(baja.status, JSON.stringify(baja.body)).toBeLessThan(300);
     expect(await vivas(vecino.usuarioId)).toEqual([]);
+    // 15-X · sin esperar al barrido de 6 h, como la baja de un menor.
+    expect(terminales.map((t) => espia.retiradas.includes(`${t}/${String(viva?.id)}`))).toEqual([
+      true,
+      true,
+    ]);
   });
 });

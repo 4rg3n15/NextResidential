@@ -34,9 +34,6 @@ export type { ResultadoBarrido } from './aplicacion/casos-de-uso';
 export type { ResultadoCaptura, SolicitudDeCaptura } from './aplicacion/casos-de-uso';
 // F (15-L) · la visita envía su foto a todos los equipos con el mismo caso de uso.
 export { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
-// C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11).
-export { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
-export type { ResultadoDeSupresionPorTitular } from './aplicacion/suprimir-por-titular';
 export type { ResultadoDeSincronizacionTotal } from './aplicacion/sincronizacion-total';
 export {
   BOVEDA_DE_PLANTILLAS,
@@ -61,8 +58,8 @@ export { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';
 /**
  * 15-X · el rostro del RESIDENTE («Mi rostro», D2; el del menor, D3): lo que
  * toca plantillas, bóveda y equipos se queda aquí; el residente pone la puerta.
- * `SuprimirYRetirarYa` saca del equipo, en el acto, el rostro del menor dado
- * de baja.
+ * `SuprimirYRetirarYa` saca del equipo, en el acto, el rostro de la cuenta o
+ * del menor dado de baja (la baja de C9, 15-M, sólo lo suprimía en la base).
  */
 export { RostroDeResidente } from './aplicacion/rostro-de-residente';
 export type {

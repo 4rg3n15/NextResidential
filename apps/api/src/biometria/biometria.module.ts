@@ -28,7 +28,6 @@ import {
 } from './aplicacion/casos-de-uso';
 import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
 import { EnviarPlantillasAEquipo } from './aplicacion/enviar-a-equipo';
-import { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
 import { RetirarPlantillasDeEquipo } from './aplicacion/retirar-de-equipo';
 import { RostroDeResidente } from './aplicacion/rostro-de-residente';
 import { SuprimirYRetirarYa } from './aplicacion/suprimir-y-retirar';
@@ -269,9 +268,8 @@ export class BiometriaModule {
         SincronizarPlantillaEnTerminales,
         EnviarPlantillasAEquipo,
         SuprimirRostroDeAutorizacion,
-        // C9 (15-M) · lo consume el módulo del residente al dar de baja una cuenta.
-        SuprimirPlantillasDeTitular,
-        // 15-X · «Mi rostro» y el rostro del menor; la baja del menor, en el acto.
+        // 15-X · «Mi rostro» y el rostro del menor; la baja de una cuenta o de un
+        // menor saca su rostro de los equipos en el acto (antes C9, 15-M, sólo de la base).
         RostroDeResidente,
         SuprimirYRetirarYa,
         // C4 (15-M) · lo resuelve la baja de un equipo (sin importar este módulo).

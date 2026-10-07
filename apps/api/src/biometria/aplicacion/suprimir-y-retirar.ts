@@ -9,9 +9,9 @@ import type { BovedaDePlantillas, RepositorioPlantillas } from './puertos';
  * La revocación (`RevocarConsentimiento`, A3 de la 15-E) ya suprimía y retiraba
  * de las terminales en el acto. Tres caminos no: el rostro de un residente que
  * se REEMPLAZA, el que se RETIRA sin consentimiento vigente que revocar, y el
- * del menor dado de BAJA (15-W D4), que `SuprimirPlantillasDeTitular` suprime
- * en la base y deja al barrido de 6 h — seis horas en que la terminal sigue
- * reconociendo a quien ya no debe. Esto hace lo mismo que la revocación, sin
+ * de la cuenta o del menor dado de BAJA (C9 de la 15-M, D4 de la 15-W), que la
+ * supresión por titular de entonces borraba de la base y dejaba al barrido de
+ * 6 h — seis horas en que la terminal seguía reconociendo a quien ya no debe. Esto hace lo mismo que la revocación, sin
  * tocar el consentimiento: vector borrado, fila suprimida y, equipo por equipo,
  * la retirada. El que no responde queda en la cola derivada de CA-10 (no se da
  * por retirado lo que sigue en el aparato) y el barrido lo reintenta.

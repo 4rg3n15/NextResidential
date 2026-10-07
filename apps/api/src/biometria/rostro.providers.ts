@@ -22,7 +22,6 @@ import { RevocarConsentimiento } from './aplicacion/casos-de-uso';
 import { PreparacionDeCaptura } from './aplicacion/preparacion-de-captura';
 import { RostroDeResidente } from './aplicacion/rostro-de-residente';
 import { SincronizarPlantillaEnTerminales } from './aplicacion/sincronizacion-total';
-import { SuprimirPlantillasDeTitular } from './aplicacion/suprimir-por-titular';
 import { SuprimirYRetirarYa } from './aplicacion/suprimir-y-retirar';
 import { ReemplazoDeRostroPg } from './infraestructura/reemplazo-de-rostro-pg';
 import { LecturaDeRostrosPg } from './infraestructura/rostros-de-residente-pg';
@@ -56,14 +55,8 @@ export const PROVEEDORES_DEL_ROSTRO: Provider[] = [
     ) => new RevocarConsentimiento(consentimientos, plantillas, boveda, reloj),
   },
   {
-    // C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11).
-    provide: SuprimirPlantillasDeTitular,
-    inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, RELOJ],
-    useFactory: (plantillas: RepositorioPlantillas, boveda: BovedaDePlantillas, reloj: Reloj) =>
-      new SuprimirPlantillasDeTitular(plantillas, boveda, reloj),
-  },
-  {
-    // 15-X · lo mismo, y fuera de los equipos en el acto.
+    // C9 (15-M) · la baja de un residente suprime sus plantillas (RN-11); desde
+    // la 15-X, además, las saca de los equipos en el acto.
     provide: SuprimirYRetirarYa,
     inject: [REPOSITORIO_PLANTILLAS, BOVEDA_DE_PLANTILLAS, RELOJ, BITACORA],
     useFactory: (
