@@ -2,8 +2,8 @@
 -- 100 · CONSENTIMIENTO DECLARADO POR QUIEN REGISTRA · ETAPA 15-L (F4) · ADR-032
 --
 -- Lo que la BASE sostiene por su cuenta, sin la API delante:
---  · el origen del consentimiento sólo admite sus dos valores, y lo que había
---    antes de la 0043 queda como otorgado por el titular;
+--  · el origen del consentimiento sólo admite sus valores (tres desde la 0057,
+--    99m), y lo que había antes de la 0043 queda como otorgado por el titular;
 --  · una declaración sin autor no entra;
 --  · la casilla de la autorización va completa —quién, cuándo, versión— o no va;
 --  · la declaración no se salta la unicidad del consentimiento vigente.
@@ -29,7 +29,7 @@ BEGIN
      WHERE origen = 'declarado_por_quien_registra' AND declarado_por IS NULL),
     'FALLO: hay una declaración sin autor';
 
-  -- 2 · el origen sólo admite sus dos valores --------------------------------
+  -- 2 · el origen sólo admite sus valores -------------------------------------
   BEGIN
     INSERT INTO public.consentimientos_biometricos
       (copropiedad_id, persona_id, version_politica, canal, origen, creado_por, actualizado_por)
