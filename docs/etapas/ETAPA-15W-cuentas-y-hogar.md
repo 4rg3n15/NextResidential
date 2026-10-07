@@ -355,6 +355,7 @@ suspendido con «Reanudar» y el tope por omisión. **App:**
   - `README.md`: la ronda; ADR-037 y ADR-038, 35 en total.
   - Este informe.
   - `docs/ESTADO_ETAPAS.md`: cabecera y ficha.
+  - `package.json` y `pnpm-lock.yaml`: `sharp` ^0.35.5 en `pnpm.overrides`, por un aviso posterior al cierre (§6).
 
 ## 4 · Tabla SOLID
 
@@ -574,6 +575,19 @@ ejecuta.
   - una sonda por corrección, en rojo con su violación.
 - La verificación completa de esa cabeza es la del CI del PR, que corre `verificar-etapa.sh --con-base` en macOS.
 
+**Tras fusionar `develop` con el PR #50** (`2943cd7`; sólo chocó `docs/ESTADO_ETAPAS.md`), `./scripts/verificar-etapa.sh --con-base`, con la base rehecha desde cero, dio el mismo veredicto:
+
+- 31 de 31 pasos, sin ningún ✗;
+- 5365 pruebas de TypeScript (5 saltadas, declaradas: las ejecuta el paso 12b) y 455 de Dart;
+- dominio 96,30 % y aplicación 97,61 % de líneas.
+
+**Después, la CI de esa cabeza cayó en `pnpm audit --prod --audit-level=high`.** El aviso salió después del último verde: **alto** en `sharp` < 0.35.5 (GHSA-wq5f-xc86-pv6w), que llega por `next`, de la consola. `develop` cae en el mismo paso, así que no es de esta ronda, pero bloquea toda fusión. Se acota `sharp` ^0.35.5 en `pnpm.overrides`, como H-13-26 y `c0e7fd7`. Con eso:
+
+- `pnpm audit --prod` no encuentra ninguna vulnerabilidad;
+- la instalación con `--frozen-lockfile` sale limpia;
+- `sharp` 0.35.5 carga desde `next`;
+- la consola compila.
+
 Antes de esta corrida, la base y las suites tocadas se ejecutaron por separado:
 
 - La suite SQL en modo Supabase.
@@ -625,6 +639,7 @@ Transversales (§2.7.8):
   - La IP sólo llega a la bitácora como HMAC (`ip:<16 hex>`, probado).
   - El documento del menor sale enmascarado (`••••5678`, probado) y el del perfil no entra en la bitácora (probado).
   - Esta ronda no añade ninguna línea de log.
+- **Dependencias.** `pnpm audit --prod --audit-level=high` en 0, con `sharp` ^0.35.5 acotada (§6).
 - **Registro público de Supabase Auth.** Debe seguir desactivado: es un paso manual del §9.
 
 ## 8 · Deuda técnica, supuestos y pendientes
@@ -725,3 +740,5 @@ Rama `etapa-15w-cuentas-y-hogar`, desde `develop` (`f605442`) · PR [4rg3n15/Nex
 - cierre: `chore(etapa-15w): cierre de etapa` — este informe y la ficha y cabecera de `docs/ESTADO_ETAPAS.md`
 - `6bc6995` fix(etapa-15w/hogar): las tres observaciones de la revisión del PR — tope omitido, número de plaza y placa con historial
 - y su registro en este informe y en la ficha (`docs(etapa-15w)`)
+- `2943cd7` chore(etapa-15w): fusiona develop (DT-15S1-C02, PR #50) en la ronda 15-W
+- `fix(etapa-15w/dependencias)`: `sharp` ^0.35.5 acotada, con su registro en este informe y en la ficha
