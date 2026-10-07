@@ -37,6 +37,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import next from 'next';
 import { ipDelCliente, proxiesDeConfianza } from './ip-del-cliente.mjs';
+import { filtrarCancelacionesDelCliente } from './cancelaciones-del-cliente.mjs';
 
 const args = process.argv.slice(2);
 const opcion = (corta, larga, porOmision) => {
@@ -54,6 +55,10 @@ const app = next({
   port: puerto,
 });
 await app.prepare();
+// D1 (15-S1) · el navegador que cancela un POST (cambiar de equipo con el video
+// negociándose) no es una excepción no capturada. Tras `prepare`: ahí pone Next
+// sus manejadores de proceso, y el filtro va delante de ellos.
+filtrarCancelacionesDelCliente();
 const manejar = app.getRequestHandler();
 
 const actualizarEnNext = app.getUpgradeHandler();

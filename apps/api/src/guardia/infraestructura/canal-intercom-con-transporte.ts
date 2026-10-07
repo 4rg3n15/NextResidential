@@ -1,5 +1,5 @@
 import type { Bitacora } from '@ncr/domain-core';
-import { soporta } from '@ncr/providers';
+import { CanalDeEquipoNoHabilitado, soporta } from '@ncr/providers';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import type { CanalDeIntercom, EstadoDeCanal } from '../aplicacion/puertos';
 import { SinTransporteDeAudio, TransporteDeAudioNoDisponible } from '../aplicacion/puertos';
@@ -110,6 +110,21 @@ export class CanalIntercomConTransporte implements CanalDeIntercom {
         );
       }
     } catch (error) {
+      /**
+       * H-15S1-C07 · el equipo declara su canal, pero nadie ha atestado que
+       * abra (la casilla de la ficha): no es un fallo del equipo, es la
+       * compuerta humana. El turno vale SIN transporte y el motivo dice qué
+       * marcar, igual que con un equipo que no declara audio. No salió ninguna
+       * petición hacia el canal: el adaptador lo comprueba antes de hablar.
+       */
+      if (error instanceof CanalDeEquipoNoHabilitado) {
+        this.bitacora.registrar('aviso', 'turno de intercom concedido SIN transporte de audio', {
+          dispositivoId,
+          operadorId,
+          motivo: error.message,
+        });
+        return this.conTransporte(turno, clave, operadorId, error.message);
+      }
       await this.turnos.soltar(copropiedadId, dispositivoId, operadorId);
       const motivo = error instanceof Error ? error.message : String(error);
       this.bitacora.registrar('aviso', 'el equipo no abrió el canal de audio; turno liberado', {

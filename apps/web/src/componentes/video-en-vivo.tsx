@@ -178,7 +178,8 @@ export const VideoEnVivo = ({
               {fase.tipo === 'sin_senal' && (
                 <p className="mt-1 text-distintivo text-texto-invertidoApagado">
                   El video se negoció pero el equipo no envía imagen. Si su ficha dice H.265,
-                  cámbielo a H.264; si no, pruebe la conexión del equipo.
+                  cámbielo a H.264 con autorización del cliente; si no, pruebe la conexión del
+                  equipo.
                 </p>
               )}
             </div>

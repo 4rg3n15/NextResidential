@@ -164,7 +164,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
     2. revoque los consentimientos de prueba y compruebe con el `Count` de la biblioteca que la plantilla salió de la terminal y, si recibe plantillas, del videoportero.
 13. **Reversión, equipo por equipo, contra la captura de `antes/`:**
 
-    1. para cada equipo, recorra su tabla de cambios (§8.2 cámara, §8.3 terminal, §8.4 videoportero) y devuelva cada casilla al valor que muestra su fichero de `antes/<equipo>/` —`…entranceParam…`, `…triggers-vehicledetection…` y `…httpHosts…` en la cámara; `…AcsCfg…` en la terminal; `…TwoWayAudio…` en el videoportero—;
+    1. para cada equipo, recorra su tabla de cambios (§8.2 cámara, §8.3 terminal, §8.4 videoportero) y devuelva cada casilla al valor que muestra su fichero de `antes/<equipo>/` —`…entranceParam…`, `…triggers-vehicledetection…` y `…httpHosts…` en la cámara; `…AcsCfg…` en la terminal; `…TwoWayAudio…` en el videoportero— (el canal de audio el sistema no lo escribe, H-15S1-C07: si `diff` lo marca, lo cambió alguien en el panel del equipo, y este firmware rechaza escribir `enabled`);
     2. capture el resultado: `node --env-file=apps/api/.env scripts/puesta-en-marcha-equipos.mjs --sin-accionar --capturar=$HOME/ncr-sitio/despues`;
     3. compare, equipo por equipo: `diff -r $HOME/ncr-sitio/antes/camara $HOME/ncr-sitio/despues/camara` (y `terminal`, `videoportero`). Sólo pueden cambiar la hora del equipo y los ficheros de la carga de prueba (llevan un identificador nuevo en cada corrida). **Cualquier otra diferencia es una casilla sin revertir**: vuelva al punto 1 con ese equipo. Si los números de los ficheros no casan (el guion preguntó otra cosa porque el equipo contestó distinto), compare por el nombre de la ruta, que va en el nombre del fichero;
     4. si una casilla no puede volver a su valor previo (p. ej. la cámara debe quedarse sin decidir por su cuenta), anótelo en la hoja como decisión, no como olvido.
@@ -253,17 +253,35 @@ segura —callar un timbre cuesta menos que escribir un evento irreversible—. 
 el adaptador **cuenta** cuántos descartó, porque esa cifra es lo que distingue
 «el videoportero está mudo» de «volcó cuatrocientos y los tiramos todos».
 
-### TwoWayAudio existe, con G.711 µ-law, y está **deshabilitado**
+### TwoWayAudio existe, con G.711 µ-law, y declara `enabled: false` —que **no** es un interruptor—
 
-El canal está presente en el equipo y el códec es G.711 µ-law, pero el canal
-viene con `enabled: false`.
+El canal está presente en el equipo y el códec es G.711 µ-law; el canal viene
+con `enabled: false`.
+
+> **Corrección 15-S1 (06/10/2026) · H-15S1-C07.** Esta sección decía que
+> habilitar el canal era un paso de puesta en marcha. **Ese paso no existe en
+> este firmware.** Medido con `curl --digest` contra el DS-KD9633-WBE6 V2.3.9:
+>
+> | Petición                                                    | Respuesta                               |
+> | ----------------------------------------------------------- | --------------------------------------- |
+> | `GET /ISAPI/System/TwoWayAudio/channels/1`                  | `<enabled>false</enabled>`, `G.711ulaw` |
+> | `PUT /ISAPI/System/TwoWayAudio/channels/1` (`enabled=true`) | `400 · statusCode 6 · badXmlContent`    |
+> | `PUT /ISAPI/System/TwoWayAudio/channels/1/open`             | `200` con `<sessionId>`                 |
+> | `PUT /ISAPI/System/TwoWayAudio/channels/1/close`            | `statusCode 1 · OK`                     |
+>
+> El equipo declara el canal con `enabled=false`, no deja escribirlo y lo abre
+> igual. Desde la 15-S1 el canal **declarado** es la capacidad ([SUPUESTO]
+> S-15S1-01: `enabled` no es un interruptor configurable en esta familia; la
+> prueba real es abrir la sesión, que suelta el turno y falla de forma honesta
+> si el equipo no abre), y la compuerta es humana: la casilla de la ficha
+> **«comprobé en sitio que el equipo abre el canal de audio (atestación)»**
+> (§8.4). Ese `curl` se hizo con `admin`: en sitio se repite con el **usuario de
+> servicio** (§8.4, paso 1).
 
 **Lo que significa para ADR-01:** la decisión no se reabre —la capacidad está
-ahí— pero **habilitar el canal es un paso de puesta en marcha**, con nombre y
-dueño, no un detalle que el adaptador resuelva por su cuenta. Y hasta que
-alguien lo habilite y se mida, **KPI-33 (audio y video < 2 s) no tiene cifra**:
-el proveedor simulado no produce una que signifique nada, y publicarla sería
-peor que no tenerla (misma decisión que en la ETAPA 10).
+ahí—. Y hasta que se mida, **KPI-33 (audio y video < 2 s) no tiene cifra**: el
+proveedor simulado no produce una que signifique nada, y publicarla sería peor
+que no tenerla (misma decisión que en la ETAPA 10).
 
 ### Lo que falta para cerrar esta sección
 
@@ -934,20 +952,30 @@ revocación se ejerce **retirando la plantilla**. Es más débil y hay que decir
 así: entre que la vigencia vence y que la supresión llega, el equipo abre. Mida
 esa ventana y anótela.
 
-### 8.4 · Videoportero · **habilitar el canal de audio**
+### 8.4 · Videoportero y terminal facial · **atestar el canal de audio**
 
-Está **deshabilitado en el equipo** —medido el 18/09/2026, junto con que lo
-soporta con G.711 µ-law—. El adaptador está escrito y **no lo habilita**: un
-adaptador que encendiera por su cuenta una vía de audio hacia la calle sería una
-decisión de seguridad tomada por el código.
+_Corregido en la 15-S1 (H-15S1-C07)._ Hasta el 06/10 esta sección pedía
+**habilitar** el canal en el equipo. No hay dónde: el DS-KD9633-WBE6 V2.3.9 lo
+declara con `enabled=false`, rechaza escribirlo (`400 badXmlContent`) y lo abre
+igual. El sistema **no escribe nada** en el canal de audio. Que la guardia hable
+por un equipo lo decide una persona que lo **comprobó en sitio**: la casilla de
+su ficha, que queda en la auditoría del equipo («audio habilitado»). Sin ella,
+la guardia obtiene el turno **sin transporte** y la consola dice qué marcar.
 
-| #   | Qué hacer                                                         | Estado previo (anótelo) |
-| --- | ----------------------------------------------------------------- | ----------------------- |
-| 1   | **Habilitar** el canal de audio bidireccional en la configuración |                         |
-| 2   | Anotar el **códec** y la frecuencia de muestreo que negocia       |                         |
-| 3   | Comprobar si es **semiduplex** o duplex completo                  |                         |
-| 4   | Medir la latencia extremo a extremo (KPI-33 · < 2 s)              |                         |
-| 5   | Probar qué pasa si **dos operadores** lo piden a la vez           |                         |
+**15-S1 · B:** la guardia habla también por la **terminal facial** si declara
+un canal (por capacidad, nunca por tipo, ADR-019). Sus rutas de audio están
+declaradas por analogía documentada y **no medidas** en la DS-K1T344MBFWX-E1
+([SUPUESTO] S-15S1-02): la tabla vale igual para ella.
+
+| #   | Qué hacer                                                                                                                                                                                                                       | Resultado (anótelo) |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | Con el **usuario de servicio** (nunca `admin`): `GET …/TwoWayAudio/channels`, `PUT …/channels/<id>/open` y `PUT …/channels/<id>/close`. Anote los tres códigos. Si `open` no da `200` con `sessionId`, **no** marque la casilla |                     |
+| 2   | Ficha del equipo → **«Probar conexión»**: el hallazgo «canal de audio bidireccional» dice el canal y el formato declarados                                                                                                      |                     |
+| 3   | Marcar en la ficha **«comprobé en sitio que el equipo abre el canal de audio (atestación)»** y guardar                                                                                                                          |                     |
+| 4   | Anotar el **códec** y la frecuencia de muestreo que negocia                                                                                                                                                                     |                     |
+| 5   | Comprobar si es **semiduplex** o duplex completo                                                                                                                                                                                |                     |
+| 6   | Medir la latencia extremo a extremo (KPI-33 · < 2 s), hablando y escuchando                                                                                                                                                     |                     |
+| 7   | Probar qué pasa si **dos operadores** lo piden a la vez                                                                                                                                                                         |                     |
 
 Hasta que (2) y (3) estén medidos, el transporte del audio **lanza en vez de
 devolver silencio**, y la consola sigue usando el simulado. Devolver silencio
@@ -962,8 +990,8 @@ tabla del ADR midió contra el simulado; **la cifra que vale es ésta**.
 
 | #   | Qué hacer                                                                                                                                                                                                                                                                                                                                                        | Resultado (anótelo) |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| 1   | **Leer las capacidades** desde la ficha del equipo (Dispositivos → ficha → «Probar conexión»): canal de audio, códec, muestreo, si está habilitado. Nada se supone por modelo.                                                                                                                                                                                   |                     |
-| 2   | Si sale **«canal no habilitado»**: habilitarlo en el equipo (paso 1 de la tabla de arriba) y volver a leer. El sistema no lo habilita por su cuenta.                                                                                                                                                                                                             |                     |
+| 1   | **Leer las capacidades** desde la ficha del equipo (Dispositivos → ficha → «Probar conexión»): canal de audio declarado, códec y muestreo. `enabled=false` **no** es un «no» (H-15S1-C07). Nada se supone por modelo.                                                                                                                                            |                     |
+| 2   | Si la guardia dice **«deshabilitado para la guardia»**: nadie ha atestado el canal. Haga los pasos 1 a 3 de §8.4 y vuelva a pedir el turno. El sistema no escribe nada en el equipo.                                                                                                                                                                             |                     |
 | 3   | Con `GUARDIA_AUDIO_TRANSPORTE=websocket` (el valor por omisión), abrir la guardia, atender una llamada y pulsar **«Hablar»**: la escucha empieza sola; «Mantener para hablar» transmite.                                                                                                                                                                         |                     |
 | 4   | **Medir < 2 s** (KPI-33, CA-19). El banco `e2e/medir-audio-guardia.mjs` mide contra el SIMULADO, no contra el equipo: en sitio, grabe con un teléfono puesto entre el altavoz del videoportero y el del puesto de guardia y dé una palmada en cada punta; la distancia entre las dos palmadas en la grabación es la latencia de cada sentido ([SUPUESTO] S-180). |                     |
 | 5   | Segundo operador a la vez: debe quedar **en cola**; con otro cliente usando el canal, la consola dice **«canal ocupado»** (`0x40002068`).                                                                                                                                                                                                                        |                     |

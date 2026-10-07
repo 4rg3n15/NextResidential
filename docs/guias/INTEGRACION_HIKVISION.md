@@ -52,16 +52,16 @@ seguir.
 
 ## 1 · Inventario y prerrequisitos
 
-| Elemento                  | Requisito                                                                                                                                                                     |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cámara LPR con barrera    | Firmware con ISAPI `Traffic`/`ITC` y `Parking/barrierGate` (la ruta de la barrera está **VERIFICADA**). `ctrlMode` accesible                                                  |
-| Terminal facial           | ISAPI `AccessControl` con `remoteCheckDoorEnabled` en `AcsCfg` (15-K, H-SITIO-05) y biblioteca `FDLib`. **DOCUMENTADO**                                                       |
-| Videoportero              | ISAPI `TwoWayAudio` (G.711 µ-law, **VERIFICADO** que existe y estaba deshabilitado), `VideoIntercom` (llamada), RTSP en el canal 1. `callSignal` sólo si el equipo lo declara |
-| Red                       | **IP fija** en cada equipo; el servidor de Next Control en la **misma red** o alcanzable por el Edge; VLAN de equipos recomendada (H-15-1)                                    |
-| Puertos hacia los equipos | HTTP ISAPI (80 o el configurado), RTSP 554 desde la máquina de go2rtc                                                                                                         |
-| Puertos hacia la API      | El de la API (3000 por omisión) desde la cámara (servidor de alarma); `webrtc.listen` de go2rtc (8555) desde el navegador                                                     |
-| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0039 incluida)                                                    |
-| Consola y app             | Consola por `http://<IP>:3100` (video sí; micrófono no sin TLS) o por `https`, con `API_URL=http://127.0.0.1:3000`; app con `--dart-define=API_URL=http://<IP>:3000`          |
+| Elemento                  | Requisito                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cámara LPR con barrera    | Firmware con ISAPI `Traffic`/`ITC` y `Parking/barrierGate` (la ruta de la barrera está **VERIFICADA**). `ctrlMode` accesible                                                                                                                                                                                                                  |
+| Terminal facial           | ISAPI `AccessControl` con `remoteCheckDoorEnabled` en `AcsCfg` (15-K, H-SITIO-05) y biblioteca `FDLib`. **DOCUMENTADO**. 15-S1 · B: audio con la guardia por `TwoWayAudio` **si lo declara**, por sus propias rutas (documentadas por analogía, **no medidas** en la DS-K1T344MBFWX-E1, S-15S1-02); su llamada a la central es el evento 5/51 |
+| Videoportero              | ISAPI `TwoWayAudio` (G.711 µ-law; declara `enabled=false`, **no** deja escribirlo —`400 badXmlContent`— y abre igual: **VERIFICADO** el 06/10, H-15S1-C07; la compuerta es la atestación de la ficha), `VideoIntercom` (llamada), RTSP en el canal 1. `callSignal` sólo si el equipo lo declara                                               |
+| Red                       | **IP fija** en cada equipo; el servidor de Next Control en la **misma red** o alcanzable por el Edge; VLAN de equipos recomendada (H-15-1)                                                                                                                                                                                                    |
+| Puertos hacia los equipos | HTTP ISAPI (80 o el configurado), RTSP 554 desde la máquina de go2rtc                                                                                                                                                                                                                                                                         |
+| Puertos hacia la API      | El de la API (3000 por omisión) desde la cámara (servidor de alarma); `webrtc.listen` de go2rtc (8555) desde el navegador                                                                                                                                                                                                                     |
+| Máquina de la API         | Node según `.nvmrc`, pnpm, `go2rtc` si va a haber video, Supabase alcanzable con las migraciones aplicadas (0039 incluida)                                                                                                                                                                                                                    |
+| Consola y app             | Consola por `http://<IP>:3100` (video sí; micrófono no sin TLS) o por `https`, con `API_URL=http://127.0.0.1:3000`; app con `--dart-define=API_URL=http://<IP>:3000`                                                                                                                                                                          |
 
 Antes de nada: `VALIDACION_HIKVISION_EN_SITIO.md` §1 (qué NO hacer, la red de
 seguridad, variables de la sesión).
@@ -202,8 +202,17 @@ idempotencia (RN-17). El equipo también admite JSON por parte
 
 **Estado previo anotado** (`VALIDACION_HIKVISION_EN_SITIO.md` §8.4).
 
-1. **Habilite el canal de audio** en el equipo (estaba deshabilitado,
-   **VERIFICADO**). La API no lo habilita sola.
+1. **Atestación del canal de audio** (H-15S1-C07, 15-S1). No hay nada que
+   habilitar: el DS-KD9633-WBE6 V2.3.9 declara el canal con `enabled=false`,
+   rechaza escribirlo (`400 badXmlContent`) y lo abre igual (**VERIFICADO** el
+   06/10). Con el **usuario de servicio**, compruebe `open` y `close`, y marque
+   en la ficha «comprobé en sitio que el equipo abre el canal de audio
+   (atestación)» (`VALIDACION_HIKVISION_EN_SITIO.md` §8.4). Sin la casilla, la
+   guardia obtiene el turno **sin transporte** y la consola dice qué marcar.
+   La API no escribe nada en el canal. **Lo mismo vale para la terminal
+   facial** que declare canal (15-S1 · B): habla por las rutas de SU familia, y
+   su llamada a la central (5/51) entra en la cola como **llamada** con esa
+   terminal propuesta para audio y video.
 2. **Llamada** (A4): el equipo emite `CallInfo`/`VideoIntercomEvent` por el
    flujo de eventos; la API resuelve la vivienda por edificio y unidad y avisa
    a portería y guardia por SSE (tema `llamadas`) como **llamada, no acceso**.
@@ -220,8 +229,12 @@ idempotencia (RN-17). El equipo también admite JSON por parte
    `POST /copropiedades/<cop>/guardia/video/<equipo>/whep`; la API construye
    `rtsp://<usuario>:<clave>@<host>:<VIDEO_PUERTO_RTSP>/Streaming/Channels/<canal>`
    **sólo en `packages/providers`** (S-46), la registra en go2rtc y devuelve la
-   respuesta SDP. El canal es el **«Canal de video»** de la ficha del equipo
-   (vacío = `102`, el subflujo; 15-L C2): se cambia desde la consola, sin
+   respuesta SDP. El canal es el **«Canal de video»** de la ficha si el equipo
+   lo **declara**; si no, uno de los que declara —el subflujo `x02` si lo hay—
+   (15-N V2), y la ficha lo **avisa** con el hallazgo «canal de video de la
+   ficha»: cuál tenía, que el equipo no lo declara y cuál se usará (15-S1 · C.3).
+   Si la lista de flujos no se pudo leer, el hallazgo lo dice con el motivo y el
+   canal de la ficha va sin contrastar. Se cambia desde la consola, sin
    reiniciar. La consola muestra **negociación** y **primer cuadro** en
    milisegundos (KPI-33 < 2 s), y los estados «cargando», «sin señal» (no
    llegó cuadro en 8 s) y «error».
@@ -229,9 +242,14 @@ idempotencia (RN-17). El equipo también admite JSON por parte
    **Códec (15-L D2).** «Probar conexión» le pregunta al equipo, con un
    `DESCRIBE` de RTSP, qué entrega en ese canal. Si es **H.265**, la ficha lo
    dice («entrega H.265 y el navegador no lo reproduce: cámbielo a H.264…») y
-   la guardia no abre un reproductor negro. Se corrige en el panel web del
-   equipo (Configuración → Video/Audio → codificación del subflujo) o eligiendo
-   otro canal en la ficha.
+   la guardia no abre un reproductor negro. Desde la 15-S1 (C.2) basta con que
+   el equipo **declare** ese códec para el canal elegido: el video se niega
+   **antes** de llamar al puente, con el canal y «requiere autorización del
+   cliente». La cámara LPR del conjunto (DS-TCG405-E V5.4.0) declara un solo
+   canal, el `101`, en **H.265** (06/10). Se corrige en el panel web del equipo
+   (Configuración → Video/Audio → codificación), **con la autorización del
+   cliente**, o eligiendo otro canal en la ficha. El código **nunca** cambia el
+   códec ni otro parámetro de la cámara.
 
    **go2rtc en el Mac (15-L D1): un comando.**
 
@@ -291,20 +309,20 @@ la 15-E:
 
 ### 8.2 · De la API hacia el equipo (por el proveedor, nunca desde el navegador)
 
-| Propósito                                     | Ruta ISAPI                                                                                                    | Familia                        | Procedencia    |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------- |
-| Identidad y capacidades                       | `GET /ISAPI/System/deviceInfo` · `GET /ISAPI/System/capabilities`                                             | todas                          | documentada    |
-| Quién controla la barrera                     | `GET /ISAPI/ITC/Entrance/entranceParam`                                                                       | cámara                         | guía oficial   |
-| Accionar la barrera                           | `PUT /ISAPI/Parking/channels/{canal}/barrierGate`                                                             | cámara                         | **verificada** |
-| Estado de la barrera                          | `GET …/barrierGate/barrierGateStatus`                                                                         | cámara                         | guía oficial   |
-| Escuchar eventos (terminal, videoportero)     | `GET /ISAPI/Event/notification/alertStream` o `POST …/subscribeEvent` según capacidad                         | comunes                        | documentada    |
-| ¿Espera el veredicto? / fijarlo               | `GET`/`PUT /ISAPI/AccessControl/AcsCfg?format=json`                                                           | terminal                       | documentada    |
-| Responder la verificación remota              | `PUT /ISAPI/AccessControl/remoteCheck?format=json`                                                            | terminal                       | documentada    |
-| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfoDetail/Delete`       | terminal                       | documentada    |
-| Abrir la puerta                               | `PUT /ISAPI/AccessControl/RemoteControl/door/{canal}`                                                         | terminal, videoportero         | documentada    |
-| Canal de audio: canales, abrir, audio, cerrar | `GET …/TwoWayAudio/channels` · `PUT …/{canal}/open` · `PUT`/`GET …/{canal}/audioData` · `PUT …/{canal}/close` | videoportero                   | documentada    |
-| Contestar o colgar (sólo si lo declara)       | `PUT /ISAPI/VideoIntercom/callSignal?format=json`                                                             | videoportero                   | documentada    |
-| Video (lo consume go2rtc, no la API)          | `rtsp://…:554/Streaming/Channels/102`                                                                         | cámara, terminal, videoportero | S-46           |
+| Propósito                                     | Ruta ISAPI                                                                                                    | Familia                            | Procedencia    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------- |
+| Identidad y capacidades                       | `GET /ISAPI/System/deviceInfo` · `GET /ISAPI/System/capabilities`                                             | todas                              | documentada    |
+| Quién controla la barrera                     | `GET /ISAPI/ITC/Entrance/entranceParam`                                                                       | cámara                             | guía oficial   |
+| Accionar la barrera                           | `PUT /ISAPI/Parking/channels/{canal}/barrierGate`                                                             | cámara                             | **verificada** |
+| Estado de la barrera                          | `GET …/barrierGate/barrierGateStatus`                                                                         | cámara                             | guía oficial   |
+| Escuchar eventos (terminal, videoportero)     | `GET /ISAPI/Event/notification/alertStream` o `POST …/subscribeEvent` según capacidad                         | comunes                            | documentada    |
+| ¿Espera el veredicto? / fijarlo               | `GET`/`PUT /ISAPI/AccessControl/AcsCfg?format=json`                                                           | terminal                           | documentada    |
+| Responder la verificación remota              | `PUT /ISAPI/AccessControl/remoteCheck?format=json`                                                            | terminal                           | documentada    |
+| Persona, plantilla, conteo, supresión         | `UserInfo/Record` · `FDLib/FDSetUp` · `FDLib/Count` · `FDLib/FDSearch/Delete` · `UserInfoDetail/Delete`       | terminal                           | documentada    |
+| Abrir la puerta                               | `PUT /ISAPI/AccessControl/RemoteControl/door/{canal}`                                                         | terminal, videoportero             | documentada    |
+| Canal de audio: canales, abrir, audio, cerrar | `GET …/TwoWayAudio/channels` · `PUT …/{canal}/open` · `PUT`/`GET …/{canal}/audioData` · `PUT …/{canal}/close` | videoportero, terminal (S-15S1-02) | documentada    |
+| Contestar o colgar (sólo si lo declara)       | `PUT /ISAPI/VideoIntercom/callSignal?format=json`                                                             | videoportero                       | documentada    |
+| Video (lo consume go2rtc, no la API)          | `rtsp://…:554/Streaming/Channels/<canal declarado>` (`101` en la cámara del conjunto)                         | cámara, terminal, videoportero     | S-46           |
 
 El catálogo completo, con lo que hay que confirmar en sitio de cada ruta, es
 `packages/providers/src/equipo/catalogo-de-rutas.ts`, y el guion `--sin-accionar`
@@ -374,24 +392,26 @@ elididos**.
 
 ## 10 · Diagnóstico de fallos frecuentes
 
-| Síntoma                                                      | Causa probable                                                 | Qué hacer                                                                                                                                    |
-| ------------------------------------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `credenciales` en el guion o en «Probar conexión»            | Digest rechazado                                               | **No insista**: el equipo bloquea la cuenta. Confirme el usuario de servicio en el panel del equipo                                          |
-| La cámara publica y la API responde `200` pero no hay evento | Secreto u origen no declarados (`ALARM_SERVER_EQUIPOS`)        | El receptor responde `200` siempre y registra «origen no declarado» en bitácora; corrija la declaración                                      |
-| Dos eventos por una lectura                                  | La cámara reenvió porque no recibió `200` a tiempo             | Compruebe la latencia de la API y el `Connection: close`; el segundo se descarta por idempotencia, mire la bitácora                          |
-| Lectura correcta y motivo `CONFIANZA_INSUFICIENTE`           | Confianza bajo el umbral (P-02: 80 en la escala del evento)    | Es el diseño (CU-01 3a): decide el portero con motivo. Si todas las lecturas caen, revise encuadre e iluminación                             |
-| La talanquera no responde                                    | Bloqueo de acceso vigente, relé sin responder o `ctrlMode ≠ 1` | Bloqueos en `/guardia/bloqueo`; historial de órdenes con su desenlace; ficha de la cámara                                                    |
-| La terminal reconoce y **abre sola**                         | `remoteCheck = false`                                          | Ficha → corrección «verificación remota». Hasta entonces es hallazgo de bloqueo                                                              |
-| La terminal reconoce y **no abre nunca**                     | La API no está suscrita (no hay escucha) o no respondió        | Bitácora: «escucha abierta» para ese equipo; `PROVEEDOR_DE_EQUIPOS` no puede ser `simulado`; equipo `activo` y con capacidad                 |
-| Plantilla «sincronizada» y la terminal no reconoce           | El conteo no subió (la API lo habría dicho) o la calidad       | Biometría → seguimiento por terminal; sincronización total; conteo `FDLib/Count` en la ficha                                                 |
-| Revocado y la terminal sigue reconociendo                    | Retirada pendiente                                             | `porRetirar` en el seguimiento; el trabajo de retirada reintenta; si persiste, suprima desde la terminal y anótelo como FALLA                |
-| «tienes la palabra y no hay audio»                           | Canal de audio deshabilitado o capacidad `no`/`desconocida`    | Habilite el canal en el equipo (§6.1) y vuelva a sondear la ficha                                                                            |
-| Audio con ruido                                              | Formato distinto del anunciado                                 | La consola decodifica lo que el equipo declara (`X-Formato-De-Audio`); compare con el códec del panel                                        |
-| Canal ocupado                                                | Exclusividad                                                   | Es el diseño: cola con puesto y liberación por timeout; un segundo operador espera                                                           |
-| Video: «Vista en vivo no desplegada»                         | Falta `GO2RTC_URL`                                             | Configúrelo en la API y reinicie; el arranque anuncia el puente                                                                              |
-| Video: «El puente de video no responde» (502)                | go2rtc caído, RTSP incorrecto (S-46) o clave rotada            | `pnpm sitio:video` en pie; si el subflujo no existe, «Canal de video» `101` en la ficha (sin reiniciar); el `PUT` reemplaza la fuente (S-47) |
-| Video negocia y no llega cuadro («sin señal»)                | ICE: el navegador no alcanza `webrtc.listen`, o H.265          | `VIDEO_IP_ANUNCIADA` con la IP correcta y `pnpm sitio:video` de nuevo; puerto 8555 abierto; misma red; «Probar conexión» dice el códec       |
-| Reloj desincronizado                                         | Eventos con hora futura o pasada                               | NTP en los equipos; la ficha lo señala; las vigencias se evalúan con el reloj de la API                                                      |
+| Síntoma                                                      | Causa probable                                                                                             | Qué hacer                                                                                                                                                             |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `credenciales` en el guion o en «Probar conexión»            | Digest rechazado                                                                                           | **No insista**: el equipo bloquea la cuenta. Confirme el usuario de servicio en el panel del equipo                                                                   |
+| La cámara publica y la API responde `200` pero no hay evento | Secreto u origen no declarados (`ALARM_SERVER_EQUIPOS`)                                                    | El receptor responde `200` siempre y registra «origen no declarado» en bitácora; corrija la declaración                                                               |
+| Dos eventos por una lectura                                  | La cámara reenvió porque no recibió `200` a tiempo                                                         | Compruebe la latencia de la API y el `Connection: close`; el segundo se descarta por idempotencia, mire la bitácora                                                   |
+| Lectura correcta y motivo `CONFIANZA_INSUFICIENTE`           | Confianza bajo el umbral (P-02: 80 en la escala del evento)                                                | Es el diseño (CU-01 3a): decide el portero con motivo. Si todas las lecturas caen, revise encuadre e iluminación                                                      |
+| La talanquera no responde                                    | Bloqueo de acceso vigente, relé sin responder o `ctrlMode ≠ 1`                                             | Bloqueos en `/guardia/bloqueo`; historial de órdenes con su desenlace; ficha de la cámara                                                                             |
+| La terminal reconoce y **abre sola**                         | `remoteCheck = false`                                                                                      | Ficha → corrección «verificación remota». Hasta entonces es hallazgo de bloqueo                                                                                       |
+| La terminal reconoce y **no abre nunca**                     | La API no está suscrita (no hay escucha) o no respondió                                                    | Bitácora: «escucha abierta» para ese equipo; `PROVEEDOR_DE_EQUIPOS` no puede ser `simulado`; equipo `activo` y con capacidad                                          |
+| Plantilla «sincronizada» y la terminal no reconoce           | El conteo no subió (la API lo habría dicho) o la calidad                                                   | Biometría → seguimiento por terminal; sincronización total; conteo `FDLib/Count` en la ficha                                                                          |
+| Revocado y la terminal sigue reconociendo                    | Retirada pendiente                                                                                         | `porRetirar` en el seguimiento; el trabajo de retirada reintenta; si persiste, suprima desde la terminal y anótelo como FALLA                                         |
+| «tienes la palabra y no hay audio»                           | Nadie atestó el canal («deshabilitado para la guardia»), o el equipo no declara canal (`no`/`desconocida`) | Compruebe `open`/`close` con el usuario de servicio y marque la atestación en la ficha (§6.1); vuelva a sondear la ficha                                              |
+| Video: «el equipo no tiene el canal 102» (RTSP 412)          | La ficha guarda un canal que el equipo no declara                                                          | «Probar conexión»: el hallazgo «canal de video de la ficha» dice cuál se usará; si dice «no se pudo contrastar», pruebe la lista de flujos con el usuario de servicio |
+| Video: «el equipo entrega H.265 en el canal 101»             | El canal elegido declara H.265                                                                             | Cambiar ese flujo a H.264 en el equipo, **con autorización del cliente**; el código no lo cambia                                                                      |
+| Audio con ruido                                              | Formato distinto del anunciado                                                                             | La consola decodifica lo que el equipo declara (`X-Formato-De-Audio`); compare con el códec del panel                                                                 |
+| Canal ocupado                                                | Exclusividad                                                                                               | Es el diseño: cola con puesto y liberación por timeout; un segundo operador espera                                                                                    |
+| Video: «Vista en vivo no desplegada»                         | Falta `GO2RTC_URL`                                                                                         | Configúrelo en la API y reinicie; el arranque anuncia el puente                                                                                                       |
+| Video: «El puente de video no responde» (502)                | go2rtc caído, RTSP incorrecto (S-46) o clave rotada                                                        | `pnpm sitio:video` en pie; si el subflujo no existe, «Canal de video» `101` en la ficha (sin reiniciar); el `PUT` reemplaza la fuente (S-47)                          |
+| Video negocia y no llega cuadro («sin señal»)                | ICE: el navegador no alcanza `webrtc.listen`, o H.265                                                      | `VIDEO_IP_ANUNCIADA` con la IP correcta y `pnpm sitio:video` de nuevo; puerto 8555 abierto; misma red; «Probar conexión» dice el códec                                |
+| Reloj desincronizado                                         | Eventos con hora futura o pasada                                                                           | NTP en los equipos; la ficha lo señala; las vigencias se evalúan con el reloj de la API                                                                               |
 
 ## 11 · Vuelta al simulado sin parar y puesta en marcha por fases
 

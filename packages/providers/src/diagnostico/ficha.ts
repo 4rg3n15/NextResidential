@@ -4,6 +4,7 @@ import { IMAGENES } from '../camara/receptor-en-el-equipo';
 import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { hallazgoDeRostros } from './hallazgo-de-rostros';
+import { hallazgoDelCanalDeVideo } from './hallazgo-del-canal-de-video';
 import { comoPasarAH264 } from '../nucleo/errores';
 
 /**
@@ -215,17 +216,21 @@ const hallazgosDeVideoportero = (c: CapacidadesDeEquipo): HallazgoDelEquipo[] =>
           ? 'declarado'
           : `canal ${String(c.audioBidireccional.canal)}` +
             (c.audioBidireccional.formato === null ? '' : ` · ${c.audioBidireccional.formato}`),
+      // H-15S1-C07 · el canal DECLARADO es la capacidad: `enabled` no es un
+      // interruptor en esta familia. Lo atesta una persona, en la ficha.
       detalle:
-        'El equipo declara un canal de audio habilitado: la guardia virtual tiene voz (ADR-01)',
+        'El equipo declara un canal de audio bidireccional; el equipo no expone un interruptor ' +
+        'que el sistema pueda leer. La guardia habla cuando una persona marca en la ficha ' +
+        '«comprobé en sitio que el equipo abre el canal de audio» (ADR-01)',
     },
     no: {
       estado: 'aviso',
       detalle:
-        'Ningún canal de audio habilitado: la guardia virtual verá pero no hablará. Habilítelo en ' +
-        'el equipo y vuelva a sondear; si el modelo no lo trae, es la contingencia del ADR-01',
+        'El equipo no declara ningún canal de audio bidireccional: la guardia virtual verá pero ' +
+        'no hablará. Si el modelo no lo trae, es la contingencia del ADR-01',
     },
     desconocida: 'No se pudo leer si el equipo tiene canales de audio bidireccional',
-    valorCorrecto: 'al menos un canal habilitado',
+    valorCorrecto: 'al menos un canal declarado',
   }),
   desdeCapacidad('señalización de llamada', c.senalizacionDeLlamada, {
     si: {
@@ -341,6 +346,13 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
   );
 };
 
+/** El video y, C.3 (15-S1), su canal contrastado con lo que el equipo declara. */
+const hallazgosDelVideo = (d: DiagnosticoDeEquipo): HallazgoDelEquipo[] => {
+  if (d.video === undefined) return [];
+  const canal = hallazgoDelCanalDeVideo(d.video, d.capacidadesDelEquipo?.video.canales);
+  return canal === null ? [hallazgoDeVideo(d.video)] : [canal, hallazgoDeVideo(d.video)];
+};
+
 /** `/alarm-server/<secreto>` → `/alarm-server/••••`: nada después del primer tramo sale. */
 const rutaOculta = (url: string | null): string => {
   if (url === null) return '(sin ruta)';
@@ -418,7 +430,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
           : hallazgosDeVideoportero(c)),
       );
     }
-    if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
+    hallazgos.push(...hallazgosDelVideo(diagnostico));
     hallazgos.push(hallazgoDelReloj(diagnostico));
     hallazgos.push(hallazgoDelReceptorHuerfano(diagnostico.receptor));
     return {
@@ -591,7 +603,7 @@ export const fichaDe = (diagnostico: DiagnosticoDeEquipo): FichaDelEquipo => {
   }
 
   // ── 6 · El reloj, invisible hasta que corrompe la trazabilidad ────────────
-  if (diagnostico.video !== undefined) hallazgos.push(hallazgoDeVideo(diagnostico.video));
+  hallazgos.push(...hallazgosDelVideo(diagnostico));
   hallazgos.push(hallazgoDelReloj(diagnostico));
 
   if (diagnostico.reportaEstadoDeBarrera === false) {

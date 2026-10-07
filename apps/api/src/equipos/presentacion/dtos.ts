@@ -107,8 +107,17 @@ export class AltaDeEquipoDto {
   @IsIn(['reporta_y_espera', 'decide_el_equipo'])
   modoDeTerminal?: 'reporta_y_espera' | 'decide_el_equipo';
 
-  /** Si una persona habilitó el canal de audio EN EL APARATO (ADR-01). */
-  @ApiPropertyOptional({ type: Boolean, default: false })
+  /**
+   * Atestación de una persona: comprobó en sitio que el equipo abre su canal
+   * de audio (ADR-01). Videoportero y terminal facial (corrección 15-S1):
+   * el equipo lo declara sin un interruptor que el sistema pueda leer
+   * (H-15S1-C07), y sin la atestación la guardia no habla por él.
+   */
+  @ApiPropertyOptional({
+    type: Boolean,
+    default: false,
+    description: 'Comprobé en sitio que el equipo abre el canal de audio (atestación)',
+  })
   @IsOptional()
   @IsBoolean()
   canalDeAudioHabilitado?: boolean;

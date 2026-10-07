@@ -113,7 +113,8 @@ describe('videoportero · apertura, audio, llamada y suscripción', () => {
     const ficha = fichaDe(
       await diagnosticar('videoportero', {
         aperturaRemota: false,
-        canalesDeAudio: [{ id: 1, habilitado: false }],
+        // H-15S1-C07 · «sin audio» es no DECLARAR canal: `enabled=false` no lo es.
+        canalesDeAudio: [],
       }),
     );
     expect(estadoDe(ficha.hallazgos, /apertura desde la plataforma/)).toBe('bloqueo');

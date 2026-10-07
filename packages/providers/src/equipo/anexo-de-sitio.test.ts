@@ -153,9 +153,13 @@ describe('anexo 15-K · H-SITIO-15 · nunca una escritura con el cuerpo vacío',
   });
 
   it('sólo el canal de audio declara su escritura sin cuerpo; el resto la lleva o no escribe', () => {
-    const sinCuerpo = RUTAS.filter((r) => opcionesDeEscritura(r).sinCuerpo === true).map(
-      (r) => r.proposito,
-    );
+    // B (15-S1) · la terminal declara las MISMAS dos del canal de audio: los
+    // propósitos sin cuerpo siguen siendo sólo esos dos, ahora en dos familias.
+    const sinCuerpo = [
+      ...new Set(
+        RUTAS.filter((r) => opcionesDeEscritura(r).sinCuerpo === true).map((r) => r.proposito),
+      ),
+    ];
     expect(sinCuerpo.sort()).toEqual([
       'abrir el canal de audio bidireccional',
       'cerrar el canal de audio bidireccional',

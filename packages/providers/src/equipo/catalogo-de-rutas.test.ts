@@ -131,6 +131,30 @@ describe('catálogo de rutas', () => {
     expect(RUTAS.filter((r) => r.acciona === true && r.dejaRastro === true)).toEqual([]);
   });
 
+  /**
+   * 15-S1 · B · el audio de la terminal es por CAPACIDAD: sus rutas sólo existen
+   * si la terminal lo declara. Sin la marca, el guion de sitio contaba como
+   * «desmentida» —un fallo— la lista de canales de una terminal sin audio (paso
+   * 12e del verificador, 07/10), y la K1T344 puede no traerlo. El videoportero
+   * sí lo trae (VERIFICADO el 06/10): sus rutas no llevan la marca.
+   */
+  it('las rutas de audio de la TERMINAL son de módulo opcional; las del videoportero, no', () => {
+    const deAudio = (familia: 'terminal' | 'videoportero') =>
+      RUTAS.filter(
+        (r) =>
+          r.familia === familia &&
+          /audio bidireccional|audio al equipo|audio del equipo/.test(r.proposito),
+      );
+    expect(deAudio('terminal')).toHaveLength(5);
+    for (const r of deAudio('terminal')) {
+      expect(r.soloSiLaDeclara, r.proposito).toMatch(/audio bidireccional/);
+    }
+    expect(deAudio('videoportero').length).toBeGreaterThanOrEqual(5);
+    for (const r of deAudio('videoportero')) {
+      expect(r.soloSiLaDeclara, r.proposito).toBeUndefined();
+    }
+  });
+
   it('ninguna ruta lleva una dirección de equipo dentro', () => {
     // KPI-11 lo comprueba en todo el árbol; aquí se fija en el sitio donde más
     // fácil sería colar una «para probar».
