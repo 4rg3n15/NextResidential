@@ -312,6 +312,16 @@ motivo escrito que queda en la auditoría:
   a abrir con su propio reconocimiento, y la plataforma registra sin decidir.
 - **Rostros**: la ficha dice si el equipo los admite, si no, o si no se pudo
   leer y por qué.
+- **Terminal · reloj.** La ficha juzga el reloj del equipo con la misma regla
+  que las altas de personas en él: si se desvía más de lo permitido, no se da
+  de alta a nadie con vigencia hasta corregirlo. Si el equipo da la hora sin
+  zona horaria, la ficha dice «no comprobado», con el motivo, y las altas
+  siguen (ronda 15-X).
+- **Vigencias en la terminal** (ronda 15-X). Cada vigencia se escribe en la
+  terminal **cinco minutos antes** de su inicio. Sin ese margen, una terminal
+  con el reloj algo atrasado respondía «Permiso vencido» a quien llegaba a su
+  hora. No abre de más: quien decide sigue siendo la plataforma, con la hora
+  verdadera.
 - **Eventos del equipo**: si otra plataforma (HikCentral) tiene la conexión de
   eventos del equipo, la ficha lo dice como bloqueo, con el remedio:
   deshabilitar el equipo en HikCentral mientras se prueba.
@@ -567,6 +577,11 @@ vivienda la resuelve el servidor desde su sesión: nunca viaja en la dirección.
 > revocar una visita se hacen en la app. En la consola web, por ahora, «Mi
 > familia» y las plazas del «Perfil» se ven pero no se cambian, los vehículos
 > sólo se dan de baja y las visitas no se revocan.
+>
+> **El rostro del residente (ronda 15-X), también sólo en la app.** «Mi rostro»
+> y el rostro de un menor del hogar no están en la consola web hasta la ronda
+> 15-Y (DT-15X-01). En producción eso deja **sin rostro a quien sólo usa la
+> consola**, como el residente con iPhone (P-23).
 
 ### Su cuenta
 
@@ -669,6 +684,73 @@ cuenta»**: es un código de un solo uso, que «Compartir» copia igual que en
 «Ocupantes». Con él, la persona hace «Crear cuenta»
 escribiendo **la misma fecha de nacimiento** que el hogar registró, y su cuenta
 queda unida a la misma persona y a la misma plaza: **conserva su historial**.
+
+### Su rostro: entrar por la terminal facial
+
+**Es opcional.** Con su rostro registrado, la terminal facial de la portería lo
+reconoce y la plataforma decide si le abre, como con la placa de su vehículo.
+Puede entrar sin él. Es un dato sensible (Ley 1581 de 2012): lo registra sólo si
+quiere, vence al año y lo retira cuando quiera.
+
+**La invitación.** Al terminar el primer ingreso la app ofrece **«Entre con su
+rostro»**: **«Registrar mi rostro»** o **«Ahora no»**. Con «Ahora no» entra y la
+app no se lo vuelve a ofrecer a esa cuenta en ese teléfono; lo tiene siempre en
+**Perfil → «Mi rostro»**. Si en ese momento no hay red, no se le ofrece y entra
+igual.
+
+**Registrarlo** (Perfil → «Mi rostro»):
+
+1. **«Tomar foto»** o **«Elegir de la galería»**: de frente, con buena luz y sin
+   nadie más en la imagen. La app dice si la foto sirve antes de enviarla.
+2. Lea la política del tratamiento de su rostro y marque **«Leí y acepto la
+   política del tratamiento de mi rostro»**.
+3. **«Registrar mi rostro»**. La app muestra el estado y, equipo por equipo, si
+   ya lo reconoce.
+
+| Lo que dice la app                                              | Qué significa                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| «No ha registrado su rostro. Es opcional: puede entrar sin él.» | No hay rostro                                                      |
+| «Registrado. Se está enviando a los equipos de la portería.»    | Todavía no está en ningún equipo                                   |
+| «Registrado en 1 de 2 equipos…»                                 | Los demás lo recibirán en cuanto respondan                         |
+| «Activo: los 2 equipos de la portería lo reconocen.»            | Todos lo tienen                                                    |
+| «Su rostro vence en 12 días: renuévelo…»                        | Faltan 30 días o menos: **«Renovar mi rostro»** con una foto nueva |
+| «Su rostro se está retirando de los equipos de la portería.»    | Lo retiró y algún equipo todavía no lo confirmó                    |
+
+**Retirarlo:** **«Retirar mi rostro»** → «¿Retirar su rostro?» → **«Retirar»**.
+Se borra en el acto, también de los equipos de la portería, y puede volver a
+registrarlo cuando quiera.
+
+- **Sin conexión no se guarda nada.** La foto no se queda en el teléfono
+  esperando la red: «Sin conexión: su foto no se guardó en el teléfono. Tómela de
+  nuevo cuando tenga conexión.»
+- **Cinco registros en 24 horas por cuenta**, contando los de sus menores. El
+  sexto responde «Ya registró un rostro 5 veces en 24 horas».
+- **Si la política cambió** mientras tenía la pantalla abierta, la app lo dice y
+  muestra la nueva: léala y vuelva a aceptarla.
+- **La foto no vuelve al teléfono.** Se guarda cifrada y sólo sale hacia los
+  equipos de la portería.
+- **Si le dan de baja**, su rostro sale de los equipos en el acto.
+
+#### El rostro de un menor del hogar
+
+Lo registra **sólo el titular de la vivienda**, como representante legal del
+menor, y **sólo de los 15 a los 17 años**. En **Mi familia → «Editar»** del
+menor, la sección «Su rostro»:
+
+| Quién mira y la edad del menor         | Lo que ve                                                         |
+| -------------------------------------- | ----------------------------------------------------------------- |
+| El titular, con un menor de 15 a 17    | **«Registrar rostro»**, o «Ver su rostro» si ya lo tiene          |
+| Otro adulto del hogar                  | «Lo registra el titular del hogar.»                               |
+| Cualquiera, con un menor de 14 o menos | «No se registra el rostro de menores de 15 años.»                 |
+| Cualquiera, sin fecha de nacimiento    | «Registre su fecha de nacimiento para poder registrar su rostro.» |
+| Con 18 cumplidos                       | Nada: crea su cuenta y registra él mismo su rostro                |
+
+La pantalla es la de «Mi rostro» con dos casillas más, que el titular marca
+antes de poder registrar: **«Soy su representante legal»** y **«Le expliqué
+para qué es su rostro y está de acuerdo»**. Si la foto se descarta, las casillas
+también: hay que volver a marcarlas. El rostro de un menor **vence al año o al
+cumplir 18, lo que llegue antes**, y al darlo de baja sale de los equipos en el
+acto.
 
 ### Autorizar una visita
 

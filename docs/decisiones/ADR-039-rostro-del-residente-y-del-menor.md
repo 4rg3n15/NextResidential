@@ -156,7 +156,9 @@ que la ley pone para el dato de un menor, y se nombra como tal.
 
 - **«Mi perfil → Mi rostro»:**
   - el estado, cada equipo y la política que mandó el servidor;
-  - registrar o renovar con la versión que se **mostró**;
+  - registrar o renovar con la versión que se **mostró**. Si cambió (409), la
+    pantalla la relee y desmarca la aceptación —y, en el de un menor, las dos
+    declaraciones—: se acepta lo que se leyó;
   - retirar con confirmación.
 - **El primer ingreso ofrece «Registrar mi rostro»** mientras la cuenta no lo
   tenga y no haya dicho «Ahora no».
