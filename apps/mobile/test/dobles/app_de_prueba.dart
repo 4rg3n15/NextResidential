@@ -210,6 +210,7 @@ class Mundo {
   late final PlazasFalsas plazas;
   final RevocacionFalsa revocacion;
   final RostroFalso rostro = RostroFalso();
+  final RostroDeMenoresFalso rostroDeMenores = RostroDeMenoresFalso();
   late final AutenticadorGobernado autenticador;
   final ResidenteGobernado repo;
   final NotificacionesFalsas notificaciones;
@@ -252,6 +253,7 @@ class Mundo {
         plazas: plazas,
         revocacion: revocacion,
         rostro: rostro,
+        rostroDeMenores: rostroDeMenores,
         tomarFoto: (_) async => fotoTomada(medidasBuenas),
         almacen: llavero,
       ),

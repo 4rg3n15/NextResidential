@@ -105,7 +105,7 @@ class _ArmazonState extends State<Armazon> with WidgetsBindingObserver {
     perfil: _c.perfil,
     alCambiarDeVivienda: _cargarTodo,
   );
-  late final _familia = AccionesDeLaFamilia.delArmazon(_d, _c, abrir: _abrir);
+  late final _familia = AccionesDeLaFamilia.delArmazon(_d, _c, abrir: _abrir, foto: _tomarFoto);
   late final ControladorDeAvisos _avisos = ControladorDeAvisos(
     fuente: _d.notificaciones,
     repositorio: _repo,

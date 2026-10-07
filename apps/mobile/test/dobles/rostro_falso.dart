@@ -1,5 +1,6 @@
 import 'package:ncr_residente/dominio/puertos.dart';
 import 'package:ncr_residente/dominio/rostro.dart';
+import 'package:ncr_residente/dominio/rostro_de_menor.dart';
 
 /// 15-X · «Mi rostro» sin red: un estado que se gobierna desde la prueba, un
 /// fallo que se le puede imponer al siguiente envío y lo que se le pidió.
@@ -73,4 +74,12 @@ class RostroFalso implements RostroDelResidente {
     falloSiguiente = null;
     if (f != null) throw f;
   }
+}
+
+/// 15-X (D3) · un rostro falso por menor: el mismo cada vez que se pide.
+class RostroDeMenoresFalso implements RostroDeMenores {
+  final porMenor = <String, RostroFalso>{};
+
+  @override
+  RostroFalso de(String residenteId) => porMenor.putIfAbsent(residenteId, () => RostroFalso());
 }

@@ -1,5 +1,7 @@
 /// «Mi rostro» (RONDA 15-X, D2, ADR-039): registrar, renovar y retirar el
-/// rostro propio, con la política que manda el servidor.
+/// rostro propio, con la política que manda el servidor. D3 · la MISMA pantalla
+/// gestiona el de un menor del hogar (`TextosDelRostro.deMenor`): cambian los
+/// textos y se añaden las dos declaraciones del representante legal.
 ///
 /// ─────────────────────────────────────────────────────────────────────────────
 /// QUÉ SE VE Y QUÉ NO
@@ -23,9 +25,10 @@ import 'package:flutter/material.dart';
 import '../../configuracion/tema.dart';
 import '../../dominio/puertos.dart';
 import '../../dominio/rostro.dart';
+import '../textos_del_rostro.dart';
 import '../widgets/avisos_de_la_foto.dart';
 import '../widgets/captura_de_rostro.dart';
-import 'comunes.dart';
+import '../widgets/estado_del_rostro.dart';
 
 /// Lo que se dice si el envío no encontró red.
 const avisoSinConexionDelRostro =
@@ -33,10 +36,18 @@ const avisoSinConexionDelRostro =
     'conexión.';
 
 class PantallaDeMiRostro extends StatefulWidget {
-  const PantallaDeMiRostro({super.key, required this.rostro, required this.tomarFoto});
+  const PantallaDeMiRostro({
+    super.key,
+    required this.rostro,
+    required this.tomarFoto,
+    this.textos = const TextosDelRostro.propio(),
+  });
 
   final RostroDelResidente rostro;
   final TomarFoto tomarFoto;
+
+  /// D3 · el propio, o el de un menor del hogar con sus dos declaraciones.
+  final TextosDelRostro textos;
 
   @override
   State<PantallaDeMiRostro> createState() => _EstadoDeMiRostro();
@@ -47,6 +58,7 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
   Fallo? _falloDeCarga;
   FotoDeRostro? _foto;
   bool _acepta = false;
+  late List<bool> _declarado = _sinDeclarar();
   bool _ocupado = false;
 
   /// Lo último que pasó, en una frase: lo bueno en verde, lo malo en rojo.
@@ -72,15 +84,21 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
     }
   }
 
+  List<bool> _sinDeclarar() => List.filled(widget.textos.declaraciones.length, false);
+
   void _descartarFoto() {
     _foto = null;
     _acepta = false;
+    _declarado = _sinDeclarar();
     _intento += 1;
   }
 
+  /// La foto que sirve, la política y, para un menor, las dos declaraciones.
+  bool get _listo => _foto != null && _acepta && _declarado.every((d) => d);
+
   Future<void> _registrar(PoliticaDelRostro politica) async {
     final foto = _foto;
-    if (foto == null || !_acepta) return;
+    if (foto == null || !_listo) return;
     setState(() {
       _ocupado = true;
       _aviso = null;
@@ -150,13 +168,13 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
     final e = _estado;
     final f = _falloDeCarga;
     return Scaffold(
-      appBar: AppBar(title: const Text('Mi rostro')),
+      appBar: AppBar(title: Text(widget.textos.titulo)),
       body: SafeArea(
         child: e == null
             ? Center(
                 child: f == null
                     ? const CircularProgressIndicator()
-                    : _SinCargar(fallo: f, alReintentar: _cargar),
+                    : SinCargarElRostro(fallo: f, alReintentar: _cargar),
               )
             : ListView(padding: const EdgeInsets.all(16), children: _contenido(e)),
       ),
@@ -166,8 +184,9 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
   List<Widget> _contenido(EstadoDeMiRostro e) {
     final politica = e.politica;
     final aviso = _aviso;
+    final t = widget.textos;
     return [
-      _TarjetaDelEstado(estado: e),
+      TarjetaDelEstadoDelRostro(estado: e),
       if (aviso != null) ...[
         const SizedBox(height: 12),
         NotaDeLaFoto(
@@ -183,7 +202,7 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
         tomarFoto: widget.tomarFoto,
         alCambiar: (foto) => setState(() => _foto = foto),
         habilitada: !_ocupado,
-        titulo: e.tieneRostro ? 'Renovar mi rostro' : 'Registrar mi rostro',
+        titulo: e.tieneRostro ? t.renovar : t.registrar,
         indicacion:
             'De frente, con buena luz y sin nadie más en la imagen: es la foto con la que la '
             'terminal de la portería lo reconocerá.',
@@ -197,19 +216,24 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
             child: Text(politica.texto, key: const Key('rostro.politica')),
           ),
         ),
-        CheckboxListTile(
-          key: const Key('rostro.acepto'),
-          value: _acepta,
-          onChanged: _ocupado ? null : (v) => setState(() => _acepta = v ?? false),
-          title: const Text('Leí y acepto la política del tratamiento de mi rostro'),
-          controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: EdgeInsets.zero,
+        _Casilla(
+          clave: 'rostro.acepto',
+          valor: _acepta,
+          texto: t.acepto,
+          alCambiar: _ocupado ? null : (v) => setState(() => _acepta = v),
         ),
+        for (final (i, declaracion) in t.declaraciones.indexed)
+          _Casilla(
+            clave: 'rostro.declaracion.$i',
+            valor: _declarado[i],
+            texto: declaracion,
+            alCambiar: _ocupado ? null : (v) => setState(() => _declarado[i] = v),
+          ),
         FilledButton(
           key: const Key('rostro.registrar'),
-          onPressed: _foto != null && _acepta && !_ocupado ? () => _registrar(politica) : null,
+          onPressed: _listo && !_ocupado ? () => _registrar(politica) : null,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-          child: Text(e.tieneRostro ? 'Renovar mi rostro' : 'Registrar mi rostro'),
+          child: Text(e.tieneRostro ? t.renovar : t.registrar),
         ),
       ],
       if (e.tieneRostro) ...[
@@ -218,7 +242,7 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
           key: const Key('rostro.retirar'),
           onPressed: _ocupado ? null : _retirar,
           icon: const Icon(Icons.delete_outline),
-          label: const Text('Retirar mi rostro'),
+          label: Text(t.retirar),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
             foregroundColor: Paleta.peligroSuave.texto,
@@ -229,56 +253,28 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
   }
 }
 
-class _TarjetaDelEstado extends StatelessWidget {
-  const _TarjetaDelEstado({required this.estado});
-  final EstadoDeMiRostro estado;
+class _Casilla extends StatelessWidget {
+  const _Casilla({
+    required this.clave,
+    required this.valor,
+    required this.texto,
+    required this.alCambiar,
+  });
+  final String clave;
+  final bool valor;
+  final String texto;
+  final void Function(bool)? alCambiar;
 
   @override
   Widget build(BuildContext context) {
-    final e = estado;
-    final registrado = e.registradoEn;
-    final vence = e.venceEn;
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            leading: Icon(e.tieneRostro ? Icons.face_retouching_natural : Icons.face_outlined),
-            title: Text(textoDelEstado(e), key: const Key('rostro.estado')),
-            subtitle: registrado == null || vence == null
-                ? null
-                : Text('Registrado el ${fechaCorta(registrado)} · vence el ${fechaCorta(vence)}'),
-          ),
-          for (final q in e.equipos)
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.door_front_door_outlined, size: 20),
-              title: Text(q.nombre),
-              trailing: Text(textoDelEquipo(q.estado)),
-            ),
-        ],
-      ),
+    final cambiar = alCambiar;
+    return CheckboxListTile(
+      key: Key(clave),
+      value: valor,
+      onChanged: cambiar == null ? null : (v) => cambiar(v ?? false),
+      title: Text(texto),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
     );
   }
-}
-
-class _SinCargar extends StatelessWidget {
-  const _SinCargar({required this.fallo, required this.alReintentar});
-  final Fallo fallo;
-  final Future<void> Function() alReintentar;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(24),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.cloud_off_outlined, size: 48),
-        const SizedBox(height: 12),
-        Text(fallo.detalle, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        FilledButton(onPressed: alReintentar, child: const Text('Reintentar')),
-      ],
-    ),
-  );
 }

@@ -220,6 +220,7 @@ void main() {
       notificacionesDelConjunto: NotificacionesQueAnotan(),
       registro: RegistroFalso(), menores: MenoresFalsos(),
       plazas: PlazasFalsas(alta), revocacion: RevocacionFalsa(), rostro: RostroFalso(),
+      rostroDeMenores: RostroDeMenoresFalso(),
     );
   });
 

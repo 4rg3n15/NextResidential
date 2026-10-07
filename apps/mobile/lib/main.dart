@@ -129,6 +129,8 @@ Future<void> main() async {
         revocacion: RevocacionPorApi(api: api, sesion: sesion),
         // 15-X (D2) · «Mi rostro»: el rostro propio, por la misma API.
         rostro: RostroPorApi(api: api, sesion: sesion),
+        // 15-X (D3) · el de un menor del hogar, por el titular.
+        rostroDeMenores: RostroDeMenoresPorApi(api: api, sesion: sesion),
         almacen: recuerdos,
         cambiosDeRed: cambiosDeRed(),
       ),

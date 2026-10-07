@@ -15,6 +15,7 @@ import 'package:ncr_residente/presentacion/controlador.dart';
 
 import '../dobles/hogar_15w_falso.dart';
 import '../dobles/hogar_falso.dart';
+import '../dobles/rostro_falso.dart';
 
 class RelojFijo implements Reloj {
   @override
@@ -43,6 +44,8 @@ Future<PlazasFalsas> abrirOcupantes(WidgetTester t, AltaFalsa alta) async {
             reloj: RelojFijo(),
             abrir: (pantalla, _) =>
                 Navigator.of(contexto).push(MaterialPageRoute<void>(builder: (_) => pantalla)),
+            rostroDeMenores: RostroDeMenoresFalso(),
+            tomarFoto: (_) async => null,
           );
           return Scaffold(
             body: TextButton(

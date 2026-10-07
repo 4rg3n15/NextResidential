@@ -21,12 +21,15 @@ import '../dominio/entidades.dart';
 import '../dominio/hogar.dart';
 import '../dominio/menores.dart';
 import '../dominio/puertos.dart';
+import '../dominio/rostro_de_menor.dart';
 import 'controlador.dart';
 import 'dependencias.dart';
 import 'pantallas/familia.dart';
 import 'pantallas/menor.dart';
+import 'pantallas/mi_rostro.dart';
 import 'pantallas/ocupantes.dart';
 import 'pestanas.dart';
+import 'textos_del_rostro.dart';
 import 'widgets/compartir.dart';
 import 'widgets/dialogo_de_motivo.dart';
 
@@ -47,6 +50,8 @@ class AccionesDeLaFamilia {
     required this.ocupantes,
     required this.reloj,
     required this.abrir,
+    required this.rostroDeMenores,
+    required this.tomarFoto,
   });
 
   /// Las del armazón: sus puertos y sus controladores de vista.
@@ -54,6 +59,7 @@ class AccionesDeLaFamilia {
     Dependencias d,
     ControladoresDelArmazon c, {
     required AbrirEncima abrir,
+    required TomarFoto foto,
   }) => AccionesDeLaFamilia(
     menores: d.menores,
     plazas: d.plazas,
@@ -63,6 +69,8 @@ class AccionesDeLaFamilia {
     ocupantes: c.ocupantes,
     reloj: d.reloj,
     abrir: abrir,
+    rostroDeMenores: d.rostroDeMenores,
+    tomarFoto: foto,
   );
 
   final RepositorioDeMenores menores;
@@ -73,6 +81,10 @@ class AccionesDeLaFamilia {
   final ControladorDeVista<MisOcupantes> ocupantes;
   final Reloj reloj;
   final AbrirEncima abrir;
+
+  /// 15-X (D3) · el rostro de un menor, con la cámara del armazón.
+  final RostroDeMenores rostroDeMenores;
+  final TomarFoto tomarFoto;
 
   /// El mensajero se toma ANTES de esperar nada: después de una escritura,
   /// la pantalla que la pidió puede haberse cerrado.
@@ -170,9 +182,26 @@ class AccionesDeLaFamilia {
             avisar('Datos guardados.');
             _recargar();
           },
+          esTitular: _esTitular,
+          alAbrirRostro: (m) => abrirRostroDelMenor(ruta, m),
         ),
       ),
     );
+  }
+
+  /// D3 · el rostro de un menor, por el titular: la pantalla de «Mi rostro» con
+  /// sus textos y las dos declaraciones del representante. Al volver, se relee.
+  Future<void> abrirRostroDelMenor(BuildContext context, MenorDelHogar menor) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PantallaDeMiRostro(
+          rostro: rostroDeMenores.de(menor.residenteId),
+          tomarFoto: tomarFoto,
+          textos: TextosDelRostro.deMenor(menor.nombreCompleto),
+        ),
+      ),
+    );
+    _recargar();
   }
 
   Future<void> darDeBaja(BuildContext context, MenorDelHogar menor) async {
