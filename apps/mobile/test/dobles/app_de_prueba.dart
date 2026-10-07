@@ -11,6 +11,7 @@ import 'package:ncr_residente/presentacion/app.dart';
 
 import 'hogar_15w_falso.dart';
 import 'hogar_falso.dart';
+import 'rostro_falso.dart';
 import 'sincronizacion.dart';
 import 'visitas.dart';
 
@@ -208,6 +209,7 @@ class Mundo {
   final MenoresFalsos menores;
   late final PlazasFalsas plazas;
   final RevocacionFalsa revocacion;
+  final RostroFalso rostro = RostroFalso();
   late final AutenticadorGobernado autenticador;
   final ResidenteGobernado repo;
   final NotificacionesFalsas notificaciones;
@@ -249,6 +251,7 @@ class Mundo {
         menores: menores,
         plazas: plazas,
         revocacion: revocacion,
+        rostro: rostro,
         tomarFoto: (_) async => fotoTomada(medidasBuenas),
         almacen: llavero,
       ),

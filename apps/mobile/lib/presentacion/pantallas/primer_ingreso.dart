@@ -7,6 +7,9 @@
 /// sus ocupantes. Esta pieza sólo pide a la API lo que falta saber y monta la
 /// pantalla del paso.
 ///
+/// 15-X (D2) · recién dado de alta, se le ofrece su rostro una vez, con «Ahora
+/// no»; quien ya estaba dado de alta lo tiene en «Mi perfil → Mi rostro».
+///
 /// 15-W · una cuenta sin vivienda asignada no tiene formulario que llenar: ve
 /// el aviso del servidor («La administración debe asignarle su vivienda») y
 /// puede volver a consultar. El correo escrito en «Crear cuenta», si se acaba
@@ -23,9 +26,11 @@ import '../../aplicacion/sesion_en_uso.dart';
 import '../../dominio/acceso.dart';
 import '../../dominio/hogar.dart';
 import '../../dominio/puertos.dart';
+import '../../dominio/rostro.dart';
 import 'alta.dart';
 import 'cambio_de_contrasena.dart';
 import 'declarar_ocupantes.dart';
+import 'ofrecer_rostro.dart';
 import '../widgets/servidor.dart';
 
 class PuertaDePrimerIngreso extends StatefulWidget {
@@ -39,6 +44,8 @@ class PuertaDePrimerIngreso extends StatefulWidget {
     this.recuperada = false,
     this.reloj = const RelojDelSistema(),
     this.correoDeContacto,
+    this.rostro,
+    this.tomarFoto,
   });
 
   final SesionEnUso sesion;
@@ -52,6 +59,11 @@ class PuertaDePrimerIngreso extends StatefulWidget {
 
   /// 15-W · el correo escrito en «Crear cuenta», si se acaba de crear.
   final String? correoDeContacto;
+
+  /// 15-X · sin los dos no se ofrece el rostro (pruebas de otras pantallas).
+  final RostroDelResidente? rostro;
+  final TomarFoto? tomarFoto;
+  bool get ofreceRostro => rostro != null && tomarFoto != null;
 
   /// La sesión se recuperó del llavero al arrancar, en vez de abrirse ahora.
   /// `[SUPUESTO]` S-59 · sin red al arrancar con una sesión así, se deja pasar
@@ -68,6 +80,9 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
   Fallo? _fallo;
   bool _consultando = false;
 
+  /// 15-X · el alta se completó AHORA, y el rostro aún no se ofreció.
+  bool _altaRecienCompletada = false, _rostroOfrecido = false;
+
   bool get _debeCambiar => widget.sesion.sesion?.debeCambiarContrasena ?? false;
 
   PasoDePrimerIngreso get _paso => pasoDePrimerIngreso(
@@ -75,6 +90,7 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
     viviendaVinculada: _estado?.viviendaVinculada,
     viviendaAsignada: _estado?.viviendaAsignada ?? true,
     debeDeclararOcupantes: _estado?.debeDeclararOcupantes ?? false,
+    ofrecerRostro: _altaRecienCompletada && !_rostroOfrecido && widget.ofreceRostro,
   );
 
   @override
@@ -95,8 +111,16 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
       case PasoDePrimerIngreso.esperarVivienda:
       case PasoDePrimerIngreso.completarAlta:
       case PasoDePrimerIngreso.declararOcupantes:
+      case PasoDePrimerIngreso.ofrecerRostro:
         setState(() {});
     }
+  }
+
+  /// 15-X · respondida la invitación —con su rostro o sin él—, se sigue.
+  void _trasOfrecer() {
+    if (!mounted) return;
+    setState(() => _rostroOfrecido = true);
+    _avanzar();
   }
 
   Future<void> _consultar() async {
@@ -160,7 +184,10 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
           correoDeContacto: widget.correoDeContacto,
           alSalir: widget.alSalir,
           alCompletar: () {
-            setState(() => _estado = null);
+            setState(() {
+              _estado = null;
+              _altaRecienCompletada = true;
+            });
             _consultar();
           },
         );
@@ -174,14 +201,19 @@ class _EstadoDeLaPuerta extends State<PuertaDePrimerIngreso> {
             _consultar();
           },
         );
+      case PasoDePrimerIngreso.ofrecerRostro:
+        final (rostro, foto) = (widget.rostro, widget.tomarFoto);
+        if (rostro == null || foto == null) break;
+        return PantallaDeOfrecerRostro(rostro: rostro, tomarFoto: foto, alSeguir: _trasOfrecer);
       default:
-        return _Consultando(
-          consultando: _consultando,
-          fallo: _fallo,
-          alReintentar: _consultar,
-          alSalir: widget.alSalir,
-        );
+        break;
     }
+    return _Consultando(
+      consultando: _consultando,
+      fallo: _fallo,
+      alReintentar: _consultar,
+      alSalir: widget.alSalir,
+    );
   }
 }
 

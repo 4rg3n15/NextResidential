@@ -834,6 +834,9 @@ try {
   (await hay('Plazas: 2 de 4'))
     ? ok('«Ocupantes» enseña el cupo de plazas con su tope (15-W)')
     : mal('el perfil no enseña el cupo de plazas');
+  (await hay('Mi rostro'))
+    ? ok('el perfil ofrece «Mi rostro», opcional (15-X)')
+    : mal('el perfil no ofrece «Mi rostro»');
   (await pagina.content()).includes('usuarios.ncr.invalid')
     ? mal('el correo sintético aparece en la página (C-36)')
     : ok('el correo sintético del token no aparece en ninguna parte (C-36)');

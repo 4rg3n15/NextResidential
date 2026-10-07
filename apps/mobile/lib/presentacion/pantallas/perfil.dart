@@ -46,6 +46,7 @@ class PantallaDePerfil extends StatelessWidget {
     required this.alCambiarVivienda,
     required this.alCambiarContrasena,
     this.alAbrirOcupantes,
+    this.alAbrirMiRostro,
     this.alRecargar,
   });
 
@@ -75,6 +76,9 @@ class PantallaDePerfil extends StatelessWidget {
   final void Function(PerfilDelResidente? perfil) alCambiarVivienda;
   final void Function() alCambiarContrasena;
   final void Function()? alAbrirOcupantes;
+
+  /// 15-X (D2) · el rostro propio: opcional, anual y retirable.
+  final void Function()? alAbrirMiRostro;
 
   static T? _datos<T>(Estado<T> e) => switch (e) {
     ConDatos<T>(datos: final d) => d,
@@ -178,6 +182,8 @@ class PantallaDePerfil extends StatelessWidget {
                     _Atajo(Icons.directions_car_outlined, 'Mis vehículos', alAbrirVehiculos),
                     _Atajo(Icons.history, 'Historial de accesos', alAbrirHistorial),
                     _Atajo(Icons.password_outlined, 'Cambiar contraseña', alCambiarContrasena),
+                    if (alAbrirMiRostro != null)
+                      _Atajo(Icons.face_outlined, 'Mi rostro', alAbrirMiRostro!),
                   ],
                 ),
               ),

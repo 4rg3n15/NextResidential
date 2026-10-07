@@ -1,6 +1,10 @@
 /// F1 · La foto frontal del visitante: tomarla o elegirla de la galería,
 /// juzgarla y decir por qué repetirla.
 ///
+/// 15-X · la captura en sí —juicio, consejos, los dos botones— vive ahora en
+/// `captura_de_rostro.dart`, que comparte con el rostro del residente; aquí
+/// quedan los textos de la visita.
+///
 /// ═════════════════════════════════════════════════════════════════════════════
 /// POR QUÉ ES UN WIDGET APARTE
 ///
@@ -46,15 +50,11 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../configuracion/tema.dart';
-import '../../dominio/calidad_de_captura.dart';
 import '../../dominio/entidades.dart';
-import '../../dominio/medidas_de_imagen.dart';
-import '../../dominio/origen_de_la_foto.dart';
 import '../../dominio/puertos.dart';
-import 'avisos_de_la_foto.dart';
+import 'captura_de_rostro.dart';
 
-class FotoDelVisitante extends StatefulWidget {
+class FotoDelVisitante extends StatelessWidget {
   const FotoDelVisitante({
     super.key,
     required this.tomarFoto,
@@ -72,169 +72,14 @@ class FotoDelVisitante extends StatefulWidget {
   final bool habilitada;
 
   @override
-  State<FotoDelVisitante> createState() => _EstadoDeLaFoto();
-}
-
-class _EstadoDeLaFoto extends State<FotoDelVisitante> {
-  FotoTomada? _foto;
-  bool _encuadreConfirmado = false;
-  List<FalloDeCalidad> _fallos = const [];
-
-  /// El origen cuyo selector está abierto, o `null`. Con uno abierto, los dos
-  /// botones esperan: dos selectores a la vez el sistema no los admite.
-  OrigenDeFoto? _abriendo;
-
-  /// Por qué no llegó la foto que se pidió, en palabras. `null` si llegó o se
-  /// canceló.
-  String? _aviso;
-
-  /// Lo que se juzga es lo que se envía: con la confirmación del encuadre, las
-  /// medidas llevan un rostro y la proporción declarada; sin ella, cero.
-  MedidasDeCaptura? get _medidasEfectivas {
-    final f = _foto;
-    if (f == null) return null;
-    return f.sinDetector && _encuadreConfirmado ? conEncuadreConfirmado(f.medidas) : f.medidas;
-  }
-
-  bool get _faltaConfirmar => (_foto?.sinDetector ?? false) && !_encuadreConfirmado;
-
-  /// Mientras falta confirmar el encuadre, «no se ve ningún rostro» no es un
-  /// consejo: es que nadie lo ha medido todavía. Se enseña el resto (luz,
-  /// nitidez), que sí sale de la foto.
-  List<FalloDeCalidad> get _consejosVisibles => _faltaConfirmar
-      ? _fallos
-          .where((f) => f != FalloDeCalidad.sinRostro && f != FalloDeCalidad.demasiadoLejos)
-          .toList()
-      : _fallos;
-
-  Future<void> _obtener(OrigenDeFoto origen) async {
-    setState(() {
-      _abriendo = origen;
-      _aviso = null;
-    });
-    try {
-      final foto = await widget.tomarFoto(origen);
-      // Cancelar la cámara o la galería no borra la foto que ya servía.
-      if (!mounted || foto == null) return;
-      setState(() {
-        _foto = foto;
-        _encuadreConfirmado = false;
-        // El juicio del dominio, no un `if` aquí: los umbrales viven en un
-        // sitio, y son los mismos para la cámara y para la galería.
-        _fallos = evaluarCaptura(foto.medidas);
-      });
-      _avisar();
-    } on FotoNoObtenida catch (e) {
-      // [SUPUESTO] S-98 · Un archivo ilegible tampoco borra la foto que ya servía:
-      // se trata como cancelar, más el aviso. Sin foto previa, sigue vacía.
-      if (mounted) setState(() => _aviso = avisoSinFoto(e.motivo, origen));
-    } on Exception {
-      // Algo que el adaptador no supo nombrar: el residente tiene que
-      // saberlo, no quedarse mirando un botón que no hizo nada.
-      if (mounted) setState(() => _aviso = avisoSinFoto(MotivoSinFoto.noSeAbrio, origen));
-    } finally {
-      if (mounted) setState(() => _abriendo = null);
-    }
-  }
-
-  void _confirmarEncuadre() {
-    final f = _foto;
-    if (f == null) return;
-    setState(() {
-      _encuadreConfirmado = true;
-      _fallos = evaluarCaptura(conEncuadreConfirmado(f.medidas));
-    });
-    _avisar();
-  }
-
-  /// La guarda no es cosmética: una foto que el propio widget rechazó no sale
-  /// de aquí, aunque el formulario olvidara mirar.
-  void _avisar() {
-    final f = _foto;
-    final m = _medidasEfectivas;
-    widget.alCambiar(
-      f != null && m != null && _fallos.isEmpty ? FotoDeVisita.deJpeg(f.jpeg, m) : null,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final foto = _foto;
-    final activa = widget.habilitada && _abriendo == null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Foto del visitante', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 4),
-        const Text(
-          'De frente, con buena luz y sin nadie más en la imagen: es la foto con la que '
-          'los equipos de reconocimiento facial lo dejarán entrar.',
-          style: TextStyle(color: Paleta.textoSuave, fontSize: 13),
-        ),
-        const SizedBox(height: 12),
-        if (foto?.vistaPrevia != null) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(
-              foto!.vistaPrevia!,
-              height: 220,
-              fit: BoxFit.cover,
-              // Una vista previa ilegible no puede tumbar el formulario: la
-              // foto se juzgó por sus medidas, no por cómo se pinta.
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (foto != null && _faltaConfirmar) ...[
-          OutlinedButton.icon(
-            key: const Key('foto.confirmarEncuadre'),
-            onPressed: activa ? _confirmarEncuadre : null,
-            icon: const Icon(Icons.center_focus_strong_outlined),
-            label: const Text('Encuadre correcto: sale UNA persona, de frente, cerca'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (foto != null && _consejosVisibles.isNotEmpty) ...[
-          ConsejosDeLaFoto(fallos: _consejosVisibles),
-          const SizedBox(height: 12),
-        ],
-        if (foto != null && _fallos.isEmpty) ...[
-          const NotaDeLaFoto(
-            icono: Icons.check_circle_outline,
-            pareja: Paleta.exitoSuave,
-            texto: 'La foto sirve. Viajará con la visita.',
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (_aviso != null) ...[
-          NotaDeLaFoto(
-            key: const Key('foto.aviso'),
-            icono: Icons.no_photography_outlined,
-            pareja: Paleta.peligroSuave,
-            texto: _aviso!,
-          ),
-          const SizedBox(height: 12),
-        ],
-        // Los mismos dos textos antes y después de tener foto: con una foto
-        // que no sirve, lo que se busca es otra, venga de donde venga.
-        BotonDeLaFoto(
-          key: const Key('foto.tomar'),
-          icono: Icons.photo_camera_outlined,
-          texto: 'Tomar foto',
-          ocupado: _abriendo == OrigenDeFoto.camara,
-          alPulsar: activa ? () => _obtener(OrigenDeFoto.camara) : null,
-        ),
-        const SizedBox(height: 8),
-        BotonDeLaFoto(
-          key: const Key('foto.galeria'),
-          icono: Icons.photo_library_outlined,
-          texto: 'Elegir de la galería',
-          ocupado: _abriendo == OrigenDeFoto.galeria,
-          alPulsar: activa ? () => _obtener(OrigenDeFoto.galeria) : null,
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => CapturaDeRostro(
+    tomarFoto: tomarFoto,
+    alCambiar: alCambiar,
+    habilitada: habilitada,
+    titulo: 'Foto del visitante',
+    indicacion:
+        'De frente, con buena luz y sin nadie más en la imagen: es la foto con la que '
+        'los equipos de reconocimiento facial lo dejarán entrar.',
+    textoSiSirve: 'La foto sirve. Viajará con la visita.',
+  );
 }

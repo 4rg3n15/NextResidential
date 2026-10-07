@@ -14,6 +14,7 @@ import '../dominio/notificaciones.dart';
 import '../dominio/puertos.dart';
 import '../dominio/registro.dart';
 import '../dominio/revocacion.dart';
+import '../dominio/rostro.dart';
 
 class Dependencias {
   const Dependencias({
@@ -33,6 +34,7 @@ class Dependencias {
     required this.menores,
     required this.plazas,
     required this.revocacion,
+    required this.rostro,
     this.tomarFoto,
     this.almacen,
     this.cambiosDeRed,
@@ -67,6 +69,9 @@ class Dependencias {
   final RepositorioDeMenores menores;
   final RepositorioDePlazas plazas;
   final RevocacionDeVisitas revocacion;
+
+  /// 15-X (D2) · «Mi rostro»: registrar, renovar y retirar el rostro propio.
+  final RostroDelResidente rostro;
 
   /// 15-I (hito 3) · la cámara REAL del teléfono, y su galería. `null` = la
   /// simulada (web, recorrido y pruebas), declarada en `fuente_de_fotos.dart`.

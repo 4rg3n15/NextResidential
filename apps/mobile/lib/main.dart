@@ -32,6 +32,7 @@ import 'infraestructura/api/plazas_api.dart';
 import 'infraestructura/api/registro_api.dart';
 import 'infraestructura/api/repositorio_api.dart';
 import 'infraestructura/api/revocacion_api.dart';
+import 'infraestructura/api/rostro_api.dart';
 import 'infraestructura/api/soporte_de_api.dart';
 import 'infraestructura/camara/camara_del_telefono.dart';
 import 'infraestructura/notificaciones/fuente.dart';
@@ -126,6 +127,8 @@ Future<void> main() async {
         menores: MenoresPorApi(api: api, sesion: sesion),
         plazas: PlazasPorApi(api: api, sesion: sesion),
         revocacion: RevocacionPorApi(api: api, sesion: sesion),
+        // 15-X (D2) · «Mi rostro»: el rostro propio, por la misma API.
+        rostro: RostroPorApi(api: api, sesion: sesion),
         almacen: recuerdos,
         cambiosDeRed: cambiosDeRed(),
       ),
