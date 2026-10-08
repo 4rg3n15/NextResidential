@@ -1,5 +1,6 @@
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import type { CanalDeIntercom } from './puertos';
+import { MedidorDeDuplex } from './medidor-de-duplex';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -33,6 +34,8 @@ export interface SalidaDeConversacion {
   audio(trama: Uint8Array): void;
   aviso(motivo: string): void;
   cerrar(codigo: number, motivo: string): void;
+  /** B3 (15-S2) · el equipo resultó semidúplex: la consola muestra el turno. */
+  semiduplex?(): void;
 }
 
 export interface TramoHablado {
@@ -105,6 +108,9 @@ export class ConversacionDeAudio {
   private subida: Promise<void> = Promise.resolve();
   private enVuelo = 0;
   private ultimaRenovacion = 0;
+  /** B3 (15-S2) · manos libres: el audio no renueva el turno; el texto «voz» de la consola, sí. */
+  private manosLibres = false;
+  private readonly duplex = new MedidorDeDuplex();
   private readonly cuenta = { segundo: -1, tramas: 0, textos: 0 };
 
   constructor(
@@ -134,14 +140,19 @@ export class ConversacionDeAudio {
 
   alTexto(texto: string): void {
     if (this.cerrada || !this.dentroDelLimite('textos')) return;
-    let tipo: unknown;
+    let mensaje: { tipo?: unknown; modo?: unknown };
     try {
-      tipo = (JSON.parse(texto) as { tipo?: unknown }).tipo;
+      mensaje = JSON.parse(texto) as { tipo?: unknown; modo?: unknown };
     } catch {
       return;
     }
-    if (tipo === 'pulsar' && this.pulsadoDesde === null) this.pulsadoDesde = this.d.reloj.ahora();
-    else if (tipo === 'soltar') this.cerrarTramo();
+    if (mensaje.tipo === 'pulsar' && this.pulsadoDesde === null) {
+      this.pulsadoDesde = this.d.reloj.ahora();
+      this.manosLibres = mensaje.modo === 'manos_libres';
+    } else if (mensaje.tipo === 'soltar') {
+      this.cerrarTramo();
+      this.manosLibres = false;
+    }
     this.renovar(true);
   }
 
@@ -157,6 +168,7 @@ export class ConversacionDeAudio {
     // Sin «pulsar», el micrófono no tiene la palabra: se descarta aquí.
     if (this.pulsadoDesde === null || this.enVuelo >= SUBIDA_MAXIMA_EN_VUELO) return;
     this.enVuelo += 1;
+    this.duplex.contarSubida(trama.length);
     const { copropiedadId, dispositivoId, operadorId } = this.p;
     this.subida = this.subida
       .then(() => this.d.canal.enviarAudio(copropiedadId, dispositivoId, operadorId, trama))
@@ -164,7 +176,8 @@ export class ConversacionDeAudio {
       .finally(() => {
         this.enVuelo -= 1;
       });
-    this.renovar(false);
+    // B3 · en manos libres el micrófono nunca calla: el silencio no renueva el turno.
+    if (!this.manosLibres) this.renovar(false);
   }
 
   /** Idempotente: el cierre del socket, un corte del servidor o el fin de la escucha. */
@@ -215,6 +228,7 @@ export class ConversacionDeAudio {
       for (;;) {
         const { done, value } = await this.bajada.next();
         if (done === true || this.cerrada) break;
+        this.duplex.contarBajada(value.length);
         this.salida.audio(value);
       }
     } catch (e) {
@@ -230,10 +244,14 @@ export class ConversacionDeAudio {
       ahora.getTime() - this.pulsadoDesde.getTime() > this.limites.tramoMaximoS * 1000
     ) {
       this.cerrarTramo();
-      this.salida.aviso(
-        `El tramo superó los ${String(this.limites.tramoMaximoS)} s: suelte y vuelva a pulsar para seguir hablando`,
-      );
+      // B3 · S-177 en manos libres: el tope parte el registro en tramos, no corta.
+      if (this.manosLibres) this.pulsadoDesde = ahora;
+      else
+        this.salida.aviso(
+          `El tramo superó los ${String(this.limites.tramoMaximoS)} s: suelte y vuelva a pulsar para seguir hablando`,
+        );
     }
+    if (this.duplex.tic()) this.salida.semiduplex?.();
     const { copropiedadId, dispositivoId, operadorId } = this.p;
     const estado = await this.d.canal.estado(copropiedadId, dispositivoId, operadorId);
     if (estado.estado !== 'abierta' || estado.transporte !== 'equipo') {

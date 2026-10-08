@@ -66,19 +66,19 @@ describe('respaldo y reversión de la configuración (J2)', () => {
     expect(respaldo.serie).toBe('SIM0000001');
     expect(respaldo.documentos.map((d) => [d.clave, d.restaurable])).toEqual([
       ['verificacion-remota', true],
+      // B4 (15-S2) · el canal de audio también se respalda; esta terminal simulada no lo declara.
+      ['canales-de-audio', false],
     ]);
     await escribir(
       e,
       'fijar que la terminal espere el veredicto de la plataforma',
       JSON.stringify({ AcsCfg: { remoteCheckDoorEnabled: false, remoteCheckTimeout: 9 } }),
     );
-    expect(await restaurarRespaldo(e, respaldo)).toEqual([
-      {
-        clave: 'verificacion-remota',
-        estado: 'restaurado',
-        detalle: 'escrito y releído igual al respaldo',
-      },
-    ]);
+    expect((await restaurarRespaldo(e, respaldo))[0]).toEqual({
+      clave: 'verificacion-remota',
+      estado: 'restaurado',
+      detalle: 'escrito y releído igual al respaldo',
+    });
     // Otra vez: nada que escribir.
     expect((await restaurarRespaldo(e, respaldo))[0]?.estado).toBe('igual');
   });

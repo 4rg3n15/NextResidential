@@ -150,6 +150,10 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
         aviso: (motivo) => {
           if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ tipo: 'cortado', motivo }));
         },
+        // B3 (15-S2) · el equipo calla mientras recibe: la consola muestra el turno.
+        semiduplex: () => {
+          if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ tipo: 'semiduplex' }));
+        },
         cerrar: (codigo, motivo) => ws.close(codigo, motivo.slice(0, 120)),
       },
     );

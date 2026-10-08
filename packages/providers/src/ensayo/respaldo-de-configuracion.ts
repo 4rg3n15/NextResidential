@@ -79,6 +79,15 @@ const RECURSOS: Readonly<Record<FamiliaDeEnsayo, readonly Recurso[]>> = {
       escribir: 'fijar que la terminal espere el veredicto de la plataforma',
       familiaDeRuta: 'terminal',
     },
+    // B4 (15-S2) · el canal de audio de la terminal también entra en el respaldo:
+    // pasarlo a G.711 sólo se hace con él guardado, y se revierte con él.
+    {
+      clave: 'canales-de-audio',
+      leer: 'leer los canales de audio bidireccional del equipo',
+      escribir: 'configurar un canal de audio bidireccional',
+      familiaDeRuta: 'terminal',
+      porCanalDeAudio: true,
+    },
   ],
   videoportero: [
     {
@@ -249,7 +258,7 @@ export const capturarRespaldo = async (
 };
 
 /** Cada canal de una lista de audio, como documento propio con su espacio de nombres. */
-const canalesDe = (lista: string): Map<number, string> => {
+export const canalesDe = (lista: string): Map<number, string> => {
   const espacio = /xmlns="([^"]+)"/.exec(lista)?.[1] ?? 'http://www.isapi.org/ver20/XMLSchema';
   const canales = new Map<number, string>();
   for (const m of lista.matchAll(/<TwoWayAudioChannel\b[^>]*>([\s\S]*?)<\/TwoWayAudioChannel>/g)) {

@@ -1026,6 +1026,8 @@ export class HikvisionProvider
       // H-15S1-C07 · la casilla de la ficha: una persona atesta que el equipo abre.
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
       canal: capacidades.audioBidireccional.canal ?? equipo.canalDeAudio ?? null,
+      // B5 (15-S2) · el formato del canal, para la línea de cada sesión en la bitácora.
+      formato: capacidades.audioBidireccional.formato,
       // A4 · contestar y colgar por señalización SÓLO si el equipo la declara
       // (el DS-KD9633 del proyecto declara que no: NO APLICA POR CAPACIDAD). B
       // (15-S1) · y si su familia la tiene catalogada: la terminal, no.

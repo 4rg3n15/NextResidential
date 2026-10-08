@@ -730,6 +730,8 @@ const RUTAS_BASE: readonly RutaDeEquipo[] = [
  */
 const PROPOSITOS_DE_AUDIO = new Set([
   'leer los canales de audio bidireccional del equipo',
+  // B4 (15-S2) · para respaldar, pasar a G.711 con autorización y revertir.
+  'configurar un canal de audio bidireccional',
   'abrir el canal de audio bidireccional',
   'cerrar el canal de audio bidireccional',
   'enviar audio al equipo',
@@ -764,7 +766,7 @@ function rutasDeAudioDeLaTerminal(base: readonly RutaDeEquipo[]): readonly RutaD
  */
 export const RUTAS: readonly RutaDeEquipo[] = [
   ...RUTAS_BASE,
-  ...rutasDeAudioDeLaTerminal(RUTAS_BASE),
+  ...rutasDeAudioDeLaTerminal([...RUTAS_BASE, ...RUTAS_DE_LA_GUIA]),
   ...RUTAS_DE_LA_GUIA,
 ];
 

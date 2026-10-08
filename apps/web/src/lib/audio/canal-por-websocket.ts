@@ -34,8 +34,25 @@ const ADELANTO_MAXIMO_S = 0.15;
 export type EstadoDelCanalWs =
   | { readonly fase: 'conectando' }
   | { readonly fase: 'escuchando'; readonly aviso?: string }
-  | { readonly fase: 'hablando' }
+  | { readonly fase: 'hablando'; readonly manosLibres?: boolean }
   | { readonly fase: 'cerrado'; readonly motivo: string };
+
+/** B3 (15-S2) · lo que se ve en vivo: nivel 0…1 de cada sentido. */
+export interface NivelesDelCanal {
+  readonly recibiendo: number;
+  readonly enviando: number;
+}
+
+/** RMS (0…1) de muestras en coma flotante: lo mismo para lo que llega y lo que sale. */
+export const nivelDe = (muestras: Float32Array): number => {
+  if (muestras.length === 0) return 0;
+  let suma = 0;
+  for (const m of muestras) suma += m * m;
+  return Math.min(1, Math.sqrt(suma / muestras.length));
+};
+
+/** Por encima, el operador habla: en manos libres, eso renueva el turno («voz»). */
+export const UMBRAL_DE_VOZ = 0.02;
 
 export interface OpcionesDelCanalWs {
   readonly url: string;
@@ -44,6 +61,11 @@ export interface OpcionesDelCanalWs {
   readonly crearSocket?: (url: string) => WebSocket;
   readonly crearContexto?: () => AudioContext;
   readonly obtenerMicrofono?: () => Promise<MediaStream>;
+  /** B3 (15-S2) · niveles en vivo, unas cuatro veces por segundo. */
+  readonly alNiveles?: (niveles: NivelesDelCanal) => void;
+  /** B3 (15-S2) · la API midió que el equipo calla mientras recibe. */
+  readonly alSemiduplex?: () => void;
+  readonly ahora?: () => number;
 }
 
 /** Los cierres que decide el servidor, en palabras para el operador. */
@@ -69,6 +91,8 @@ export class CanalDeAudioPorWebSocket {
   private quiereHablar = false;
   private abriendo = false;
   private terminado = false;
+  private manosLibres = false;
+  private readonly niveles = { recibiendo: 0, enviando: 0, avisado: -Infinity, voz: -Infinity };
 
   constructor(private readonly opciones: OpcionesDelCanalWs) {
     this.contexto = (opciones.crearContexto ?? (() => new AudioContext()))();
@@ -87,9 +111,10 @@ export class CanalDeAudioPorWebSocket {
   }
 
   /** Mantener pulsado: abre el micrófono y transmite hasta `soltar`. */
-  async pulsar(): Promise<void> {
+  async pulsar(manosLibres = false): Promise<void> {
     this.quiereHablar = true;
     if (this.terminado || this.captura !== null || this.abriendo) return;
+    this.manosLibres = manosLibres;
     this.abriendo = true;
     try {
       const flujo = await (this.opciones.obtenerMicrofono ?? microfonoPorOmision)();
@@ -97,16 +122,28 @@ export class CanalDeAudioPorWebSocket {
         for (const pista of flujo.getTracks()) pista.stop();
         return;
       }
-      this.enviarTexto({ tipo: 'pulsar' });
+      this.enviarTexto(
+        this.manosLibres ? { tipo: 'pulsar', modo: 'manos_libres' } : { tipo: 'pulsar' },
+      );
       this.captura = this.capturar(flujo);
-      this.opciones.alEstado({ fase: 'hablando' });
+      this.opciones.alEstado({ fase: 'hablando', manosLibres: this.manosLibres });
     } finally {
       this.abriendo = false;
     }
   }
 
+  /**
+   * B3 (15-S2) · manos libres: el micrófono abierto hasta colgar (o hasta
+   * `soltar`), con cancelación de eco y supresión de ruido. La bajada nunca se
+   * detiene mientras se habla, ni aquí ni en la API.
+   */
+  manosLibresActivas(): Promise<void> {
+    return this.pulsar(true);
+  }
+
   soltar(): void {
     this.quiereHablar = false;
+    this.manosLibres = false;
     if (this.captura === null) return;
     this.captura();
     this.captura = null;
@@ -132,7 +169,10 @@ export class CanalDeAudioPorWebSocket {
     this.opciones.alEstado({ fase: 'cerrado', motivo });
   }
 
-  private enviarTexto(mensaje: { readonly tipo: 'pulsar' | 'soltar' }): void {
+  private enviarTexto(mensaje: {
+    readonly tipo: 'pulsar' | 'soltar' | 'voz';
+    readonly modo?: 'manos_libres';
+  }): void {
     if (this.socket.readyState === 1) this.socket.send(JSON.stringify(mensaje));
   }
 
@@ -144,6 +184,7 @@ export class CanalDeAudioPorWebSocket {
     if (typeof datos !== 'string') return;
     try {
       const aviso = JSON.parse(datos) as { tipo?: unknown; motivo?: unknown };
+      if (aviso.tipo === 'semiduplex') this.opciones.alSemiduplex?.();
       if (aviso.tipo === 'cortado') {
         // El servidor cortó el tramo (turno caducado o tramo demasiado largo).
         this.quiereHablar = false;
@@ -162,6 +203,7 @@ export class CanalDeAudioPorWebSocket {
   private programar(bytes: Uint8Array): void {
     if (bytes.length === 0 || this.terminado) return;
     const muestras = decodificar(this.opciones.formato, bytes);
+    this.anotarNivel('recibiendo', nivelDe(muestras));
     const bufer = this.contexto.createBuffer(1, muestras.length, HZ_DEL_CANAL);
     bufer.copyToChannel(muestras, 0);
     const fuente = this.contexto.createBufferSource();
@@ -175,6 +217,28 @@ export class CanalDeAudioPorWebSocket {
     this.cursor += bufer.duration;
   }
 
+  /**
+   * B3 · el nivel de un sentido, a la consola como mucho cuatro veces por
+   * segundo; y en manos libres, «voz» a la API como mucho una vez por segundo
+   * cuando el operador habla de verdad (el silencio no renueva el turno).
+   */
+  private anotarNivel(sentido: 'recibiendo' | 'enviando', nivel: number): void {
+    const ahora = (this.opciones.ahora ?? Date.now)();
+    this.niveles[sentido] = nivel;
+    if (sentido === 'enviando' && this.manosLibres && nivel > UMBRAL_DE_VOZ) {
+      if (ahora - this.niveles.voz >= 1000) {
+        this.niveles.voz = ahora;
+        this.enviarTexto({ tipo: 'voz' });
+      }
+    }
+    if (ahora - this.niveles.avisado < 250) return;
+    this.niveles.avisado = ahora;
+    this.opciones.alNiveles?.({
+      recibiendo: this.niveles.recibiendo,
+      enviando: this.captura === null ? 0 : this.niveles.enviando,
+    });
+  }
+
   private capturar(flujo: MediaStream): () => void {
     const fuente = this.contexto.createMediaStreamSource(flujo);
     const procesador = this.contexto.createScriptProcessor(MUESTRAS_POR_BLOQUE, 1, 1);
@@ -185,6 +249,7 @@ export class CanalDeAudioPorWebSocket {
         this.contexto.sampleRate,
         HZ_DEL_CANAL,
       );
+      this.anotarNivel('enviando', nivelDe(a8k));
       const { trozos, resto } = trocear(
         pendiente,
         codificar(this.opciones.formato, a8k),

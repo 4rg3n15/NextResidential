@@ -71,7 +71,8 @@ describe('IntercomIsapiPersistente · contra el videoportero simulado en red', (
     await intercom.cerrarSesion('fin');
     expect((await flujo.next()).done).toBe(true);
     expect(
-      equipo.peticiones().filter((p) => p.startsWith('GET') && p.endsWith('audioData')),
+      // B2 (15-S2) · ahora con `?sessionId=` detrás: el equipo lo dio al abrir.
+      equipo.peticiones().filter((p) => p.startsWith('GET') && p.includes('/audioData')),
     ).not.toHaveLength(0);
   });
 
