@@ -62,8 +62,8 @@ describe.skipIf(omitida !== null)(
         [
           'streams:',
           `  camara: exec:${ffmpeg ?? 'ffmpeg'} -hide_banner -loglevel error -re -f lavfi -i ` +
-            'testsrc2=size=320x240:rate=15 -c:v libx265 -preset ultrafast -tune zerolatency ' +
-            '-x265-params keyint=15:log-level=error -an -f rtsp {output}',
+            'testsrc2=size=320x240:rate=10 -c:v libx265 -preset ultrafast -tune zerolatency ' +
+            '-x265-params keyint=10:log-level=error -an -f rtsp {output}',
         ],
         { rtspInterno: true },
       );
