@@ -15,6 +15,7 @@ import { juzgarDuplex } from '@ncr/providers';
  * turno de palabra.
  * ═════════════════════════════════════════════════════════════════════════════
  */
+/** [SUPUESTO] S-15S2-04 · media tasa de G.711: por encima, el operador habla. */
 const HABLANDO_B_POR_S = 4000;
 
 export class MedidorDeDuplex {

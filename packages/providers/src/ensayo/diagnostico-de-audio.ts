@@ -81,7 +81,10 @@ export const nivelDbfs = (bytes: Uint8Array, formato: string | null): number | n
   return rms === 0 ? -Infinity : Math.round(20 * Math.log10(rms) * 10) / 10;
 };
 
-/** B3 · dúplex por la bajada: lo que llega mientras se habla frente a lo de antes. */
+/**
+ * B3 · dúplex por la bajada: lo que llega mientras se habla frente a lo de antes.
+ * [SUPUESTO] S-15S2-04 · ≥ 50 % completo, < 10 % semidúplex, con 800 B/s de base.
+ */
 export const juzgarDuplex = (
   bytesPorSegundoAntes: number,
   bytesPorSegundoDurante: number,

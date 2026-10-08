@@ -20,7 +20,7 @@
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
-/** Dónde escucha el RTSP interno de go2rtc: sólo bucle local. */
+/** Dónde escucha el RTSP interno de go2rtc: sólo bucle local. [SUPUESTO] S-15S2-01 · el 8554, libre en el Mac. */
 export const RTSP_INTERNO = '127.0.0.1:8554';
 
 /** La política de `VIDEO_TRANSCODIFICAR`, o un error en palabras si no es una de las dos. */

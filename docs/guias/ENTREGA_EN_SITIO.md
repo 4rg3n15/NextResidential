@@ -154,9 +154,32 @@ expected key`. Se escribe con **permisos 0600**, y si en el fichero quedó un
   «Probar conexión» **avisa** con el hallazgo «canal de video de la ficha» (cuál
   tenía, que el equipo no lo declara, cuál se usará) y lo guarda; si la lista no
   se pudo leer lo dice con el motivo —pruébela con el **usuario de servicio**,
-  no con `admin`—; y un canal que **declara** H.265 se niega antes del puente:
-  «cambie ese flujo a H.264 en el equipo (requiere autorización del cliente)».
-  El código no cambia el códec.
+  no con `admin`—. _Corregido en la 15-S2:_ la 15-S1 negaba ese canal ANTES
+  del puente, también a Safari, que sí reproduce H.265; ver el punto siguiente.
+  El código no cambia el códec del equipo.
+- **15-S2 · A · H.265: Safari directo, Chrome transcodificado.** Medido con
+  go2rtc v1.9.14 y una fuente H.265: con la oferta de **Safari** el puente sirve
+  el H.265 **directo** (primer cuadro en ≈0,2 s); la de **Chrome** no trae H.265
+  y go2rtc contestaba `500 · codecs not matched`. Ahora la API decide la vía
+  con el códec del equipo y lo que el navegador acepta:
+  - **Safari** → directo, sin coste.
+  - **Chrome** → el puente lo **transcodifica a H.264** con **ffmpeg**, si
+    `VIDEO_TRANSCODIFICAR=auto` (por omisión). Instálelo la víspera:
+    **`brew install ffmpeg`**; `pnpm sitio:video -- --preparar` falla si falta y
+    lo dice. Cuesta CPU y retraso: en el banco, el primer cuadro llegó a
+    **≈1,4–2,5 s** de pedirlo (frente a los 2 s de KPI-33); en el Mac se mide
+    con el paso 7.
+  - Sin ffmpeg, con `VIDEO_TRANSCODIFICAR=nunca` o con el video servido por el
+    Edge: «no reproducible» con los **tres remedios** — (1) Safari, (2) ffmpeg,
+    (3) H.264 en el equipo **con autorización del cliente**.
+  - La transcodificación lee del **RTSP interno de go2rtc, sólo en
+    `127.0.0.1:8554`** (`pnpm sitio:video` lo enciende con `auto`): la clave del
+    equipo **no** aparece en los argumentos de ffmpeg (comprobado con `ps`).
+    go2rtc deja entrar a ese RTSP sin credencial desde el propio Mac
+    (H-15S2-02): por eso nunca escucha en la red.
+  - El **paso 7 de `pnpm sitio:ensayo`** dice la vía (directo o
+    transcodificado), la SDP y el **primer cuadro a los N ms de pedirlo**, y
+    prueba además la vía de Safari.
 - Con `GO2RTC_URL` en el `.env`, el **paso 7 de `pnpm sitio:ensayo`** además
   negocia WebRTC de verdad contra go2rtc (PATCH + `POST /api/webrtc`) y mide
   los milisegundos; sin credencial en ninguna línea.
@@ -363,6 +386,26 @@ fila en la hoja.
 6. **Puerta libre y bloqueada** (§8.4.3), con el administrador del conjunto delante.
 7. **Opcional:** el corte de WAN del Edge, si hay Edge y queda tiempo
    ([`DESPLIEGUE_EDGE.md`](DESPLIEGUE_EDGE.md) §9).
+
+> **15-S2 · lo nuevo de esta visita, antes del punto 2.** Detalle en
+> [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md) §8.4.4.
+>
+> - **Video de la cámara (H.265):** ábrala en **Safari** y en **Chrome**; anote la
+>   vía y los ms del paso 7 (`pnpm sitio:ensayo -- --equipo=camara`).
+> - **Audio medido:** `pnpm sitio:audio -- --equipo=videoportero` y
+>   `--equipo=terminal`. Dice formato, volúmenes, si el equipo usa el
+>   `sessionId`, los bytes y el nivel de lo que manda, si es **dúplex o
+>   semidúplex**, y pregunta si se oyó el tono. Informe en `$HOME/ncr-sitio`,
+>   sin IP ni claves, y **sin guardar audio** (la voz es dato personal).
+> - **Terminal que no es G.711:** sólo con autorización del cliente,
+>   `pnpm sitio:audio -- --equipo=terminal --pasar-a-g711
+--respaldo=$HOME/ncr-sitio/respaldo` (respaldo primero, pregunta, relee);
+>   se revierte con `pnpm sitio:ensayo -- --equipo=terminal
+--restaurar=$HOME/ncr-sitio/respaldo`.
+> - **Consola de guardia:** «**Manos libres**» (micrófono abierto hasta colgar)
+>   y «Mantener para hablar»; los medidores «Recibiendo del equipo» y
+>   «Enviando». Si el equipo resulta semidúplex, la consola lo dice y muestra
+>   el turno.
 
 **Lo que no se puede probar en sitio, y por qué:**
 

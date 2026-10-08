@@ -973,7 +973,7 @@ declaradas por analogía documentada y **no medidas** en la DS-K1T344MBFWX-E1
 | 2   | Ficha del equipo → **«Probar conexión»**: el hallazgo «canal de audio bidireccional» dice el canal y el formato declarados                                                                                                      |                     |
 | 3   | Marcar en la ficha **«comprobé en sitio que el equipo abre el canal de audio (atestación)»** y guardar                                                                                                                          |                     |
 | 4   | Anotar el **códec** y la frecuencia de muestreo que negocia                                                                                                                                                                     |                     |
-| 5   | Comprobar si es **semiduplex** o duplex completo                                                                                                                                                                                |                     |
+| 5   | Comprobar si es **semiduplex** o duplex completo: **`pnpm sitio:audio`** lo mide (15-S2, §8.4.4)                                                                                                                                |                     |
 | 6   | Medir la latencia extremo a extremo (KPI-33 · < 2 s), hablando y escuchando                                                                                                                                                     |                     |
 | 7   | Probar qué pasa si **dos operadores** lo piden a la vez                                                                                                                                                                         |                     |
 
@@ -1000,7 +1000,29 @@ tabla del ADR midió contra el simulado; **la cifra que vale es ésta**.
 
 Si el equipo es **semiduplex**, la consola lo dice junto al botón; el manual de
 la familia no lo declara en las capacidades de audio, así que se anota a oído en
-el paso 3 de la tabla de arriba.
+el paso 3 de la tabla de arriba. _Desde la 15-S2 se MIDE_ (§8.4.4).
+
+#### 8.4.4 · Audio dúplex, `sessionId` y diagnóstico (15-S2)
+
+_Añadido en la 15-S2 (2026-10-08)._ Lo que el 07/10 quedó sin explicar —la
+terminal no oía al operador; el operador no oía al equipo mientras hablaba— se
+mide con **`pnpm sitio:audio -- --equipo=<familia o nombre>`**, que usa el
+mismo adaptador que la guardia (el del WebSocket) y no guarda audio.
+
+| #   | Qué hacer                                                                                                                                                                                                        | Resultado (anótelo) |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | `pnpm sitio:audio -- --equipo=videoportero`: anote **formato, muestreo, tasa y volumen del altavoz** (sólo lectura)                                                                                              |                     |
+| 2   | La línea **`sessionId:`** — `usado` (el equipo lo acepta), `rechazado` (lo rechazó y se siguió sin él) o `no lo dio el equipo`; y los **estados HTTP** de `open`, `audioData` y `close`                          |                     |
+| 3   | La **bajada**: bytes por segundo y nivel en dBFS escuchando; ponga a alguien a hablar delante del equipo y repita: el nivel debe subir                                                                           |                     |
+| 4   | El **tono de 2 s**: ¿se oyó en el equipo? Si **no**, es FALLO: con `sessionId: rechazado` o `usado` ya se descartó la sesión; mire el volumen del altavoz y el formato                                           |                     |
+| 5   | La línea **`dúplex:`** — `completo` (la bajada siguió mientras sonaba el tono) o `semiduplex` (calló). Es lo que explica no oír al equipo mientras se habla                                                      |                     |
+| 6   | Lo mismo con **`--equipo=terminal`**. Si dice «NO es G.711», la consola no puede hablarle: sólo con **autorización del cliente**, `--pasar-a-g711 --respaldo=$HOME/ncr-sitio/respaldo` (respaldo primero)        |                     |
+| 7   | En la consola de guardia: **«Manos libres»** y hablar sin pulsar; los medidores **Recibiendo** y **Enviando** se mueven a la vez en un equipo dúplex. Medir < 2 s (KPI-33) con la palmada de la fila 4 de §8.4.1 |                     |
+
+**Por qué el `sessionId`** ([SUPUESTO] S-15S2-02): el DS-KD9633 lo devuelve en
+`open` y hasta la 15-S1 no se usaba. Ahora se manda en `audioData` y `close`;
+si el equipo rechaza la petición con él, se repite sin él. La fila 2 dice cuál
+de los dos casos es el de cada equipo, sin tocar código.
 
 #### 8.4.2 · Las salidas del videoportero (15-P · P3)
 
