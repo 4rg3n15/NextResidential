@@ -334,6 +334,14 @@ export const esquemaConfiguracion = z.object({
    */
   VIDEO_PUERTO_RTSP: z.coerce.number().int().min(1).max(65535).default(554),
   /**
+   * A3 (15-S2) · ¿transcodifica el puente a H.264 cuando el navegador no
+   * acepta el códec del equipo (H.265 en Chrome)? `auto`: sí, con ffmpeg en la
+   * máquina de go2rtc y su RTSP interno en 127.0.0.1 (`pnpm sitio:video` lo
+   * enciende); `nunca`: no, y la consola dice los tres remedios. Transcodificar
+   * cuesta CPU y retraso: medido en banco, el primer cuadro tarda ≈2 s más.
+   */
+  VIDEO_TRANSCODIFICAR: z.enum(['auto', 'nunca']).default('auto'),
+  /**
    * C4 (15-L) · cada cuántos segundos se toma el latido de los equipos
    * (señal de su escucha o una lectura real de su identidad). 0 lo apaga.
    */

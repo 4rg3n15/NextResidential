@@ -51,7 +51,10 @@ describe('la ficha dice el video que entrega el equipo', () => {
     expect(d.capacidadesDelEquipo?.video.codec).toBe('H.265');
     const h = fichaDe(d).hallazgos.find((x) => x.campo === 'video en vivo (canal 101)');
     expect(h?.estado).toBe('aviso');
-    expect(h?.detalle).toMatch(/H\.265 .* el navegador no lo reproduce/);
+    // A2 (15-S2) · ya no «no lo reproduce»: Safari directo, Chrome transcodificado.
+    expect(h?.detalle).toMatch(
+      /H\.265 en el canal 101: Safari lo reproduce directo; Chrome, sólo si el puente lo transcodifica/,
+    );
   });
 
   it('un canal que el equipo no tiene: se dice cuál, y la capacidad queda en «no»', async () => {
@@ -96,12 +99,19 @@ describe('el origen del video respeta lo que el equipo contestó', () => {
       reloj: { ahora: () => new Date(0) },
     });
 
-  it('H.265 en el canal de la ficha: se niega antes de negociar, con palabras', async () => {
-    const error = await proveedorCon('101')
-      .origenDeVideo('v-1')
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(VideoNoReproducible);
-    expect(motivoLegible(error)).toMatch(/H\.265 en el canal 101 .* cámbielo a H\.264/);
+  // A2 (15-S2) · la MISMA regla que el códec declarado: la última respuesta
+  // RTSP en ese canal viaja con el origen y la API decide con la oferta.
+  it('H.265 en el canal de la ficha: el origen lleva el códec de la última respuesta RTSP', async () => {
+    expect(await proveedorCon('101').origenDeVideo('v-1')).toMatchObject({
+      codec: 'H.265',
+      canal: '101',
+    });
+  });
+
+  it('VideoNoReproducible, si llega de un Edge viejo, se dice con los tres remedios', () => {
+    expect(motivoLegible(new VideoNoReproducible('v-1', 'H.265', '101'))).toMatch(
+      /H\.265 en el canal 101 .*Safari.*ffmpeg.*H\.264 en el equipo/,
+    );
   });
 
   it('si la ficha ya apunta a otro canal, la respuesta vieja no manda', async () => {

@@ -128,7 +128,19 @@ export interface EscalamientoDeAlerta {
 export interface PuenteDeVideo {
   asegurarFlujo(nombre: string, fuente: string): Promise<void>;
   negociar(nombre: string, ofertaSdp: string): Promise<string>;
+  /**
+   * A3 (15-S2) · registra el flujo `nombre`, ya asegurado, TRANSCODIFICADO a
+   * H.264 bajo otro nombre, y lo devuelve. La fuente nueva REFERENCIA el flujo
+   * por su nombre: la credencial del equipo no aparece en ella ni en los
+   * argumentos del proceso que transcodifica (RN-21). `null`: este puente no
+   * puede transcodificar ese flujo (el que sirve el Edge). Sin el método, el
+   * puente no transcodifica nunca.
+   */
+  asegurarTranscodificado?(nombre: string): Promise<string | null>;
 }
+
+/** A3 (15-S2) · `VIDEO_TRANSCODIFICAR`: `auto` transcodifica cuando hace falta; `nunca`, no. */
+export type PoliticaDeTranscodificacion = 'auto' | 'nunca';
 
 export const PUENTE_DE_VIDEO = Symbol.for('ncr.puerto.PuenteDeVideo');
 

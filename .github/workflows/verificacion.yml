@@ -250,6 +250,13 @@ jobs:
       - name: Chromium para el paso 12c
         run: pnpm exec playwright install chromium
 
+      # A6 (15-S2) · las pruebas de transcodificación H.265 → H.264 arrancan
+      # go2rtc con ffmpeg de verdad; sin ffmpeg se OMITEN con nombre y, con
+      # `--con-base`, una omisión no declarada es FALLO (D-112). Como el
+      # binario de go2rtc, se pone en vez de declarar la omisión.
+      - name: ffmpeg para las pruebas de transcodificación
+        run: brew install ffmpeg || brew list ffmpeg
+
       - name: PostgreSQL en el runner
         run: |
           brew install postgresql@16 || brew list postgresql@16

@@ -13,6 +13,15 @@ export interface OrigenDeVideo {
   /** Qué flujo es: principal (mayor calidad) o secundario (menor latencia). */
   readonly flujo: 'principal' | 'secundario';
   readonly detalle: string;
+  /**
+   * A2 (15-S2) · el códec que el equipo declara para ESTE canal (o, si no lo
+   * declara, el de su última respuesta RTSP en él): «H.264», «H.265». `null` o
+   * ausente si no se sabe. Con él y la oferta del navegador, la API decide si
+   * el video va directo, transcodificado o no se puede ver (`via-de-video.ts`).
+   */
+  readonly codec?: string | null;
+  /** A2 (15-S2) · el canal elegido (canal×100+flujo), para nombrarlo al operador. */
+  readonly canal?: string | null;
 }
 
 /**

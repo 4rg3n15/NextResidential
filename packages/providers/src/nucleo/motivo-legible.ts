@@ -46,8 +46,8 @@ export const motivoLegible = (error: unknown): string => {
   if (error instanceof VideoNoReproducible) {
     return (
       `el equipo entrega ${error.codec} en el canal ${error.canal} y el navegador no lo ` +
-      'reproduce por WebRTC: cámbielo a H.264 en el equipo (requiere autorización del ' +
-      'cliente) o elija otro canal en su ficha'
+      'reproduce por WebRTC: ábralo en Safari, instale ffmpeg en el Mac para que el puente ' +
+      'lo transcodifique, o cámbielo a H.264 en el equipo (requiere autorización del cliente)'
     );
   }
   if (error instanceof SinCanalDeVideo) {

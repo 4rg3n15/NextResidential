@@ -7,7 +7,9 @@ import { PUENTE_DE_VIDEO } from '../aplicacion/puertos';
 import type { CredencialesEnElEdge } from '../../comun/credenciales-en-el-edge';
 import { copropiedadEnCurso } from '../../proveedores';
 import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado } from '../aplicacion/puertos';
-import type { PuenteDeVideo } from '../aplicacion/puertos';
+import type { PoliticaDeTranscodificacion, PuenteDeVideo } from '../aplicacion/puertos';
+import { CONFIGURACION } from '../../configuracion/configuracion.module';
+import type { Configuracion } from '../../configuracion/esquema';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
 import { NegociarVistaEnVivo } from '../aplicacion/vista-en-vivo';
@@ -47,6 +49,13 @@ export class PuenteDeVideoPorElEdge implements PuenteDeVideo {
     this.delEdge.delete(nombre);
     if (this.directo === null) throw new PuenteDeVideoNoConfigurado();
     await this.directo.asegurarFlujo(nombre, fuente);
+  }
+
+  /** A3 (15-S2) · el go2rtc del Edge no transcodifica (aún): para sus flujos, `null`. */
+  async asegurarTranscodificado(nombre: string): Promise<string | null> {
+    if (this.delEdge.has(nombre) || this.directo?.asegurarTranscodificado === undefined)
+      return null;
+    return this.directo.asegurarTranscodificado(nombre);
   }
 
   async negociar(nombre: string, ofertaSdp: string): Promise<string> {
@@ -105,14 +114,16 @@ export const vistaEnVivoPorCopropiedad = (
   bitacora: Bitacora,
   reloj: Reloj,
   edge?: CredencialesEnElEdge | null,
+  transcodificar: PoliticaDeTranscodificacion = 'auto',
 ): Negociacion => {
-  const deSiempre = new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj);
+  const deSiempre = new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj, transcodificar);
   if (edge === undefined || edge === null) return deSiempre;
   const conEdge = new NegociarVistaEnVivo(
     proveedor,
     new PuenteDeVideoPorElEdge(puente, edge),
     bitacora,
     reloj,
+    transcodificar,
   );
   return new VistaEnVivoPorCopropiedad(deSiempre, conEdge, edge);
 };
@@ -124,7 +135,23 @@ export const PROVEEDOR_DE_VISTA_EN_VIVO: FactoryProvider<Negociacion> = {
     PUENTE_DE_VIDEO,
     BITACORA,
     RELOJ,
+    CONFIGURACION,
     { token: CREDENCIALES_EN_EL_EDGE, optional: true },
   ],
-  useFactory: vistaEnVivoPorCopropiedad,
+  useFactory: (
+    proveedor: ProveedorDeEquipos,
+    puente: PuenteDeVideo | null,
+    bitacora: Bitacora,
+    reloj: Reloj,
+    configuracion: Configuracion,
+    edge?: CredencialesEnElEdge | null,
+  ) =>
+    vistaEnVivoPorCopropiedad(
+      proveedor,
+      puente,
+      bitacora,
+      reloj,
+      edge,
+      configuracion.VIDEO_TRANSCODIFICAR,
+    ),
 };

@@ -232,6 +232,13 @@ if go2rtc_bin=$(node scripts/lib/go2rtc-para-pruebas.mjs "$RAIZ_DEL_REPO" 2>&1);
 else
   echo "   · sin go2rtc real: $(printf '%s\n' "$go2rtc_bin" | tail -n 1)"
 fi
+# A6 (15-S2) · y ffmpeg, para las de transcodificación: no se descarga; sin él
+# se omiten con nombre y, con `--con-base`, la comprobación de saltadas falla.
+if command -v ffmpeg >/dev/null 2>&1; then
+  ok "ffmpeg para las pruebas de transcodificación: $(command -v ffmpeg)"
+else
+  echo "   · sin ffmpeg: las pruebas de transcodificación se omitirán (macOS: brew install ffmpeg)"
+fi
 TURBO_TELEMETRY_DISABLED=1 con_limite "$LIMITE_LARGO" pnpm exec turbo run test -- \
   --reporter=default --reporter=json --outputFile=.informe-paso5.json \
   >"$salida_pruebas" 2>&1

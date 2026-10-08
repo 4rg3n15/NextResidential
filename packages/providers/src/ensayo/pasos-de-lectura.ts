@@ -186,14 +186,17 @@ export const pasoDeVideo = (d: DiagnosticoDeEquipo, familia: FamiliaDeEnsayo): R
         'también en la ficha del equipo en la consola',
     );
   }
-  if (v.codec !== 'H.264') {
-    return resultado(
-      'video',
-      'fallo',
-      `El equipo entrega ${v.codec ?? 'un códec que no se pudo leer'} (${donde}); el navegador ` +
-        'sólo reproduce H.264',
-      'En el panel web: Configuración → Video/Audio → subflujo → codificación H.264',
-    );
-  }
-  return resultado('video', 'ok', `H.264 por RTSP (${donde})`);
+  if (v.codec === 'H.264') return resultado('video', 'ok', `H.264 por RTSP (${donde})`);
+  // A2 (15-S2) · la misma regla que la API: otro códec NO es un fallo en sí.
+  // Safari reproduce H.265 directo y Chrome lo ve transcodificado por el
+  // puente; un códec no leído se intenta directo. La negociación de abajo
+  // dice qué vía queda y cuánto tarda.
+  return resultado(
+    'video',
+    'ok',
+    v.codec === null
+      ? `Video por RTSP en un códec que no se pudo leer (${donde}): se intenta directo`
+      : `${v.codec} por RTSP (${donde}): Safari lo reproduce directo; Chrome, sólo ` +
+          'transcodificado por el puente (ffmpeg y VIDEO_TRANSCODIFICAR=auto)',
+  );
 };

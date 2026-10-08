@@ -53,14 +53,17 @@ describe('del rechazo del fabricante a la clase NEUTRAL · una por reacción', (
 describe('15-P · 0.5 · H.265: el mensaje dice cómo pasar a H.264', () => {
   it('es el texto que la consola enseña entero (causas-de-video.test.ts)', async () => {
     const { VideoNoReproducible } = await import('../nucleo/errores');
-    // C.2 (15-S1) · con el texto pedido tras la visita del 06/10: WebRTC y la
-    // autorización del cliente, porque el códec del equipo no lo cambia el código.
+    // C.2 (15-S1) · WebRTC y la autorización del cliente; A4 (15-S2) · además
+    // los tres remedios, en el orden en que se aplican en sitio.
     expect(new VideoNoReproducible('disp', 'H.265', '101').message).toBe(
-      'El equipo entrega H.265 en el canal 101; el navegador no lo reproduce por WebRTC: ' +
-        'cambie ese flujo a H.264 en el equipo (requiere autorización del cliente). Para verlo: ' +
-        'en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» elija el ' +
-        'principal (canal 101); en «Codificación de video» ponga H.264 y pulse Guardar; o elija ' +
-        'otro canal en su ficha que ya entregue H.264.',
+      'El equipo entrega H.265 en el canal 101: el navegador no lo reproduce por WebRTC. ' +
+        'Para verlo: (1) abra la consola en Safari, que reproduce H.265; (2) instale ffmpeg en ' +
+        'el Mac (`brew install ffmpeg`) con VIDEO_TRANSCODIFICAR=auto y reinicie ' +
+        '`pnpm sitio:video`, y el puente lo transcodifica a H.264; o (3) cambie ese flujo a ' +
+        'H.264 en el equipo, lo que requiere autorización del cliente. Para (3): en la web del ' +
+        'equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» elija el principal ' +
+        '(canal 101); en «Codificación de video» ponga H.264 y pulse Guardar; o elija otro ' +
+        'canal en su ficha que ya entregue H.264.',
     );
     expect(new VideoNoReproducible('disp', 'H.265', '102').message).toContain(
       'subflujo (canal 102)',

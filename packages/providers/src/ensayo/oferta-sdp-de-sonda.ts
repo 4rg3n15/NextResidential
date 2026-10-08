@@ -46,3 +46,18 @@ export const OFERTA_SDP_DE_SONDA = ((): string => {
     '',
   ].join('\r\n');
 })();
+
+/**
+ * A5 (15-S2) · la misma oferta con H.265 además de H.264: la forma de Safari,
+ * que reproduce H.265 por WebRTC. Con ella el puente sirve un equipo en H.265
+ * DIRECTO (medido con go2rtc v1.9.14: 201 en ≈115 ms), sin transcodificar.
+ */
+export const OFERTA_SDP_DE_SONDA_CON_H265 = OFERTA_SDP_DE_SONDA.replace(
+  'm=video 9 UDP/TLS/RTP/SAVPF 96',
+  'm=video 9 UDP/TLS/RTP/SAVPF 96 97',
+).replace(
+  'a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
+  'a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\r\n' +
+    'a=rtpmap:97 H265/90000\r\n' +
+    'a=fmtp:97 level-id=93;profile-id=1;tier-flag=0;tx-mode=SRST',
+);

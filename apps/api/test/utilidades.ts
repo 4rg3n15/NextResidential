@@ -111,6 +111,7 @@ export const configuracionDePrueba: Configuracion = {
   EQUIPOS_FOTO_KB_MAXIMOS: 200,
   EQUIPOS_FOTO_LADO_MAXIMO: 1024,
   VIDEO_PUERTO_RTSP: 554,
+  VIDEO_TRANSCODIFICAR: 'auto',
   // C4 · el latido corre por intervalo; las suites que lo miran llaman a la pasada.
   EQUIPOS_LATIDO_S: 0,
   // Este banco no tiene base: el cargador que lee de ella fallaría en cada

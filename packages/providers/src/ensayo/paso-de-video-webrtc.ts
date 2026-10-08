@@ -1,6 +1,8 @@
 import { urlRtspDe } from '../hikvision/video-rtsp';
 import { sinSecretos } from '../equipo/intercambio';
-import { OFERTA_SDP_DE_SONDA } from './oferta-sdp-de-sonda';
+import { REMEDIOS_DE_VIDEO, codecsDeLaOferta, decidirViaDeVideo } from '../nucleo/via-de-video';
+import { PuenteDelEnsayo } from './negociacion-de-ensayo';
+import { OFERTA_SDP_DE_SONDA, OFERTA_SDP_DE_SONDA_CON_H265 } from './oferta-sdp-de-sonda';
 import { resultado } from './tipos';
 import type { OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
 
@@ -21,6 +23,19 @@ import type { OpcionesDeEnsayo, ResultadoDePaso } from './tipos';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const CAUSAS: readonly { readonly patron: RegExp; readonly frase: string }[] = [
+  // A3 (15-S2) · lo que go2rtc dice sin ffmpeg o con su RTSP interno apagado.
+  {
+    patron: /ffmpeg"?: executable file not found|fork\/exec [^:]*ffmpeg/i,
+    frase: 'el puente no encuentra ffmpeg para transcodificar a H.264 (`brew install ffmpeg`)',
+  },
+  {
+    patron: /rtsp module disabled/i,
+    frase: 'el puente tiene apagado su RTSP interno: reinícielo con `pnpm sitio:video`',
+  },
+  {
+    patron: /codecs not matched/i,
+    frase: 'el navegador no acepta el códec del equipo y no se transcodificó',
+  },
   {
     patron: /did not find expected key|yaml/i,
     frase: 'el puente rechazó el registro por un `streams:` sobrante en su fichero',
@@ -59,10 +74,27 @@ const limpio = (texto: string): string =>
 const causaDe = (texto: string): string =>
   CAUSAS.find((c) => c.patron.test(texto))?.frase ?? 'el puente no pudo negociar el video';
 
+/**
+ * A5 (15-S2) · el primer cuadro DESDE QUE SE PIDE —la SDP más lo que tarda el
+ * primer fragmento con medios—, contra los 2 s de KPI-33. En el banco, tras la
+ * SDP el cuadro llega en ≈45 ms porque el transcodificador ya está en marcha:
+ * la espera está en la SDP, que go2rtc no contesta hasta conocer el códec que
+ * le entrega ffmpeg.
+ */
+const fraseDelCuadro = (sdpMs: number, cuadroMs: number | null): string => {
+  if (cuadroMs === null) return 'primer cuadro no medido (el puente no entregó medios en 10 s)';
+  const total = sdpMs + cuadroMs;
+  return (
+    `primer cuadro a los ${String(total)} ms de pedirlo (SDP ${String(sdpMs)} + ` +
+    `${String(cuadroMs)})${total > 2000 ? ', SOBRE la meta de 2 s de KPI-33' : ''}`
+  );
+};
+
 export const pasoDeVideoWebrtc = async (
   o: OpcionesDeEnsayo,
   sonda: ResultadoDePaso,
   canalProbado: string | null = null,
+  codecProbado: string | null = null,
 ): Promise<ResultadoDePaso> => {
   if (o.puente === undefined) {
     return {
@@ -78,9 +110,27 @@ export const pasoDeVideoWebrtc = async (
   if (canal === null) {
     return { ...sonda, detalle: [...sonda.detalle, 'WebRTC no probado: no hay canal de video'] };
   }
-  const base = o.puente.url.replace(/\/+$/, '');
-  const fetchFn = o.puente.fetchFn ?? ((entrada, init) => fetch(entrada, init));
+  const fallo = (causa: string, detalle: string, accion = ACCION): ResultadoDePaso =>
+    resultado('video', 'fallo', `${sonda.causa}, pero ${causa}`, accion, [
+      ...sonda.detalle,
+      `puente: ${detalle}`,
+    ]);
+  // A2 (15-S2) · la MISMA regla que la API, con la oferta de la sonda (H.264,
+  // como Chrome): el peor caso de los dos navegadores.
+  const via = decidirViaDeVideo(
+    codecProbado,
+    codecsDeLaOferta(OFERTA_SDP_DE_SONDA),
+    o.puente.transcodificar !== 'nunca',
+  );
+  if (via.via === 'no_reproducible') {
+    return fallo(via.motivo, 'sin vía de video para Chrome', REMEDIOS_DE_VIDEO);
+  }
+  const puente = new PuenteDelEnsayo(
+    o.puente.url,
+    o.puente.fetchFn ?? ((entrada, init) => fetch(entrada, init)),
+  );
   const nombre = `ensayo-${equipo.familia}`;
+  const derivado = `${nombre}-h264`;
   const src = urlRtspDe({
     host: equipo.host,
     puerto: equipo.puertoRtsp,
@@ -88,49 +138,61 @@ export const pasoDeVideoWebrtc = async (
     clave: equipo.clave,
     canal,
   });
-  const fallo = (causa: string, detalle: string): ResultadoDePaso =>
-    resultado('video', 'fallo', `${sonda.causa}, pero ${causa}`, ACCION, [
-      ...sonda.detalle,
-      `puente: ${detalle}`,
-    ]);
   try {
-    const registro = await fetchFn(
-      `${base}/api/streams?${new URLSearchParams({ name: nombre, src }).toString()}`,
-      { method: 'PATCH', signal: AbortSignal.timeout(5000) },
-    );
-    if (!registro.ok) {
-      const texto = limpio(await registro.text().catch(() => ''));
-      return fallo(causaDe(texto), `registro HTTP ${String(registro.status)} · ${texto}`);
+    const registros: readonly { readonly flujo: string; readonly fuente: string }[] = [
+      { flujo: nombre, fuente: src },
+      // A3 · la fuente transcodificada REFERENCIA el flujo por su nombre (RN-21).
+      ...(via.via === 'directo'
+        ? []
+        : [{ flujo: derivado, fuente: `ffmpeg:${nombre}#video=h264` }]),
+    ];
+    for (const { flujo, fuente } of registros) {
+      const registro = await puente.registrar(flujo, fuente);
+      if (!registro.ok) {
+        const texto = limpio(await registro.text().catch(() => ''));
+        return fallo(causaDe(texto), `registro HTTP ${String(registro.status)} · ${texto}`);
+      }
     }
-    const inicio = Date.now();
-    const negociacion = await fetchFn(
-      `${base}/api/webrtc?${new URLSearchParams({ src: nombre }).toString()}`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/sdp', accept: 'application/sdp' },
-        body: OFERTA_SDP_DE_SONDA,
-        signal: AbortSignal.timeout(15_000),
-      },
-    );
-    const cuerpo = await negociacion.text().catch(() => '');
-    const tardo = Date.now() - inicio;
-    void fetchFn(`${base}/api/streams?${new URLSearchParams({ src: nombre }).toString()}`, {
-      method: 'DELETE',
-      signal: AbortSignal.timeout(2000),
-    }).catch(() => undefined);
-    if (!negociacion.ok || !cuerpo.startsWith('v=0')) {
-      const texto = limpio(cuerpo);
+    const usados = registros.map((r) => r.flujo);
+    const negociado = via.via === 'directo' ? nombre : derivado;
+    const n = await puente.negociar(negociado, OFERTA_SDP_DE_SONDA);
+    if (n.estado < 200 || n.estado > 299 || !n.cuerpo.startsWith('v=0')) {
+      puente.retirar(usados);
+      const texto = limpio(n.cuerpo);
       return fallo(
         causaDe(texto),
-        `negociación HTTP ${String(negociacion.status)} · ${texto === '' ? 'sin SDP' : texto}`,
+        `negociación HTTP ${String(n.estado)} · ${texto === '' ? 'sin SDP' : texto}`,
       );
     }
+    const cuadro = await puente.primerCuadro(negociado);
+    // A5 · con H.265, también la vía de Safari: directa, sin transcodificar.
+    const safari =
+      codecProbado === 'H.265'
+        ? await puente.negociar(nombre, OFERTA_SDP_DE_SONDA_CON_H265).catch(() => null)
+        : null;
+    puente.retirar(usados);
+    const lineaSafari =
+      safari === null
+        ? []
+        : [
+            `puente: Safari (oferta con H.265) · ${
+              safari.cuerpo.startsWith('v=0')
+                ? `directo, SDP en ${String(safari.ms)} ms`
+                : `HTTP ${String(safari.estado)} · ${limpio(safari.cuerpo)}`
+            }`,
+          ];
     return resultado(
       'video',
       'ok',
-      `${sonda.causa}; WebRTC negociado con el puente en ${String(tardo)} ms`,
+      `${sonda.causa}; WebRTC negociado con el puente en ${String(n.ms)} ms (${via.via}), ` +
+        fraseDelCuadro(n.ms, cuadro),
       null,
-      [...sonda.detalle, `puente: SDP en ${String(tardo)} ms (meta < 2 s de KPI-33)`],
+      [
+        ...sonda.detalle,
+        `puente: Chrome (oferta H.264) · ${via.via}, SDP en ${String(n.ms)} ms, ` +
+          `${fraseDelCuadro(n.ms, cuadro)} (meta < 2 s de KPI-33)`,
+        ...lineaSafari,
+      ],
     );
   } catch (error) {
     const texto = limpio(error instanceof Error ? error.message : String(error));

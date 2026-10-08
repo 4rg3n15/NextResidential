@@ -126,6 +126,8 @@ export interface EquipoDeEnsayo extends OpcionesDeEquipo {
 export interface PuenteDeEnsayo {
   readonly url: string;
   readonly fetchFn?: typeof fetch;
+  /** A3 (15-S2) · `VIDEO_TRANSCODIFICAR` del `.env`; sólo `nunca` la apaga. */
+  readonly transcodificar?: string;
 }
 
 export interface OpcionesDeEnsayo {

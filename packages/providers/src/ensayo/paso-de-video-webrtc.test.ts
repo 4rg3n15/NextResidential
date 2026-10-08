@@ -82,7 +82,9 @@ describe('pasoDeVideoWebrtc', () => {
     expect(src).toMatch(
       /^rtsp:\/\/servicio:.*@192\.0\.2\.40:554\/Streaming\/Channels\/102#backchannel=0$/,
     );
-    expect(llamadas.map((l) => l.metodo)).toEqual(['PATCH', 'POST', 'DELETE']);
+    // A5 (15-S2) · tras la SDP, el primer cuadro (GET /api/stream.mp4); aquí no hay medios.
+    expect(llamadas.map((l) => l.metodo)).toEqual(['PATCH', 'POST', 'GET', 'DELETE']);
+    expect(p.causa).toMatch(/\(directo\), primer cuadro no medido/);
     expect(todoElTexto(p)).not.toContain(CLAVE);
     expect(todoElTexto(p)).not.toMatch(/rtsp:\/\//);
   });
