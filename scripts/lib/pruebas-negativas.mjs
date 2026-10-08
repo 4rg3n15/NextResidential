@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
 import { sinColores } from './sin-colores.mjs';
+import { conLectorLento } from './lector-lento.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -1711,10 +1712,32 @@ try {
      * **no hay ninguna suite en rojo**, que es lo que la sonda va a provocar.
      */
     try {
+      const inicioBase = Date.now();
       const base = conConfig();
+      const duracionBase = Date.now() - inicioBase;
       !/SUITE EN ROJO/.test(base.salida)
         ? ok('el banco parte sin ninguna suite en rojo')
         : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
+
+      /**
+       * 15-S2 · H-15S2-09 · LA CAUSA DEL «dijo: nada». No era el plazo: la
+       * salida de Node hacia un pipe es asíncrona, y el `process.exit(1)` del
+       * final de `metricas.mjs` tiraba lo que quedaba en cola cuando el lector
+       * se retrasaba. Aquí el lector se retrasa A PROPÓSITO —hasta que el
+       * proceso termina, o el triple de lo que tardó la línea base— y la salida
+       * tiene que llegar entera. Con `process.exit` llega cortada siempre en el
+       * mismo byte.
+       */
+      const lenta = await conLectorLento('node', ['scripts/lib/metricas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, NCR_PAQUETES_METRICAS: '@ncr/config' },
+        esperaMs: 3 * duracionBase + 5000,
+      });
+      /## Totales/.test(lenta.salida)
+        ? ok('la salida llega entera aunque quien la lee se retrase (H-15S2-09)')
+        : mal(
+            `con un lector lento la salida se corta en ${lenta.salida.length} bytes (código ${String(lenta.codigo)}): un process.exit tira lo que quedaba en cola (H-15S2-09)`,
+          );
 
       writeFileSync(
         sonda,

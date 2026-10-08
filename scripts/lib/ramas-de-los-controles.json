@@ -26,6 +26,7 @@
   "scripts/lib/hoja-de-resultados.mjs": 5,
   "scripts/lib/info-plist-ios.mjs": 9,
   "scripts/lib/inyeccion-explicita.mjs": 5,
+  "scripts/lib/lector-lento.mjs": 0,
   "scripts/lib/longitud-por-campo.mjs": 0,
   "scripts/lib/mermaid-analizable.mjs": 8,
   "scripts/lib/metricas.mjs": 50,

@@ -491,6 +491,17 @@ const esperados =
     ? ficheros
     : ficheros.filter((f) => directoriosMedidos.some((d) => f.startsWith(d)));
 
+/**
+ * 15-S2 · H-15S2-09 · `process.exitCode`, NUNCA `process.exit`.
+ *
+ * Quien lee esta salida casi nunca es una terminal: es el verificador o la
+ * sonda D-100, y con `stdio: 'pipe'` Node la escribe en un socket ASÍNCRONO.
+ * La lista de ficheros de arriba son ~560 escrituras pequeñas: si el lector se
+ * retrasa, el resto queda en cola, el `execFileSync` de vitest bloquea el bucle
+ * y `process.exit(1)` la tira. Así falló la sonda D-100 —código 1, sin señal,
+ * la salida cortada a mitad de la lista— en la 15-K y dos veces en la 15-S2.
+ * Con `exitCode` el proceso no termina hasta haberlo escrito todo.
+ */
 if (totalFicheros < esperados.length) {
   const medidos = new Set(ficherosMedidos);
   console.log(
@@ -498,15 +509,13 @@ if (totalFicheros < esperados.length) {
   );
   for (const f of esperados) if (!medidos.has(f)) console.log(`     - ${f}`);
   console.log('   Un fichero que no se recoge no deja ningún rojo: por eso esto es un fallo.');
-  process.exit(1);
-}
-if (sinMedir.length > 0) {
+  process.exitCode = 1;
+} else if (sinMedir.length > 0) {
   console.log(`\n   ${sinMedir.length} paquete(s) QUEDARON FUERA de la medición:`);
   for (const p of sinMedir) console.log(`     - ${p}`);
   console.log('   Una capa sin medir no es una capa que cumple.');
-  process.exit(1);
-}
-if (corridasIncompletas.length > 0) {
+  process.exitCode = 1;
+} else if (corridasIncompletas.length > 0) {
   console.log(`\n   ${corridasIncompletas.length} corrida(s) que no dieron una medición válida:`);
   for (const c of corridasIncompletas) console.log(`     - ${c}`);
   console.log(
@@ -516,9 +525,8 @@ if (corridasIncompletas.length > 0) {
       '   Si dice CORRIDA INTERRUMPIDA, no hay ninguna prueba a la que culpar —el proceso\n' +
       '   murió— y lo que hay que mirar es la máquina, no la cobertura.',
   );
-  process.exit(1);
-}
-if (incumple > 0) {
+  process.exitCode = 1;
+} else if (incumple > 0) {
   console.log(`\n   ${incumple} capa(s) por debajo del umbral de §2.4 o sin medir`);
-  process.exit(1);
+  process.exitCode = 1;
 }
