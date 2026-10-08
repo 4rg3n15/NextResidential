@@ -122,6 +122,8 @@ export interface DiagnosticoDeAudio {
 const dormir = (ms: number) => new Promise((listo) => setTimeout(listo, ms));
 
 const TONO_MS = 2000;
+/** Lo que ya venía en camino cuando empezó el tono no dice nada del dúplex. */
+const ARRANQUE_MS = 300;
 
 export const diagnosticarAudio = async (o: OpcionesDelDiagnostico): Promise<DiagnosticoDeAudio> => {
   const ahora = o.ahora ?? Date.now;
@@ -183,7 +185,8 @@ export const diagnosticarAudio = async (o: OpcionesDelDiagnostico): Promise<Diag
     muestras.filter((m) => m.t >= desde && m.t < hasta).reduce((n, m) => n + m.bytes.length, 0);
   const antes = (entre(0, finDeEscucha) * 1000) / Math.max(1, finDeEscucha);
   const durante = tonoEnviado
-    ? (entre(tonoDesde, tonoHasta) * 1000) / Math.max(1, tonoHasta - tonoDesde)
+    ? (entre(tonoDesde + ARRANQUE_MS, tonoHasta) * 1000) /
+      Math.max(1, tonoHasta - tonoDesde - ARRANQUE_MS)
     : antes;
   const todo = new Uint8Array(muestras.reduce((n, m) => n + m.bytes.length, 0));
   muestras.reduce((i, m) => (todo.set(m.bytes, i), i + m.bytes.length), 0);

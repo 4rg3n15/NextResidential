@@ -1,7 +1,6 @@
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
-import { codecsDeLaOferta, decidirViaDeVideo, fraseDeVideoNoReproducible } from '@ncr/providers';
-import type { PoliticaDeTranscodificacion, PuenteDeVideo } from './puertos';
+import type { PoliticaDeTranscodificacion, PuenteDeVideo, ReglaDeVideo } from './puertos';
 import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
 import { explicarFalloDelPuente } from './causas-de-video';
 
@@ -82,6 +81,8 @@ export class NegociarVistaEnVivo {
     private readonly bitacora: Bitacora,
     private readonly reloj: Reloj,
     private readonly transcodificar: PoliticaDeTranscodificacion = 'auto',
+    /** A2 (15-S2) · sin regla, se intenta directo, como hasta la 15-S1. */
+    private readonly regla: ReglaDeVideo | null = null,
   ) {}
 
   /**
@@ -97,7 +98,7 @@ export class NegociarVistaEnVivo {
   ): Promise<{ readonly flujo: string } | { readonly motivo: string }> {
     const derivado = await asegurar(nombre);
     if (derivado !== null) return { flujo: derivado };
-    const sin = decidirViaDeVideo(codec, ofertados, false);
+    const sin = this.regla?.decidir(codec, ofertados, false) ?? { via: 'directo' };
     return { motivo: sin.via === 'no_reproducible' ? sin.motivo : 'el puente no transcodifica' };
   }
 
@@ -140,16 +141,17 @@ export class NegociarVistaEnVivo {
 
     const nombre = nombreDeFlujo(dispositivoId);
     const codec = origen.codec ?? null;
-    const ofertados = codecsDeLaOferta(solicitud.ofertaSdp);
+    const regla = this.regla;
+    const ofertados = regla?.codecsDeLaOferta(solicitud.ofertaSdp) ?? new Set<string>();
     const noReproducible = (motivo: string): SinOrigenDeVideo =>
       new SinOrigenDeVideo(
         dispositivoId,
-        fraseDeVideoNoReproducible(codec ?? 'un códec', origen.canal ?? null, motivo),
+        regla?.frase(codec ?? 'un códec', origen.canal ?? null, motivo) ?? motivo,
       );
     const puente = this.puente;
     const asegurar = puente.asegurarTranscodificado?.bind(puente);
     const transcodifica = this.transcodificar === 'auto' && asegurar !== undefined;
-    const via = decidirViaDeVideo(codec, ofertados, transcodifica);
+    const via = regla?.decidir(codec, ofertados, transcodifica) ?? { via: 'directo' as const };
     // A4 · sin vía posible se dice ANTES de tocar el puente.
     if (via.via === 'no_reproducible') throw noReproducible(via.motivo);
     const inicio = this.reloj.ahora().getTime();

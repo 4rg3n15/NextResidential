@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CanalDeIntercom, EstadoDeCanal } from './puertos';
 import { ConversacionDeAudio } from './conversacion-de-audio';
 import type { ConversacionTerminada } from './conversacion-de-audio';
-import { MedidorDeDuplex } from './medidor-de-duplex';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -28,7 +27,23 @@ const ABIERTA = {
   via: 'websocket',
 } satisfies EstadoDeCanal;
 
+/** Un medidor de mentira: cuenta lo que le dan y dice «semidúplex» cuando la prueba quiera. */
+const medidorFalso = () => {
+  const cuenta = { subida: 0, bajada: 0, tics: 0 };
+  let semiduplexEn = Infinity;
+  return {
+    cuenta,
+    medidor: {
+      contarSubida: (b: number) => void (cuenta.subida += b),
+      contarBajada: (b: number) => void (cuenta.bajada += b),
+      tic: () => ++cuenta.tics === semiduplexEn,
+    },
+    semiduplexAlSegundo: (n: number) => (semiduplexEn = n),
+  };
+};
+
 const montar = () => {
+  const falso = medidorFalso();
   let ahora = Date.parse('2026-10-08T12:00:00Z');
   const pendientes: ((r: IteratorResult<Uint8Array>) => void)[] = [];
   const canal = {
@@ -57,6 +72,7 @@ const montar = () => {
       ids: { nuevo: () => 'conv-1' },
       bitacora: { registrar: vi.fn() },
       temporizador: { cadaSegundo: (fn) => ((latir = fn), () => undefined) },
+      crearMedidorDeDuplex: () => falso.medidor,
     },
     P,
     salida,
@@ -68,6 +84,7 @@ const montar = () => {
     salida,
     registradas,
     esperar,
+    falso,
     /** Un segundo de reloj: lo que sube y baja en él, y el latido. */
     segundo: async (subida: number, bajada: number) => {
       // Al ritmo del micrófono: cada trama sale antes de la siguiente.
@@ -130,41 +147,16 @@ describe('ConversacionDeAudio · manos libres y dúplex (B3)', () => {
     expect(m.salida.aviso).toHaveBeenCalledWith(expect.stringMatching(/superó los 60 s/));
   });
 
-  it('el equipo calla mientras recibe: «semiduplex» a la consola, una sola vez', async () => {
+  it('el medidor recibe lo que sube y lo que baja; cuando dice semidúplex, la consola se entera', async () => {
     const m = montar();
     await m.conversacion.iniciar();
     m.conversacion.alTexto(JSON.stringify({ tipo: 'pulsar', modo: 'manos_libres' }));
-    for (let s = 0; s < 3; s += 1) await m.segundo(0, 50);
-    for (let s = 0; s < 3; s += 1) await m.segundo(50, 0);
-    for (let s = 0; s < 3; s += 1) await m.segundo(50, 0);
-    expect(m.salida.semiduplex).toHaveBeenCalledTimes(1);
-  });
-
-  it('dúplex completo: nunca «semiduplex»', async () => {
-    const m = montar();
-    await m.conversacion.iniciar();
-    m.conversacion.alTexto(JSON.stringify({ tipo: 'pulsar' }));
-    for (let s = 0; s < 3; s += 1) await m.segundo(0, 50);
-    for (let s = 0; s < 3; s += 1) await m.segundo(50, 50);
+    m.falso.semiduplexAlSegundo(3);
+    await m.segundo(5, 2);
+    expect(m.falso.cuenta).toMatchObject({ subida: 800, bajada: 320 });
+    await m.segundo(0, 0);
     expect(m.salida.semiduplex).not.toHaveBeenCalled();
-  });
-});
-
-describe('MedidorDeDuplex', () => {
-  it('hacen falta dos segundos de cada clase; un segundo a medias no cuenta', () => {
-    const d = new MedidorDeDuplex();
-    d.contarBajada(8000);
-    expect(d.tic()).toBe(false);
-    d.contarSubida(8000);
-    expect(d.tic()).toBe(false);
-    d.contarSubida(1000);
-    d.contarBajada(8000);
-    expect(d.tic()).toBe(false);
-    d.contarBajada(8000);
-    expect(d.tic()).toBe(false);
-    d.contarSubida(8000);
-    expect(d.tic()).toBe(true);
-    d.contarSubida(8000);
-    expect(d.tic()).toBe(false);
+    await m.segundo(0, 0);
+    expect(m.salida.semiduplex).toHaveBeenCalledTimes(1);
   });
 });

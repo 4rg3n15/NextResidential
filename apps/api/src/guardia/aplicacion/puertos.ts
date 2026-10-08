@@ -1,3 +1,5 @@
+import type { ViaDeVideo } from '@ncr/providers';
+
 /**
  * Puertos del módulo de guardia.
  *
@@ -141,6 +143,29 @@ export interface PuenteDeVideo {
 
 /** A3 (15-S2) · `VIDEO_TRANSCODIFICAR`: `auto` transcodifica cuando hace falta; `nunca`, no. */
 export type PoliticaDeTranscodificacion = 'auto' | 'nunca';
+
+/**
+ * A2 (15-S2) · LA REGLA DE LA VÍA DEL VIDEO, declarada por el consumidor. La
+ * implementa el núcleo de proveedores (`via-de-video.ts`), la MISMA que usa el
+ * paso 7 del ensayo, y la pone la infraestructura: la capa de aplicación no
+ * importa VALOR del paquete de proveedores (frontera A).
+ */
+export interface ReglaDeVideo {
+  codecsDeLaOferta(sdp: string): ReadonlySet<string>;
+  decidir(
+    codec: string | null,
+    oferta: ReadonlySet<string>,
+    transcodificacion: boolean,
+  ): ViaDeVideo;
+  frase(codec: string, canal: string | null, motivo: string): string;
+}
+
+/** B3 (15-S2) · el semidúplex, medido cada segundo; `tic` dice `true` la primera vez. */
+export interface MedidorDeDuplex {
+  contarSubida(bytes: number): void;
+  contarBajada(bytes: number): void;
+  tic(): boolean;
+}
 
 export const PUENTE_DE_VIDEO = Symbol.for('ncr.puerto.PuenteDeVideo');
 

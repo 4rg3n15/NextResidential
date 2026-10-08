@@ -12,6 +12,7 @@ import type { Go2rtcDePruebas, OrigenDeVideo, ProveedorDeEquipos } from '@ncr/pr
 import type { Bitacora } from '@ncr/domain-core';
 import { PuenteGo2rtc } from './puente-go2rtc';
 import { NegociarVistaEnVivo, videoActivoEnRespuesta } from '../aplicacion/vista-en-vivo';
+import { REGLA_DE_VIDEO } from './regla-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -80,6 +81,7 @@ describe.skipIf(omitida !== null)(
         bitacora,
         reloj,
         'auto',
+        REGLA_DE_VIDEO,
       );
       const solicitud = {
         copropiedadId: 'c-1',

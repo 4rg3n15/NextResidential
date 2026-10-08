@@ -1,4 +1,4 @@
-import { juzgarDuplex } from '@ncr/providers';
+import { juzgarDuplex } from '../ensayo/diagnostico-de-audio';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════

@@ -1,3 +1,4 @@
+import { MedidorDeDuplex } from '@ncr/providers';
 import type { Server } from 'node:http';
 import { Inject, Injectable } from '@nestjs/common';
 import type { OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
@@ -137,6 +138,8 @@ export class PuertaDeAudioPorWebSocket implements OnApplicationBootstrap, OnModu
         ids: this.ids,
         bitacora: this.bitacora,
         temporizador: TEMPORIZADOR_REAL,
+        // B3 (15-S2) · el semidúplex, medido con la regla de `pnpm sitio:audio`.
+        crearMedidorDeDuplex: () => new MedidorDeDuplex(),
       },
       {
         copropiedadId: datos.copropiedadId,

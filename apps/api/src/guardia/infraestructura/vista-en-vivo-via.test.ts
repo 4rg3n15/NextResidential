@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import type { OrigenDeVideo, ProveedorDeEquipos } from '@ncr/providers';
 import { OFERTA_SDP_DE_NAVEGADOR } from '@ncr/providers';
-import { NegociarVistaEnVivo } from './vista-en-vivo';
-import type { PoliticaDeTranscodificacion, PuenteDeVideo } from './puertos';
-import { PuenteDeVideoFallo, SinOrigenDeVideo } from './puertos';
+import { NegociarVistaEnVivo } from '../aplicacion/vista-en-vivo';
+import type { PoliticaDeTranscodificacion, PuenteDeVideo } from '../aplicacion/puertos';
+import { PuenteDeVideoFallo, SinOrigenDeVideo } from '../aplicacion/puertos';
+import { vistaEnVivoPorCopropiedad } from './puente-de-video-por-el-edge';
+import { REGLA_DE_VIDEO } from './regla-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -63,7 +65,14 @@ const banco = (
     registrar: (_n: string, _m: string, datos?: unknown) => anotaciones.push(datos),
   } as unknown as Bitacora;
   const reloj = { ahora: () => new Date(0) };
-  const caso = new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj, politica);
+  const caso = new NegociarVistaEnVivo(
+    proveedor,
+    puente,
+    bitacora,
+    reloj,
+    politica,
+    REGLA_DE_VIDEO,
+  );
   const pedir = (ofertaSdp: string) =>
     caso.ejecutar({ copropiedadId: 'c', dispositivoId: DISPOSITIVO, operadorId: 'o', ofertaSdp });
   return { pedir, llamadas, anotaciones };
@@ -136,6 +145,34 @@ describe('NegociarVistaEnVivo · la vía (A2–A4, 15-S2)', () => {
     const error = await b.pedir(CHROME).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PuenteDeVideoFallo);
     expect((error as Error).message).toMatch(/necesita ffmpeg .*`brew install ffmpeg`/);
+  });
+
+  it('la fábrica de la API entrega la regla: con «nunca», no reproducible sin tocar el puente', async () => {
+    const llamadas: string[] = [];
+    const puente: PuenteDeVideo = {
+      asegurarFlujo: async (n) => void llamadas.push(n),
+      negociar: async () => RESPUESTA,
+    };
+    const proveedor = { origenDeVideo: async () => H265 } as unknown as ProveedorDeEquipos;
+    const bitacora = { registrar: () => undefined } as unknown as Bitacora;
+    const caso = vistaEnVivoPorCopropiedad(
+      proveedor,
+      puente,
+      bitacora,
+      { ahora: () => new Date(0) },
+      null,
+      'nunca',
+    );
+    const error = await caso
+      .ejecutar({
+        copropiedadId: 'c',
+        dispositivoId: DISPOSITIVO,
+        operadorId: 'o',
+        ofertaSdp: CHROME,
+      })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SinOrigenDeVideo);
+    expect(llamadas).toEqual([]);
   });
 
   it('códec desconocido (equipo que no lo declara): directo, como hasta ahora', async () => {

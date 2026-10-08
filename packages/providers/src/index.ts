@@ -97,6 +97,7 @@ export type { CausaDeVideo, DiagnosticoDeVideo, OrigenDeVideo } from './nucleo/v
 export * from './nucleo/via-de-video';
 // B3 (15-S2) · dúplex o semidúplex: la misma regla en `pnpm sitio:audio` y en la conversación.
 export { juzgarDuplex } from './ensayo/diagnostico-de-audio';
+export { MedidorDeDuplex } from './videoportero/medidor-de-duplex';
 // V2 (15-N) · el canal de video, elegido entre los que el equipo declara.
 export * from './nucleo/canal-de-video';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';

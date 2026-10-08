@@ -117,7 +117,10 @@ const principal = async () => {
     decir(`▷ ${nombre}`);
     const cliente = new P.ClienteDeEquipo(e);
     const lista = await cliente
-      .pedir('GET', '/ISAPI/System/TwoWayAudio/channels')
+      .pedir(
+        'GET',
+        P.rutaPara('leer los canales de audio bidireccional del equipo', e.familia).ruta,
+      )
       .catch((error) => ({ ok: false, estado: 0, cuerpo: String(error?.message ?? error) }));
     const canal = lista.ok ? P.describirCanalDeAudio(lista.cuerpo) : null;
     if (canal === null) {

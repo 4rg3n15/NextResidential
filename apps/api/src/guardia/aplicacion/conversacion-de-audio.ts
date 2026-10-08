@@ -1,6 +1,5 @@
 import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
-import type { CanalDeIntercom } from './puertos';
-import { MedidorDeDuplex } from './medidor-de-duplex';
+import type { CanalDeIntercom, MedidorDeDuplex } from './puertos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -93,6 +92,7 @@ export interface DependenciasDeConversacion {
   readonly ids: GeneradorDeId;
   readonly bitacora: Bitacora;
   readonly temporizador: Temporizador;
+  readonly crearMedidorDeDuplex?: () => MedidorDeDuplex; // B3 (15-S2) · sin él no se mide
 }
 
 /** Tramas que esperan al equipo: más es retraso, y en vivo se descarta. */
@@ -108,9 +108,9 @@ export class ConversacionDeAudio {
   private subida: Promise<void> = Promise.resolve();
   private enVuelo = 0;
   private ultimaRenovacion = 0;
-  /** B3 (15-S2) · manos libres: el audio no renueva el turno; el texto «voz» de la consola, sí. */
+  /** B3 · manos libres: el silencio no renueva el turno («voz» sí) y S-177 parte tramos, no corta. */
   private manosLibres = false;
-  private readonly duplex = new MedidorDeDuplex();
+  private readonly duplex: MedidorDeDuplex | null;
   private readonly cuenta = { segundo: -1, tramas: 0, textos: 0 };
 
   constructor(
@@ -118,7 +118,9 @@ export class ConversacionDeAudio {
     private readonly p: ParticipantesDeConversacion,
     private readonly salida: SalidaDeConversacion,
     private readonly limites: LimitesDeConversacion = LIMITES_POR_OMISION,
-  ) {}
+  ) {
+    this.duplex = d.crearMedidorDeDuplex?.() ?? null;
+  }
 
   /** `false` si no tiene la palabra: se cierra el canal sin abrir nada. */
   async iniciar(): Promise<boolean> {
@@ -168,7 +170,7 @@ export class ConversacionDeAudio {
     // Sin «pulsar», el micrófono no tiene la palabra: se descarta aquí.
     if (this.pulsadoDesde === null || this.enVuelo >= SUBIDA_MAXIMA_EN_VUELO) return;
     this.enVuelo += 1;
-    this.duplex.contarSubida(trama.length);
+    this.duplex?.contarSubida(trama.length);
     const { copropiedadId, dispositivoId, operadorId } = this.p;
     this.subida = this.subida
       .then(() => this.d.canal.enviarAudio(copropiedadId, dispositivoId, operadorId, trama))
@@ -176,7 +178,6 @@ export class ConversacionDeAudio {
       .finally(() => {
         this.enVuelo -= 1;
       });
-    // B3 · en manos libres el micrófono nunca calla: el silencio no renueva el turno.
     if (!this.manosLibres) this.renovar(false);
   }
 
@@ -228,7 +229,7 @@ export class ConversacionDeAudio {
       for (;;) {
         const { done, value } = await this.bajada.next();
         if (done === true || this.cerrada) break;
-        this.duplex.contarBajada(value.length);
+        this.duplex?.contarBajada(value.length);
         this.salida.audio(value);
       }
     } catch (e) {
@@ -244,14 +245,13 @@ export class ConversacionDeAudio {
       ahora.getTime() - this.pulsadoDesde.getTime() > this.limites.tramoMaximoS * 1000
     ) {
       this.cerrarTramo();
-      // B3 · S-177 en manos libres: el tope parte el registro en tramos, no corta.
       if (this.manosLibres) this.pulsadoDesde = ahora;
       else
         this.salida.aviso(
           `El tramo superó los ${String(this.limites.tramoMaximoS)} s: suelte y vuelva a pulsar para seguir hablando`,
         );
     }
-    if (this.duplex.tic()) this.salida.semiduplex?.();
+    if (this.duplex?.tic() === true) this.salida.semiduplex?.();
     const { copropiedadId, dispositivoId, operadorId } = this.p;
     const estado = await this.d.canal.estado(copropiedadId, dispositivoId, operadorId);
     if (estado.estado !== 'abierta' || estado.transporte !== 'equipo') {

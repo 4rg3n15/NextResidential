@@ -43,7 +43,7 @@ export interface GuionDeAudioEnRed {
    * (por omisión), lo EXIGE (400 sin él) o lo RECHAZA (400 con él).
    */
   readonly sessionId?: 'ignorado' | 'exigido' | 'rechazado';
-  /** B7 (15-S2) · semidúplex: mientras LLEGA audio (últimos 200 ms), la bajada calla. */
+  /** B7 (15-S2) · semidúplex: mientras LLEGA audio (últimos 500 ms), la bajada calla. */
   readonly semiduplex?: boolean;
 }
 
@@ -186,7 +186,7 @@ export const videoporteroDeAudioEnRed = async (
         'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: application/octet-stream\r\n\r\n',
       );
       const soltar = bajada.suscribir((trama) => {
-        if (guion.semiduplex !== true || Date.now() - ultimaSubida > 200) socket.write(trama);
+        if (guion.semiduplex !== true || Date.now() - ultimaSubida > 500) socket.write(trama);
       });
       socket.once('close', soltar);
       return 'bajada';

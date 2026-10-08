@@ -15,6 +15,7 @@ import type { ProveedorDeEquipos } from '@ncr/providers';
 import { NegociarVistaEnVivo } from '../aplicacion/vista-en-vivo';
 import type { SolicitudDeVistaEnVivo } from '../aplicacion/vista-en-vivo';
 import { redactar } from './puente-go2rtc';
+import { REGLA_DE_VIDEO } from './regla-de-video';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -116,7 +117,14 @@ export const vistaEnVivoPorCopropiedad = (
   edge?: CredencialesEnElEdge | null,
   transcodificar: PoliticaDeTranscodificacion = 'auto',
 ): Negociacion => {
-  const deSiempre = new NegociarVistaEnVivo(proveedor, puente, bitacora, reloj, transcodificar);
+  const deSiempre = new NegociarVistaEnVivo(
+    proveedor,
+    puente,
+    bitacora,
+    reloj,
+    transcodificar,
+    REGLA_DE_VIDEO,
+  );
   if (edge === undefined || edge === null) return deSiempre;
   const conEdge = new NegociarVistaEnVivo(
     proveedor,
@@ -124,6 +132,7 @@ export const vistaEnVivoPorCopropiedad = (
     bitacora,
     reloj,
     transcodificar,
+    REGLA_DE_VIDEO,
   );
   return new VistaEnVivoPorCopropiedad(deSiempre, conEdge, edge);
 };
