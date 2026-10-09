@@ -5,7 +5,7 @@ import type { VeredictoDelReceptor } from '../camara/receptor-en-el-equipo';
 import type { CapacidadesDeEquipo, EstadoDeCapacidad } from '../nucleo/capacidades';
 import { hallazgoDeRostros } from './hallazgo-de-rostros';
 import { hallazgoDelCanalDeVideo } from './hallazgo-del-canal-de-video';
-import { comoPasarAH264 } from '../nucleo/errores';
+import { pasosParaH264 } from '../nucleo/errores';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -313,8 +313,11 @@ const hallazgoDeVideo = (v: VideoDelEquipo): HallazgoDelEquipo => {
       valorLeido: v.codec ?? 'sin video en lo que describe',
       detalle:
         (v.codec === 'H.265'
-          ? `El equipo entrega H.265 en el canal ${v.canal} y el navegador no lo reproduce: la ` +
-            `consola lo dirá en vez de mostrar negro. ${comoPasarAH264(v.canal)} Luego vuelva a probar`
+          ? // A2 (15-S2) · H.265 ya no se niega: Safari lo ve directo y Chrome, transcodificado.
+            `El equipo entrega H.265 en el canal ${v.canal}: Safari lo reproduce directo; Chrome, ` +
+            'sólo si el puente lo transcodifica (ffmpeg en el Mac y VIDEO_TRANSCODIFICAR=auto), ' +
+            'con ≈2 s más hasta el primer cuadro. Para verlo en H.264 sin transcodificar ' +
+            `(requiere autorización del cliente): ${pasosParaH264(v.canal)} Luego vuelva a probar`
           : `El equipo describe el canal ${v.canal} sin un video H.264 legible: elija otro canal o ` +
             'cambie la codificación en el equipo') + delCanal,
     };

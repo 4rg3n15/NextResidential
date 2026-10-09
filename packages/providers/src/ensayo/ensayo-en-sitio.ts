@@ -98,7 +98,14 @@ export const ensayarEquipo = async (
   pasos.push(await pasoDeRostro(o, c, esperar));
   // E2/C1 (15-M) · la sonda RTSP y, con GO2RTC_URL, la negociación WebRTC real.
   // V2 (15-N) · el WebRTC, en el canal que la sonda RTSP usó (el declarado).
-  pasos.push(await pasoDeVideoWebrtc(o, pasoDeVideo(d, equipo.familia), d.video?.canal ?? null));
+  pasos.push(
+    await pasoDeVideoWebrtc(
+      o,
+      pasoDeVideo(d, equipo.familia),
+      d.video?.canal ?? null,
+      d.video?.codec ?? null,
+    ),
+  );
   pasos.push(await pasoDeAudio(o, c, esperar));
   pasos.push(await pasoDeVerificacion(o, c));
   return informe(pasos);

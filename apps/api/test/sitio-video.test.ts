@@ -68,7 +68,8 @@ describe('pnpm sitio:video · configuración de go2rtc (D1)', () => {
     // E2/C1 · sin `streams:` (ni vacío): los flujos van en memoria por PATCH.
     expect(yaml).not.toMatch(/^streams/m);
     expect(yaml).toContain('ice_servers: []');
-    expect(yaml).toMatch(/rtsp:\n {2}listen: ""/);
+    // A3 (15-S2) · por omisión (auto) el RTSP interno escucha, y SÓLO en 127.0.0.1.
+    expect(yaml).toMatch(/rtsp:\n {2}listen: "127\.0\.0\.1:8554"/);
     expect(yaml).not.toContain(CLAVE);
     expect(yaml).not.toMatch(/rtsp:\/\//);
     expect(r.salida).not.toContain(CLAVE);
@@ -142,10 +143,18 @@ describe('pnpm sitio:video · configuración de go2rtc (D1)', () => {
     const ruta = join(carpeta, 'preparar.env');
     writeFileSync(ruta, 'GO2RTC_URL=http://127.0.0.1:1984\nVIDEO_IP_ANUNCIADA=192.0.2.15\n');
     // Un binario ya presente (GO2RTC_BIN): no descarga, y con --preparar no lo lanza.
+    // A3 (15-S2) · un ffmpeg en el PATH, para que el resultado no dependa de la máquina.
+    const conFfmpeg = join(carpeta, 'con-ffmpeg');
+    mkdirSync(conFfmpeg, { recursive: true });
+    writeFileSync(join(conFfmpeg, 'ffmpeg'), '#!/bin/sh\n', { mode: 0o755 });
     const r = spawnSync(
       process.execPath,
       [GUION, '--preparar', '--env', ruta, '--dir', join(carpeta, 'preparado')],
-      { encoding: 'utf8', timeout: 20_000, env: { ...process.env, GO2RTC_BIN: process.execPath } },
+      {
+        encoding: 'utf8',
+        timeout: 20_000,
+        env: { ...process.env, GO2RTC_BIN: process.execPath, PATH: conFfmpeg },
+      },
     );
     expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
     expect(r.stdout).toContain('go2rtc listo');

@@ -61,6 +61,7 @@ import { elegirEquipos, numero } from './lib/equipos-del-ensayo.mjs';
 import { comprobacionesDeLaPlataforma } from './lib/comprobaciones-del-mac.mjs';
 import { comprobacionesDeLaVispera } from './lib/vispera-de-sitio.mjs';
 import { respaldar, restaurar } from './lib/respaldo-en-sitio.mjs';
+import { puenteDelEnsayo } from './lib/transcodificacion-del-puente.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -262,8 +263,7 @@ const principal = async () => {
         : { verificaciones: sim?.verificacionesDe?.(equipo) ?? verificaciones }),
       ...(foto === undefined ? {} : { foto }),
       ...(equipo.familia === 'camara' ? { receptorEsperado: receptorDe(equipo) } : {}),
-      // E2/C1 (15-M) · con GO2RTC_URL el paso 7 negocia WebRTC contra el puente real.
-      ...(process.env.GO2RTC_URL ? { puente: { url: process.env.GO2RTC_URL } } : {}),
+      ...puenteDelEnsayo(process.env), // E2/C1 (15-M) y A5 (15-S2): el paso 7 contra go2rtc
       esperaDeEventoMs: numero(valor('espera'), 60) * 1000,
       esperaDeSincronizacionMs,
       plazoDeVerificacionS: numero(process.env.TERMINAL_PLAZO_DE_VERIFICACION_S, 8),

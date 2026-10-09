@@ -1,3 +1,4 @@
+import { fraseDeVideoNoReproducible } from './via-de-video';
 import type { NombreDeCapacidad } from './capacidades';
 
 /**
@@ -71,11 +72,13 @@ export class CapacidadNoSoportada extends ErrorDeEquipo {
  * › Video) [SUPUESTO S-175: varía en algún firmware; la guía de sitio lo
  * confirma]. El flujo se dice por su canal: `x01` principal, `x02` subflujo.
  */
-export const comoPasarAH264 = (canal: string): string =>
-  `Para verlo: en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» ` +
+export const pasosParaH264 = (canal: string): string =>
+  `en la web del equipo, Configuración › Video/Audio › Video; en «Tipo de flujo» ` +
   `elija el ${canal.endsWith('01') ? 'principal' : 'subflujo'} (canal ${canal}); en ` +
   '«Codificación de video» ponga H.264 y pulse Guardar; o elija otro canal en su ficha que ya ' +
   'entregue H.264.';
+
+export const comoPasarAH264 = (canal: string): string => `Para verlo: ${pasosParaH264(canal)}`;
 
 export class VideoNoReproducible extends ErrorDeEquipo {
   constructor(
@@ -86,11 +89,12 @@ export class VideoNoReproducible extends ErrorDeEquipo {
     // Sin el identificador: esta frase la lee el operador en la consola de video.
     // C.2 (15-S1) · el cambio de códec es del equipo y lo autoriza el cliente:
     // el sistema no lo hace por su cuenta.
+    // A4 (15-S2) · con los tres remedios —Safari, ffmpeg o H.264 en el equipo—
+    // y, para el tercero, cómo.
     super(
       dispositivoId,
-      `El equipo entrega ${codec} en el canal ${canal}; el navegador no lo reproduce por ` +
-        'WebRTC: cambie ese flujo a H.264 en el equipo (requiere autorización del cliente). ' +
-        comoPasarAH264(canal),
+      `El equipo ${fraseDeVideoNoReproducible(codec, canal, 'el navegador no lo reproduce por WebRTC')} ` +
+        `Para (3): ${pasosParaH264(canal)}`,
     );
   }
 }

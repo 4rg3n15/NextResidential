@@ -97,3 +97,7 @@ export type { EnsayoSimulado } from './simulacion/ensayo-simulado';
 // los repite contra el equipo.
 export { IntercomDeEquipo } from './videoportero/intercom-equipo';
 export { IntercomIsapiPersistente } from './videoportero/intercom-isapi-persistente';
+// B6 (15-S2) · `pnpm sitio:audio`: el audio de un equipo, medido en sitio.
+export { describirCanalDeAudio, diagnosticarAudio } from './ensayo/diagnostico-de-audio';
+// B4 (15-S2) · pasar el canal a G.711 sólo con autorización, respaldo y relectura.
+export { pasarCanalAG711 } from './ensayo/canal-a-g711';

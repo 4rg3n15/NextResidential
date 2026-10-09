@@ -19,6 +19,7 @@ import { opcionesDeEscritura, rutaPara } from '../equipo/catalogo-de-rutas';
 import { resumenIsapi } from '../equipo/errores-del-fabricante';
 import { CanalDeAudioOcupado } from '../nucleo/errores';
 import { CODIGO_CANAL_OCUPADO, esCanalOcupado } from './errores-de-audio';
+import { SesionDeAudio } from './sesion-de-audio';
 
 /**
  * AUDIO BIDIRECCIONAL CONTRA EL EQUIPO · ADR-01.
@@ -101,6 +102,8 @@ export interface OpcionesDeIntercom extends OpcionesDeEquipo {
    */
   readonly canal: number | null;
   readonly margenSegundos?: number;
+  /** B5 (15-S2) · el formato que el canal declara, para el registro de la sesión. */
+  readonly formato?: string | null;
 }
 
 export class CanalDeAudioSinDescubrir extends Error {
@@ -185,9 +188,12 @@ export class IntercomDeEquipo implements IntercomProvider {
   private abierto: string | null = null;
   /** A4 · el flujo de subida de la sesión abierta, si ya se abrió. */
   private salida: { readonly cola: ColaDeSalida; fallo: Error | null } | null = null;
+  /** B2/B5 (15-S2) · el `sessionId` de la sesión abierta y lo que pasó en ella. */
+  readonly sesionDeAudio: SesionDeAudio;
 
   constructor(private readonly opciones: OpcionesDeIntercom) {
     this.cliente = new ClienteDeEquipo(opciones);
+    this.sesionDeAudio = new SesionDeAudio(opciones.ahora);
   }
 
   /** `false` mientras nadie haya atestado que el equipo abre su canal. */
@@ -267,6 +273,8 @@ export class IntercomDeEquipo implements IntercomProvider {
       );
     }
     this.abierto = dispositivoId;
+    // B2 (15-S2) · el `sessionId` que dio el equipo viaja en audioData y close.
+    this.sesionDeAudio.abrir(respuesta.cuerpo, respuesta.estado);
     // A4 · con señalización declarada, abrir el audio ES contestar la llamada.
     await this.senalizar('answer');
     return 'abierta';
@@ -327,16 +335,26 @@ export class IntercomDeEquipo implements IntercomProvider {
     if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
     if (this.salida === null) this.salida = this.abrirSalida(this.opciones.canal);
     if (this.salida.fallo !== null) throw this.salida.fallo;
+    this.sesionDeAudio.contar('subida', fragmento.length);
     await this.salida.cola.empujar(fragmento);
   }
 
   private abrirSalida(canal: number): { readonly cola: ColaDeSalida; fallo: Error | null } {
     const cola = new ColaDeSalida();
     const salida: { readonly cola: ColaDeSalida; fallo: Error | null } = { cola, fallo: null };
-    const ruta = rutaPara('enviar audio al equipo', this.familia, canal);
+    const ruta = this.sesionDeAudio.ruta(
+      rutaPara('enviar audio al equipo', this.familia, canal).ruta,
+    );
+    const conId = this.sesionDeAudio.conId;
     void this.cliente
-      .subirFlujo(ruta.ruta, () => cola.flujo(), 'application/octet-stream')
+      .subirFlujo(ruta, () => cola.flujo(), 'application/octet-stream')
       .then((respuesta) => {
+        // B2 · rechazada CON sessionId: la siguiente trama abre otra sin él.
+        if (this.sesionDeAudio.anotar('PUT audioData', respuesta.estado, conId)) {
+          if (this.salida === salida) this.salida = null;
+          cola.cerrar();
+          return;
+        }
         if (!respuesta.ok) {
           salida.fallo = new Error(
             `El equipo no aceptó el flujo de audio (HTTP ${String(respuesta.estado)})`,
@@ -355,8 +373,21 @@ export class IntercomDeEquipo implements IntercomProvider {
     const dispositivoId = this.abierto;
     if (dispositivoId === null) throw new Error('No hay ninguna sesión de audio abierta');
     if (this.opciones.canal === null) throw new CanalDeAudioSinDescubrir(dispositivoId);
-    const ruta = rutaPara('recibir audio del equipo', this.familia, this.opciones.canal);
-    for await (const trozo of this.cliente.flujoBinario(ruta.ruta)) yield trozo;
+    const base = rutaPara('recibir audio del equipo', this.familia, this.opciones.canal).ruta;
+    const conId = this.sesionDeAudio.conId;
+    let flujo = await this.cliente.abrirFlujoDeEventos(this.sesionDeAudio.ruta(base));
+    // B2 (15-S2) · rechazada CON sessionId: una vez más, sin él.
+    if (this.sesionDeAudio.anotar('GET audioData', flujo.estado, conId)) {
+      flujo = await this.cliente.abrirFlujoDeEventos(this.sesionDeAudio.ruta(base));
+      this.sesionDeAudio.anotar('GET audioData', flujo.estado);
+    }
+    if (flujo.estado < 200 || flujo.estado > 299) {
+      throw new Error(`El equipo rechazó la bajada de audio (HTTP ${String(flujo.estado)})`);
+    }
+    for await (const trozo of flujo.trozos) {
+      this.sesionDeAudio.contar('bajada', trozo.length);
+      yield trozo;
+    }
   }
 
   async cerrarSesion(motivo: string): Promise<void> {
@@ -389,14 +420,27 @@ export class IntercomDeEquipo implements IntercomProvider {
       this.familia,
       this.opciones.canal,
     );
+    const cerrar = () =>
+      this.cliente.pedir(
+        ruta.metodo,
+        this.sesionDeAudio.ruta(ruta.ruta),
+        undefined,
+        opcionesDeEscritura(ruta),
+      );
     try {
-      await this.cliente.pedir(ruta.metodo, ruta.ruta, undefined, opcionesDeEscritura(ruta));
+      // B2 (15-S2) · con su sessionId; rechazado por él, una vez sin él.
+      const conId = this.sesionDeAudio.conId;
+      if (this.sesionDeAudio.anotar('close', (await cerrar()).estado, conId)) {
+        this.sesionDeAudio.anotar('close', (await cerrar()).estado);
+      }
     } catch {
       // Si no se pudo cerrar, el equipo lo soltará por su propio vencimiento.
       // No se reintenta aquí: `motivo` ya está en el histórico y encadenar
       // reintentos retrasaría la respuesta al operador que está colgando.
       void motivo;
     }
+    // B5 · una línea por sesión: bytes, primeros bytes, estados y sessionId.
+    this.sesionDeAudio.registrar(this.opciones.traza, dispositivoId, this.opciones.formato ?? null);
   }
 
   async estadoSesion(): Promise<EstadoSesionIntercom> {

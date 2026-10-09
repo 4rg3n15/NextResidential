@@ -1,6 +1,6 @@
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { ProveedorDeEquipos } from '@ncr/providers';
-import type { PuenteDeVideo } from './puertos';
+import type { PoliticaDeTranscodificacion, PuenteDeVideo, ReglaDeVideo } from './puertos';
 import { PuenteDeVideoFallo, PuenteDeVideoNoConfigurado, SinOrigenDeVideo } from './puertos';
 import { explicarFalloDelPuente } from './causas-de-video';
 
@@ -26,6 +26,11 @@ import { explicarFalloDelPuente } from './causas-de-video';
  *     E2/C1 (15-M) · lo que el puente conteste mal sale de aquí EN PALABRAS y
  *     con remedio (`causas-de-video.ts`), nunca un «HTTP 500 · EOF» a secas.
  *
+ *  4. A2/A3 (15-S2) · ANTES del puente se decide la vía con el códec del
+ *     equipo y la oferta del navegador (`decidirViaDeVideo`): directo,
+ *     transcodificado a H.264 por el puente, o no reproducible con sus tres
+ *     remedios. Lo que no se puede ver se dice sin tocar el puente.
+ *
  * El nombre del flujo es el identificador del dispositivo con prefijo: único
  * entre copropiedades sin que el puente tenga que saber de tenants.
  * ═════════════════════════════════════════════════════════════════════════════
@@ -42,6 +47,8 @@ export interface VistaEnVivoNegociada {
   readonly flujo: 'principal' | 'secundario';
   readonly detalle: string;
   readonly latenciaMs: number;
+  /** A5 (15-S2) · por dónde se sirvió: directo o transcodificado a H.264 por el puente. */
+  readonly via: 'directo' | 'transcodificado';
 }
 
 export const nombreDeFlujo = (dispositivoId: string): string => `ncr-${dispositivoId}`;
@@ -73,7 +80,27 @@ export class NegociarVistaEnVivo {
     private readonly puente: PuenteDeVideo | null,
     private readonly bitacora: Bitacora,
     private readonly reloj: Reloj,
+    private readonly transcodificar: PoliticaDeTranscodificacion = 'auto',
+    /** A2 (15-S2) · sin regla, se intenta directo, como hasta la 15-S1. */
+    private readonly regla: ReglaDeVideo | null = null,
   ) {}
+
+  /**
+   * A3 (15-S2) · el flujo transcodificado que registra el puente. Un puente
+   * que no puede con ESE flujo (el que sirve el Edge) devuelve `null`, y se
+   * vuelve a decidir sin transcodificación para dar el motivo correcto.
+   */
+  private async transcodificado(
+    asegurar: (nombre: string) => Promise<string | null>,
+    nombre: string,
+    codec: string | null,
+    ofertados: ReadonlySet<string>,
+  ): Promise<{ readonly flujo: string } | { readonly motivo: string }> {
+    const derivado = await asegurar(nombre);
+    if (derivado !== null) return { flujo: derivado };
+    const sin = this.regla?.decidir(codec, ofertados, false) ?? { via: 'directo' };
+    return { motivo: sin.via === 'no_reproducible' ? sin.motivo : 'el puente no transcodifica' };
+  }
 
   /**
    * El fallo en palabras (E2/C1) y, cuando el puente no dice el código, con lo
@@ -113,12 +140,31 @@ export class NegociarVistaEnVivo {
     }
 
     const nombre = nombreDeFlujo(dispositivoId);
-    const inicio = this.reloj.ahora().getTime();
+    const codec = origen.codec ?? null;
+    const regla = this.regla;
+    const ofertados = regla?.codecsDeLaOferta(solicitud.ofertaSdp) ?? new Set<string>();
+    const noReproducible = (motivo: string): SinOrigenDeVideo =>
+      new SinOrigenDeVideo(
+        dispositivoId,
+        regla?.frase(codec ?? 'un códec', origen.canal ?? null, motivo) ?? motivo,
+      );
     const puente = this.puente;
+    const asegurar = puente.asegurarTranscodificado?.bind(puente);
+    const transcodifica = this.transcodificar === 'auto' && asegurar !== undefined;
+    const via = regla?.decidir(codec, ofertados, transcodifica) ?? { via: 'directo' as const };
+    // A4 · sin vía posible se dice ANTES de tocar el puente.
+    if (via.via === 'no_reproducible') throw noReproducible(via.motivo);
+    const inicio = this.reloj.ahora().getTime();
     let respuestaSdp: string;
+    let flujo = nombre;
     try {
       await puente.asegurarFlujo(nombre, origen.rtsp);
-      respuestaSdp = await puente.negociar(nombre, solicitud.ofertaSdp);
+      if (via.via === 'transcodificado' && asegurar !== undefined) {
+        const eleccion = await this.transcodificado(asegurar, nombre, codec, ofertados);
+        if ('motivo' in eleccion) throw noReproducible(eleccion.motivo);
+        flujo = eleccion.flujo;
+      }
+      respuestaSdp = await puente.negociar(flujo, solicitud.ofertaSdp);
     } catch (error) {
       if (!(error instanceof PuenteDeVideoFallo)) throw error;
       throw await this.explicar(dispositivoId, error.motivo);
@@ -137,7 +183,9 @@ export class NegociarVistaEnVivo {
       copropiedadId: solicitud.copropiedadId,
       flujo: origen.flujo,
       latenciaMs,
+      via: via.via,
+      codec,
     });
-    return { respuestaSdp, flujo: origen.flujo, detalle: origen.detalle, latenciaMs };
+    return { respuestaSdp, flujo: origen.flujo, detalle: origen.detalle, latenciaMs, via: via.via };
   }
 }

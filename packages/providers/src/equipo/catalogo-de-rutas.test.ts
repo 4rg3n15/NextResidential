@@ -145,7 +145,8 @@ describe('catálogo de rutas', () => {
           r.familia === familia &&
           /audio bidireccional|audio al equipo|audio del equipo/.test(r.proposito),
       );
-    expect(deAudio('terminal')).toHaveLength(5);
+    // B4 (15-S2) · seis: también «configurar un canal», para respaldarlo y pasarlo a G.711.
+    expect(deAudio('terminal')).toHaveLength(6);
     for (const r of deAudio('terminal')) {
       expect(r.soloSiLaDeclara, r.proposito).toMatch(/audio bidireccional/);
     }

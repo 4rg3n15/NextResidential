@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -22,6 +22,8 @@ import { join } from 'node:path';
 export interface Go2rtcDePruebas {
   /** `http://127.0.0.1:<puerto>`, sin barra final. */
   readonly url: string;
+  /** A3 (15-S2) · el puerto del RTSP interno en 127.0.0.1, o `null` si está apagado. */
+  readonly puertoRtsp: number | null;
   readonly rutaYaml: string;
   /** Lo que hay en el fichero de configuración ahora mismo. */
   readonly yaml: () => string;
@@ -35,6 +37,21 @@ export const binarioGo2rtc = (): string | null => {
 
 /** El rótulo con el que se omite una prueba cuando no hay binario. */
 export const OMITIDA_SIN_BINARIO = 'OMITIDA: sin GO2RTC_BIN';
+
+/**
+ * A6 (15-S2) · ffmpeg en el PATH, que go2rtc usa para transcodificar. No se
+ * descarga: sin él, la prueba se omite con nombre (`OMITIDA_SIN_FFMPEG`).
+ */
+export const binarioFfmpeg = (): string | null => {
+  for (const d of (process.env['PATH'] ?? '').split(delimiter)) {
+    if (d === '') continue;
+    const ruta = join(d, 'ffmpeg');
+    if (existsSync(ruta)) return ruta;
+  }
+  return null;
+};
+
+export const OMITIDA_SIN_FFMPEG = 'OMITIDA: sin ffmpeg en el PATH';
 
 const puertoLibre = async (): Promise<number> => {
   const servidor = createServer();
@@ -97,17 +114,20 @@ const esperarEsquemas = async (
 export const arrancarGo2rtc = async (
   binario: string,
   lineasExtra: readonly string[] = [],
+  opciones: { readonly rtspInterno?: boolean } = {},
 ): Promise<Go2rtcDePruebas> => {
   const carpeta = mkdtempSync(join(tmpdir(), 'go2rtc-prueba-'));
   const rutaYaml = join(carpeta, 'go2rtc.yaml');
   const puerto = await puertoLibre();
+  // A3 (15-S2) · la transcodificación lee de aquí; como en sitio, sólo 127.0.0.1.
+  const puertoRtsp = opciones.rtspInterno === true ? await puertoLibre() : null;
   writeFileSync(
     rutaYaml,
     [
       'api:',
       `  listen: "127.0.0.1:${String(puerto)}"`,
       'rtsp:',
-      '  listen: ""',
+      `  listen: "${puertoRtsp === null ? '' : `127.0.0.1:${String(puertoRtsp)}`}"`,
       'webrtc:',
       '  listen: ""',
       // Sin STUN: con el de Google por omisión y sin Internet, la respuesta
@@ -137,7 +157,7 @@ export const arrancarGo2rtc = async (
     await cerrar();
     throw error;
   }
-  return { url, rutaYaml, yaml: () => readFileSync(rutaYaml, 'utf8'), cerrar };
+  return { url, puertoRtsp, rutaYaml, yaml: () => readFileSync(rutaYaml, 'utf8'), cerrar };
 };
 
 /**

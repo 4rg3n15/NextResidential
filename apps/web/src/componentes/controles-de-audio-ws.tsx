@@ -2,13 +2,17 @@
 
 import type { JSX, KeyboardEvent, RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Mic, Volume2, VolumeX } from 'lucide-react';
+import { Headphones, Mic, Volume2, VolumeX } from 'lucide-react';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { formatoG711De } from '@/lib/audio/g711';
 import type { FormatoG711 } from '@/lib/audio/g711';
 import { CanalDeAudioPorWebSocket } from '@/lib/audio/canal-por-websocket';
-import type { EstadoDelCanalWs, OpcionesDelCanalWs } from '@/lib/audio/canal-por-websocket';
+import type {
+  EstadoDelCanalWs,
+  NivelesDelCanal,
+  OpcionesDelCanalWs,
+} from '@/lib/audio/canal-por-websocket';
 import { urlDelAudio } from '@/lib/origen-directo';
 
 /**
@@ -31,6 +35,8 @@ export interface CanalDeAudio {
   pulsar(): Promise<void>;
   soltar(): void;
   cerrar(): void;
+  /** B3 (15-S2) · micrófono abierto hasta colgar o hasta volver a pulsarlo. */
+  manosLibresActivas?(): Promise<void>;
 }
 
 export interface PropiedadesDeControlesWs {
@@ -45,8 +51,15 @@ const usarCanal = (
   formato: FormatoG711 | null,
   pedirBillete: () => Promise<string>,
   crearCanal: (o: OpcionesDelCanalWs) => CanalDeAudio,
-): { readonly estado: EstadoDelCanalWs; readonly canal: RefObject<CanalDeAudio | null> } => {
+): {
+  readonly estado: EstadoDelCanalWs;
+  readonly canal: RefObject<CanalDeAudio | null>;
+  readonly niveles: NivelesDelCanal;
+  readonly semiduplex: boolean;
+} => {
   const [estado, setEstado] = useState<EstadoDelCanalWs>({ fase: 'conectando' });
+  const [niveles, setNiveles] = useState<NivelesDelCanal>({ recibiendo: 0, enviando: 0 });
+  const [semiduplex, setSemiduplex] = useState(false);
   const canal = useRef<CanalDeAudio | null>(null);
   useEffect(() => {
     if (formato === null) return;
@@ -63,6 +76,13 @@ const usarCanal = (
           formato,
           alEstado: (e) => {
             if (vigente) setEstado(e);
+          },
+          // B3 (15-S2) · los dos sentidos en vivo, y el turno si el equipo es semidúplex.
+          alNiveles: (n) => {
+            if (vigente) setNiveles(n);
+          },
+          alSemiduplex: () => {
+            if (vigente) setSemiduplex(true);
           },
         });
       })
@@ -82,8 +102,25 @@ const usarCanal = (
       colgar();
     };
   }, [formato, pedirBillete, crearCanal]);
-  return { estado, canal };
+  return { estado, canal, niveles, semiduplex };
 };
+
+/**
+ * B3 (15-S2) · un sentido del audio: si pasa algo y cuánto. `<meter>` nativo y
+ * sin `style` en línea: la CSP de la consola no admite estilos en línea.
+ */
+const Medidor = ({ rotulo, nivel }: { rotulo: string; nivel: number }): JSX.Element => (
+  <label className="flex items-center gap-2 text-distintivo text-texto-apagado">
+    <span className="w-44 shrink-0">{rotulo}</span>
+    <meter
+      className="h-2 w-full"
+      min={0}
+      max={100}
+      low={5}
+      value={Math.min(100, Math.round(Math.sqrt(nivel) * 100))}
+    />
+  </label>
+);
 
 const crearCanalReal = (o: OpcionesDelCanalWs): CanalDeAudio => new CanalDeAudioPorWebSocket(o);
 
@@ -93,7 +130,7 @@ export const ControlesDeAudioWs = ({
   crearCanal = crearCanalReal,
 }: PropiedadesDeControlesWs): JSX.Element => {
   const formato = formatoG711De(formatoAnunciado);
-  const { estado, canal } = usarCanal(formato, pedirBillete, crearCanal);
+  const { estado, canal, niveles, semiduplex } = usarCanal(formato, pedirBillete, crearCanal);
   const [fallo, setFallo] = useState<string | undefined>(undefined);
 
   const pulsar = (): void => {
@@ -107,6 +144,17 @@ export const ControlesDeAudioWs = ({
     });
   };
   const soltar = (): void => canal.current?.soltar();
+  const manosLibres = estado.fase === 'hablando' && estado.manosLibres === true;
+  const alternarManosLibres = (): void => {
+    setFallo(undefined);
+    if (manosLibres) {
+      soltar();
+      return;
+    }
+    canal.current?.manosLibresActivas?.().catch(() => {
+      setFallo('No se pudo abrir el micrófono: permítalo para esta página');
+    });
+  };
   const conTeclado = (e: KeyboardEvent<HTMLDivElement>, abajo: boolean): void => {
     if (e.key !== ' ') return;
     e.preventDefault();
@@ -133,7 +181,10 @@ export const ControlesDeAudioWs = ({
       tabIndex={0}
       onKeyDown={(e) => conTeclado(e, true)}
       onKeyUp={(e) => conTeclado(e, false)}
-      onBlur={soltar}
+      onBlur={() => {
+        // En manos libres el micrófono sigue abierto aunque el foco se vaya.
+        if (!manosLibres) soltar();
+      }}
     >
       <div className="flex flex-wrap items-center gap-2">
         <Distintivo
@@ -181,13 +232,32 @@ export const ControlesDeAudioWs = ({
           }}
         >
           <Mic className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
-          {hablando ? 'Hablando… suelte para escuchar' : 'Mantener para hablar'}
+          {hablando && !manosLibres ? 'Hablando… suelte para escuchar' : 'Mantener para hablar'}
+        </Boton>
+        <Boton
+          variante={manosLibres ? 'primario' : 'secundario'}
+          tamano="sm"
+          aria-pressed={manosLibres}
+          disabled={cerrado || estado.fase === 'conectando' || (hablando && !manosLibres)}
+          onClick={alternarManosLibres}
+        >
+          <Headphones className="h-4 w-4" aria-hidden="true" strokeWidth={1.75} />
+          {manosLibres ? 'Manos libres: activas' : 'Manos libres'}
         </Boton>
       </div>
-      <p className="text-distintivo text-texto-apagado">
-        Turno de palabra: {hablando ? 'usted' : 'el visitante'}. El equipo no declara si es
-        semiduplex: mientras usted habla, puede no oírse al visitante.
-      </p>
+      <Medidor rotulo="Recibiendo del equipo · nivel" nivel={niveles.recibiendo} />
+      <Medidor rotulo="Enviando · nivel" nivel={hablando ? niveles.enviando : 0} />
+      {semiduplex ? (
+        <p className="text-distintivo text-aviso-texto" role="status">
+          Equipo semidúplex (medido): mientras usted habla no oye al equipo. Turno de palabra:{' '}
+          <strong>{hablando ? 'usted' : 'el equipo'}</strong>.
+        </p>
+      ) : (
+        <p className="text-distintivo text-texto-apagado">
+          Se oye al equipo también mientras usted habla. Si el equipo resulta semidúplex, aquí se
+          indicará el turno de palabra.
+        </p>
+      )}
       {cerrado ? (
         <p className="text-distintivo text-peligro-texto" role="alert">
           {estado.motivo}

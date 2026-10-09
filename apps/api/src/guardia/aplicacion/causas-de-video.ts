@@ -35,6 +35,31 @@ const CAUSAS: readonly Causa[] = [
       'sobrante): pare el puente y vuelva a arrancarlo con `pnpm sitio:video`, que lo regenera',
   },
   {
+    // A3 (15-S2) · go2rtc sin ffmpeg: «exec: "ffmpeg": executable file not found»
+    // o «fork/exec <ruta>: no such file or directory» (medido con v1.9.14). Va
+    // antes que el 404: «not found» también casaría allí.
+    patron: /ffmpeg"?: executable file not found|fork\/exec [^:]*ffmpeg/i,
+    frase:
+      'el puente necesita ffmpeg para transcodificar el video a H.264 y no lo encuentra: ' +
+      'instálelo en el Mac (`brew install ffmpeg`) y reinicie `pnpm sitio:video`; o abra la ' +
+      'consola en Safari; o pase el flujo a H.264 en el equipo (requiere autorización del cliente)',
+  },
+  {
+    // A3 (15-S2) · el RTSP interno apagado: la fuente ffmpeg no tiene de dónde leer.
+    patron: /rtsp module disabled/i,
+    frase:
+      'el puente tiene apagado su RTSP interno, que la transcodificación necesita: reinícielo ' +
+      'con `pnpm sitio:video` de esta versión (con VIDEO_TRANSCODIFICAR=auto lo enciende en 127.0.0.1)',
+  },
+  {
+    // A1 (15-S2) · el códec del equipo no está en la oferta y no se transcodificó.
+    patron: /codecs not matched/i,
+    frase:
+      'el navegador no acepta el códec del equipo y el puente no lo transcodificó: abra la ' +
+      'consola en Safari, instale ffmpeg con VIDEO_TRANSCODIFICAR=auto, o pase el flujo a ' +
+      'H.264 en el equipo (requiere autorización del cliente)',
+  },
+  {
     patron: /\b412\b|Precondition Failed/i,
     frase:
       'el equipo no tiene ese canal de video: elija otro canal en la ficha del equipo ' +

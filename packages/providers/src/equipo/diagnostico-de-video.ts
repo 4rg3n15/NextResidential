@@ -1,6 +1,7 @@
 import type { DiagnosticoDeVideo } from '../nucleo/video';
 import type { ResultadoRtsp } from './rtsp-describe';
-import { comoPasarAH264 } from '../nucleo/errores';
+import { pasosParaH264 } from '../nucleo/errores';
+import { REMEDIOS_DE_VIDEO } from '../nucleo/via-de-video';
 
 /**
  * V5 (15-N) · de la respuesta RTSP del equipo a una causa y una frase.
@@ -35,9 +36,10 @@ export const diagnosticoDeVideoDesde = (canal: string, r: ResultadoRtsp): Diagno
           canal,
           causa: 'codec',
           codec: r.codec,
+          // A4 (15-S2) · con los tres remedios: Safari, ffmpeg o H.264 en el equipo.
           frase:
-            `el equipo entrega ${r.codec ?? 'un códec ilegible'} en el canal ${canal} y el ` +
-            `navegador sólo reproduce H.264. ${comoPasarAH264(canal)}`,
+            `el equipo entrega ${r.codec ?? 'un códec ilegible'} en el canal ${canal} y este ` +
+            `navegador no lo recibe. ${REMEDIOS_DE_VIDEO} Para (3): ${pasosParaH264(canal)}`,
         };
   }
   if (r.clase === 'credencial') {

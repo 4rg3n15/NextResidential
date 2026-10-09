@@ -36,6 +36,7 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
 import { sinColores } from './sin-colores.mjs';
+import { conLectorLento } from './lector-lento.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -61,7 +62,13 @@ const correr = (cmd, args, opciones = {}) => {
       }),
     };
   } catch (e) {
-    return { codigo: e.status ?? 1, salida: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+    // 15-S2 · la señal dice si lo mató el plazo (SIGTERM de `timeout`): sin ella,
+    // una salida cortada a medias parecía un control que no detecta nada.
+    return {
+      codigo: e.status ?? 1,
+      senal: e.signal ?? null,
+      salida: `${e.stdout ?? ''}${e.stderr ?? ''}`,
+    };
   }
 };
 
@@ -1681,11 +1688,22 @@ try {
      * ════════════════════════════════════════════════════════════════════════
      */
     const sonda = join(raiz, 'packages', 'config', 'src', 'sonda-roja.test.ts');
+    /**
+     * 15-S2 · plazo propio de 300 s. Dos de cinco corridas del banco en la
+     * 15-S2 —y una de la 15-K— dieron aquí «dijo: nada»: la salida traía la
+     * lista de ficheros de `metricas.mjs` y nada más, que es lo que queda si el
+     * plazo de 120 s de `correr` lo corta antes de los resultados. Aislada, la
+     * medición tarda 3 s. Y si vuelve a fallar, `porque` dice cómo terminó.
+     */
     const conConfig = (extra = {}) =>
       correr('node', ['scripts/lib/metricas.mjs'], {
         cwd: raiz,
+        timeout: 300_000,
         env: { ...process.env, NCR_PAQUETES_METRICAS: '@ncr/config', ...extra },
       });
+    const porque = (r) =>
+      `código ${String(r.codigo)}${r.senal ? `, señal ${r.senal} (¿el plazo?)` : ''} · ` +
+      r.salida.trim().split('\n').slice(-2).join(' | ').slice(0, 200);
 
     /**
      * La línea base no se mide por el código de salida: una corrida
@@ -1694,10 +1712,32 @@ try {
      * **no hay ninguna suite en rojo**, que es lo que la sonda va a provocar.
      */
     try {
+      const inicioBase = Date.now();
       const base = conConfig();
+      const duracionBase = Date.now() - inicioBase;
       !/SUITE EN ROJO/.test(base.salida)
         ? ok('el banco parte sin ninguna suite en rojo')
         : mal('la línea base ya tiene pruebas rojas: la sonda no demostraría nada');
+
+      /**
+       * 15-S2 · H-15S2-09 · LA CAUSA DEL «dijo: nada». No era el plazo: la
+       * salida de Node hacia un pipe es asíncrona, y el `process.exit(1)` del
+       * final de `metricas.mjs` tiraba lo que quedaba en cola cuando el lector
+       * se retrasaba. Aquí el lector se retrasa A PROPÓSITO —hasta que el
+       * proceso termina, o el triple de lo que tardó la línea base— y la salida
+       * tiene que llegar entera. Con `process.exit` llega cortada siempre en el
+       * mismo byte.
+       */
+      const lenta = await conLectorLento('node', ['scripts/lib/metricas.mjs'], {
+        cwd: raiz,
+        env: { ...process.env, NCR_PAQUETES_METRICAS: '@ncr/config' },
+        esperaMs: 3 * duracionBase + 5000,
+      });
+      /## Totales/.test(lenta.salida)
+        ? ok('la salida llega entera aunque quien la lee se retrase (H-15S2-09)')
+        : mal(
+            `con un lector lento la salida se corta en ${lenta.salida.length} bytes (código ${String(lenta.codigo)}): un process.exit tira lo que quedaba en cola (H-15S2-09)`,
+          );
 
       writeFileSync(
         sonda,
@@ -1736,7 +1776,7 @@ try {
       /esta prueba falla a proposito y su nombre tiene que aparecer/.test(conRoja.salida)
         ? ok('el NOMBRE de la prueba roja aparece en la salida')
         : mal(
-            `la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas (dijo: ${dijo || 'nada'})`,
+            `la prueba roja NO se nombra: el mensaje vuelve a mandar a buscar a ciegas (dijo: ${dijo || 'nada'}; ${porque(conRoja)})`,
           );
 
       /sonda-roja\.test\.ts/.test(conRoja.salida)
@@ -1746,11 +1786,13 @@ try {
       // Y que NO se disfrace de corrida interrumpida, que es el otro remedio.
       /SUITE EN ROJO/.test(conRoja.salida) && !/CORRIDA INTERRUMPIDA/.test(conRoja.salida)
         ? ok('se clasifica como SUITE EN ROJO, no como corrida interrumpida')
-        : mal('una suite en rojo se informa como corrida interrumpida: remedio equivocado');
+        : mal(
+            `una suite en rojo se informa como corrida interrumpida: remedio equivocado (${porque(conRoja)})`,
+          );
 
       /saltadas=1\b/.test(conRoja.salida)
         ? ok('la prueba SALTADA se cuenta y se publica para que otro la compare (D-112)')
-        : mal('una saltada no aparece en el recuento legible por máquina');
+        : mal(`una saltada no aparece en el recuento legible por máquina (${porque(conRoja)})`);
 
       // 15-K (anexo) · un fichero que NO CARGA se nombra con su motivo, y no
       // se disfraza de corrida interrumpida.
@@ -1767,7 +1809,9 @@ try {
       /esta sonda no carga a proposito/.test(sinCargar.salida) &&
       !/CORRIDA INTERRUMPIDA/.test(sinCargar.salida)
         ? ok('un fichero de prueba que no carga se nombra con su motivo, como SUITE EN ROJO')
-        : mal('un fichero que no carga se informa sin su motivo: otra vez a buscar a ciegas');
+        : mal(
+            `un fichero que no carga se informa sin su motivo: otra vez a buscar a ciegas (${porque(sinCargar)})`,
+          );
 
       // El eco de pnpm no es el nombre de ninguna prueba.
       !/ERR_PNPM_/.test(conRoja.salida)

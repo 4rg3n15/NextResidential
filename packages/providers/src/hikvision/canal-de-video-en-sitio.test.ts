@@ -6,7 +6,6 @@ import { RegistroEnMemoria } from './registro-de-equipos';
 import { ClienteDeEquipo } from '../equipo/cliente';
 import { equipoSimulado } from '../simulacion/equipo-simulado';
 import { capacidadesDesdeJson } from '../nucleo/capacidades';
-import { VideoNoReproducible } from '../nucleo/errores';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -17,8 +16,8 @@ import { VideoNoReproducible } from '../nucleo/errores';
  * la cadena entera con el XML de la forma real —`StreamingChannel` con
  * `version`/`xmlns` y `<enabled>` anidados en Unicast/Multicast/Security—:
  * descubrimiento → JSON (lo que guarda la base) → `capacidadesDesdeJson` →
- * proveedor. C.1: el 101 sale «propuesto» y se dice. C.2: como el 101 DECLARA
- * H.265, el video se niega ANTES de llamar al puente, con el motivo.
+ * proveedor. C.1: el 101 sale «propuesto» y se dice. C.2 (corregida en la
+ * 15-S2, A2): el 101 DECLARA H.265 y el origen lo lleva; la API decide.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const LISTA_REAL = `<?xml version="1.0" encoding="UTF-8"?>
@@ -112,13 +111,13 @@ describe('15-S1 · C · el canal de la cámara LPR del 06/10', () => {
     });
   });
 
-  it('C.2 · el 101 DECLARA H.265: se niega ANTES del puente, con el canal y la autorización', async () => {
+  // A2 (15-S2) · la regla de C.2 era una regresión: negaba también a Safari,
+  // que reproduce H.265 (medido con go2rtc v1.9.14). Ahora el proveedor
+  // entrega el origen CON el códec declarado y la API decide la vía.
+  it('A2 · el 101 DECLARA H.265: el origen sale con su códec y su canal, sin negarse', async () => {
     const { p } = await proveedor(LISTA_REAL);
-    const error = await p.origenDeVideo('camara-1').catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(VideoNoReproducible);
-    expect(error).toMatchObject({ codec: 'H.265', canal: '101' });
-    expect((error as Error).message).toMatch(
-      /el equipo entrega H\.265 en el canal 101; el navegador no lo reproduce por WebRTC: cambie ese flujo a H\.264 en el equipo \(requiere autorización del cliente\)/i,
-    );
+    const origen = await p.origenDeVideo('camara-1');
+    expect(origen).toMatchObject({ codec: 'H.265', canal: '101', flujo: 'principal' });
+    expect(origen?.rtsp).toMatch(/Channels\/101#backchannel=0$/);
   });
 });

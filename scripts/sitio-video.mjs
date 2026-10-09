@@ -28,6 +28,10 @@
  *      `GO2RTC_BIN`), lo descarga para la arquitectura del Mac y dice su
  *      SHA-256. La versión se fija con `GO2RTC_VERSION` (p. ej. v1.9.9).
  *   4. Lo arranca en primer plano. Ctrl+C lo para.
+ *   5. A3 (15-S2) · con VIDEO_TRANSCODIFICAR=auto enciende el RTSP interno de
+ *      go2rtc SÓLO en 127.0.0.1 y comprueba ffmpeg (no lo descarga: `--preparar`
+ *      falla y dice `brew install ffmpeg`). Es lo que deja ver en Chrome un
+ *      equipo en H.265 (`lib/transcodificacion-del-puente.mjs`).
  *
  *   pnpm sitio:video                          # genera y arranca
  *   pnpm sitio:video -- --solo-configuracion  # sólo escribe el fichero
@@ -65,6 +69,12 @@ import { fileURLToPath } from 'node:url';
 import { ipDelMac } from './lib/red-del-mac.mjs';
 import { juzgarRegistro } from './lib/registro-de-go2rtc.mjs';
 import { candidatoDeEsteEquipo, comprobarPuertoWebrtc } from './lib/candidato-webrtc.mjs';
+import {
+  buscarFfmpeg,
+  escuchaRtspInterna,
+  juzgarFfmpeg,
+  politicaDeTranscodificacion,
+} from './lib/transcodificacion-del-puente.mjs';
 import { networkInterfaces } from 'node:os';
 
 const RAIZ = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -130,6 +140,11 @@ const registro = juzgarRegistro(env.get('VIDEO_REGISTRO') ?? '', permitirTraza);
 if (registro.error !== null) salir(registro.error);
 if (registro.aviso !== null) console.warn(`⚠ ${registro.aviso}`);
 
+// A3 (15-S2) · transcodificar exige el RTSP interno (sólo 127.0.0.1) y ffmpeg.
+const transcodificacion = politicaDeTranscodificacion(env.get('VIDEO_TRANSCODIFICAR'));
+if (transcodificacion.error !== null) salir(transcodificacion.error);
+const ffmpeg = juzgarFfmpeg(transcodificacion.politica, buscarFfmpeg(process.env.PATH));
+
 const candidato = candidatoDeEsteEquipo(ip, networkInterfaces());
 if (!candidato.propio) console.warn(`⚠ ${candidato.frase}`);
 
@@ -139,7 +154,7 @@ const yaml = [
   'api:',
   `  listen: "${escucha}"`,
   'rtsp:',
-  '  listen: ""',
+  `  listen: "${escuchaRtspInterna(transcodificacion.politica)}"`,
   'webrtc:',
   `  listen: ":${puertoWebrtc}"`,
   '  candidates:',
@@ -213,8 +228,12 @@ if (binario === null) {
 
 if (preparar) {
   console.log(`✓ go2rtc listo en ${binario}. En sitio: pnpm sitio:video`);
+  // A3 (15-S2) · ffmpeg no se descarga: se dice cómo instalarlo.
+  if (ffmpeg.falta) salir(ffmpeg.frase);
+  console.log(`✓ ${ffmpeg.frase}`);
   process.exit(0);
 }
+console.log(`${ffmpeg.falta ? '⚠' : '✓'} ${ffmpeg.frase}`);
 
 console.log(`▶ ${binario} -config ${rutaYaml}   (Ctrl+C para parar)`);
 console.log(`  Compruebe desde la API: curl http://${escucha}/api`);

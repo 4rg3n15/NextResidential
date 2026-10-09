@@ -20,6 +20,14 @@ import { PuenteDeVideoFallo } from '../aplicacion/puertos';
  *    WHEP de go2rtc: la oferta va en el cuerpo y la respuesta SDP vuelve con
  *    `201` (o `200`).
  *
+ *  - A3 (15-S2) · `PATCH /api/streams?name=<nombre>-h264&src=ffmpeg:<nombre>#video=h264`
+ *    registra el MISMO flujo transcodificado a H.264. La fuente referencia el
+ *    flujo por su NOMBRE: go2rtc lanza ffmpeg contra su RTSP interno
+ *    (`rtsp://127.0.0.1:<puerto>/<nombre>`), así que la credencial del equipo
+ *    no aparece ni en la fuente ni en los argumentos del proceso (RN-21;
+ *    medido con `ps` en el banco de la 15-S2). Exige el RTSP interno de go2rtc
+ *    en 127.0.0.1, que `pnpm sitio:video` enciende con VIDEO_TRANSCODIFICAR=auto.
+ *
  * La fuente lleva la credencial del equipo. Por eso este adaptador es el único
  * sitio de la API que la ve, y por eso NINGÚN error sale de aquí con ella
  * dentro: `redactar` quita cualquier `rtsp://…` de lo que go2rtc responda
@@ -44,6 +52,14 @@ export const redactar = (texto: string): string =>
  */
 export const conFinDeLinea = (sdp: string): string =>
   sdp.endsWith('\r\n') ? sdp : `${sdp.replace(/[\r\n]+$/, '')}\r\n`;
+
+/** A3 (15-S2) · el flujo transcodificado: nombre derivado y fuente que referencia el original. */
+export const flujoTranscodificado = (
+  nombre: string,
+): { readonly nombre: string; readonly fuente: string } => ({
+  nombre: `${nombre}-h264`,
+  fuente: `ffmpeg:${nombre}#video=h264`,
+});
 
 export class PuenteGo2rtc implements PuenteDeVideo {
   private readonly base: string;
@@ -83,6 +99,12 @@ export class PuenteGo2rtc implements PuenteDeVideo {
       { method: 'PATCH' },
       'registro del flujo en el puente',
     );
+  }
+
+  async asegurarTranscodificado(nombre: string): Promise<string> {
+    const derivado = flujoTranscodificado(nombre);
+    await this.asegurarFlujo(derivado.nombre, derivado.fuente);
+    return derivado.nombre;
   }
 
   async negociar(nombre: string, ofertaSdp: string): Promise<string> {

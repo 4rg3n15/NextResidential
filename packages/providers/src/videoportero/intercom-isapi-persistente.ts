@@ -7,6 +7,7 @@ import { ConexionCruda } from './conexion-cruda';
 import type { DestinoCrudo } from './conexion-cruda';
 import { CanalDeAudioSinDescubrir, IntercomDeEquipo } from './intercom-equipo';
 import type { OpcionesDeIntercom } from './intercom-equipo';
+import type { SesionDeAudio } from './sesion-de-audio';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -80,6 +81,7 @@ export class IntercomIsapiPersistente implements IntercomProvider {
 
   async enviarAudio(fragmento: Uint8Array): Promise<void> {
     this.exigirAbierta();
+    this.turno.sesionDeAudio.contar('subida', fragmento.length);
     if (this.subida?.escribir(fragmento) === true) return;
     this.subida?.cerrar();
     this.subida = await this.conectar('PUT');
@@ -91,7 +93,10 @@ export class IntercomIsapiPersistente implements IntercomProvider {
     const bajada = await this.conectar('GET');
     this.bajadas.add(bajada);
     try {
-      yield* bajada.cuerpo();
+      for await (const trozo of bajada.cuerpo()) {
+        this.turno.sesionDeAudio.contar('bajada', trozo.length);
+        yield trozo;
+      }
     } finally {
       bajada.cerrar();
       this.bajadas.delete(bajada);
@@ -112,6 +117,11 @@ export class IntercomIsapiPersistente implements IntercomProvider {
     return this.turno.estadoSesion();
   }
 
+  /** B2/B5 (15-S2) · el `sessionId` y lo que pasó en la sesión (para el diagnóstico). */
+  get sesionDeAudio(): SesionDeAudio {
+    return this.turno.sesionDeAudio;
+  }
+
   private exigirAbierta(): void {
     if (!this.abierta) throw new Error('No hay ninguna sesión de audio abierta');
   }
@@ -121,8 +131,11 @@ export class IntercomIsapiPersistente implements IntercomProvider {
       throw new CanalDeAudioSinDescubrir(this.opciones.dispositivoId ?? '(sin identificador)');
     }
     const proposito = metodo === 'PUT' ? 'enviar audio al equipo' : 'recibir audio del equipo';
-    // B (15-S1) · la familia del equipo: videoportero o terminal.
-    return rutaPara(proposito, this.opciones.familia ?? 'videoportero', this.opciones.canal).ruta;
+    // B (15-S1) · la familia del equipo: videoportero o terminal. B2 (15-S2) ·
+    // con el `sessionId` de la sesión mientras el equipo lo acepte.
+    return this.turno.sesionDeAudio.ruta(
+      rutaPara(proposito, this.opciones.familia ?? 'videoportero', this.opciones.canal).ruta,
+    );
   }
 
   /**
@@ -133,6 +146,7 @@ export class IntercomIsapiPersistente implements IntercomProvider {
    */
   private async conectar(metodo: 'GET' | 'PUT', reintento = false): Promise<ConexionCruda> {
     const ruta = this.ruta(metodo);
+    const conId = this.turno.sesionDeAudio.conId;
     await this.asegurarDesafio();
     const conexion = ConexionCruda.abrir(
       this.destino,
@@ -143,6 +157,8 @@ export class IntercomIsapiPersistente implements IntercomProvider {
     if (metodo === 'PUT') {
       void conexion.respuesta.then(
         (r) => {
+          // B2 (15-S2) · rechazada con sessionId: la siguiente trama, sin él.
+          this.turno.sesionDeAudio.anotar('PUT audioData', r.estado, conId);
           if (r.estado < 300) return;
           if (r.estado === 401) this.sesion.descartarDesafio();
           conexion.cerrar();
@@ -152,8 +168,10 @@ export class IntercomIsapiPersistente implements IntercomProvider {
       return conexion;
     }
     const r = await conexion.respuesta;
+    const sinSesion = this.turno.sesionDeAudio.anotar('GET audioData', r.estado, conId);
     if (r.estado < 300) return conexion;
     conexion.cerrar();
+    if (sinSesion) return this.conectar(metodo, reintento);
     // E1 · un 401 al desafío guardado nunca es la clave: uno limpio y otra vez.
     if (r.estado === 401 && !reintento) {
       this.sesion.descartarDesafio();

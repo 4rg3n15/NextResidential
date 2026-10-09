@@ -93,6 +93,11 @@ export type { TransporteDeFlujo, OpcionesDeEscucha } from './equipo/escucha-aler
 export type { EscuchaActiva, TransporteDeEscucha } from './nucleo/escucha';
 /** A5 (15-E) · el origen RTSP que el proveedor entrega al puente de video. */
 export type { CausaDeVideo, DiagnosticoDeVideo, OrigenDeVideo } from './nucleo/video';
+// A2 (15-S2) · directo, transcodificado o no reproducible: la misma regla en la API y en el ensayo.
+export * from './nucleo/via-de-video';
+// B3 (15-S2) · dúplex o semidúplex: la misma regla en `pnpm sitio:audio` y en la conversación.
+export { juzgarDuplex } from './ensayo/diagnostico-de-audio';
+export { MedidorDeDuplex } from './videoportero/medidor-de-duplex';
 // V2 (15-N) · el canal de video, elegido entre los que el equipo declara.
 export * from './nucleo/canal-de-video';
 export { CAMPOS_IGNORADOS_A_PROPOSITO } from './hikvision/contratos-de-evento';

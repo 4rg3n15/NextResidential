@@ -48,7 +48,7 @@ import { descubrirCapacidades } from './capacidades-hikvision';
 import { CARRIL_VERIFICADO_DE_LA_CAMARA } from '../camara/carril';
 import type { CapacidadesDeEquipo, NombreDeCapacidad } from '../nucleo/capacidades';
 import { CAPACIDADES_SIN_CONSULTAR, estadoDe, soporta } from '../nucleo/capacidades';
-import { CapacidadNoSoportada, CredencialRechazada, VideoNoReproducible } from '../nucleo/errores';
+import { CapacidadNoSoportada, CredencialRechazada } from '../nucleo/errores';
 import { MEDIO_DE_ESPERA_REAL, POLITICA_DE_ORDENES, conReintentos } from '../nucleo/reintentos';
 import type { MedioDeEspera } from '../nucleo/reintentos';
 import { publicarConEspera } from '../nucleo/publicacion-con-espera';
@@ -437,28 +437,23 @@ export class HikvisionProvider
       });
     }
     const canal = eleccion.canal;
-    // C.2 (corrección 15-S1) · el códec que el equipo DECLARA para el canal
-    // elegido: si no es H.264, se dice ANTES de llamar al puente. Antes sólo se
-    // miraba el de la última sonda RTSP, y la cámara del 06/10 (101 en H.265)
-    // llegaba al puente para fallar allí. El códec del equipo NO se toca.
+    // A2 (15-S2) · el códec del canal elegido —el que el equipo DECLARA (C.2,
+    // 15-S1) o, si no lo declara, el de su última respuesta RTSP en ese canal
+    // (D2, 15-L)— viaja con el origen, y la API decide con la oferta del
+    // navegador: directo, transcodificado o no reproducible. Antes se negaba
+    // aquí todo lo que no fuera H.264, también a Safari, que sí reproduce
+    // H.265 (regresión medida en el banco de la 15-S2). El códec del equipo NO
+    // se toca.
     const declarado =
       canal === null ? null : (declarados?.find((c) => c.id === canal)?.codec ?? null);
-    if (canal !== null && declarado !== null && declarado !== 'H.264') {
-      throw new VideoNoReproducible(dispositivoId, declarado, canal);
-    }
-    // D2 (15-L) · si la última respuesta RTSP del equipo, en ESTE canal, fue un
-    // códec que el navegador no reproduce, se dice ahora y no con un negro.
-    const video = equipo.capacidades?.video;
-    if (
-      canal !== null &&
-      video !== undefined &&
-      video.codec !== null &&
-      video.codec !== 'H.264' &&
-      video.canal === canal
-    ) {
-      throw new VideoNoReproducible(dispositivoId, video.codec, canal);
-    }
-    return origenRtspDe(equipo, this.opciones.puertoRtsp, declarados);
+    const sondeado = equipo.capacidades?.video;
+    const codec =
+      declarado ??
+      (canal !== null && sondeado !== undefined && sondeado.canal === canal
+        ? sondeado.codec
+        : null);
+    const origen = origenRtspDe(equipo, this.opciones.puertoRtsp, declarados);
+    return origen === null ? null : { ...origen, codec, canal };
   }
 
   /** V2 (15-N) · los canales declarados; un descubrimiento fallido no tumba el video. */
@@ -1031,6 +1026,8 @@ export class HikvisionProvider
       // H-15S1-C07 · la casilla de la ficha: una persona atesta que el equipo abre.
       canalHabilitado: equipo.canalDeAudioHabilitado ?? false,
       canal: capacidades.audioBidireccional.canal ?? equipo.canalDeAudio ?? null,
+      // B5 (15-S2) · el formato del canal, para la línea de cada sesión en la bitácora.
+      formato: capacidades.audioBidireccional.formato,
       // A4 · contestar y colgar por señalización SÓLO si el equipo la declara
       // (el DS-KD9633 del proyecto declara que no: NO APLICA POR CAPACIDAD). B
       // (15-S1) · y si su familia la tiene catalogada: la terminal, no.

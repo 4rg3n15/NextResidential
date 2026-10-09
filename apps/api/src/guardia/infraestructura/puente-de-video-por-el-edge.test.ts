@@ -183,6 +183,7 @@ describe('VistaEnVivoPorCopropiedad (15-Q2, E2 · R1)', () => {
         flujo: 'principal' as const,
         detalle: quien,
         latenciaMs: 1,
+        via: 'directo' as const,
       };
     },
   });

@@ -135,10 +135,28 @@ describe('las tres respuestas engañosas: el ensayo no las da por buenas', () =>
 });
 
 describe('los demás fallos dicen su causa y su acción', () => {
-  it('H.265 en el subflujo: el video falla y dice cómo cambiarlo', async () => {
+  // A2 (15-S2) · H.265 ya no es un fallo en sí: la misma regla que la API.
+  it('H.265 en el subflujo: la sonda no falla y dice Safari directo, Chrome transcodificado', async () => {
     const r = await paso(opciones('camara', 'video-h265'), 'video');
-    expect(r?.estado).toBe('fallo');
-    expect(r?.accion).toMatch(/H\.264/);
+    expect(r?.estado).toBe('ok');
+    expect(r?.causa).toMatch(
+      /H\.265 por RTSP .*Safari lo reproduce directo; Chrome, sólo transcodificado/,
+    );
+  });
+
+  it('A5 (15-S2) · H.265 con puente: el ensayo entrega el códec al paso 7, que transcodifica', async () => {
+    const vistas: string[] = [];
+    const fetchFn: typeof fetch = async (u, o) => {
+      vistas.push(`${o?.method ?? 'GET'} ${new URL(String(u)).searchParams.get('name') ?? ''}`);
+      return o?.method === 'POST'
+        ? new Response('v=0\r\nm=video 9 X 96\r\n', { status: 201 })
+        : new Response('', { status: o?.method === undefined ? 404 : 200 });
+    };
+    const o = { ...opciones('camara', 'video-h265-puente'), puente: { url: 'http://p', fetchFn } };
+    const r = await paso(o, 'video');
+    expect(r?.estado).toBe('ok');
+    expect(r?.causa).toMatch(/\(transcodificado\)/);
+    expect(vistas).toContain('PATCH ensayo-camara-h264');
   });
 
   it('zona horaria equivocada en la cámara: el paso 2 lo dice en horas', async () => {

@@ -38,6 +38,13 @@ export interface GuionDeAudioEnRed {
   readonly usuario: string;
   readonly clave: string;
   readonly canales?: readonly CanalDeAudioSimulado[];
+  /**
+   * B7 (15-S2) · qué hace con `?sessionId=` en audioData y close: lo ignora
+   * (por omisión), lo EXIGE (400 sin él) o lo RECHAZA (400 con él).
+   */
+  readonly sessionId?: 'ignorado' | 'exigido' | 'rechazado';
+  /** B7 (15-S2) · semidúplex: mientras LLEGA audio (últimos 500 ms), la bajada calla. */
+  readonly semiduplex?: boolean;
 }
 
 export interface EstadoDelVideoporteroEnRed {
@@ -99,6 +106,7 @@ export const videoporteroDeAudioEnRed = async (
   const deAudio = new Set<Socket>();
   const detector = new DetectorDeMarcas((t) => marcasRecibidas.push(t));
   let sesion = false;
+  let ultimaSubida = 0;
   const cuenta = { aperturas: 0, cierres: 0, ocupado: 0, bytes: 0, subidas: 0, bajadas: 0 };
   let entramado: 'crudo' | 'chunked' | null = null;
 
@@ -125,6 +133,15 @@ export const videoporteroDeAudioEnRed = async (
     } else if (canales.find((c) => String(c.id) === audio[1]) === undefined) {
       socket.write(
         respuestaHttp('403 Forbidden', estadoIsapi(ruta, 4, 'Invalid Operation', 'notSupport')),
+      );
+    } else if (
+      audio[2] !== 'open' &&
+      (guion.sessionId === 'exigido'
+        ? !/[?&]sessionId=1(?:&|$)/.test(p.uri)
+        : guion.sessionId === 'rechazado' && /[?&]sessionId=/.test(p.uri))
+    ) {
+      socket.write(
+        respuestaHttp('400 Bad Request', estadoIsapi(ruta, 4, 'Invalid Content', 'badParameters')),
       );
     } else if (audio[2] === 'open' && p.metodo === 'PUT') {
       if (sesion) {
@@ -168,7 +185,9 @@ export const videoporteroDeAudioEnRed = async (
       socket.write(
         'HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: application/octet-stream\r\n\r\n',
       );
-      const soltar = bajada.suscribir((trama) => socket.write(trama));
+      const soltar = bajada.suscribir((trama) => {
+        if (guion.semiduplex !== true || Date.now() - ultimaSubida > 500) socket.write(trama);
+      });
       socket.once('close', soltar);
       return 'bajada';
     } else if (p.metodo === 'PUT') {
@@ -229,6 +248,7 @@ export const videoporteroDeAudioEnRed = async (
         if (modo === 'subida') {
           const llega = (b: Buffer): void => {
             cuenta.bytes += b.length;
+            ultimaSubida = Date.now();
             detector.alimentar(b);
           };
           const trozado = new DecodificadorTrozado(llega);

@@ -25,7 +25,9 @@ export type { ServidorRtspSimulado, GuionRtsp } from './servidor-rtsp';
 export {
   OFERTA_SDP_DE_PRUEBA,
   OMITIDA_SIN_BINARIO,
+  OMITIDA_SIN_FFMPEG,
   arrancarGo2rtc,
+  binarioFfmpeg,
   binarioGo2rtc,
   fuentesDeAudioParaGo2rtc,
 } from './go2rtc-de-pruebas';
