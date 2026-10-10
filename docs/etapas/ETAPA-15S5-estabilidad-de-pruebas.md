@@ -4,7 +4,7 @@
 **PR:** hacia `develop`, sin fusionar · **Fecha:** 2026-10-10 ·
 **Encargo:** RONDA 15-S5, tareas 1 a 7 y la declaración de la visita del 09/10 ·
 **Cierra:** DT-15M-C01 · DT-15M-C02 · DT-15S2-10 · DT-15S2-11 · H-15S4-01 · la carrera de paridad del PR #54 ·
-**Deja abierta con evidencia:** DT-15X-07 · **Abre:** H-15S5-01 a H-15S5-05 · DT-15S5-01 a DT-15S5-06 · S-15S5-01
+**Deja abierta con evidencia:** DT-15X-07 · **Abre:** H-15S5-01 a H-15S5-06 · DT-15S5-01 a DT-15S5-06 · S-15S5-01
 
 > **No toca producto.** Sólo pruebas (`apps/api/test`), guiones del verificador
 > (`scripts/verificar-etapa.sh` y `scripts/lib/`) y documentación. La
@@ -376,7 +376,8 @@ escriba esta corrida. Y no crece: sale la asignación redundante de
 `codigoSalida`.
 
 La sonda (`sondas/informe-viejo.mjs`) planta un informe viejo con una roja de
-nombre inconfundible y corre `metricas` sin `pnpm` en el `PATH`:
+nombre inconfundible y corre `metricas` con un `pnpm` falso delante en el
+`PATH`, que muere sin escribir informe (H-15S5-06):
 
 - con el control anterior: «SUITE EN ROJO · ✗ roja de OTRA corrida»;
 - con el nuevo: «CORRIDA INTERRUMPIDA · … sin informe JSON», sin nombrarla.
@@ -606,6 +607,20 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
     `URL_BASE` de `base-exigida.ts` sin registrar el guardián. La sesión
     parada de la interferencia usa ahora el `Pool` de la prueba (en el commit
     de la T2).
+- **H-15S5-06 · La sonda de la T6 daba por hecho dónde vive `pnpm`.** La CI
+  del PR #56 dio rojo en «controles» (ubuntu y macOS) con una sola
+  comprobación: «metricas culpa a una prueba de OTRA corrida o no dice que
+  falta el informe».
+  - La sonda quitaba del `PATH` el directorio de `node`, porque aquí `pnpm`
+    vive a su lado. En los runners de GitHub está en `~/setup-pnpm`: vitest
+    corría, escribía un informe nuevo y la premisa no se cumplía.
+  - Reproducido con `pnpm` y `node` enlazados en otro directorio del `PATH`:
+    el mismo ✗.
+  - Ahora antepone al `PATH` un `pnpm` falso que muere sin escribir informe,
+    que es vitest muriendo. Pasa con los dos `PATH`; con el `rmSync` de
+    `metricas.mjs` quitado vuelve a dar el ✗. Lo corrige `9378f90`.
+  - Las tres corridas del verificador eran verdes de verdad: aquí la sonda sí
+    escondía `pnpm`. Lo que faltaba era que lo hiciera en cualquier máquina.
 
 **Deuda que abre.**
 
@@ -673,3 +688,4 @@ Rama `etapa-15s5-estabilidad-de-pruebas`, desde `develop` (`e2507bc`, merge del 
 - `6760384` docs(etapa-15s5): DT-15X-07 — no reproducido en 140 pasadas de equipos.e2e con carga — T7
 - `bd6dcdd` fix(etapa-15s5/verificador): el paso 9 ya no se pasa de su límite — H-15S5-05
 - el cierre: `chore(etapa-15s5): cierre de etapa`, con este informe, ESTADO y el registro.
+- `9378f90` fix(etapa-15s5/verificador): la sonda del informe viejo no depende de dónde viva pnpm — H-15S5-06, tras el rojo de la CI
