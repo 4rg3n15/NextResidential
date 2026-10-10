@@ -2836,7 +2836,7 @@ try {
         for (const [fichero, antes, despues] of caso.parches) arbol.mutar(fichero, antes, despues);
         const r = correr('node', ['e2e/arranque-de-desarrollo.mjs'], {
           timeout: 420_000,
-          env: { ...process.env, NCR_RAIZ: arbol.raiz },
+          env: { ...process.env, NCR_RAIZ: arbol.raiz, NODE_V8_COVERAGE: '' }, // ídem 41 (15-S5)
         });
         r.codigo !== 0 && caso.esperado.test(r.salida)
           ? ok(`${caso.id} · ${caso.bien}`)
@@ -3314,8 +3314,10 @@ try {
         for (const paquete of readdirSync(join(raiz, carpeta))) enlazar(join(carpeta, paquete));
       }
       const TSC = join(raiz, 'node_modules', 'typescript', 'bin', 'tsc');
+      // 15-S5 · sin la cobertura del paso 9: nadie mide la de `tsc`, y lo hacía 3× más lento.
+      const env = { ...process.env, NODE_V8_COVERAGE: '' };
       const tsc = (...args) =>
-        correr(process.execPath, [TSC, ...args], { cwd: espejo, timeout: 300_000 });
+        correr(process.execPath, [TSC, ...args], { cwd: espejo, timeout: 300_000, env });
       const compilar = (carpeta) => tsc('-p', `${carpeta}/tsconfig.pruebas.json`);
 
       // Las opciones EFECTIVAS (`--showConfig` resuelve el `extends`).
