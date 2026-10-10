@@ -40,6 +40,7 @@ import { conLectorLento } from './lector-lento.mjs';
 import { sondasDeEstabilidad } from './sondas/estabilidad.mjs';
 import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
 import { sondaDeBaseCorta, sondaDeBaseRepuesta } from './sondas/base-corta.mjs';
+import { sondaDeInformeViejo } from './sondas/informe-viejo.mjs';
 import { sondasDeLectorLentoPorClase } from './sondas/lector-lento-por-clase.mjs';
 
 /** 15-S5 · DT-15S2-11 · un representante por clase de guion con salida sin tope. */
@@ -1570,6 +1571,8 @@ try {
       // Si cualquier aserción de arriba lanzara, el fichero NO se queda.
       rmSync(sonda, { force: true });
     }
+    // 15-S5 · DT-15M-C02 · un informe viejo no se lee como de esta corrida (sondas/).
+    sondaDeInformeViejo({ raiz, banco, correr, ok, mal, control: 'scripts/lib/metricas.mjs' });
     // 15-S5 · DT-15S2-11 · un lector lento por clase de guion: la salida llega entera (sondas/).
     await sondasDeLectorLentoPorClase({ raiz, banco, ok, mal, controles: ESCRITORES_SIN_TOPE });
   }
