@@ -4,7 +4,7 @@
 **PR:** hacia `develop`, sin fusionar · **Fecha:** 2026-10-10 ·
 **Encargo:** RONDA 15-S5, tareas 1 a 7 y la declaración de la visita del 09/10 ·
 **Cierra:** DT-15M-C01 · DT-15M-C02 · DT-15S2-10 · DT-15S2-11 · H-15S4-01 · la carrera de paridad del PR #54 ·
-DT-15X-07 (tras reproducirse en la CI del PR #56) · **Abre:** H-15S5-01 a H-15S5-07 · DT-15S5-01 a DT-15S5-07 · S-15S5-01
+DT-15X-07 (tras reproducirse en la CI del PR #56) · **Abre:** H-15S5-01 a H-15S5-08 · DT-15S5-01 a DT-15S5-08 · S-15S5-01
 
 > **No toca producto.** Sólo pruebas (`apps/api/test`), guiones del verificador
 > (`scripts/verificar-etapa.sh` y `scripts/lib/`) y documentación. La
@@ -48,16 +48,23 @@ DT-15X-07 (tras reproducirse en la CI del PR #56) · **Abre:** H-15S5-01 a H-15S
      Node): `supertest` no lo usa.
    - La causa que encaja es otra, y sólo existe en macOS: dos servidores en el
      mismo puerto, uno en la comodín y otro en `127.0.0.1` (H-15S5-07).
-     Corregida en las pruebas. Que macOS lo permita es [Probable]: aquí no
-     puedo medirlo; lo mide en cada plataforma la prueba nueva, en la CI.
-5. **Hay un choque entre dos reglas del encargo, y lo resolví así.**
+     Corregida en las pruebas. Que macOS lo permite no se puede medir aquí;
+     lo midió la prueba nueva en la CI de macOS, y lo confirmó.
+5. **Una prueba de `providers` cae con carga, y detrás hay un defecto de
+   `pnpm sitio:audio` que esta ronda no puede tocar (DT-15S5-08).**
+   - El diagnóstico de audio da el semidúplex por «indeterminado» si la subida
+     tarda más de ~0,5 s en empezar, por carga o por una red lenta.
+   - En sitio, eso es un diagnóstico equivocado. El arreglo es de
+     `packages/providers/src/ensayo/`, fuera de lo permitido.
+   - Tumbó una corrida del verificador sobre `a8ba087` (§6).
+6. **Hay un choque entre dos reglas del encargo, y lo resolví así.**
    - La regla 4 manda las sondas a `pruebas-negativas.mjs`. La regla 2 prohíbe
      que crezca un fichero de más de 300 líneas, y ese tiene 3911.
    - Las sondas nuevas viven en `scripts/lib/sondas/`, invocadas desde la suite
      con su ruta literal, que es donde `controles-sin-prueba-negativa.mjs` la
      busca. Moví allí también la sonda 7 tal cual.
    - La suite **baja de 3911 a 3652 líneas**.
-6. **La primera corrida del verificador salió FALLIDA, y no por una prueba.**
+7. **La primera corrida del verificador salió FALLIDA, y no por una prueba.**
    - El paso 9 —el banco negativo bajo la cobertura de V8— superó su límite
      de 600 s y lo mataron; detrás cayó el trinquete de ramas, que se queda
      sin la cobertura del banco muerto. Y una prueba de la T2 importaba de
@@ -438,9 +445,11 @@ es UUID se sigue rechazando», con `socket hang up` en `socketOnEnd`.
   `apps/api/test` deje fuera el `127.0.0.1`, y **el peligro en cada
   plataforma**: en macOS espera que una concreta comparta puerto con una
   comodín; en Linux, `EADDRINUSE`.
-- **Lo que no he podido medir:** el lado de macOS. Es la semántica documentada
-  de BSD, [Probable]; la prueba lo mide en la CI y, si la premisa fuera falsa,
-  lo dirá.
+- **Medido en macOS:** aquí no se puede, así que lo midió la CI. El verificador
+  completo de macOS sobre `a8ba087` dio 2554 en verde y 5 saltadas, las
+  declaradas de siempre, con 564 de 564 ficheros. Entre ellas, la prueba que
+  espera que en macOS una dirección concreta comparta puerto con una comodín.
+  La premisa es [Cierto] en las dos plataformas.
 
 ## 3 · Árbol de archivos
 
@@ -560,6 +569,20 @@ entre la primera y la segunda.
 
 Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (el paso 9 superó sus 600 s, y `rostro-del-residente-pg` importaba `base-exigida.ts` sin el guardián): no cuenta, y su causa es H-15S5-05 (§8). El «1 control declarado no ejercido» es el mismo de las rondas anteriores (D-112), y no es de Linux.
 
+**Después del PR, sobre el código que cambió** (`9378f90`, `52edec5`):
+
+- Sobre `ada6a94`: **FALLIDA**, y no cuenta. El contenedor se reinició y PostgreSQL
+  quedó caído; el propio verificador lo dijo en el paso 1c («se pidió
+  --con-base y la base no está utilizable … ECONNREFUSED»).
+- Sobre `a8ba087`: **FALLIDA**, por DT-15S5-08: la prueba del semidúplex dio
+  `indeterminado` en el paso 5, y al caer `providers` turbo cortó el resto
+  (180 de 564 ficheros). El paso 14, en la misma corrida, dio tres pasadas
+  idénticas en verde con 564 de 564.
+- La CI sobre `a8ba087`, en verde: los cuatro checks, el verificador completo
+  de macOS incluido.
+- La corrida sobre el commit que trae este texto se registra en el commit
+  siguiente.
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | Medida                   | Estado                                                                                                                                                                                                                           |
@@ -655,6 +678,25 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
   conexiones; lo que encaja es que en macOS un doble en `127.0.0.1:0` y la app
   de `crearApp` en la comodín pueden compartir puerto. Detalle y corrección en
   §2, T7. Lo corrige `52edec5`.
+- **H-15S5-08 · El diagnóstico de audio confunde «la subida tardó en
+  arrancar» con «el equipo habla mientras le hablan».** Una corrida del
+  verificador sobre `a8ba087` cayó en `diagnostico-de-audio.test.ts` ›
+  «semidúplex: la bajada calla mientras suena el tono»: `indeterminado` en vez
+  de `semiduplex`, 770 ms más lenta de lo normal.
+  - `diagnosticarAudio` mide la bajada «mientras suena el tono» a partir de
+    un arranque FIJO de 300 ms. El simulado, como un equipo semidúplex, habla
+    hasta que le llega la primera trama de subida.
+  - Si la subida tarda más en empezar (la conexión y el Digest con carga, o
+    una red lenta en sitio), lo que el equipo dice en ese hueco cuenta como
+    «habló mientras sonaba».
+  - Medido, retrasando sólo la primera trama de subida: 0 ms y 200 ms →
+    0 B/s, semidúplex; 400 ms → 372 B/s (5 %), semidúplex; 600 ms →
+    1016 B/s (14 %), indeterminado; 900 ms → 1735 B/s (23 %),
+    indeterminado.
+  - Parar el bucle entero 700 ms NO lo produce: el simulado se para con él.
+    Lo descarté así, midiendo, antes de dar con el arranque de la subida.
+  - No lo corrijo: está en `packages/providers/src/ensayo/`, fuera de las
+    rutas de esta ronda. Queda como DT-15S5-08.
 
 **Deuda que abre.**
 
@@ -685,6 +727,17 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
   H-15S5-07 queda ahí, mucho menor. El escaneo de la prueba nueva mira sólo
   `apps/api/test`.
 
+- **DT-15S5-08 · Media · `pnpm sitio:audio` puede decir «indeterminado» ante
+  un equipo semidúplex** si la subida tarda más de ~0,5 s en arrancar
+  (H-15S5-08).
+  - En sitio es un diagnóstico equivocado. En la suite, una prueba que cae
+    con carga.
+  - Remedio propuesto: que `diagnosticarAudio` mida «mientras sonaba» desde
+    que se entrega la primera trama del tono, no desde un plazo fijo de
+    300 ms. Y una prueba que retrase esa primera trama.
+  - Fichero: `packages/providers/src/ensayo/diagnostico-de-audio.ts`, fuera
+    de lo permitido aquí.
+
 **Supuestos.**
 
 - **S-15S5-01** — las particiones de `eventos` en una base de pruebas vieja
@@ -707,9 +760,9 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
 3. Para la próxima ronda que pueda tocar `scripts/sitio-ensayo.mjs` y
    `scripts/puesta-en-marcha-equipos.mjs`: DT-15S5-01 y -02. Son una línea cada
    uno: `process.exitCode` en vez de `process.exit`.
-4. Mire en la CI de macOS que `servidores-en-loopback.test.ts` pase: su
-   tercera prueba confirma la premisa de H-15S5-07 en macOS. Si falla, la
-   causa de DT-15X-07 no es esa y hay que reabrirla.
+4. Para la próxima ronda que pueda tocar `packages/providers/src/ensayo/`:
+   DT-15S5-08. `pnpm sitio:audio` puede llamar «indeterminado» a un equipo
+   semidúplex si la subida tarda en arrancar; el remedio propuesto está en §8.
 
 ## 10 · Rama y commits
 
