@@ -1264,10 +1264,10 @@ paso "14 · estabilidad: la suite da lo mismo tres veces seguidas"
 # el cierre de etapa se hace con el valor por defecto.
 REPETICIONES="${NCR_REPETICIONES:-3}"
 if salida_est=$(con_limite "$LIMITE_LARGO" node scripts/lib/estabilidad.mjs --repeticiones "$REPETICIONES" 2>&1); then
-  echo "$salida_est" | grep -E "^   corrida" | sed 's/^/   /'
+  echo "$salida_est" | grep -E "^   (corrida|pasada)" | sed 's/^/   /'
   ok "${salida_est##*$'\n'}"
 else
-  echo "$salida_est" | grep -E "^   (corrida|✗)|^     " | head -20 | sed 's/^/   /'
+  echo "$salida_est" | grep -E "^   (corrida|pasada|✗|los informes)|^     " | head -30 | sed 's/^/   /'
   mal "la suite no es reproducible entre corridas"
 fi
 

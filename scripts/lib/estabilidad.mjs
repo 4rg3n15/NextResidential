@@ -28,10 +28,18 @@
  *   node scripts/lib/estabilidad.mjs [--repeticiones N] [--comando "<orden>"]
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import { ESCAPES_ANSI } from './sin-colores.mjs';
 import { DIRECTORIO_DE_INFORMES } from './reporteros-de-prueba.mjs';
+import {
+  archivarPasada,
+  archivoDeLasPasadas,
+  diagnosticoDeFicheros,
+  empezarArchivo,
+  ficherosDe,
+  limpiarSueltos,
+} from './ficheros-de-la-pasada.mjs';
 
 const argv = process.argv.slice(2);
 const valorDe = (bandera, porDefecto) => {
@@ -86,15 +94,15 @@ const SIN_COLOR = ESCAPES_ANSI;
 // aunque el guion se invoque desde otro sitio.
 const RAIZ = dirname(DIRECTORIO_DE_INFORMES);
 
-const limpiarInformes = () => {
-  rmSync(DIRECTORIO_DE_INFORMES, { recursive: true, force: true });
-  mkdirSync(DIRECTORIO_DE_INFORMES, { recursive: true });
-};
-
+/**
+ * 15-S5 · DT-15S2-10 · cada pasada guarda SUS informes en `estabilidad/pasada-N/`
+ * y de ahí se leen: la siguiente ya no los borra antes de comparar
+ * (`ficheros-de-la-pasada.mjs`).
+ */
 /** Rojas nombradas por el informe JSON: `paquete › nombre completo (fichero)`. */
-const rojasDelInforme = () => {
-  if (!existsSync(DIRECTORIO_DE_INFORMES)) return { rojas: [], informes: 0 };
-  const ficheros = readdirSync(DIRECTORIO_DE_INFORMES).filter((f) => f.endsWith('.json'));
+const rojasDelInforme = (directorio) => {
+  if (!existsSync(directorio)) return { rojas: [], informes: 0 };
+  const ficheros = readdirSync(directorio).filter((f) => f.endsWith('.json'));
   const rojas = [];
   // Corrección 2 de la 15-L · el NOMBRE de una roja intermitente no basta para
   // diagnosticarla: el informe se borra en la corrida siguiente y con él el
@@ -106,7 +114,7 @@ const rojasDelInforme = () => {
     const paquete = basename(fichero, '.json');
     let informe;
     try {
-      informe = JSON.parse(readFileSync(join(DIRECTORIO_DE_INFORMES, fichero), 'utf8'));
+      informe = JSON.parse(readFileSync(join(directorio, fichero), 'utf8'));
     } catch {
       // Un informe ilegible es en sí un dato: se nombra y se compara como
       // cualquier otra roja, en vez de desaparecer en un `catch` vacío.
@@ -149,8 +157,9 @@ const firmaDe = (salida, codigo, rojas) => {
 };
 
 const corridas = [];
+empezarArchivo(DIRECTORIO_DE_INFORMES);
 for (let i = 1; i <= repeticiones; i += 1) {
-  limpiarInformes();
+  limpiarSueltos(DIRECTORIO_DE_INFORMES);
   const r = spawnSync(comando, {
     shell: true,
     encoding: 'utf8',
@@ -159,10 +168,13 @@ for (let i = 1; i <= repeticiones; i += 1) {
     env: { ...process.env, TURBO_FORCE: 'true', CI: '1' },
     maxBuffer: 64 * 1024 * 1024,
   });
-  const { rojas, motivos, informes } = rojasDelInforme();
-  const firma = firmaDe(`${r.stdout ?? ''}${r.stderr ?? ''}`, r.status ?? 1, rojas);
+  const archivo = archivarPasada(DIRECTORIO_DE_INFORMES, i);
+  const { rojas, motivos, informes } = rojasDelInforme(archivo);
+  const salida = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+  const firma = firmaDe(salida, r.status ?? 1, rojas);
   firma.informes = informes;
   firma.motivos = motivos;
+  firma.pasada = { ...ficherosDe(archivo, RAIZ), salida };
   corridas.push(firma);
   const resumen =
     firma.recuentos.filter((l) => l.includes('Tests ')).join(' · ') || '(sin recuento)';
@@ -222,6 +234,11 @@ for (const [i, c] of corridas.entries()) {
   }
 }
 
+// 15-S5 · DT-15S2-10 · el fichero que cae fuera de sus aserciones, con su nombre.
+const ficherosPorPasada = diagnosticoDeFicheros(corridas.map((c) => c.pasada));
+ficherosPorPasada.lineas.forEach((l) => console.log(l));
+fallos += ficherosPorPasada.fallos;
+
 for (const [i, c] of corridas.entries()) {
   if (i === 0 || c.texto === primera.texto) continue;
   console.log(`   ✗ la corrida ${i + 1} NO coincide con la primera. Diferencias:`);
@@ -233,6 +250,9 @@ for (const [i, c] of corridas.entries()) {
 }
 
 if (fallos > 0) {
+  console.log(
+    `   los informes de cada pasada quedan en ${relative(RAIZ, archivoDeLasPasadas(DIRECTORIO_DE_INFORMES))}/`,
+  );
   console.log(
     'FALLO estabilidad: la suite no es reproducible. Una prueba intermitente enseña a reejecutar hasta el verde.',
   );
