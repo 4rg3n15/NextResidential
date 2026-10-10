@@ -9,18 +9,20 @@
  * «CORRIDA INTERRUMPIDA».
  *
  * Se planta un informe viejo con una roja de nombre inconfundible y se corre
- * `metricas.mjs` sin `pnpm` en el `PATH`: vitest no llega a correr, así que esta
- * corrida no escribe nada. Tiene que fallar, decir que no hay informe y no
- * nombrar la roja vieja.
+ * `metricas.mjs` con un `pnpm` falso delante en el `PATH`, que muere sin
+ * escribir informe: es vitest muriendo, sin depender de dónde viva el `pnpm`
+ * real (en el runner de GitHub no está junto a `node`, y quitar el directorio
+ * de `node` del `PATH` no lo escondía). Tiene que fallar, decir que no hay
+ * informe y no nombrar la roja vieja.
  *
  * Vive en `sondas/` por lo mismo que las demás (`ficheros-caidos.mjs`).
  * `control` llega como literal desde la suite.
  * ═════════════════════════════════════════════════════════════════════════════
  */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, dirname, join } from 'node:path';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
-export const sondaDeInformeViejo = ({ raiz, correr, ok, mal, control }) => {
+export const sondaDeInformeViejo = ({ raiz, banco, correr, ok, mal, control }) => {
   const informes = join(raiz, '.informes-de-prueba');
   const viejo = join(informes, '-ncr-config.json');
   mkdirSync(informes, { recursive: true });
@@ -45,16 +47,20 @@ export const sondaDeInformeViejo = ({ raiz, correr, ok, mal, control }) => {
       ],
     }),
   );
-  // Sin el directorio de `pnpm`: node va por su ruta absoluta y vitest no arranca.
-  const sinPnpm = (process.env.PATH ?? '')
-    .split(delimiter)
-    .filter((d) => d !== dirname(process.execPath))
-    .join(delimiter);
+  // Un `pnpm` que muere antes de que vitest escriba nada, delante del real.
+  const falso = join(banco, 'pnpm-que-muere');
+  mkdirSync(falso, { recursive: true });
+  writeFileSync(join(falso, 'pnpm'), '#!/bin/sh\necho "Error: vitest murió (sonda)" >&2\nexit 1\n');
+  chmodSync(join(falso, 'pnpm'), 0o755);
   try {
     const r = correr(process.execPath, [control], {
       cwd: raiz,
       timeout: 300_000,
-      env: { ...process.env, PATH: sinPnpm, NCR_PAQUETES_METRICAS: '@ncr/config' },
+      env: {
+        ...process.env,
+        PATH: `${falso}${delimiter}${process.env.PATH ?? ''}`,
+        NCR_PAQUETES_METRICAS: '@ncr/config',
+      },
     });
     r.codigo !== 0 &&
     /CORRIDA INTERRUMPIDA/.test(r.salida) &&
