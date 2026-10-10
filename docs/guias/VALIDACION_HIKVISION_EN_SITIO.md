@@ -1149,13 +1149,14 @@ identificadores internos del registro (copropiedad, equipo, operador,
 
 ### 10.1 · Fuentes, y lo que NO es evidencia
 
-| Fuente                                  | Qué es                                                                                                                      |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `audio-2026-10-09T2020.md`              | Informe de `pnpm sitio:audio` del **videoportero**, 20:19:51                                                                |
-| `audio-2026-10-09T2021.md`              | Informe de `pnpm sitio:audio` de la **terminal**, 20:20:47                                                                  |
-| Extracto de `api.log` del 09/10         | Las líneas «sesión de audio terminada» y «conversación de guardia terminada», de 20:32 a 20:38, y los diagnósticos de 20:30 |
-| Declaración del usuario (encargo 15-S4) | Audio y video «SÍ»; los hitos, en la §10.4                                                                                  |
-| `hoja.md`                               | **NO es evidencia**: es la plantilla SIMULADA del 07/10 (18:10 UTC), vacía                                                  |
+| Fuente                                              | Qué es                                                                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `audio-2026-10-09T2020.md`                          | Informe de `pnpm sitio:audio` del **videoportero**, 20:19:51                                                                |
+| `audio-2026-10-09T2021.md`                          | Informe de `pnpm sitio:audio` de la **terminal**, 20:20:47                                                                  |
+| Extracto de `api.log` del 09/10                     | Las líneas «sesión de audio terminada» y «conversación de guardia terminada», de 20:32 a 20:38, y los diagnósticos de 20:30 |
+| Declaración del usuario (encargo 15-S4)             | Audio y video «SÍ»; los hitos, en la §10.4                                                                                  |
+| Declaración del usuario, 2026-10-10 (encargo 15-S5) | El navegador (Safari) y el estado de cada hito: §10.4                                                                       |
+| `hoja.md`                                           | **NO es evidencia**: es la plantilla SIMULADA del 07/10 (18:10 UTC), vacía                                                  |
 
 Qué sesión es de qué equipo: lo dice el usuario en el encargo («Terminal,
 20:35»). Las tres sesiones de 20:32 a 20:37 son del mismo equipo, la terminal;
@@ -1217,24 +1218,38 @@ Cómo se lee:
 
 ### 10.4 · Video, cámara e hitos
 
-| Qué                                                  | Lo que hay                                                                   | Fuente                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Video en vivo de la cámara LPR y del videoportero    | **SÍ**                                                                       | Declaración del usuario                                     |
-| Navegador del video                                  | **no declarado** (el encargo dejó «[Safari / Chrome]» sin elegir)            | —                                                           |
-| Primer cuadro (KPI-33, < 2 s)                        | **sin cifra**                                                                | —                                                           |
-| Canal de video de la terminal                        | canal 101: H.264, 1920 × 1080, 25 cuadros/s como máximo, CBR de 2 048 kbit/s | `api.log`, 20:30:16, «leer los canales de video del equipo» |
-| Audio extremo a extremo (KPI-33, < 2 s)              | **sin cifra**: la palmada de la §8.4.1, fila 4, no consta                    | —                                                           |
-| Audio en los dos equipos, hablar y escuchar a la vez | **SÍ**, con la salvedad de la sesión de las 20:33:56 (§10.3)                 | Declaración del usuario y §10.3                             |
-| Hito 1 · prototipo funcional                         | **no declarado**                                                             | El encargo dejó «[SÍ / NO / NO SE PROBÓ]»                   |
-| Hito 2 · LPR real                                    | **no declarado**                                                             | Ídem                                                        |
-| Hito 3 · facial real                                 | **no declarado**                                                             | Ídem                                                        |
-| Rostro de residente («Mi rostro» → PERMITIDO)        | **no declarado**                                                             | Ídem                                                        |
-| «Decide solo» de la cámara, atestado                 | **no declarado**                                                             | Ídem                                                        |
-| Apertura remota (KPI-32, < 3 s) y relé (KPI-13)      | **sin cifra**                                                                | —                                                           |
+_Actualizado en la 15-S5 con lo **declarado por el usuario el 2026-10-10**: la
+15-S4 los tenía como «no declarados» porque el encargo los dejó sin elegir._
 
-Un hito sin declarar cuenta como **NO SE PROBÓ** (regla 10 del encargo:
-comportamiento conservador). Por eso la ETAPA 15 sigue **BLOQUEADA**, y BE-02
-dice qué falta (ESTADO, cabecera).
+| Qué                                                                    | Lo que hay                                                                   | Fuente                                                      |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Video en vivo de la cámara LPR, la terminal y el videoportero          | **SÍ**                                                                       | Declarado por el usuario el 2026-10-10                      |
+| Navegador del video                                                    | **Safari**                                                                   | Declarado por el usuario el 2026-10-10                      |
+| Primer cuadro (KPI-33, < 2 s)                                          | **sin cifra**                                                                | —                                                           |
+| Canal de video de la terminal                                          | canal 101: H.264, 1920 × 1080, 25 cuadros/s como máximo, CBR de 2 048 kbit/s | `api.log`, 20:30:16, «leer los canales de video del equipo» |
+| Audio bidireccional con el videoportero y la terminal desde la guardia | **SÍ**, con la salvedad de la sesión de las 20:33:56 (§10.3)                 | Declarado por el usuario el 2026-10-10; §10.3               |
+| Audio extremo a extremo (KPI-33, < 2 s)                                | **sin cifra**: la palmada de la §8.4.1, fila 4, no consta                    | —                                                           |
+| Autorizaciones creadas y funcionales                                   | **SÍ**, pero **sin acceso físico ni evento declarado**: no cuentan como hito | Declarado por el usuario el 2026-10-10                      |
+| Hito 1 · prototipo funcional                                           | **PARCIAL**: no se declaran la app con sesión ni los eventos en tiempo real  | Declarado por el usuario el 2026-10-10                      |
+| Hito 2 · LPR real                                                      | **NO SE PROBÓ**                                                              | Declarado por el usuario el 2026-10-10                      |
+| Hito 3 · facial real                                                   | **NO SE PROBÓ**                                                              | Declarado por el usuario el 2026-10-10                      |
+| Rostro de residente («Mi rostro» → PERMITIDO)                          | **NO SE PROBÓ**                                                              | Declarado por el usuario el 2026-10-10                      |
+| «Decide solo» de la cámara, atestado                                   | **NO SE PROBÓ**                                                              | Declarado por el usuario el 2026-10-10                      |
+| Apertura remota (KPI-32, < 3 s) y relé (KPI-13)                        | **sin cifra**                                                                | —                                                           |
+
+**La ETAPA 15 sigue BLOQUEADA sólo por BE-02.** Lo que falta para cerrarla,
+exactamente:
+
+1. **Hito 2 (LPR real)** con su evento en /eventos: L1 por la app, de la placa
+   a la barrera por orden de la plataforma.
+2. **Hito 3 (facial real)** con su evento en /eventos: T1 por la app, de la
+   foto a la apertura.
+3. **El prototipo completo**: además de lo declarado, la app con sesión y los
+   eventos en tiempo real.
+4. **«Decide solo» de la cámara, atestado** tras la prueba física (§8.2).
+5. **KPI-13, KPI-32 y KPI-33** de extremo a extremo, con su cifra.
+
+El guion de la próxima visita es la §10.6.
 
 ### 10.5 · Lo que dice la documentación del fabricante
 
