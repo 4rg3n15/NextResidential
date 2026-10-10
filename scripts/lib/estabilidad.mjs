@@ -256,9 +256,10 @@ if (fallos > 0) {
   console.log(
     'FALLO estabilidad: la suite no es reproducible. Una prueba intermitente enseña a reejecutar hasta el verde.',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    `OK estabilidad: ${repeticiones} corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar`,
+  );
 }
-
-console.log(
-  `OK estabilidad: ${repeticiones} corridas forzadas (sin caché de turbo) con resultado idéntico y ningún error sin manejar`,
-);

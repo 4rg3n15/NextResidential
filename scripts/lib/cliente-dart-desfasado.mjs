@@ -146,12 +146,14 @@ try {
       '\nRegenérelo:\n' +
         '  pnpm contrato && (cd apps/mobile && dart run swagger_parser && dart run build_runner build --delete-conflicting-outputs)',
     );
-    process.exit(1);
+    // 15-S5 · DT-15S2-11 · exitCode y no exit: la lista no tiene tope y se lee por un
+    // pipe; y así el `finally` sí borra el banco (con exit quedaba en $TMPDIR).
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `cliente Dart al día: ${enRepo.length} ficheros generados desde ${CONTRATO}, sin diferencias`,
+    );
   }
-
-  console.log(
-    `cliente Dart al día: ${enRepo.length} ficheros generados desde ${CONTRATO}, sin diferencias`,
-  );
 } finally {
   rmSync(banco, { recursive: true, force: true });
 }

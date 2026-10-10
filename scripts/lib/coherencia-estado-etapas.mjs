@@ -323,10 +323,10 @@ if (problemas.length > 0) {
   console.error(
     '\nUna etapa no se cierra dejando la cabecera o el mapa atrás (regla del DoD, 2026-09-08).',
   );
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log(
+    `coherente: ${mapa.size} etapas en el mapa, ${cerradas.length} cerradas con ficha e informe, ` +
+      `cabecera al día · ${comprobadas} de ${enCurso.size} rama(s) «en curso» comprobadas contra git`,
+  );
 }
-
-console.log(
-  `coherente: ${mapa.size} etapas en el mapa, ${cerradas.length} cerradas con ficha e informe, ` +
-    `cabecera al día · ${comprobadas} de ${enCurso.size} rama(s) «en curso» comprobadas contra git`,
-);

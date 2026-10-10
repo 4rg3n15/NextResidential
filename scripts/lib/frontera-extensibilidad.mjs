@@ -169,9 +169,11 @@ if (violaciones.length > 0) {
       '  aplicación no importan @ncr/providers; fuera del paquete nadie nombra un adaptador; y el\n' +
       '  adaptador ficticio sólo conoce el núcleo. Si necesita algo que no está en nucleo/, súbalo.',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    `OK frontera-extensibilidad: ${candidatosA.length} fichero(s) de dominio/aplicación sin ` +
+      '@ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo',
+  );
 }
-console.log(
-  `OK frontera-extensibilidad: ${candidatosA.length} fichero(s) de dominio/aplicación sin ` +
-    '@ncr/providers, ningún adaptador nombrado fuera del paquete, y el ficticio sólo toca el núcleo',
-);

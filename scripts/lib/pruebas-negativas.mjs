@@ -40,7 +40,13 @@ import { conLectorLento } from './lector-lento.mjs';
 import { sondasDeEstabilidad } from './sondas/estabilidad.mjs';
 import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
 import { sondaDeBaseCorta, sondaDeBaseRepuesta } from './sondas/base-corta.mjs';
+import { sondasDeLectorLentoPorClase } from './sondas/lector-lento-por-clase.mjs';
 
+/** 15-S5 · DT-15S2-11 · un representante por clase de guion con salida sin tope. */
+const ESCRITORES_SIN_TOPE = {
+  hallazgos: 'scripts/lib/inyeccion-explicita.mjs',
+  resumen: 'scripts/lib/estabilidad.mjs',
+};
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
 
@@ -1564,6 +1570,8 @@ try {
       // Si cualquier aserción de arriba lanzara, el fichero NO se queda.
       rmSync(sonda, { force: true });
     }
+    // 15-S5 · DT-15S2-11 · un lector lento por clase de guion: la salida llega entera (sondas/).
+    await sondasDeLectorLentoPorClase({ raiz, banco, ok, mal, controles: ESCRITORES_SIN_TOPE });
   }
 
   console.log('\n▸ 23 · un número de `wc` comparado como TEXTO se detecta (D-103)');
@@ -3629,9 +3637,11 @@ if (estadoFinal === estadoInicial) {
 
 if (fallos > 0) {
   console.log(`\nPRUEBAS NEGATIVAS: ${fallos} comprobación(es) fallaron`);
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    '\nPRUEBAS NEGATIVAS: los 35 controles detectan su violación y aceptan el caso legítimo, ' +
+      'sin tocar el árbol',
+  );
 }
-console.log(
-  '\nPRUEBAS NEGATIVAS: los 35 controles detectan su violación y aceptan el caso legítimo, ' +
-    'sin tocar el árbol',
-);
