@@ -1024,6 +1024,14 @@ mismo adaptador que la guardia (el del WebSocket) y no guarda audio.
 si el equipo rechaza la petición con él, se repite sin él. La fila 2 dice cuál
 de los dos casos es el de cada equipo, sin tocar código.
 
+> **Corrección de la 15-S4 (medido el 09/10, §10).** El `sessionId` ya no es un
+> supuesto: lo documenta el fabricante (S-15S2-02, documentado) y las sesiones
+> de la guardia lo usaron con 200 en los dos equipos. **La línea
+> «`sessionId: rechazado`» de `pnpm sitio:audio` no es fiable**: el 09/10 la
+> dio en los dos equipos por un 400 que siguió igual sin el `sessionId`
+> (C-65, DT-15S4-01). Por eso, en la fila 4, un «NO» con «rechazado» **no**
+> descarta nada: lo que vale es la sesión de la guardia (§10.3).
+
 #### 8.4.2 · Las salidas del videoportero (15-P · P3)
 
 | #   | Qué hacer                                                                                                                                                                   | Resultado (anótelo) |
@@ -1128,3 +1136,146 @@ credenciales de los equipos (`H-15B-1` en `docs/seguridad/AUDITORIA.md`).
 Editar un equipo **sin** escribir la clave significa «no la cambies», y en ese
 caso el sistema **no prueba la conexión**: dice que no la probó en vez de
 inventar un rechazo, porque un rechazo falso invita a reintentar.
+
+---
+
+## 10 · Lo medido en la visita del 09/10 (15-S4)
+
+_Añadido en la 15-S4 (2026-10-10). Sólo documentación: ninguna línea de código
+cambió con esto._ Cada cifra lleva su fuente. Las horas son las del registro,
+en UTC (Bogotá = UTC−5). Los equipos se nombran por su papel: los
+identificadores internos del registro (copropiedad, equipo, operador,
+`sessionId`) no se copian aquí.
+
+### 10.1 · Fuentes, y lo que NO es evidencia
+
+| Fuente                                  | Qué es                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `audio-2026-10-09T2020.md`              | Informe de `pnpm sitio:audio` del **videoportero**, 20:19:51                                                                |
+| `audio-2026-10-09T2021.md`              | Informe de `pnpm sitio:audio` de la **terminal**, 20:20:47                                                                  |
+| Extracto de `api.log` del 09/10         | Las líneas «sesión de audio terminada» y «conversación de guardia terminada», de 20:32 a 20:38, y los diagnósticos de 20:30 |
+| Declaración del usuario (encargo 15-S4) | Audio y video «SÍ»; los hitos, en la §10.4                                                                                  |
+| `hoja.md`                               | **NO es evidencia**: es la plantilla SIMULADA del 07/10 (18:10 UTC), vacía                                                  |
+
+Qué sesión es de qué equipo: lo dice el usuario en el encargo («Terminal,
+20:35»). Las tres sesiones de 20:32 a 20:37 son del mismo equipo, la terminal;
+la de 20:37 a 20:38 es del videoportero.
+
+### 10.2 · Audio: lo que midió `pnpm sitio:audio` (20:19 y 20:20)
+
+| Dato                               | Videoportero (20:19:51)                                   | Terminal (20:20:47)                                       |
+| ---------------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| Canal y formato                    | canal 1 · **G.711ulaw**                                   | canal 1 · **G.711ulaw**                                   |
+| Muestreo, tasa, volúmenes          | no declarados                                             | no declarados                                             |
+| Bajada escuchando                  | **7 681 B/s** · nivel −16 dBFS                            | **7 852 B/s** · nivel −28,8 dBFS                          |
+| Bajada en la ventana «del tono»    | 1 740 B/s                                                 | 2 715 B/s                                                 |
+| Primer byte de bajada              | 174 ms                                                    | 152 ms                                                    |
+| Subida (el tono)                   | 16 000 B · primer byte a los 25 515 ms                    | 16 000 B · primer byte a los 16 212 ms                    |
+| ¿Se oyó el tono?                   | **NO**                                                    | **NO**                                                    |
+| Dúplex                             | indeterminado                                             | indeterminado                                             |
+| `sessionId`                        | «rechazado»                                               | «rechazado»                                               |
+| `PUT audioData`                    | 20: un 200, un 401 y **18 × 400** (17 ya sin `sessionId`) | 37: un 200, un 401 y **35 × 400** (34 ya sin `sessionId`) |
+| `open` / `GET audioData` / `close` | 200 / 200 / 200                                           | 200 / 200 / 200                                           |
+| Veredicto del guion                | ✗ FALLO                                                   | ✗ FALLO                                                   |
+
+La bajada de los dos equipos, ~7,7–7,9 kB/s, es la de G.711 a 8 kHz
+(8 000 B/s nominales). **Lo de «sessionId rechazado» y «¿se oyó? NO» no se
+sostiene:** lo refutan las sesiones de la guardia de la §10.3, y la causa más
+probable está en el guion, no en el equipo (C-65 y DT-15S4-01 del registro).
+
+### 10.3 · Audio: las sesiones de la guardia (20:32 a 20:38)
+
+Una línea «sesión de audio terminada» por sesión (B5 de la 15-S2). Todas con
+**`sessionId: usado`**, formato `g711u` y `close` con `?sessionId=` contestado
+con 200. La duración va de la línea «canal de audio del equipo abierto» al
+`close`.
+
+| Sesión                          | Duración | Estados HTTP                                               | Subida                    | Bajada                | 1.er byte subida / bajada | Tramos |
+| ------------------------------- | -------: | ---------------------------------------------------------- | ------------------------- | --------------------- | ------------------------- | -----: |
+| Terminal, 20:32:09–20:32:43     |   34,0 s | open 200 · PUT 200 · GET 200 · close 200                   | 85 440 B (10,7 s de voz)  | 241 267 B (7 092 B/s) | 7 910 ms / 853 ms         |      3 |
+| Terminal, 20:33:56–20:35:26     |   90,1 s | open 200 · **PUT 401** · GET 200 · close 200               | **0 B**                   | 684 801 B (7 597 B/s) | — / 1 038 ms              |  **0** |
+| Terminal, 20:35:43–20:37:02     |   78,9 s | open 200 · **PUT 401** · GET 200 · **PUT 200** · close 200 | 384 320 B (48,0 s de voz) | 577 267 B (7 316 B/s) | 1 929 ms / 780 ms         |      6 |
+| Videoportero, 20:37:27–20:38:09 |   42,4 s | open 200 · PUT 200 · GET 200 · close 200                   | 164 640 B (20,6 s de voz) | 335 612 B (7 919 B/s) | 5 405 ms / 958 ms         |      3 |
+
+Cómo se lee:
+
+- **El `sessionId` funciona en los dos equipos.** En la subida, la bajada y el
+  `close`, con 200. Lo confirma la documentación del fabricante (§10.5).
+- **La sesión de las 20:33:56 no subió ni un byte, y tampoco tuvo un solo tramo.**
+  Un tramo empieza cuando la API recibe «pulsar» de la consola; sin «pulsar»,
+  la API descarta el audio del micrófono antes de llegar al equipo
+  (`conversacion-de-audio.ts`). Con «tramos: 0», el equipo no pudo oír al
+  operador. **El 401 no lo explica:** la subida se reabre en la primera trama
+  que llega, como muestra la sesión de las 20:35:43 (PUT 401 y después PUT 200,
+  384 320 B). Lo que queda sin saber es si el operador pulsó (C-66 y
+  DT-15S4-02).
+- **El primer `PUT audioData` dio 401 en 2 de 4 sesiones.** Es el desafío
+  Digest caducado: el mismo que el registro anota en cada `open` y `close` como
+  «el equipo rechazó el nonce guardado» (DT-15S4-03).
+- **El «primer byte» cuenta desde `open`, no de extremo a extremo.** No es
+  KPI-33: esa cifra sigue sin medirse (§10.4).
+
+### 10.4 · Video, cámara e hitos
+
+| Qué                                                  | Lo que hay                                                                   | Fuente                                                      |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Video en vivo de la cámara LPR y del videoportero    | **SÍ**                                                                       | Declaración del usuario                                     |
+| Navegador del video                                  | **no declarado** (el encargo dejó «[Safari / Chrome]» sin elegir)            | —                                                           |
+| Primer cuadro (KPI-33, < 2 s)                        | **sin cifra**                                                                | —                                                           |
+| Canal de video de la terminal                        | canal 101: H.264, 1920 × 1080, 25 cuadros/s como máximo, CBR de 2 048 kbit/s | `api.log`, 20:30:16, «leer los canales de video del equipo» |
+| Audio extremo a extremo (KPI-33, < 2 s)              | **sin cifra**: la palmada de la §8.4.1, fila 4, no consta                    | —                                                           |
+| Audio en los dos equipos, hablar y escuchar a la vez | **SÍ**, con la salvedad de la sesión de las 20:33:56 (§10.3)                 | Declaración del usuario y §10.3                             |
+| Hito 1 · prototipo funcional                         | **no declarado**                                                             | El encargo dejó «[SÍ / NO / NO SE PROBÓ]»                   |
+| Hito 2 · LPR real                                    | **no declarado**                                                             | Ídem                                                        |
+| Hito 3 · facial real                                 | **no declarado**                                                             | Ídem                                                        |
+| Rostro de residente («Mi rostro» → PERMITIDO)        | **no declarado**                                                             | Ídem                                                        |
+| «Decide solo» de la cámara, atestado                 | **no declarado**                                                             | Ídem                                                        |
+| Apertura remota (KPI-32, < 3 s) y relé (KPI-13)      | **sin cifra**                                                                | —                                                           |
+
+Un hito sin declarar cuenta como **NO SE PROBÓ** (regla 10 del encargo:
+comportamiento conservador). Por eso la ETAPA 15 sigue **BLOQUEADA**, y BE-02
+dice qué falta (ESTADO, cabecera).
+
+### 10.5 · Lo que dice la documentación del fabricante
+
+Documentos entregados con el encargo de la 15-S4 en versión sin marca. **No se
+versionan**: aquí sólo se cita el documento, la sección y el dato.
+
+| Documento                                        | Equipo de esta obra | Sección                                                                  | Dato                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------ | ------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ISAPI, Face Recognition Terminals · Value Series | La terminal         | «Product Scope»                                                          | Lista `DS-K1T344MBFWX-E1`: el sufijo `-E1` de la tabla de equipos de arriba                                                                                                                                                                                                                             |
+| Ídem                                             | La terminal         | «Two-Way Audio» → «API Calling Flow»                                     | «Create an HTTP persistent connection to send the two-way audio data: `PUT /ISAPI/System/TwoWayAudio/channels/<audioID>/audioData`»; sin `Content-Length`, con `Connection: keep-alive` y `Content-Type: application/octet-stream`; Digest; G.711ulaw de longitud fija, 160/320 B por trama de 20/40 ms |
+| Ídem                                             | La terminal         | «Two-Way Audio» → «Message Format and Example»                           | Los ejemplos de `GET` y `PUT …/audioData` no llevan `Content-Length`                                                                                                                                                                                                                                    |
+| Ídem                                             | La terminal         | API Reference → «Receive two-way audio data» y «Send two-way audio data» | `GET …/audioData?sessionId=<audioSessionID>` y `PUT …/audioData?sessionId=<audioSessionID>&type=<type>`                                                                                                                                                                                                 |
+| Ídem                                             | La terminal         | API Reference → «Start two-way audio» y «Stop two-way audio»             | `open` contesta `TwoWayAudioSession` con `<sessionId>`; `PUT …/close?sessionId=<audioSessionID>`                                                                                                                                                                                                        |
+| ISAPI, IP Series · Ultra Series                  | El videoportero     | «Product Scope»                                                          | Lista `DS-KD9633-WBE6`: es el documento de este videoportero                                                                                                                                                                                                                                            |
+| Ídem                                             | El videoportero     | «Two-Way Audio» → «API Calling Flow» y «Message Format and Example»      | El mismo flujo, la misma nota sobre `Content-Length` y los mismos ejemplos que la terminal                                                                                                                                                                                                              |
+| Ídem                                             | El videoportero     | API Reference → «Start two-way audio» y «Stop two-way audio»             | `open` contesta con `<sessionId>`; `PUT …/close?sessionId=<audioSessionID>`. **Su referencia no trae** las entradas de `audioData` con `sessionId`: eso lo midió la guardia (§10.3)                                                                                                                     |
+| ISAPI (cámaras ANPR)                             | La cámara LPR       | «Product Scope» y el índice                                              | Lista `DS-TCG405-E`; el documento **no tiene sección de audio bidireccional**: la cámara no tiene audio, como ya se sabía                                                                                                                                                                               |
+
+Consecuencias para lo construido, sin cambiar código:
+
+- **El diseño actual de la subida es el que pide el fabricante:** un `PUT`
+  persistente, sin `Content-Length`, con `keep-alive` y `octet-stream`. La idea
+  de «falta Content-Length», planteada en sitio el 09/10 y nunca implementada,
+  **queda refutada** (C-65).
+- **El `sessionId` deja de ser un supuesto:** S-15S2-02 pasa a documentado, con
+  la cita de arriba.
+
+### 10.6 · Qué medir en la próxima visita
+
+1. **Los tres hitos**, con su evidencia: hito 1 (tablero con los tres equipos
+   en línea, la app con sesión, eventos en tiempo real), hito 2 (L1 por la app
+   hasta el evento) e hito 3 (T1 por la app hasta el evento). Y anotar cada
+   uno como SÍ, NO o NO SE PROBÓ.
+2. **KPI-33 de extremo a extremo**, con la palmada de la §8.4.1, fila 4, y el
+   primer cuadro del video, anotando el navegador.
+3. **KPI-32 y KPI-13**, con el cronómetro de la §5.3.
+4. **La sesión sin tramos.** Pulsar «Mantener para hablar», mirar que el medidor
+   «Enviando» se mueva y comprobar en el registro que la sesión cierra con
+   «tramos» > 0 y «bytesSubidos» > 0. Repetirlo justo después de una sesión
+   cuyo primer PUT dé 401.
+5. **`pnpm sitio:audio` sin la espera:** `--segundos=1` y Enter en cuanto
+   pregunte, para que el tono salga en los primeros segundos, por el mismo
+   `PUT` que abrió `open`. Si así «se oyó: SÍ» y «sessionId: usado», el 400 de
+   las 20:19 no era del `sessionId` (C-65, DT-15S4-01).

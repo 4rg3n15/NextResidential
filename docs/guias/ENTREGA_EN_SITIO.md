@@ -29,6 +29,7 @@
 - [6 · Reversión](#6--reversión)
 - [7 · Plan B por equipo](#7--plan-b-por-equipo)
 - [8 · Lo que sigue valiendo de las visitas archivadas](#8--lo-que-sigue-valiendo-de-las-visitas-archivadas)
+- [9 · La visita del 09/10: lo medido y lo que falta](#9--la-visita-del-0910-lo-medido-y-lo-que-falta)
 
 ---
 
@@ -642,3 +643,41 @@ o la clave» ya están en §4 y §7._
 | Modelo y firmware con «dato del DD-MM-YYYY»                       | El sondeo de hoy no alcanzó el equipo: son los que se leyeron ese día                                                          | No los dé por actuales; «Probar conexión» cuando el equipo conteste                          |
 | «La API no responde»                                              | La consola no alcanza la API: apagada o reiniciándose                                                                          | Mire la terminal de la API; si está arrancando, espere unos segundos                         |
 | «Servicio no disponible por ahora»                                | La API contestó que le falta algo, y el mensaje dice qué (p. ej. la base de datos, o «el Edge del conjunto no está conectado») | Siga el mensaje                                                                              |
+
+## 9 · La visita del 09/10: lo medido y lo que falta
+
+_15-S4 (2026-10-10). Detalle, cifras y fuentes en
+[`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md) §10._
+
+**Lo que quedó medido.**
+
+| Qué                           | Resultado del 09/10                                                                                                                                                       | Fuente                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Formato de audio              | **G.711ulaw** en el videoportero y en la terminal, canal 1                                                                                                                | `pnpm sitio:audio`, 20:19:51 y 20:20:47               |
+| Bajada (equipo → Mac)         | **7 681 B/s** (videoportero) y **7 852 B/s** (terminal), con nivel de voz (−16 y −28,8 dBFS): la tasa de G.711 a 8 kHz                                                    | Ídem                                                  |
+| Guardia, hablar y oír         | 4 sesiones, todas con `sessionId: usado` y `close` 200. Subieron 85 440, 384 320 y 164 640 B en tres de ellas. **La de las 20:33:56 no subió nada y no tuvo ni un tramo** | `api.log`, «sesión de audio terminada», 20:32 a 20:38 |
+| Video en vivo                 | Cámara LPR y videoportero, **SÍ**. Navegador **no declarado**                                                                                                             | Declaración del usuario                               |
+| Canal de video de la terminal | 101, H.264 1920 × 1080, 25 cuadros/s como máximo                                                                                                                          | `api.log`, 20:30:16                                   |
+
+**Lo que NO quedó medido, y por qué la ETAPA 15 sigue BLOQUEADA.**
+
+- **Los tres hitos del reto no están declarados.** El encargo de la 15-S4 los
+  dejó como «[SÍ / NO / NO SE PROBÓ]», sin elegir, y `hoja.md` es la plantilla
+  simulada del 07/10, vacía. Sin hitos declarados no hay cierre: cuentan como
+  NO SE PROBÓ.
+- **KPI-33, KPI-32 y KPI-13 siguen sin cifra.** El «primer byte» de las
+  sesiones cuenta desde `open`, no de extremo a extremo.
+
+**Lo que cambia para la próxima visita.**
+
+1. **No dé por buena la línea «sessionId: rechazado» de `pnpm sitio:audio`.**
+   El 09/10 salió en los dos equipos por un 400 ajeno al `sessionId` (C-65). Lo
+   que vale es la sesión de la guardia. Para el diagnóstico: `--segundos=1` y
+   Enter en cuanto pregunte.
+2. **En la guardia, pulse antes de hablar** («Mantener para hablar» o «Manos
+   libres») y mire que **«Enviando»** se mueva. Sin «pulsar», la API no manda
+   nada al equipo (DT-15S4-02).
+3. **Anote cada hito como SÍ, NO o NO SE PROBÓ**, con su evidencia: hito 1
+   (tablero con los tres equipos en línea, la app con sesión, eventos en tiempo
+   real), hito 2 (L1 por la app hasta el evento), hito 3 (T1 por la app hasta el
+   evento). Anote también el navegador del video y las tres latencias.
