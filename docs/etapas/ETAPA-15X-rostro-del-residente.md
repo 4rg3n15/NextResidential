@@ -549,7 +549,10 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
   tener la autorización del representante** (409) hasta que ése venza o lo
   revoque su titular: la base admite un consentimiento vigente por persona, y
   el representante no revoca lo que no autorizó.
-- **DT-15X-07 · `equipos.e2e` cayó una vez en macOS con «socket hang up»**
+- **DT-15X-07 · `equipos.e2e` cayó una vez en macOS con «socket hang up»** ·
+  **CERRADO en la 15-S5** (H-15S5-07): volvió a salir en la CI de macOS del
+  PR #56; en macOS un doble en `127.0.0.1:0` y `crearApp` en la comodín podían
+  compartir puerto. `crearApp` escucha ya en `127.0.0.1`.
   («A.3 · … probar sin volver a escribir la clave no inventa un rechazo», CI
   del PR #52 sobre `ab48efa`, paso 7). No se reproduce en Linux ni volvió a
   salir. **Sin causa raíz**: lo digo así en vez de llamarlo intermitente.

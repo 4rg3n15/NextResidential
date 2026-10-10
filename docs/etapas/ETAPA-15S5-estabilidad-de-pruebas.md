@@ -4,7 +4,7 @@
 **PR:** hacia `develop`, sin fusionar · **Fecha:** 2026-10-10 ·
 **Encargo:** RONDA 15-S5, tareas 1 a 7 y la declaración de la visita del 09/10 ·
 **Cierra:** DT-15M-C01 · DT-15M-C02 · DT-15S2-10 · DT-15S2-11 · H-15S4-01 · la carrera de paridad del PR #54 ·
-**Deja abierta con evidencia:** DT-15X-07 · **Abre:** H-15S5-01 a H-15S5-06 · DT-15S5-01 a DT-15S5-06 · S-15S5-01
+DT-15X-07 (tras reproducirse en la CI del PR #56) · **Abre:** H-15S5-01 a H-15S5-07 · DT-15S5-01 a DT-15S5-07 · S-15S5-01
 
 > **No toca producto.** Sólo pruebas (`apps/api/test`), guiones del verificador
 > (`scripts/verificar-etapa.sh` y `scripts/lib/`) y documentación. La
@@ -40,15 +40,16 @@
    - En Linux llegan enteros: medido con lector lento.
    - Quedan como DT-15S5-01 y DT-15S5-02. Corregirlos es una línea cada uno,
      pero los dos están congelados o fuera de los ficheros permitidos.
-4. **DT-15X-07 no se reprodujo.**
-   - Se intentaron 140 pasadas de `equipos.e2e`, varias a la vez y
-     con carga, sin un solo «socket hang up».
-   - Sí encontré y medí un mecanismo que da exactamente ese mensaje con esta
-     pila: el agente HTTP de Node 22 conserva la conexión y el servidor se
-     reabre en el mismo puerto. Falla 300 de 300.
-   - No puedo afirmar que sea la causa: en `equipos.e2e` la ventana para que
-     ocurra no existe en la práctica (§2, T7). No lo llamo intermitente: queda
-     abierta, con lo probado.
+4. **DT-15X-07 no se reprodujo aquí, y el mecanismo que medí no era.**
+   - 140 pasadas de `equipos.e2e` en Linux, con carga, sin un solo «socket
+     hang up».
+   - La CI de macOS del PR #56 sí lo reprodujo, con la prueba exacta. Con ese
+     dato descarté el mecanismo que había medido (el agente _keep-alive_ de
+     Node): `supertest` no lo usa.
+   - La causa que encaja es otra, y sólo existe en macOS: dos servidores en el
+     mismo puerto, uno en la comodín y otro en `127.0.0.1` (H-15S5-07).
+     Corregida en las pruebas. Que macOS lo permita es [Probable]: aquí no
+     puedo medirlo; lo mide en cada plataforma la prueba nueva, en la CI.
 5. **Hay un choque entre dos reglas del encargo, y lo resolví así.**
    - La regla 4 manda las sondas a `pruebas-negativas.mjs`. La regla 2 prohíbe
      que crezca un fichero de más de 300 líneas, y ese tiene 3911.
@@ -98,7 +99,8 @@ base, y un verificador que nombra lo que cae y no pierde lo que escribe.
   en riesgo de `scripts/lib` pasan a `process.exitCode`, y hay una sonda de
   lector lento por clase de guion.
 - **T6 · `metricas.mjs`** ya no lee el informe de una corrida anterior.
-- **T7 · `equipos.e2e` bajo carga:** no reproducido; lo probado queda escrito.
+- **T7 · `equipos.e2e` bajo carga:** no reproducido aquí; reproducido en la
+  CI de macOS del PR #56, y corregido (H-15S5-07).
 - **La declaración del usuario del 2026-10-10** sobre la visita del 09/10,
   registrada en `ESTADO_ETAPAS.md` (ficha de la ETAPA 15 y BE-02) y en
   `VALIDACION_HIKVISION_EN_SITIO.md` §10.
@@ -414,9 +416,31 @@ de la rama.
   de vueltas (compilar el módulo de Nest, firmar el token).
 - Para que pase haría falta el mismo puerto y menos de diez vueltas.
 
-**Queda abierta, con esto escrito.** Si vuelve a salir, el registro tiene que
-decir en qué prueba y con qué puerto: eso confirmaría o descartaría este
-mecanismo.
+**Corrección, después del PR: ese mecanismo no era (H-15S5-07).** La CI de
+macOS del PR #56 lo reprodujo en «`Sin zona` quita la zona › un zonaId que no
+es UUID se sigue rechazando», con `socket hang up` en `socketOnEnd`.
+
+- `supertest` (superagent 9.0.2) usa `agent: false`: cada petición abre su
+  conexión con `Connection: close`, medido. No hay conexión guardada que
+  reutilizar, así que lo de arriba no le aplica.
+- Lo que sí encaja: `crearApp` escuchaba en la comodín (`0.0.0.0` aquí) y
+  varios dobles en `127.0.0.1:0`. Uno es el proxy de
+  `pgboss-y-sonda-ante-cortes`, que mientras está «apagado» destruye toda
+  conexión que entra: un `socket hang up` por `socketOnEnd`, exacto.
+- En BSD, con `SO_REUSEADDR` (libuv lo pone), una dirección concreta puede
+  quedarse el MISMO puerto que una comodín de otro proceso, y la conexión a
+  `127.0.0.1:P` va a la concreta. En Linux da `EADDRINUSE`, medido: por eso
+  aquí nunca salió. Las dos veces fue macOS, en el paso 7, con los ficheros en
+  paralelo.
+- **Corrección:** `crearApp` y `saneamiento-entrada` escuchan en `127.0.0.1`.
+  `servidores-en-loopback.test.ts`, vista fallar antes (escuchaba en `0.0.0.0`;
+  el escaneo nombró las dos líneas), comprueba eso, que ningún `listen(0…)` de
+  `apps/api/test` deje fuera el `127.0.0.1`, y **el peligro en cada
+  plataforma**: en macOS espera que una concreta comparta puerto con una
+  comodín; en Linux, `EADDRINUSE`.
+- **Lo que no he podido medir:** el lado de macOS. Es la semántica documentada
+  de BSD, [Probable]; la prueba lo mide en la CI y, si la premisa fuera falsa,
+  lo dirá.
 
 ## 3 · Árbol de archivos
 
@@ -430,6 +454,7 @@ apps/api/test/
 ├─ visita-de-la-corrida.ts           39  una visita vigente con placa propia (D-134) y un Pool de un uso
 ├─ consultas-de-porteros-pg.ts       40  las lecturas de porteros-por-identificador, y «sin huecos»
 ├─ ordenes-manuales-pg.test.ts       94  las órdenes manuales, en copropiedad propia (antes en persistencia-operativa)
+├─ servidores-en-loopback.test.ts    67  DT-15X-07: los servidores de prueba en 127.0.0.1, y el peligro medido por plataforma
 └─ dobles/
    ├─ plantillas-de-la-corrida.ts    73  TerminalEspia, soloLasPropias y la plantilla ajena que vence
    └─ visitas-con-foto.ts            79  los dobles de visitas-pg y el hogar propio del bloque 3i
@@ -466,6 +491,8 @@ docs/etapas/ETAPA-15S5-estabilidad-de-pruebas.md     este informe
 | `apps/api/test/modo-de-puerta-pg.test.ts`                                                                | 137 → 164                   | La orden, mañana                                                                                              |
 | `apps/api/test/mis-visitas-revocacion.e2e.test.ts`                                                       | 219 → 227                   | Baja de su terminal                                                                                           |
 | `apps/api/test/visitas-pg.test.ts`                                                                       | 692 → 667                   | Hogar propio en 3i; dobles fuera                                                                              |
+| `apps/api/test/utilidades.ts`                                                                            | 649 → 648                   | `crearApp` escucha en `127.0.0.1` (DT-15X-07)                                                                 |
+| `apps/api/test/saneamiento-entrada.e2e.test.ts`                                                          | 287 → 287                   | Ídem                                                                                                          |
 | `scripts/lib/estabilidad.mjs`                                                                            | 244 → 265                   | T3 y T5                                                                                                       |
 | `scripts/lib/verificar-base-de-pruebas.mjs`                                                              | 130 → 169                   | T4                                                                                                            |
 | `scripts/lib/metricas.mjs`                                                                               | 532 → 532                   | T6                                                                                                            |
@@ -490,6 +517,7 @@ documentos no aplican.
 | `dobles/plantillas-de-la-corrida.ts`                                                                     | El espía, el acotado y la ajena: lo que `biometria-pg` necesita de la base | `soloLasPropias` decora el repositorio sin tocarlo                         | `soloLasPropias` devuelve un `RepositorioPlantillas` real, con `vencidas` filtrado: sustituible donde el original | Sólo el puerto `RepositorioPlantillas`              | Recibe el repositorio, no lo construye                                                           |
 | `dobles/visitas-con-foto.ts`                                                                             | Los dobles de las visitas con foto y el hogar propio                       | —                                                                          | `TerminalesSimuladas` cumple `FaceTemplateProvider`                                                               | Ídem                                                | `Pool` por parámetro                                                                             |
 | `ordenes-manuales-pg.test.ts`                                                                            | Un bloque: las órdenes sobreviven a un reinicio                            | —                                                                          | —                                                                                                                 | —                                                   | —                                                                                                |
+| `servidores-en-loopback.test.ts`                                                                         | Una propiedad: dónde escuchan los servidores de prueba                     | Un servidor de prueba nuevo entra en el escaneo sin tocar la prueba        | —                                                                                                                 | —                                                   | —                                                                                                |
 | `ficheros-de-la-pasada.mjs`                                                                              | Ficheros por pasada: archivar, leer y diagnosticar                         | `estabilidad.mjs` lo usa sin cambiar su comparación de firmas              | —                                                                                                                 | Seis funciones sueltas                              | Directorio y raíz por parámetro                                                                  |
 | `pruebas-negativas.mjs`                                                                                  | La suite de sondas: esta ronda le quita la 7 y sólo invoca las nuevas      | Sondas nuevas en módulos nuevos, no en ella                                | —                                                                                                                 | —                                                   | El entorno de los procesos que nadie mide (`tsc`, el arranque de la 35), explícito en la llamada |
 | `sondas/*.mjs`                                                                                           | Una tarea por fichero; la 7, tal cual                                      | Sondas nuevas en módulos nuevos; la suite sólo las invoca                  | —                                                                                                                 | Reciben `{ raiz, banco, correr, ok, mal, control }` | El control llega como literal desde la suite                                                     |
@@ -545,6 +573,7 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
 
 **Cerradas en esta ronda.**
 
+- **DT-15X-07** — T7 y H-15S5-07: reproducida en la CI del PR #56 y corregida.
 - **DT-15M-C01** — §2, T2, con la tabla. Los once de la 15-M y los seis que
   faltaban.
 - **DT-15M-C02** — T6.
@@ -621,6 +650,11 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
     `metricas.mjs` quitado vuelve a dar el ✗. Lo corrige `9378f90`.
   - Las tres corridas del verificador eran verdes de verdad: aquí la sonda sí
     escondía `pnpm`. Lo que faltaba era que lo hiciera en cualquier máquina.
+- **H-15S5-07 · DT-15X-07 tenía causa, y no era la que medí.** La CI de
+  macOS del PR #56 lo reprodujo con la prueba exacta. `supertest` no reutiliza
+  conexiones; lo que encaja es que en macOS un doble en `127.0.0.1:0` y la app
+  de `crearApp` en la comodín pueden compartir puerto. Detalle y corrección en
+  §2, T7. Lo corrige `52edec5`.
 
 **Deuda que abre.**
 
@@ -643,11 +677,13 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
   `NCR_INTERFERENCIA=todas` y recree la base después costaría unos 4 minutos
   más un `verificar.sh`. Lo propongo; no lo añado sin que lo pidan.
 
-**Deuda que sigue abierta con evidencia nueva.**
-
-- **DT-15X-07 · `equipos.e2e` «socket hang up»** (§2, T7). No reproducido, con
-  las pasadas contadas. El mecanismo medido y por qué no lo doy por causa están
-  en §2.
+- **DT-15S5-07 · Baja · dos servidores de prueba de la API siguen en la
+  comodín**, fuera de las rutas que esta ronda puede tocar:
+  `apps/api/src/autenticacion/infraestructura/jwks.test.ts:41` y
+  `apps/api/src/arranque/puerto-mientras-arranca.test.ts:69`. Son dos
+  `listen()` por corrida frente a los cientos de `crearApp`: el riesgo de
+  H-15S5-07 queda ahí, mucho menor. El escaneo de la prueba nueva mira sólo
+  `apps/api/test`.
 
 **Supuestos.**
 
@@ -671,8 +707,9 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
 3. Para la próxima ronda que pueda tocar `scripts/sitio-ensayo.mjs` y
    `scripts/puesta-en-marcha-equipos.mjs`: DT-15S5-01 y -02. Son una línea cada
    uno: `process.exitCode` en vez de `process.exit`.
-4. Si `equipos.e2e` vuelve a dar «socket hang up», guarde el registro entero del
-   trabajo (DT-15X-07): hace falta saber en qué prueba fue.
+4. Mire en la CI de macOS que `servidores-en-loopback.test.ts` pase: su
+   tercera prueba confirma la premisa de H-15S5-07 en macOS. Si falla, la
+   causa de DT-15X-07 no es esa y hay que reabrirla.
 
 ## 10 · Rama y commits
 
@@ -689,3 +726,5 @@ Rama `etapa-15s5-estabilidad-de-pruebas`, desde `develop` (`e2507bc`, merge del 
 - `bd6dcdd` fix(etapa-15s5/verificador): el paso 9 ya no se pasa de su límite — H-15S5-05
 - el cierre: `chore(etapa-15s5): cierre de etapa`, con este informe, ESTADO y el registro.
 - `9378f90` fix(etapa-15s5/verificador): la sonda del informe viejo no depende de dónde viva pnpm — H-15S5-06, tras el rojo de la CI
+- `ada6a94` docs(etapa-15s5): H-15S5-06
+- `52edec5` fix(etapa-15s5/pruebas): DT-15X-07 — los servidores de prueba de la API escuchan en 127.0.0.1, no en la comodín — H-15S5-07, tras el rojo del verificador de macOS en la CI
