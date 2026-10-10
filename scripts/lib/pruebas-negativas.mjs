@@ -39,6 +39,7 @@ import { sinColores } from './sin-colores.mjs';
 import { conLectorLento } from './lector-lento.mjs';
 import { sondasDeEstabilidad } from './sondas/estabilidad.mjs';
 import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
+import { sondaDeBaseCorta, sondaDeBaseRepuesta } from './sondas/base-corta.mjs';
 
 const CONTRATO = 'packages/contracts/openapi.json';
 const CLIENTE = 'packages/contracts/src/generado/api.ts';
@@ -2024,6 +2025,7 @@ try {
         NCR_PGDATABASE: 'ncr_sonda',
       };
       const guion = join(raiz, 'scripts/base-de-pruebas.sh');
+      const urlDeLaSonda = 'postgresql://postgres@127.0.0.1:55439/ncr_sonda';
 
       /**
        * ═══════════════════════════════════════════════════════════════════
@@ -2123,6 +2125,9 @@ try {
         rmSync(dirPg, { recursive: true, force: true });
       } else {
         ok('base-de-pruebas: la sonda levanta un clúster corto a propósito');
+        // 15-S5 · H-15S4-01 · el control del principio del verificador lo rechaza (sondas/).
+        const sobreLaCorta = { raiz, banco, correr, ok, mal, url: urlDeLaSonda };
+        sondaDeBaseCorta({ ...sobreLaCorta, control: 'scripts/lib/verificar-base-de-pruebas.mjs' });
 
         // 2 · la siguiente invocación lo encuentra vivo. Tiene que NEGARSE a
         //     reutilizarlo, decir por qué, y dejarlo con el valor que la suite
@@ -2139,6 +2144,10 @@ try {
         /Se reinicia/.test(ahora.salida)
           ? mal('el clúster reiniciado SIGUE por debajo del mínimo: se reinicia en bucle')
           : ok('y la invocación siguiente ya lo reutiliza, porque ahora sí sirve');
+        sondaDeBaseRepuesta({
+          ...sobreLaCorta,
+          control: 'scripts/lib/verificar-base-de-pruebas.mjs',
+        });
 
         parar();
         rmSync(dirPg, { recursive: true, force: true });
