@@ -580,8 +580,17 @@ Antes de estas tres, una corrida sobre el código de la T7 salió **FALLIDA** (e
   idénticas en verde con 564 de 564.
 - La CI sobre `a8ba087`, en verde: los cuatro checks, el verificador completo
   de macOS incluido.
-- La corrida sobre el commit que trae este texto se registra en el commit
-  siguiente.
+- **Sobre `a141a3e`, el último commit de código y de registro antes de este, en
+  verde:** en 54 min 25 s → «VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe».
+  - 31 de 31 pasos, 96 ✓ y 0 ✗.
+  - 564 de 564 ficheros de prueba; 5651 pruebas de TypeScript y 508 de Dart.
+  - El banco negativo y el trinquete de ramas en verde (45 controles medidos,
+    238 bloques sin ejercer, ninguno sube de su base).
+  - Tres pasadas idénticas en el paso 14, sin un fichero caído.
+  - Dominio 96,41 %, aplicación 97,75 %, global 88,56 % de líneas.
+  - La CI sobre el mismo commit, en verde: los cuatro checks, el verificador
+    de macOS incluido. La prueba del semidúplex pasó esta vez; DT-15S5-08
+    sigue abierta, porque su causa sigue ahí.
 
 ## 7 · Verificación de seguridad (§2.7)
 
