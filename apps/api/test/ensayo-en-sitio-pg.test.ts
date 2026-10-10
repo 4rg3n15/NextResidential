@@ -12,6 +12,7 @@ import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositor
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { horaDeLaOrden } from './hora-de-la-orden';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -295,13 +296,9 @@ const visita = async (
   return { autorizacionId: r.body.id as string, personaId: p.id, documento: p.documento };
 };
 
-/**
- * Las órdenes manuales no dependen de la hora del escenario, y `ordenes_manuales`
- * es de solo inserción: escribirlas con la fecha de mañana dejaría filas «del
- * futuro» que desplazan a las de otras suites en «las últimas N».
- */
-const ordenAHoraReal = (): void => {
-  reloj = new Date();
+/** Las órdenes manuales no dependen de la hora del escenario: `hora-de-la-orden.ts`. */
+const ordenAHoraReal = async (): Promise<void> => {
+  reloj = await horaDeLaOrden(pool as Pool, COP_A);
 };
 
 const vetar = async (cuerpo: { placa?: string; documento?: string }): Promise<void> => {
@@ -460,7 +457,7 @@ describe('ENSAYO SIMULADO · cámara LPR con vehículo de TERCERO (día y franja
     const antes = mock.aperturas.length;
     await leerPlaca(placa, 60);
     expect(mock.aperturas.slice(antes).some((x) => x.dispositivoId === LPR)).toBe(false);
-    ordenAHoraReal();
+    await ordenAHoraReal();
     const manual = await con(operador).post(`/copropiedades/${COP_A}/guardia/ordenes`, {
       dispositivoId: LPR,
       accion: 'abrir',
@@ -593,7 +590,7 @@ describe('ENSAYO SIMULADO · videoportero: timbre → aviso → vista en vivo �
   it('V4 · apertura remota atribuida al operador, persistida y ejecutada por el proveedor', async () => {
     if (omitida()) return;
     const antes = mock.aperturas.length;
-    ordenAHoraReal();
+    await ordenAHoraReal();
     const r = await con(operador).post(`/copropiedades/${COP_A}/guardia/ordenes`, {
       dispositivoId: INTERCOM,
       accion: 'abrir',
@@ -618,7 +615,7 @@ describe('ENSAYO SIMULADO · videoportero: timbre → aviso → vista en vivo �
   it('V5 · negación con motivo: la puerta NO se mueve y queda registrada', async () => {
     if (omitida()) return;
     const antes = mock.aperturas.length;
-    ordenAHoraReal();
+    await ordenAHoraReal();
     const r = await con(operador).post(`/copropiedades/${COP_A}/guardia/ordenes`, {
       dispositivoId: INTERCOM,
       accion: 'negar',

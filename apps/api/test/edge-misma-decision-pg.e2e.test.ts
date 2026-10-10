@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { randomBytes } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import type { ResultadoAcceso } from '@ncr/domain-core';
 // `utilidades` PRIMERO: carga `AppModule` en su orden (ciclo eventos ↔ autorizaciones).
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { MOTOR_DE_DECISION, type MotorDeDecision } from '../src/eventos/aplicacion/puertos';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { interferir, semillaVieja } from './interferencia';
+import { conPool, visitaVigenteConPlaca } from './visita-de-la-corrida';
 import {
   revocarConsentimientoDe,
   sembrarResidenteConRostro,
@@ -34,6 +37,12 @@ import type { InstantaneaDeReglas } from '../../edge/src/aplicacion/instantanea-
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const CAMARA = '90000000-0000-4000-8000-000000000001';
+/**
+ * 15-S5 · la visita vigente es DE ESTA CORRIDA (D-134): la `ABC9999` de la
+ * semilla vence a las ocho horas, y con la base vieja el caso dejaba de probar
+ * una visita permitida sin ponerse rojo (interferencia `semilla-vieja`).
+ */
+const VISITA = `VI${randomBytes(3).toString('hex').toUpperCase()}`;
 let app: INestApplication | undefined;
 let plantillaPropia = '';
 /** 15-S5 · la plantilla de «otro fichero»: entra en la instantánea y se revoca después. */
@@ -46,6 +55,8 @@ let disponible = false;
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
+  await interferir('semilla-vieja', () => semillaVieja(URL_BASE ?? ''));
+  await conPool(URL_BASE, (p) => visitaVigenteConPlaca(p, VISITA));
   plantillaPropia = await sembrarRostroReconocible(URL_BASE);
   plantillaAjena = await sembrarResidenteConRostro(URL_BASE, 'PERMITIDO');
   plantillaRevocada = await sembrarResidenteConRostro(URL_BASE, 'PERMITIDO');
@@ -101,7 +112,7 @@ const CASOS: readonly { nombre: string; placa: string; confianza: number }[] = [
   { nombre: 'vehículo sin dueño (persona sintética)', placa: 'CONC001', confianza: 0.95 },
   {
     nombre: 'placa de una VISITA vigente (autorización con placa)',
-    placa: 'ABC9999',
+    placa: VISITA,
     confianza: 0.95,
   },
   { nombre: 'placa de una visita vencida', placa: 'XYZ9999', confianza: 0.95 },
@@ -229,6 +240,18 @@ describe.skipIf(URL_BASE === undefined)('RN-16 · nube y Edge deciden igual (15-
 
   it('los casos cubren permitidos Y negados: si no, no probarían nada', async () => {
     expect(instantanea?.vehiculos.length).toBeGreaterThan(0);
-    expect(instantanea?.autorizaciones.some((a) => a.placa === 'ABC9999')).toBe(true);
+    expect(instantanea?.autorizaciones.some((a) => a.placa === VISITA)).toBe(true);
+    // 15-S5 · y la visita PERMITE: vencida, «visita vigente» no probaría nada.
+    const motor = (app as INestApplication).get<MotorDeDecision>(MOTOR_DE_DECISION);
+    const visita = await motor.decidir({
+      copropiedadId: COP_A,
+      dispositivoId: CAMARA,
+      metodo: 'placa',
+      personaId: null,
+      placaLeida: VISITA,
+      zonaId: null,
+      confianza: 0.95,
+    });
+    expect(visita.permitido).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { capacidadesDescubiertas } from '@ncr/providers';
-import type { Bitacora, FaceTemplateProvider, GeneradorDeId, Reloj } from '@ncr/domain-core';
+import type { Bitacora, GeneradorDeId, Reloj } from '@ncr/domain-core';
 import type { ContextoTenant } from '../src/autenticacion';
 import { ACTOR_INGESTA } from '../src/comun/actores-de-servicio';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
@@ -23,6 +23,7 @@ import {
 import { SincronizarPlantillaEnTerminales } from '../src/biometria/aplicacion/sincronizacion-total';
 import { IdentidadBiometricaDesdeRepositorios } from '../src/biometria/aplicacion/identidad-biometrica';
 import { RespuestaDelTitular } from './dobles/respuesta-del-titular';
+import { TerminalEspia, ajenaQueVence, soloLasPropias } from './dobles/plantillas-de-la-corrida';
 import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
@@ -63,18 +64,6 @@ class RelojMovil implements Reloj {
 class Ids implements GeneradorDeId {
   nuevo(): string {
     return randomUUID();
-  }
-}
-class TerminalEspia implements FaceTemplateProvider {
-  readonly recibidas: string[] = [];
-  readonly retiradas: string[] = [];
-  bytes: Uint8Array | null = null;
-  async sincronizar(dispositivoId: string, plantillaId: string, plantilla: Uint8Array) {
-    this.bytes = plantilla;
-    this.recibidas.push(`${dispositivoId}/${plantillaId}`);
-  }
-  async suprimir(dispositivoId: string, plantillaId: string) {
-    this.retiradas.push(`${dispositivoId}/${plantillaId}`);
   }
 }
 const bitacora: Bitacora = { registrar: () => undefined };
@@ -199,7 +188,7 @@ beforeAll(async () => {
       una,
       bitacora,
     );
-    barrer = new BarrerPlantillasVencidas(plantillas, boveda, reloj);
+    barrer = new BarrerPlantillasVencidas(soloLasPropias(plantillas, propias), boveda, reloj);
     identidad = new IdentidadBiometricaDesdeRepositorios(plantillas, consentimientos);
   } catch (error) {
     console.warn('biometria-pg: base no preparada, se omite:', error);
@@ -216,6 +205,8 @@ afterAll(async () => {
   await pool?.end();
 });
 
+/** Las plantillas que captura esta corrida: lo único que su barrido puede suprimir. */
+const propias = new Set<string>();
 const captura = async (horasDeVida = 8) => {
   const r = await capturar.ejecutar(ctx(), {
     titularId,
@@ -226,6 +217,7 @@ const captura = async (horasDeVida = 8) => {
     suprimirEn: new Date(reloj.ahora().getTime() + horasDeVida * HORA),
   });
   if (!r.ok || !r.valor.aceptada) throw new Error('la captura debía aceptarse');
+  propias.add(r.valor.plantillaId);
   return r.valor;
 };
 
@@ -343,6 +335,8 @@ describe.skipIf(URL_BASE === undefined)('A3 · biometría contra PostgreSQL', ()
     if (!total.ok) expect(total.error.codigo).toBe('OPERACION_NO_PERMITIDA');
     expect(terminal.recibidas).not.toContain(`${terminalId}/${plantillaId}`);
 
+    // 15-S5 · la de una visita de otro fichero, que vence antes que el reloj del barrido.
+    const ajena = await ajenaQueVence(pool as Pool, COP_A, 90);
     reloj.instante = new Date(AHORA.getTime() + 2 * HORA);
     const barrido = await barrer.ejecutar(ctx());
     expect(barrido.ok && barrido.valor.suprimidas).toBeGreaterThanOrEqual(1);
@@ -350,6 +344,7 @@ describe.skipIf(URL_BASE === undefined)('A3 · biometría contra PostgreSQL', ()
       estado: 'suprimida',
       vector_cifrado: null,
     });
+    expect((await filaPlantilla(ajena))?.estado).toBe('activa');
     reloj.instante = AHORA;
   });
 
