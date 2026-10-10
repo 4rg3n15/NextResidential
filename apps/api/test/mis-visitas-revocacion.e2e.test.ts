@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { FACE_TEMPLATE_PROVIDER } from '@ncr/domain-core';
 import type { FaceTemplateProvider } from '@ncr/domain-core';
 import { capacidadesDescubiertas } from '@ncr/providers';
@@ -82,6 +82,14 @@ const banco = bancoDelHogar('sin DATABASE_URL_PRUEBAS o sin las migraciones 0055
   },
 });
 const omitida = (): boolean => !banco.disponible;
+// 15-S5 · DT-15M-C01 · la terminal de la corrida se da de baja, como en `visitas-pg`:
+// cada corrida dejaba una terminal facial activa más en COP_A, y la foto de una
+// visita —y su retirada— va a TODAS (RN-19: baja lógica, nunca borrado).
+afterAll(async () => {
+  if (banco.disponible && equipos !== undefined && terminal !== '') {
+    await equipos.desactivar(ctxAdmin, COP_A, terminal, 'fin de la prueba de revocación');
+  }
+});
 
 /** Un JPEG mínimo: los bytes de cabecera y de cierre que el tipo real exige. */
 const jpeg = (): string =>

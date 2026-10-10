@@ -11,7 +11,7 @@
  * Uso: node scripts/lib/metricas.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { sinColores } from './sin-colores.mjs';
 
@@ -89,6 +89,7 @@ const DIRECTORIO_DE_INFORMES = join(raiz, '.informes-de-prueba');
 const correr = (paquete, dir) => {
   mkdirSync(DIRECTORIO_DE_INFORMES, { recursive: true });
   const salida = join(DIRECTORIO_DE_INFORMES, `${paquete.replace(/[^a-z0-9]+/gi, '-')}.json`);
+  rmSync(salida, { force: true }); // 15-S5 · DT-15M-C02: sólo cuenta el que escriba ESTA corrida
   let codigoSalida = 0;
   let crudoSalida = '';
   let crudoError = '';
@@ -118,7 +119,6 @@ const correr = (paquete, dir) => {
        */
       { cwd: raiz, stdio: 'pipe', encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
     );
-    codigoSalida = 0;
   } catch (e) {
     codigoSalida = typeof e.status === 'number' ? e.status : 1;
     crudoSalida = String(e.stdout ?? '');

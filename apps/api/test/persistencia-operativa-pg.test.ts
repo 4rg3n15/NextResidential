@@ -10,9 +10,7 @@ import {
   AlertasDelCicloDelEquipo,
   NOTA_DE_RESOLUCION_AUTOMATICA,
 } from '../src/eventos/aplicacion/alertas-del-ciclo-del-equipo';
-import { BitacoraDeOrdenesPg } from '../src/guardia/infraestructura/bitacora-de-ordenes-pg';
 import { RegistroDeAuditoriaPg } from '../src/comun/auditoria/auditoria-pg';
-import type { OrdenEjecutada } from '../src/guardia/aplicacion/apertura-manual';
 import { URL_BASE, exigirBase } from './base-exigida';
 
 /**
@@ -35,7 +33,6 @@ const bitacora: Bitacora = { registrar: () => undefined };
 let escribe: Pool | undefined;
 let lee: Pool | undefined;
 let disponible = false;
-let operadorId = '';
 let dispositivoId = '';
 let viviendaId = '';
 
@@ -76,10 +73,6 @@ beforeAll(async () => {
         copropiedad_id: null,
       }),
     ]);
-    const u = await c.query<{ id: string }>(
-      "SELECT u.id FROM public.usuarios u JOIN public.roles_usuario r ON r.usuario_id = u.id WHERE u.copropiedad_id = $1 AND r.rol IN ('portero','administrador') LIMIT 1",
-      [COP],
-    );
     const d = await c.query<{ id: string }>(
       'SELECT id FROM public.dispositivos WHERE copropiedad_id = $1 LIMIT 1',
       [COP],
@@ -89,10 +82,9 @@ beforeAll(async () => {
       [COP],
     );
     c.release();
-    operadorId = u.rows[0]?.id ?? '';
     dispositivoId = d.rows[0]?.id ?? '';
     viviendaId = v.rows[0]?.id ?? '';
-    disponible = Boolean(operadorId && dispositivoId && viviendaId);
+    disponible = Boolean(dispositivoId && viviendaId);
   } catch {
     disponible = false;
   }
@@ -233,50 +225,6 @@ describe('A1 · A2 (15-N) · la caída se resuelve sola y la lista filtra por fe
     const leida = await new RepositorioAlertasPg(lee as Pool, bitacora).porId(COP, alerta.valor.id);
     expect(leida?.estado).toBe('resuelta');
     expect(leida?.notas).toContain(NOTA_DE_RESOLUCION_AUTOMATICA);
-  });
-});
-
-describe('órdenes manuales · el rastro de RN-08 sobrevive a un reinicio', () => {
-  it('registrar, anotar el desenlace y leer las últimas con otra instancia', async () => {
-    if (omitida()) return;
-    const orden: OrdenEjecutada = {
-      id: randomUUID(),
-      copropiedadId: COP,
-      accion: 'abrir',
-      motivo: `Visitante confirmado por teléfono ${CORRIDA}`,
-      operadorId,
-      rol: 'portero',
-      dispositivoId,
-      // Dentro de DOS días: `verificacion-remota-armada-pg` deja cada corrida
-      // una orden fechada MAÑANA en esta copropiedad, y con veinte corridas en
-      // un día la de ahora ya no entraba en «las últimas 20». Así, la de esta
-      // corrida es siempre la más reciente.
-      momento: new Date(Date.now() + 2 * 86_400_000),
-      eventoId: null,
-    };
-    const a = new BitacoraDeOrdenesPg(escribe as Pool);
-    await a.registrar(orden);
-    await a.anotarResultado(COP, orden.id, 'aceptada', 'relé en 120 ms');
-
-    const ultimas = await new BitacoraDeOrdenesPg(lee as Pool).ultimas(COP, 20);
-    const mia = ultimas.find((o) => o.id === orden.id);
-    expect(mia?.motivo).toBe(orden.motivo);
-    expect(mia?.resultado).toBe('aceptada');
-    expect(mia?.detalle).toBe('relé en 120 ms');
-    expect(mia?.rol).toBe('portero');
-  });
-
-  it('las órdenes no se borran: DELETE falla por disparador', async () => {
-    if (omitida()) return;
-    const c = await (lee as Pool).connect();
-    try {
-      await c.query("SELECT set_config('request.jwt.claims', '', false)");
-      await expect(
-        c.query('DELETE FROM public.ordenes_manuales WHERE copropiedad_id = $1', [COP]),
-      ).rejects.toThrow();
-    } finally {
-      c.release();
-    }
   });
 });
 

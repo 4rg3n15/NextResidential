@@ -1,14 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { randomBytes } from 'node:crypto';
-import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
 import type { ResultadoAcceso } from '@ncr/domain-core';
 // `utilidades` PRIMERO: carga `AppModule` en su orden (ciclo eventos ↔ autorizaciones).
 import { COP_A, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { MOTOR_DE_DECISION, type MotorDeDecision } from '../src/eventos/aplicacion/puertos';
 import { URL_BASE, exigirBase } from './base-exigida';
-import { conVehiculoSinDueno } from './vehiculo-sin-dueno';
+import { interferir, semillaVieja } from './interferencia';
+import { conPool, visitaVigenteConPlaca } from './visita-de-la-corrida';
+import {
+  revocarConsentimientoDe,
+  sembrarResidenteConRostro,
+  sembrarResidentesConRostro,
+  sembrarRostroReconocible,
+  type MotivoDeResidente,
+} from './siembra-de-rostros';
 import { cabecerasDelEdge } from './edge-de-prueba';
 import { DecidirLocalmente } from '../../edge/src/aplicacion/decidir-localmente';
 import type { InstantaneaDeReglas } from '../../edge/src/aplicacion/instantanea-de-reglas';
@@ -30,16 +37,30 @@ import type { InstantaneaDeReglas } from '../../edge/src/aplicacion/instantanea-
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const CAMARA = '90000000-0000-4000-8000-000000000001';
-const ACTOR = '00000000-0000-4000-8000-000000000002';
+/**
+ * 15-S5 · la visita vigente es DE ESTA CORRIDA (D-134): la `ABC9999` de la
+ * semilla vence a las ocho horas, y con la base vieja el caso dejaba de probar
+ * una visita permitida sin ponerse rojo (interferencia `semilla-vieja`).
+ */
+const VISITA = `VI${randomBytes(3).toString('hex').toUpperCase()}`;
 let app: INestApplication | undefined;
 let plantillaPropia = '';
+/** 15-S5 · la plantilla de «otro fichero»: entra en la instantánea y se revoca después. */
+let plantillaAjena = '';
+/** 15-S5 · una propia con el consentimiento revocado ANTES de la instantánea. */
+let plantillaRevocada = '';
 let residentes: Readonly<Record<MotivoDeResidente, string>> | undefined;
 let instantanea: InstantaneaDeReglas | undefined;
 let disponible = false;
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
+  await interferir('semilla-vieja', () => semillaVieja(URL_BASE ?? ''));
+  await conPool(URL_BASE, (p) => visitaVigenteConPlaca(p, VISITA));
   plantillaPropia = await sembrarRostroReconocible(URL_BASE);
+  plantillaAjena = await sembrarResidenteConRostro(URL_BASE, 'PERMITIDO');
+  plantillaRevocada = await sembrarResidenteConRostro(URL_BASE, 'PERMITIDO');
+  await revocarConsentimientoDe(URL_BASE, plantillaRevocada);
   residentes = await sembrarResidentesConRostro(URL_BASE);
   const firmante = await crearFirmante();
   app = await crearApp(firmante, undefined, {
@@ -77,96 +98,6 @@ afterAll(async () => {
 
 exigirBase('sin DATABASE_URL_PRUEBAS', () => disponible);
 
-/**
- * Una persona de ESTA corrida con consentimiento vigente y plantilla activa y
- * sincronizada: el camino del rostro RECONOCIBLE, que la semilla no garantiza.
- */
-const sembrarRostroReconocible = async (url: string): Promise<string> => {
-  const pool = await conVehiculoSinDueno(new Pool({ connectionString: url, max: 1 }));
-  try {
-    const { rows } = await pool.query<{ id: string }>(
-      `WITH p AS (
-         INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
-                                      nombre_completo, creado_por, actualizado_por)
-         VALUES ($1, 'cedula', $2, 'Paridad de rostro', $3, $3) RETURNING id
-       ), c AS (
-         INSERT INTO public.consentimientos_biometricos (copropiedad_id, persona_id,
-                version_politica, canal, estado, otorgado_en, creado_por, actualizado_por)
-         SELECT $1, p.id, 'v1.0', 'presencial', 'vigente', now(), $3, $3 FROM p
-         RETURNING id, persona_id
-       )
-       INSERT INTO public.plantillas_biometricas (copropiedad_id, persona_id, consentimiento_id,
-              calidad, vector_cifrado, llave_ref, algoritmo, suprimir_en, sincronizada_en,
-              estado, creado_por, actualizado_por)
-       SELECT $1, c.persona_id, c.id, 0.9, '\\x0102'::bytea, 'vault:ncr/plantillas/v1',
-              'AES-256-GCM', now() + interval '1 day', now(), 'activa', $3, $3 FROM c
-       RETURNING id`,
-      [COP_A, `PAR${randomBytes(4).toString('hex').toUpperCase()}`, ACTOR],
-    );
-    return rows[0]?.id ?? '';
-  } finally {
-    await pool.end();
-  }
-};
-
-/**
- * 15-X · D1 · tres RESIDENTES con rostro de esta corrida, cada uno con su
- * motivo. Antes de la 15-X los tres salían FALLO_TECNICO en los dos lados:
- * iguales, y la comparación no probaba nada. Devuelve la plantilla de cada uno.
- */
-type MotivoDeResidente = 'PERMITIDO' | 'SIN_CONSENTIMIENTO' | 'LISTA_NEGRA';
-const sembrarResidentesConRostro = async (
-  url: string,
-): Promise<Record<MotivoDeResidente, string>> => {
-  const pool = new Pool({ connectionString: url, max: 1 });
-  const uno = async (motivo: MotivoDeResidente): Promise<string> => {
-    const { rows } = await pool.query<{ id: string }>(
-      `WITH p AS (
-         INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
-                                      nombre_completo, creado_por, actualizado_por)
-         VALUES ($1, 'cedula', $2, 'Residente con rostro', $3, $3) RETURNING id
-       ), r AS (
-         INSERT INTO public.residentes (copropiedad_id, vivienda_id, persona_id, creado_por,
-                                        actualizado_por)
-         SELECT $1, '30000000-0000-4000-8000-000000000001', p.id, $3, $3 FROM p
-         RETURNING persona_id
-       ), v AS (
-         INSERT INTO public.listas_negras (copropiedad_id, persona_id, motivo, creado_por,
-                                           actualizado_por)
-         SELECT $1, r.persona_id, 'Paridad 15-X', $3, $3 FROM r WHERE $4 = 'LISTA_NEGRA'
-         RETURNING persona_id
-       ), c AS (
-         INSERT INTO public.consentimientos_biometricos (copropiedad_id, persona_id,
-                version_politica, canal, estado, otorgado_en, creado_por, actualizado_por)
-         SELECT $1, r.persona_id, 'v1.0', 'presencial',
-                CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN 'pendiente' ELSE 'vigente' END::estado_consentimiento,
-                CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN NULL ELSE now() END, $3, $3 FROM r
-         RETURNING id, persona_id
-       )
-       INSERT INTO public.plantillas_biometricas (copropiedad_id, persona_id, consentimiento_id,
-              calidad, vector_cifrado, llave_ref, algoritmo, suprimir_en, sincronizada_en,
-              estado, creado_por, actualizado_por)
-       SELECT $1, c.persona_id, c.id, 0.9, '\\x0102'::bytea, 'vault:ncr/plantillas/v1',
-              'AES-256-GCM', now() + interval '1 day',
-              CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN NULL ELSE now() END,
-              CASE WHEN $4 = 'SIN_CONSENTIMIENTO' THEN 'pendiente_consentimiento'
-                   ELSE 'activa' END::estado_plantilla, $3, $3 FROM c
-       RETURNING id`,
-      [COP_A, `RES${randomBytes(4).toString('hex').toUpperCase()}`, ACTOR, motivo],
-    );
-    return rows[0]?.id ?? '';
-  };
-  try {
-    return {
-      PERMITIDO: await uno('PERMITIDO'),
-      SIN_CONSENTIMIENTO: await uno('SIN_CONSENTIMIENTO'),
-      LISTA_NEGRA: await uno('LISTA_NEGRA'),
-    };
-  } finally {
-    await pool.end();
-  }
-};
-
 /** Lo que importa de una decisión para RN-16: permiso, motivo, regla y confirmación. */
 const esencia = (r: ResultadoAcceso) => ({
   permitido: r.permitido,
@@ -181,7 +112,7 @@ const CASOS: readonly { nombre: string; placa: string; confianza: number }[] = [
   { nombre: 'vehículo sin dueño (persona sintética)', placa: 'CONC001', confianza: 0.95 },
   {
     nombre: 'placa de una VISITA vigente (autorización con placa)',
-    placa: 'ABC9999',
+    placa: VISITA,
     confianza: 0.95,
   },
   { nombre: 'placa de una visita vencida', placa: 'XYZ9999', confianza: 0.95 },
@@ -230,12 +161,27 @@ describe.skipIf(URL_BASE === undefined)('RN-16 · nube y Edge deciden igual (15-
     const motor = (app as INestApplication).get<MotorDeDecision>(MOTOR_DE_DECISION);
     const cache = { vigente: () => instantanea ?? null, guardar: () => false };
     const plantillas = instantanea?.plantillas ?? [];
+    // 15-S5 · lo que hacía `biometria-pg` en paralelo, siempre en este instante:
+    // revocar una plantilla ajena DESPUÉS de la instantánea y ANTES de la nube.
+    await revocarConsentimientoDe(URL_BASE ?? '', plantillaAjena);
     // El rostro reconocible de esta corrida está, y reconocible: si no, la
     // comparación sólo cubriría negaciones por consentimiento.
     expect(
       plantillas.find((p) => p.plantillaId === plantillaPropia)?.reconocibleHasta,
     ).toBeTruthy();
-    for (const p of plantillas) {
+    // 15-S5 · la interferencia es real: la ajena estaba en la instantánea.
+    expect(plantillas.some((p) => p.plantillaId === plantillaAjena)).toBe(true);
+    // Y sólo se comparan las que siembra ESTE fichero: las de otro pueden cambiar
+    // entre la instantánea y la nube, y entonces no son los mismos datos (RN-16 es
+    // «misma decisión con la misma versión de reglas», no «con datos distintos»).
+    const propias = new Set([
+      plantillaPropia,
+      plantillaRevocada,
+      ...Object.values(residentes ?? {}),
+    ]);
+    const comparadas = plantillas.filter((p) => propias.has(p.plantillaId));
+    expect(comparadas).toHaveLength(propias.size);
+    for (const p of comparadas) {
       const solicitud = { personaId: p.personaId, placaLeida: null, zonaId: null, confianza: 1 };
       const nube = await motor.decidir({
         copropiedadId: COP_A,
@@ -294,6 +240,18 @@ describe.skipIf(URL_BASE === undefined)('RN-16 · nube y Edge deciden igual (15-
 
   it('los casos cubren permitidos Y negados: si no, no probarían nada', async () => {
     expect(instantanea?.vehiculos.length).toBeGreaterThan(0);
-    expect(instantanea?.autorizaciones.some((a) => a.placa === 'ABC9999')).toBe(true);
+    expect(instantanea?.autorizaciones.some((a) => a.placa === VISITA)).toBe(true);
+    // 15-S5 · y la visita PERMITE: vencida, «visita vigente» no probaría nada.
+    const motor = (app as INestApplication).get<MotorDeDecision>(MOTOR_DE_DECISION);
+    const visita = await motor.decidir({
+      copropiedadId: COP_A,
+      dispositivoId: CAMARA,
+      metodo: 'placa',
+      personaId: null,
+      placaLeida: VISITA,
+      zonaId: null,
+      confianza: 0.95,
+    });
+    expect(visita.permitido).toBe(true);
   });
 });

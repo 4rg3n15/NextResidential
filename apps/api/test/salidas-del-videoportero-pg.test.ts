@@ -6,6 +6,7 @@ import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDePuntosPg } from '../src/equipos/infraestructura/puntos-de-acceso-pg';
 import { BitacoraDeOrdenesPg } from '../src/guardia/infraestructura/bitacora-de-ordenes-pg';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { horaDeLaOrden } from './hora-de-la-orden';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -156,7 +157,7 @@ describe('BitacoraDeOrdenesPg · la orden atada a su punto', () => {
       operadorId: OPERADOR,
       rol: 'operador_central',
       dispositivoId: INTERCOM,
-      momento: new Date('2099-01-01T00:00:00Z'),
+      momento: await horaDeLaOrden(pool as Pool, MIRA),
       eventoId: null,
       punto: { id: punto?.id ?? '', nombre: 'no se lee de aquí', numeroDePuerta: 2 },
     });

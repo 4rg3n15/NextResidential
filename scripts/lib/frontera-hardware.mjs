@@ -142,10 +142,11 @@ if (hallazgos.length > 0) {
   console.error(
     `\nKPI-11: el protocolo del fabricante solo puede aparecer en ${PAQUETE_PERMITIDO}/.`,
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    `KPI-11: sin ISAPI ni IPs de dispositivo fuera de ${PAQUETE_PERMITIDO}/ ` +
+      '(los rangos de documentación de RFC 5737 no cuentan: no son de nadie)',
+  );
 }
-
-console.log(
-  `KPI-11: sin ISAPI ni IPs de dispositivo fuera de ${PAQUETE_PERMITIDO}/ ` +
-    '(los rangos de documentación de RFC 5737 no cuentan: no son de nadie)',
-);

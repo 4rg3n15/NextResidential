@@ -661,6 +661,12 @@ _15-S4 (2026-10-10). Detalle, cifras y fuentes en
 
 **Lo que NO quedó medido, y por qué la ETAPA 15 sigue BLOQUEADA.**
 
+> **Actualizado en la 15-S5 (declarado por el usuario el 2026-10-10).** El video
+> se vio con **Safari**, en los tres equipos. El prototipo queda **PARCIAL**.
+> LPR real, facial real, rostro de residente y «decide solo» atestado: **NO SE
+> PROBÓ**. Lo que falta, exactamente, está en
+> [`VALIDACION_HIKVISION_EN_SITIO.md`](VALIDACION_HIKVISION_EN_SITIO.md) §10.4.
+
 - **Los tres hitos del reto no están declarados.** El encargo de la 15-S4 los
   dejó como «[SÍ / NO / NO SE PROBÓ]», sin elegir, y `hoja.md` es la plantilla
   simulada del 07/10, vacía. Sin hitos declarados no hay cierre: cuentan como

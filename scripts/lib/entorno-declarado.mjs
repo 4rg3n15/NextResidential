@@ -188,10 +188,11 @@ if (problemas.length > 0) {
     '\n  `.env.example` es la única documentación de la configuración, y `entorno:diff`\n' +
       '  compara contra él. Un ejemplo que miente convierte los dos en ruido.',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    `entorno declarado: ${totalEsquema} variables de ${SUPERFICIES.length} esquemas, todas en su ` +
+      `.env.example · ${FUERA_DE_ZOD.size} leídas fuera de Zod, con motivo`,
+  );
 }
-
-console.log(
-  `entorno declarado: ${totalEsquema} variables de ${SUPERFICIES.length} esquemas, todas en su ` +
-    `.env.example · ${FUERA_DE_ZOD.size} leídas fuera de Zod, con motivo`,
-);

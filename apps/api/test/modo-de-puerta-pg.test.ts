@@ -13,6 +13,7 @@ import { relojFijo } from '../src/eventos/aplicacion/dobles';
 import { BarrerReversionesDePuertas } from '../src/guardia/aplicacion/reversion-de-puertas';
 import { claimsDeServicio } from '../src/comun/claims-de-servicio';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { interferir } from './interferencia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -25,7 +26,15 @@ import { URL_BASE, exigirBase } from './base-exigida';
  * ═════════════════════════════════════════════════════════════════════════════
  */
 const EQUIPO = randomUUID();
-const T0 = new Date();
+/**
+ * 15-S5 · DT-15M-C01 · MAÑANA, no ahora. Cada API de la suite con PostgreSQL
+ * barre las reversiones de TODAS las copropiedades cada 30 s con el reloj real:
+ * si esta prueba tardaba más de un minuto entre la orden y su barrido, otra API
+ * revertía la puerta con un proveedor que no la conoce (interferencia
+ * `barrido-ajeno-de-puertas`). Con la orden fechada mañana, ningún reloj real
+ * la ve vencida; sólo el de la segunda API de esta prueba.
+ */
+const T0 = new Date(Date.now() + 86_400_000);
 let firmante: Firmante;
 let pool: Pool | undefined;
 let disponible = false;
@@ -115,6 +124,24 @@ describe('C3/C6 · la reversión pendiente vive en la base', () => {
 
   it('una API NUEVA, dos minutos después, la revierte con su barrido', async () => {
     if (!disponible) return;
+    // 15-S5 · el ciclo de 30 s de la API de OTRO fichero cuando esta prueba tarda más
+    // de un minuto: reloj REAL + 2 min, todas las copropiedades, sin EQUIPO en su proveedor.
+    await interferir('barrido-ajeno-de-puertas', async () => {
+      const ajena = await crearApp(
+        firmante,
+        (b) => b.overrideProvider(RELOJ).useValue(relojFijo(new Date(Date.now() + 2 * 60_000))),
+        {
+          PERSISTENCIA_DE_EVENTOS: 'postgres',
+          DATABASE_URL: URL_BASE ?? '',
+          DATABASE_POOLER_URL: URL_BASE ?? '',
+        },
+      );
+      try {
+        await ajena.get(BarrerReversionesDePuertas).ejecutar();
+      } finally {
+        await ajena.close();
+      }
+    });
     const app = await levantar(new Date(T0.getTime() + 2 * 60_000));
     try {
       await app.get(BarrerReversionesDePuertas).ejecutar();

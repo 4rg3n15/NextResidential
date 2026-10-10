@@ -21,8 +21,12 @@ import { join } from 'node:path';
 
 const evento = (emisor, nombre) => new Promise((r) => emisor.once(nombre, r));
 
-/** @returns {Promise<{ codigo: number | null, salida: string, terminoSinLector: boolean }>} */
-export const conLectorLento = async (comando, args, { cwd, env, esperaMs }) => {
+/**
+ * `conError`: también la salida de error, por el mismo socket (15-S5: los
+ * controles de hallazgos escriben sus hallazgos por stderr).
+ * @returns {Promise<{ codigo: number | null, salida: string, terminoSinLector: boolean }>}
+ */
+export const conLectorLento = async (comando, args, { cwd, env, esperaMs, conError = false }) => {
   const dir = mkdtempSync(join(tmpdir(), 'ncr-lector-lento-'));
   const servidor = createServer({ pauseOnConnect: true });
   try {
@@ -33,7 +37,8 @@ export const conLectorLento = async (comando, args, { cwd, env, esperaMs }) => {
     await evento(escritor, 'connect');
     const lector = await aceptada;
 
-    const hijo = spawn(comando, args, { cwd, env, stdio: ['ignore', escritor, 'ignore'] });
+    const error = conError ? escritor : 'ignore';
+    const hijo = spawn(comando, args, { cwd, env, stdio: ['ignore', escritor, error] });
     // El hijo tiene su copia del descriptor; la nuestra impediría el fin de fichero.
     escritor.destroy();
     const salio = evento(hijo, 'exit');

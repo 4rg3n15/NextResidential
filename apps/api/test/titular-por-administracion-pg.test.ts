@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DOMINIO_SINTETICO } from '../src/cuentas/dominio/correo-sintetico';
 import { COP_A, COP_B } from './utilidades';
 import { INICIAL, NUEVA, SUPER, bancoDelHogar } from './banco-del-hogar-pg';
+import { interferir } from './interferencia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -22,6 +23,12 @@ const omitida = (): boolean => !banco.disponible;
 const RESIDENTES = `/copropiedades/${COP_A}/residentes`;
 const correoDe = (usuario: string, cop = COP_A): string => `${usuario}@${cop}.${DOMINIO_SINTETICO}`;
 
+/** Lo que la búsqueda promete de CADA fila: el texto está en su identificador o su agrupación. */
+const coinciden = (filas: unknown, q: string): boolean =>
+  (filas as { identificador: string; agrupacion: string | null }[]).every((v) =>
+    [v.identificador, v.agrupacion ?? ''].some((c) => c.toLowerCase().includes(q.toLowerCase())),
+  );
+
 describe('15-W · D1 · el titular nace con su vivienda', () => {
   const s = banco.sufijo;
   let vivienda = '';
@@ -30,9 +37,14 @@ describe('15-W · D1 · el titular nace con su vivienda', () => {
   it('la cuenta nace asignada: ocupación, bitácora, origen y cambio obligatorio', async () => {
     if (omitida()) return;
     vivienda = await banco.vivienda(COP_A, `T${s}`);
+    // 15-S5 · otra vivienda de COP_A cuyo identificador también contiene `T${s}`.
+    await interferir('vivienda-parecida', () => banco.vivienda(COP_A, `XT${s}`));
     const libres = await banco.comoSuper('get', `${RESIDENTES}/viviendas-sin-titular?q=T${s}`);
     expect(libres.status, JSON.stringify(libres.body)).toBe(200);
-    expect((libres.body as { id: string }[]).map((v) => v.id)).toEqual([vivienda]);
+    // 15-S5 · DT-15M-C01 · la búsqueda es por subcadena sobre TODA COP_A: se exige
+    // la de esta corrida, no que sea la única.
+    expect((libres.body as { id: string }[]).map((v) => v.id)).toContain(vivienda);
+    expect(coinciden(libres.body, `T${s}`)).toBe(true);
     const alta = await banco.comoSuper('post', `${RESIDENTES}/cuentas`, {
       usuario: `tit.${s}`,
       contrasenaInicial: INICIAL,
@@ -59,7 +71,9 @@ describe('15-W · D1 · el titular nace con su vivienda', () => {
     expect(rastro?.n).toBe('1');
     // Ya no se ofrece a otra primera cuenta, y la lista la enseña con su vivienda.
     const despues = await banco.comoSuper('get', `${RESIDENTES}/viviendas-sin-titular?q=T${s}`);
-    expect(despues.body).toEqual([]);
+    expect(despues.status).toBe(200);
+    expect((despues.body as { id: string }[]).map((v) => v.id)).not.toContain(vivienda);
+    expect(coinciden(despues.body, `T${s}`)).toBe(true);
     const lista = await banco.comoSuper('get', `${RESIDENTES}/cuentas`);
     const fila = (
       lista.body as { usuarioId: string; vivienda: string | null; origen: string }[]

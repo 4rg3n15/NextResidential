@@ -16,6 +16,8 @@ import { crearApp, crearFirmante, tokenDe } from './utilidades';
 import type { Firmante } from './utilidades';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { altaDeCopropiedadAjena, interferir } from './interferencia';
+import { consultasDePorteros } from './consultas-de-porteros-pg';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -224,23 +226,7 @@ const porteroListo = async (
   return { id, numero, token: segundo.body.accessToken as string };
 };
 
-const poolDe = async (cop: string) =>
-  (
-    await (pool as Pool).query<{ numero: number; inicio: number; fin: number; siguiente: number }>(
-      'SELECT numero, inicio, fin, siguiente FROM public.pools_de_porteros WHERE copropiedad_id = $1',
-      [cop],
-    )
-  ).rows[0];
-
-const rechazosDeIp = async (usuarioId: string, ip: string) =>
-  (
-    await (pool as Pool).query<{ recurso: string; resultado: string }>(
-      `SELECT recurso, resultado FROM public.auditoria_seguridad
-        WHERE tipo = 'restriccion_de_ip' AND usuario_id = $1 AND host(ip) = $2
-        ORDER BY ocurrido_en`,
-      [usuarioId, ip],
-    )
-  ).rows;
+const { poolDe, rechazosDeIp, huecosEntre } = consultasDePorteros(() => pool as Pool);
 
 describe('H7 (15-L) · porteros por identificador, contra la base real', () => {
   let cop1 = '';
@@ -252,10 +238,12 @@ describe('H7 (15-L) · porteros por identificador, contra la base real', () => {
   it('0 · copropiedades nuevas reciben su pool por la TABLA: [n·1000+1, n·1000+999], sin solape', async () => {
     if (omitida()) return;
     cop1 = await copropiedadNueva('H7 uno', 1);
+    await interferir('copropiedad-nueva', () => altaDeCopropiedadAjena(pool as Pool));
     cop2 = await copropiedadNueva('H7 dos', 2);
     cop3 = await copropiedadNueva('H7 tres', 3);
     const [a, b] = [await poolDe(cop1), await poolDe(cop2)];
-    expect(b?.numero).toBe((a?.numero ?? 0) + 1);
+    // 15-S5 · DT-15M-C01 · «b = a + 1» contaba con que nadie diera de alta otra en medio.
+    expect(await huecosEntre(a?.numero ?? 0, b?.numero ?? 0)).toEqual({ avanza: true, huecos: 0 });
     const { rows } = await (pool as Pool).query<{ malos: string; primero: number | null }>(
       `SELECT count(*) FILTER (WHERE inicio <> numero * 1000 + 1 OR fin <> numero * 1000 + 999)::text AS malos,
               min(inicio) AS primero
