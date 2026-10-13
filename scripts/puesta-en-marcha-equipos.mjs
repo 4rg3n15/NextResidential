@@ -574,6 +574,7 @@ if (abrir) {
   );
   if (simulado) anotar('SIMULADO: el ensayo del procedimiento, no una verificación.');
   escribirInforme();
+  await new Promise((salio) => process.stdout.write('', salio)); // DT-15S5-02: lo escrito ya salió
   process.exit(huboProblema ? 1 : 0);
 }
 
@@ -904,5 +905,4 @@ try {
 } catch (error) {
   console.error(`No se pudo escribir la hoja de resultados: ${String(error?.message ?? error)}`);
 }
-
-process.exit(huboProblema ? 1 : 0);
+process.exitCode = huboProblema ? 1 : 0; // DT-15S5-02: exitCode, no exit (16 KB en macOS)

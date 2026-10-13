@@ -11,7 +11,8 @@
  *  · RESÚMENES DE SUITE: el paso 14, la suite negativa, los recuentos.
  *    Representante: `estabilidad.mjs`, con una suite falsa.
  *
- * Las dos se leen con el lector lento de la 15-S2 (`lector-lento.mjs`): con
+ * Las tres clases (la 3.ª, los guiones de sitio, en `lector-lento-de-sitio.mjs`)
+ * se leen con el lector lento de la 15-S2 (`lector-lento.mjs`): con
  * `process.exit` la salida llega cortada en el mismo byte; con `exitCode`,
  * entera, con su última línea.
  *
@@ -21,6 +22,7 @@
 import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { conLectorLento } from '../lector-lento.mjs';
+import { sondasDeLectorLentoDeSitio } from './lector-lento-de-sitio.mjs';
 
 const MUCHOS = 600;
 
@@ -100,4 +102,7 @@ export const sondasDeLectorLentoPorClase = async ({ raiz, banco, ok, mal, contro
 
   rmSync(join(informes, 'sonda.json'), { force: true });
   rmSync(join(informes, 'estabilidad'), { recursive: true, force: true });
+
+  // Clase 3 · 15-S6 · los guiones de sitio (DT-15S5-01 y -02), en `--simulado`.
+  await sondasDeLectorLentoDeSitio({ raiz, banco, ok, mal });
 };

@@ -154,6 +154,7 @@ const persona = () => {
 
 // ── EL ENSAYO ────────────────────────────────────────────────────────────────
 const principal = async () => {
+  const informe = valor('informe') === null ? null : fueraDelRepo(valor('informe'), 'el informe');
   decir(
     `pnpm sitio:ensayo · ${new Date().toISOString()}${simulado ? ' · SIMULADO: no vale como verificación' : ''}`,
   );
@@ -195,7 +196,8 @@ const principal = async () => {
       zonaDelConjunto: process.env.EQUIPOS_ZONA_HORARIA || 'America/Bogota',
     });
     await sim?.cerrar();
-    process.exit(fallos > 0 ? 1 : 0);
+    process.exitCode = fallos > 0 ? 1 : 0; // DT-15S5-01: la salida llega entera al lector
+    return;
   }
 
   if (!simulado) await comprobacionesDeLaVispera({ pool, decir, raiz: RAIZ, rutaEnv });
@@ -286,15 +288,13 @@ const principal = async () => {
     `VEREDICTO: ${r.fallo === 0 ? 'SIN FALLOS' : 'CON FALLOS'} · ${r.ok} OK · ${r.fallo} FALLO · ` +
       `${r.omitido} omitidos · ${r.no_aplica} no aplica`,
   );
-  const destino = valor('informe');
-  if (destino !== null) {
-    const ruta = fueraDelRepo(destino, 'el informe');
-    writeFileSync(ruta, `# Ensayo en sitio\n\n\`\`\`\n${salida.join('\n')}\n\`\`\`\n`, {
+  if (informe !== null) {
+    writeFileSync(informe, `# Ensayo en sitio\n\n\`\`\`\n${salida.join('\n')}\n\`\`\`\n`, {
       mode: 0o600,
     });
-    console.log(`informe: ${ruta}`);
+    console.log(`informe: ${informe}`);
   }
-  process.exit(r.fallo === 0 ? 0 : 1);
+  process.exitCode = r.fallo === 0 ? 0 : 1; // DT-15S5-01: exitCode, no exit (16 KB en macOS)
 };
 
 await principal();
