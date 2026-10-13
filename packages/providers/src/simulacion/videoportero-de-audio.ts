@@ -7,6 +7,12 @@ import { DecodificadorTrozado } from '../videoportero/cuerpo-trozado';
 import { DetectorDeMarcas, FuenteDeTramas } from './marcas-de-audio';
 import { desafioDigest, digestValido, leerPeticion } from './rtsp-mensajes';
 import type { PeticionRtsp } from './rtsp-mensajes';
+import {
+  CAPACIDADES,
+  ERROR_CANAL_OCUPADO,
+  estadoIsapi,
+  respuestaHttp,
+} from './respuestas-del-videoportero';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -45,6 +51,10 @@ export interface GuionDeAudioEnRed {
   readonly sessionId?: 'ignorado' | 'exigido' | 'rechazado';
   /** B7 (15-S2) · semidúplex: mientras LLEGA audio (últimos 500 ms), la bajada calla. */
   readonly semiduplex?: boolean;
+  /** DT-15S4-01 (15-S6) · acepta N `PUT audioData` por sesión; al siguiente, 400 y cierre. */
+  readonly putsPorSesion?: number;
+  /** DT-15S4-01 (15-S6) · una subida sin bytes durante estos ms se cierra: el `PUT` ocioso. */
+  readonly subidaOciosaMs?: number;
 }
 
 export interface EstadoDelVideoporteroEnRed {
@@ -72,26 +82,7 @@ export interface VideoporteroDeAudioEnRed {
   cerrar(): Promise<void>;
 }
 
-/** 0x40002068 en decimal, como lo escribe el equipo en `errorCode`. */
-export const ERROR_CANAL_OCUPADO = 0x40002068;
-
-const respuestaHttp = (estado: string, cuerpo = '', tipo = 'application/xml'): string =>
-  `HTTP/1.1 ${estado}\r\nContent-Type: ${tipo}\r\nContent-Length: ${String(Buffer.byteLength(cuerpo))}\r\n\r\n${cuerpo}`;
-
-const estadoIsapi = (ruta: string, codigo: number, cadena: string, sub: string, error?: number) =>
-  `<?xml version="1.0" encoding="UTF-8"?><ResponseStatus version="2.0" xmlns="${ESPACIO}">` +
-  `<requestURL>${ruta}</requestURL><statusCode>${String(codigo)}</statusCode>` +
-  `<statusString>${cadena}</statusString><subStatusCode>${sub}</subStatusCode>` +
-  (error === undefined ? '' : `<errorCode>${String(error)}</errorCode>`) +
-  (error === ERROR_CANAL_OCUPADO
-    ? '<errorMsg>Two-Way audio in progress...Please Wait.</errorMsg>'
-    : '') +
-  '</ResponseStatus>';
-
-const CAPACIDADES =
-  `<?xml version="1.0" encoding="UTF-8"?><TwoWayAudioChannel version="2.0" xmlns="${ESPACIO}">` +
-  '<id>1</id><enabled opt="true,false"/><audioCompressionType opt="G.711ulaw"/>' +
-  '<audioSamplingRate opt="8.00"/></TwoWayAudioChannel>';
+export { ERROR_CANAL_OCUPADO } from './respuestas-del-videoportero';
 
 export const videoporteroDeAudioEnRed = async (
   guion: GuionDeAudioEnRed,
@@ -107,6 +98,7 @@ export const videoporteroDeAudioEnRed = async (
   const detector = new DetectorDeMarcas((t) => marcasRecibidas.push(t));
   let sesion = false;
   let ultimaSubida = 0;
+  let putsEnSesion = 0;
   const cuenta = { aperturas: 0, cierres: 0, ocupado: 0, bytes: 0, subidas: 0, bajadas: 0 };
   let entramado: 'crudo' | 'chunked' | null = null;
 
@@ -122,6 +114,10 @@ export const videoporteroDeAudioEnRed = async (
     const audio = /^\/ISAPI\/System\/TwoWayAudio\/channels\/(\d+)\/(open|close|audioData)$/i.exec(
       ruta,
     );
+    const rechazo400 = (): boolean =>
+      socket.write(
+        respuestaHttp('400 Bad Request', estadoIsapi(ruta, 4, 'Invalid Content', 'badParameters')),
+      );
     if (p.metodo === 'GET' && /\/TwoWayAudio\/channels\/capabilities$/i.test(ruta)) {
       socket.write(respuestaHttp('200 OK', CAPACIDADES));
     } else if (p.metodo === 'GET' && /\/TwoWayAudio\/channels$/i.test(ruta)) {
@@ -140,9 +136,7 @@ export const videoporteroDeAudioEnRed = async (
         ? !/[?&]sessionId=1(?:&|$)/.test(p.uri)
         : guion.sessionId === 'rechazado' && /[?&]sessionId=/.test(p.uri))
     ) {
-      socket.write(
-        respuestaHttp('400 Bad Request', estadoIsapi(ruta, 4, 'Invalid Content', 'badParameters')),
-      );
+      rechazo400();
     } else if (audio[2] === 'open' && p.metodo === 'PUT') {
       if (sesion) {
         cuenta.ocupado += 1;
@@ -160,6 +154,7 @@ export const videoporteroDeAudioEnRed = async (
         );
       } else {
         sesion = true;
+        putsEnSesion = 0;
         cuenta.aperturas += 1;
         socket.write(
           respuestaHttp(
@@ -191,6 +186,12 @@ export const videoporteroDeAudioEnRed = async (
       socket.once('close', soltar);
       return 'bajada';
     } else if (p.metodo === 'PUT') {
+      if (guion.putsPorSesion !== undefined && putsEnSesion >= guion.putsPorSesion) {
+        rechazo400();
+        socket.end();
+        return 'cabecera';
+      }
+      putsEnSesion += 1;
       cuenta.subidas += 1;
       deAudio.add(socket);
       entramado = /chunked/i.test(p.cabeceras.get('transfer-encoding') ?? '') ? 'chunked' : 'crudo';
@@ -246,9 +247,14 @@ export const videoporteroDeAudioEnRed = async (
         }
         modo = atender(socket, p);
         if (modo === 'subida') {
+          const ocioso =
+            guion.subidaOciosaMs === undefined
+              ? null
+              : setTimeout(() => socket.end(), guion.subidaOciosaMs).unref();
           const llega = (b: Buffer): void => {
             cuenta.bytes += b.length;
             ultimaSubida = Date.now();
+            ocioso?.refresh();
             detector.alimentar(b);
           };
           const trozado = new DecodificadorTrozado(llega);

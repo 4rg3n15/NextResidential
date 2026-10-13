@@ -2,6 +2,12 @@ import { decodificarUlaw, tramaDeTono } from '../simulacion/marcas-de-audio';
 import { motivoLegible } from '../nucleo/motivo-legible';
 import type { SesionDeAudio } from '../videoportero/sesion-de-audio';
 import type { Interlocutor } from './tipos';
+import {
+  PAUSA_TRAS_RECHAZO_MS,
+  REAPERTURAS_MAXIMAS,
+  subidasRechazadas,
+  veredictoDeSesion,
+} from './veredicto-de-sesion';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -20,6 +26,13 @@ import type { Interlocutor } from './tipos';
  *   4. un tono de 2 s MIENTRAS se escucha: si la bajada sigue, dúplex
  *      completo; si calla, semidúplex; y se pregunta a la persona si lo oyó;
  *   5. cerrar, y los estados HTTP de la sesión.
+ *
+ * 15-S6 (DT-15S4-01, DT-15S5-08) · DOS sesiones, no una. La escucha va en la
+ * primera; el tono, en una segunda que se abre DESPUÉS del Enter del operador:
+ * así el `PUT` de subida no se queda ocioso mientras se escucha, y la ventana
+ * «del tono» empieza cuando empieza el tono. «Mientras sonaba» se mide desde
+ * que se ENTREGA la primera trama, no desde un plazo fijo; y un 400 sólo se
+ * atribuye al `sessionId` cuando se demuestra (`veredicto-de-sesion.ts`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export interface CanalDescrito {
@@ -122,8 +135,61 @@ export interface DiagnosticoDeAudio {
 const dormir = (ms: number) => new Promise((listo) => setTimeout(listo, ms));
 
 const TONO_MS = 2000;
-/** Lo que ya venía en camino cuando empezó el tono no dice nada del dúplex. */
-const ARRANQUE_MS = 300;
+/** Lo que ya venía en camino cuando se ENTREGÓ la primera trama no dice nada del dúplex. */
+const EN_VUELO_MS = 300;
+
+/** Una sesión: abre, acumula la bajada con su instante, y cierra cuando se le pide. */
+const sesionDeEscucha = async (o: OpcionesDelDiagnostico, ahora: () => number) => {
+  const muestras: { t: number; bytes: Uint8Array }[] = [];
+  const inicio = ahora();
+  await o.audio.abrirSesion('diagnostico-de-audio', 'diagnostico-de-audio');
+  let escuchando = true;
+  const bajada = o.audio.recibirAudio()[Symbol.asyncIterator]();
+  const lector = (async () => {
+    while (escuchando) {
+      const { done, value } = await bajada.next();
+      if (done === true) return;
+      muestras.push({ t: ahora() - inicio, bytes: value });
+    }
+  })().catch(() => undefined);
+  return {
+    desde: () => ahora() - inicio,
+    bytesEntre: (desde: number, hasta: number) =>
+      muestras.filter((m) => m.t >= desde && m.t < hasta).reduce((n, m) => n + m.bytes.length, 0),
+    todo: () => {
+      const todo = new Uint8Array(muestras.reduce((n, m) => n + m.bytes.length, 0));
+      muestras.reduce((i, m) => (todo.set(m.bytes, i), i + m.bytes.length), 0);
+      return todo;
+    },
+    cerrar: async () => {
+      escuchando = false;
+      await o.audio.cerrarSesion('fin del diagnóstico de audio').catch(() => undefined);
+      await lector;
+    },
+  };
+};
+
+/**
+ * El tono, trama a trama, vigilando la subida: una reapertura rechazada se
+ * cuenta, se le da una pausa, y al tope el tono se detiene. Devuelve cuándo se
+ * entregó la primera trama y cuántos rechazos hubo.
+ */
+const enviarTono = async (o: OpcionesDelDiagnostico, desde: () => number) => {
+  let entregada: number | null = null;
+  const rechazosAntes = subidasRechazadas(
+    o.audio.sesionDeAudio.resumen(null)['estadosHttp'] as string[],
+  );
+  const rechazos = () =>
+    subidasRechazadas(o.audio.sesionDeAudio.resumen(null)['estadosHttp'] as string[]) -
+    rechazosAntes;
+  for (let i = 0; i < TONO_MS / 20; i += 1) {
+    await o.audio.enviarAudio(tramaDeTono(i));
+    entregada ??= desde();
+    if (rechazos() > REAPERTURAS_MAXIMAS) break;
+    await dormir(rechazos() > 0 && i > 0 ? PAUSA_TRAS_RECHAZO_MS : 20);
+  }
+  return { entregada: entregada ?? desde(), rechazos: rechazos() };
+};
 
 export const diagnosticarAudio = async (o: OpcionesDelDiagnostico): Promise<DiagnosticoDeAudio> => {
   const ahora = o.ahora ?? Date.now;
@@ -140,58 +206,58 @@ export const diagnosticarAudio = async (o: OpcionesDelDiagnostico): Promise<Diag
         'el tono no se envía (B4: pasar el canal a G.711 sólo con autorización y respaldo)',
     );
   }
-  const muestras: { t: number; bytes: Uint8Array }[] = [];
-  const inicio = ahora();
+  // 1 · escuchar, en una sesión propia.
+  let escucha: Awaited<ReturnType<typeof sesionDeEscucha>>;
   try {
-    await o.audio.abrirSesion('diagnostico-de-audio', 'diagnostico-de-audio');
+    escucha = await sesionDeEscucha(o, ahora);
   } catch (error) {
     lineas.push(`✗ el canal no se abrió: ${motivoLegible(error)}`);
     return { lineas, duplex: 'indeterminado', oyoElTono: null, fallo: true };
   }
-  let escuchando = true;
-  const bajada = o.audio.recibirAudio()[Symbol.asyncIterator]();
-  const lector = (async () => {
-    while (escuchando) {
-      const { done, value } = await bajada.next();
-      if (done === true) return;
-      muestras.push({ t: ahora() - inicio, bytes: value });
-    }
-  })().catch(() => undefined);
   await dormir(o.escucharMs);
-  const finDeEscucha = ahora() - inicio;
+  const finDeEscucha = escucha.desde();
+  await escucha.cerrar();
+  const antes = (escucha.bytesEntre(0, finDeEscucha) * 1000) / Math.max(1, finDeEscucha);
+  let nivel = nivelDbfs(escucha.todo(), canal.formato);
+
+  // 2 · el tono, en una segunda sesión abierta DESPUÉS del Enter: el PUT no espera ocioso.
   let oyo: boolean | null = null;
-  const tonoDesde = ahora() - inicio;
+  let durante = antes;
   let tonoEnviado = false;
+  let falloDelTono = false;
   if (esG711(canal.formato) === 'ulaw') {
     await o.interlocutor.indicar(`Escuche ${o.nombre}: va a sonar un tono de 2 s`);
-    for (let i = 0; i < TONO_MS / 20; i += 1) {
-      await o.audio.enviarAudio(tramaDeTono(i));
-      await dormir(20);
+    try {
+      const tono = await sesionDeEscucha(o, ahora);
+      const { entregada, rechazos } = await enviarTono(o, tono.desde);
+      const tonoHasta = tono.desde();
+      await dormir(500);
+      await tono.cerrar();
+      tonoEnviado = true;
+      durante =
+        (tono.bytesEntre(entregada + EN_VUELO_MS, tonoHasta) * 1000) /
+        Math.max(1, tonoHasta - entregada - EN_VUELO_MS);
+      nivel = nivelDbfs(tono.todo(), canal.formato) ?? nivel;
+      if (rechazos > 0) {
+        lineas.push(
+          `⚠ subida rechazada ${String(rechazos)} vez/veces (reapertura con pausa de ` +
+            `${String(PAUSA_TRAS_RECHAZO_MS)} ms, tope ${String(REAPERTURAS_MAXIMAS)})` +
+            `${rechazos > REAPERTURAS_MAXIMAS ? ': el tono se detuvo' : ''}`,
+        );
+      }
+      oyo = await o.interlocutor.confirmar(`¿Se oyó el tono en ${o.nombre}?`);
+    } catch (error) {
+      lineas.push(`✗ el canal del tono no se abrió: ${motivoLegible(error)}`);
+      falloDelTono = true;
     }
-    tonoEnviado = true;
   } else if (esG711(canal.formato) === 'alaw') {
     lineas.push(
       '· formato A-law: el tono de prueba es µ-law y no se envía; pruebe desde la consola',
     );
   }
-  const tonoHasta = ahora() - inicio;
-  await dormir(500);
-  escuchando = false;
-  await o.audio.cerrarSesion('fin del diagnóstico de audio').catch(() => undefined);
-  await lector;
-  if (tonoEnviado) oyo = await o.interlocutor.confirmar(`¿Se oyó el tono en ${o.nombre}?`);
 
-  const entre = (desde: number, hasta: number) =>
-    muestras.filter((m) => m.t >= desde && m.t < hasta).reduce((n, m) => n + m.bytes.length, 0);
-  const antes = (entre(0, finDeEscucha) * 1000) / Math.max(1, finDeEscucha);
-  const durante = tonoEnviado
-    ? (entre(tonoDesde + ARRANQUE_MS, tonoHasta) * 1000) /
-      Math.max(1, tonoHasta - tonoDesde - ARRANQUE_MS)
-    : antes;
-  const todo = new Uint8Array(muestras.reduce((n, m) => n + m.bytes.length, 0));
-  muestras.reduce((i, m) => (todo.set(m.bytes, i), i + m.bytes.length), 0);
-  const nivel = nivelDbfs(todo, canal.formato);
   const resumen = o.audio.sesionDeAudio.resumen(canal.formato);
+  const estados = resumen['estadosHttp'] as string[];
   const duplex = tonoEnviado ? juzgarDuplex(antes, durante) : 'indeterminado';
   lineas.push(
     `bajada (del equipo): ${String(Math.round(antes))} B/s escuchando · ` +
@@ -202,8 +268,8 @@ export const diagnosticarAudio = async (o: OpcionesDelDiagnostico): Promise<Diag
       `${String(resumen['primerByteSubidaMs'] ?? 'nunca')} ms · ¿se oyó? ` +
       `${oyo === null ? 'sin respuesta' : oyo ? 'sí' : 'NO'}`,
     `dúplex: ${duplex}${duplex === 'semiduplex' ? ' (el equipo calla mientras recibe: la consola muestra el turno)' : ''}`,
-    `sessionId: ${String(resumen['sessionId'])} · estados HTTP: ${(resumen['estadosHttp'] as string[]).join(', ')}`,
+    `sessionId: ${veredictoDeSesion(resumen['sessionId'], estados)} · estados HTTP: ${estados.join(', ')}`,
   );
-  const fallo = antes === 0 || oyo === false;
+  const fallo = antes === 0 || oyo === false || falloDelTono;
   return { lineas, duplex, oyoElTono: oyo, fallo };
 };
