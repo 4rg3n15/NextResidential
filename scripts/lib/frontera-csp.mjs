@@ -71,7 +71,8 @@ if (hallazgos.length > 0) {
   );
   console.error('Use `claseDeAlto` / `claseDeAncho` de src/lib/proporcion.ts.\n');
   for (const h of hallazgos) console.error(`  · ${h}`);
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(`OK ningún atributo \`style\` en la consola (${ficheros.length} ficheros, §2.7.7)`);
 }
-
-console.log(`OK ningún atributo \`style\` en la consola (${ficheros.length} ficheros, §2.7.7)`);

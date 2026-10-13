@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { RepositorioCopropiedadesPg } from '../src/multiempresa/repositorio-copropiedades-pg';
 import type { ContextoTenant } from '../src/autenticacion';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { altaDeCopropiedadAjena, interferir } from './interferencia';
 
 /**
  * El catálogo de copropiedades **por el camino de la RLS**, contra PostgreSQL
@@ -64,14 +65,36 @@ const todas = async (): Promise<string[]> =>
     .map((f) => f.id)
     .sort();
 
+/**
+ * 15-S5 · DT-15M-C01 · «vista = todas» comparaba dos lecturas hechas en
+ * instantes distintos, y otras suites dan de alta copropiedades A LA VEZ. Como
+ * no se borran (`tg_prohibir_delete`), la propiedad sin carrera es: todas las
+ * que había ANTES de leer, ninguna que no exista DESPUÉS, y ninguna dos veces.
+ */
+const esTodas = (
+  antes: readonly string[],
+  vistas: readonly string[],
+  despues: readonly string[],
+) => {
+  expect(vistas).toEqual(expect.arrayContaining([...antes]));
+  expect(despues).toEqual(expect.arrayContaining([...vistas]));
+  expect(new Set(vistas).size).toBe(vistas.length);
+};
+
 describe('RLS · el alcance del superadministrador es global sin pertenecer a ninguna', () => {
   it('ve TODAS las copropiedades —las dos de las semillas incluidas— con copropiedad_id nulo', async () => {
     if (omitida()) return;
     const repo = new RepositorioCopropiedadesPg(pool as Pool);
+    const antes = await todas();
     const filas = await repo.listarParaElAlcance(ctx('superadministrador', null));
+    await interferir('copropiedad-nueva', () => altaDeCopropiedadAjena(pool as Pool));
     // TODAS las que hay en la base, no «dos»: otras suites (H7 de la 15-L)
     // crean copropiedades propias, y el alcance global tiene que incluirlas.
-    expect(filas.map((c) => c.id).sort()).toEqual(await todas());
+    esTodas(
+      antes,
+      filas.map((c) => c.id),
+      await todas(),
+    );
     expect(filas.map((c) => c.id)).toEqual(expect.arrayContaining([COP_MIRA, COP_ROBLE]));
     // El nombre hace falta para el selector de la cabecera: sin él, el
     // superadministrador elegiría entre dos UUID.
@@ -118,8 +141,14 @@ describe('RLS · el alcance del superadministrador es global sin pertenecer a ni
         JSON.stringify({ rol: 'superadministrador', usuario_id: USUARIO, copropiedad_id: null }),
       ]);
       await cliente.query('SET ROLE authenticated');
+      const antes = await todas();
       const { rows } = await cliente.query<{ id: string }>('SELECT id FROM public.copropiedades');
-      expect(rows.map((f) => f.id).sort()).toEqual(await todas());
+      await interferir('copropiedad-nueva', () => altaDeCopropiedadAjena(pool as Pool));
+      esTodas(
+        antes,
+        rows.map((f) => f.id),
+        await todas(),
+      );
     } finally {
       await cliente.query('RESET ROLE').catch(() => undefined);
       cliente.release();

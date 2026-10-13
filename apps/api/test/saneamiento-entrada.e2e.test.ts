@@ -93,7 +93,7 @@ beforeAll(async () => {
   app = modulo.createNestApplication<NestExpressApplication>({ logger: false });
   montarTuberiaHttp(app, configuracionDePrueba);
   await app.init();
-  await app.listen(0);
+  await app.listen(0, '127.0.0.1'); // DT-15X-07: como crearApp
 }, 60_000);
 afterAll(async () => {
   await app?.close();

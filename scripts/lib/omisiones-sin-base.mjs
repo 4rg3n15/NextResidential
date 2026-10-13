@@ -176,11 +176,12 @@ if (indebidos.length > 0 || (exigida && omitidas.length > 0)) {
       '  Una prueba que retorna antes de su primera aserción no falla: PASA. Con --con-base\n' +
       '  la base es obligatoria; o se levanta la base, o se corre sin --con-base y se dice.',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    omitidas.length === 0
+      ? `omisiones por falta de base: ninguna · ${resumen}`
+      : `omisiones por falta de base: ${omitidas.length}, permitidas sin --con-base · ${resumen}`,
+  );
 }
-
-console.log(
-  omitidas.length === 0
-    ? `omisiones por falta de base: ninguna · ${resumen}`
-    : `omisiones por falta de base: ${omitidas.length}, permitidas sin --con-base · ${resumen}`,
-);

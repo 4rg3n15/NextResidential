@@ -11,6 +11,8 @@ import {
 import { RepositorioPadronPg } from '../src/padron/infraestructura/repositorio-pg';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { autorizacionesFuturasEnLaCompartida, interferir } from './interferencia';
+import { copropiedadDeLaCorrida } from './copropiedad-propia';
 
 /**
  * O3 · la autorización creada DESDE LA CONSOLA contra base real.
@@ -23,9 +25,15 @@ import { URL_BASE, exigirBase } from './base-exigida';
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
-const COP = '10000000-0000-4000-8000-000000000001';
-const VIVIENDA_CON_TITULAR = '30000000-0000-4000-8000-000000000001';
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
+/**
+ * 15-S5 · DT-15M-C01 · una copropiedad PROPIA, con su vivienda, su titular y su
+ * visitante. En COP_A, la lista de la consola trae las 300 de inicio más
+ * reciente, y las que otras corridas dejan empezando en el futuro acababan
+ * sacando de ella la de esta (interferencia `autorizaciones-futuras`).
+ */
+let COP = '';
+let VIVIENDA_CON_TITULAR = '';
 
 let pool: Pool | undefined;
 let disponible = false;
@@ -47,17 +55,32 @@ beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
   pool = new Pool({ connectionString: URL_BASE, max: 4 });
   try {
-    const usuario = await pool.query<{ id: string }>(
-      `SELECT id FROM public.usuarios WHERE copropiedad_id = $1 ORDER BY id LIMIT 1`,
-      [COP],
+    const propia = await copropiedadDeLaCorrida(pool, `Autorizaciones ${CORRIDA}`);
+    COP = propia.id;
+    actorId = propia.ctx.usuarioId;
+    const { rows } = await pool.query<{ vivienda: string; visitante: string }>(
+      `WITH v AS (
+         INSERT INTO public.viviendas (copropiedad_id, identificador, creado_por, actualizado_por)
+         VALUES ($1, '101', $2, $2) RETURNING id
+       ), p AS (
+         INSERT INTO public.personas (copropiedad_id, tipo_documento, numero_documento,
+                                      nombre_completo, creado_por, actualizado_por)
+         VALUES ($1, 'cedula', 'TIT' || $3, 'Titular O3', $2, $2),
+                ($1, 'cedula', 'VIS' || $3, 'Visitante O3', $2, $2)
+         RETURNING id, nombre_completo
+       ), r AS (
+         INSERT INTO public.residentes (copropiedad_id, vivienda_id, persona_id, es_titular,
+                                       creado_por, actualizado_por)
+         SELECT $1, v.id, p.id, true, $2, $2 FROM v, p WHERE p.nombre_completo = 'Titular O3'
+         RETURNING vivienda_id
+       )
+       SELECT r.vivienda_id AS vivienda, p.id AS visitante
+         FROM r, p WHERE p.nombre_completo = 'Visitante O3'`,
+      [COP, actorId, CORRIDA],
     );
-    const persona = await pool.query<{ id: string }>(
-      `SELECT id FROM public.personas WHERE copropiedad_id = $1 ORDER BY id LIMIT 1`,
-      [COP],
-    );
-    actorId = usuario.rows[0]?.id ?? '';
-    personaId = persona.rows[0]?.id ?? '';
-    disponible = actorId !== '' && personaId !== '';
+    VIVIENDA_CON_TITULAR = rows[0]?.vivienda ?? '';
+    personaId = rows[0]?.visitante ?? '';
+    disponible = actorId !== '' && personaId !== '' && VIVIENDA_CON_TITULAR !== '';
   } catch {
     disponible = false;
   }
@@ -178,6 +201,9 @@ describe('O3 · autorizaciones de la consola contra base (D-131, S-38, RN-05)', 
     );
     expect(rows[0]).toEqual({ bucket: 'bucket-de-prueba', ruta: clave, tipo: 'foto_visitante' });
 
+    await interferir('autorizaciones-futuras', () =>
+      autorizacionesFuturasEnLaCompartida(pool as Pool, 300),
+    );
     const lista = await repo.listar(COP, 'activas');
     expect(lista.find((a) => a.id === autorizacionId)?.tieneFotografia).toBe(true);
     // Una autorización de otra copropiedad no se enlaza: el filtro de aplicación.

@@ -16,6 +16,7 @@
  *
  *   node scripts/lib/verificar-base-de-pruebas.mjs
  */
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const url = process.env.DATABASE_URL_PRUEBAS;
@@ -66,6 +67,34 @@ const describir = (cadena) => {
  */
 const REMEDIO = './supabase/verificar.sh --con-semillas --modo-supabase';
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 15-S5 · H-15S4-01 · «CONTESTA» TAMPOCO ES «AGUANTA LA SUITE».
+ *
+ * La primera corrida del verificador de la 15-S4 dio FALLIDA en KPI-03 con
+ * «sorry, too many clients already»: la base se había arrancado a mano, con las
+ * 100 conexiones por omisión, y KPI-03 abre cien a la vez mientras otros
+ * ficheros tienen las suyas. Este control la dio por buena —contestaba, tenía
+ * esquema y semillas— y el fallo llegó a mitad del paso 7, con un mensaje que
+ * no nombraba la causa.
+ *
+ * El mínimo es el de `scripts/base-de-pruebas.sh` (`CONEXIONES_MINIMAS`), leído
+ * de allí y no copiado: una sola fuente. La ruta del guion puede pasarse como
+ * argumento —la sonda lo hace para ver fallar la lectura—.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const GUION_DE_LA_BASE = process.argv[2] ?? 'scripts/base-de-pruebas.sh';
+const minimo = /^CONEXIONES_MINIMAS="\$\{NCR_PGMAXCONN_MINIMAS:-(\d+)\}"$/m.exec(
+  readFileSync(GUION_DE_LA_BASE, 'utf8'),
+);
+if (minimo === null) {
+  console.error(
+    `FALLO no leo CONEXIONES_MINIMAS en ${GUION_DE_LA_BASE}: sin el mínimo no se puede saber si la base aguanta la suite.`,
+  );
+  process.exit(1);
+}
+const CONEXIONES_MINIMAS = Number(minimo[1]);
+
 const cliente = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
 /**
  * 15-O · el primer fallo, venga de una consulta o de un corte de la conexión.
@@ -81,6 +110,15 @@ try {
   await cliente.connect();
   const { rows } = await cliente.query('select version() as v, current_user as u');
   const version = String(rows[0].v).split(',')[0];
+
+  const { rows: max } = await cliente.query('show max_connections');
+  const conexiones = Number(max[0].max_connections);
+  if (conexiones < CONEXIONES_MINIMAS) {
+    console.error(
+      `FALLO la base de ${describir(url)} admite ${conexiones} conexiones y la suite necesita ${CONEXIONES_MINIMAS} (KPI-03 abre cien a la vez): arránquela con scripts/base-de-pruebas.sh`,
+    );
+    process.exit(1);
+  }
 
   // `to_regclass` devuelve null si la tabla no existe, sin lanzar: es la forma
   // de preguntar por el esquema sin tratar el «no está» como un error de SQL.
@@ -114,6 +152,7 @@ try {
 
   console.log(
     `base de pruebas: ${describir(url)} · ${version} · conectado como ${rows[0].u} ` +
+      `· max_connections ${conexiones} (≥ ${CONEXIONES_MINIMAS}) ` +
       `· esquema presente · ${sem[0].n} copropiedad(es) sembrada(s)`,
   );
 } catch (e) {

@@ -215,11 +215,12 @@ for (const [clave, etapa] of EXENTAS) {
 if (problemas.length > 0) {
   console.log('FALLO el contrato OpenAPI tiene respuestas sin tipo:');
   for (const p of problemas) console.log(`  · ${p}`);
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  const tipadas = vistas.size - EXENTAS.size;
+  console.log(
+    `OK ${tipadas} de ${vistas.size} operaciones con respuesta tipada; ` +
+      `${EXENTAS.size} exentas con etapa declarada`,
+  );
 }
-
-const tipadas = vistas.size - EXENTAS.size;
-console.log(
-  `OK ${tipadas} de ${vistas.size} operaciones con respuesta tipada; ` +
-    `${EXENTAS.size} exentas con etapa declarada`,
-);

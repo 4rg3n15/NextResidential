@@ -310,14 +310,14 @@ if (hallazgos.length > 0) {
     `PORTABILIDAD: ${hallazgos.length} construcción(es) que divergen entre BSD y GNU\n`,
   );
   for (const h of hallazgos) {
-    console.error(`  ${h.archivo}:${h.linea}`);
-    console.error(`    ${h.texto}`);
-    console.error(`    ✗ ${h.problema}`);
-    console.error(`    → ${h.alternativa}\n`);
+    console.error(
+      `  ${h.archivo}:${h.linea}\n    ${h.texto}\n    ✗ ${h.problema}\n    → ${h.alternativa}\n`,
+    );
   }
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log(
+    `portabilidad: ${auditados.length} superficies con shell sin construcciones divergentes BSD/GNU ` +
+      `(.sh, scripts de package.json, .husky/, run: de workflows, Makefile)`,
+  );
 }
-console.log(
-  `portabilidad: ${auditados.length} superficies con shell sin construcciones divergentes BSD/GNU ` +
-    `(.sh, scripts de package.json, .husky/, run: de workflows, Makefile)`,
-);

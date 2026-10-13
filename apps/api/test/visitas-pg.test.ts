@@ -5,13 +5,13 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
 import { FACE_TEMPLATE_PROVIDER } from '@ncr/domain-core';
-import type { FaceTemplateProvider } from '@ncr/domain-core';
 import { capacidadesDescubiertas } from '@ncr/providers';
 import type { ContextoTenant } from '../src/autenticacion';
 import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositorio-equipos-pg';
 import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { MEDIDAS_BUENAS, TerminalesSimuladas, hogarPropio, jpeg } from './dobles/visitas-con-foto';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -44,40 +44,6 @@ const VIVIENDA_DEL_RESIDENTE = '30000000-0000-4000-8000-000000000042';
 const LLAVE_EQUIPOS = 'llave-de-equipos-solo-para-pruebas-32+';
 const MINUTO = 60_000;
 
-/**
- * El equipo que rechaza: la respuesta de la terminal real cuando el cuerpo no
- * le cuadra (H-SITIO, anexo 15-K) — un 400 con su `subStatusCode`.
- */
-const RESPUESTA_400 = 'la terminal respondió 400 (badJsonContent)';
-
-class TerminalesSimuladas implements FaceTemplateProvider {
-  readonly recibidas: string[] = [];
-  readonly retiradas: string[] = [];
-  readonly rechazan = new Set<string>();
-  async sincronizar(dispositivoId: string, plantillaId: string): Promise<void> {
-    if (this.rechazan.has(dispositivoId)) throw new Error(RESPUESTA_400);
-    this.recibidas.push(`${dispositivoId}/${plantillaId}`);
-  }
-  async suprimir(dispositivoId: string, plantillaId: string): Promise<void> {
-    this.retiradas.push(`${dispositivoId}/${plantillaId}`);
-  }
-}
-
-/** Un JPEG mínimo: los bytes de cabecera y de cierre que el tipo real exige. */
-const jpeg = (): string =>
-  Buffer.concat([
-    Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
-    randomBytes(96),
-    Buffer.from([0xff, 0xd9]),
-  ]).toString('base64');
-
-const MEDIDAS_BUENAS = {
-  rostrosDetectados: 1,
-  nitidez: 0.9,
-  iluminacion: 0.6,
-  proporcionRostro: 0.4,
-};
-
 let pool: Pool | undefined;
 let app: INestApplication | undefined;
 let disponible = false;
@@ -89,6 +55,8 @@ const enVivo: { tema: string; carga: unknown }[] = [];
 let portero = '';
 let admin = '';
 let residente = '';
+/** 15-S5 · el residente de un hogar PROPIO, para el bloque 3i. */
+let residentePropio = '';
 let superadmin = '';
 
 const ctxAdmin = (): ContextoTenant => ({
@@ -162,6 +130,10 @@ beforeAll(async () => {
   portero = await tokenDe(firmante, { rol: 'portero', usuarioId: PORTERO });
   admin = await tokenDe(firmante, { rol: 'administrador', usuarioId: ADMIN });
   residente = await tokenDe(firmante, { rol: 'residente', usuarioId: RESIDENTE });
+  residentePropio = await tokenDe(firmante, {
+    rol: 'residente',
+    usuarioId: await hogarPropio(pool, CORRIDA),
+  });
   superadmin = await tokenDe(firmante, {
     rol: 'superadministrador',
     usuarioId: SUPER,
@@ -635,7 +607,10 @@ describe('3i · sincronización app ↔ consola, contra la base', () => {
 
   it('el residente crea una visita en la app y la consola la lista en el acto', async () => {
     if (omitida()) return;
-    const r = await con(residente).post(`/copropiedades/${COP_A}/mi/visitas`, visitaDeLaApp(8));
+    const r = await con(residentePropio).post(
+      `/copropiedades/${COP_A}/mi/visitas`,
+      visitaDeLaApp(8),
+    );
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     desdeLaApp = r.body.id as string;
     const consola = await con(portero).get(`/copropiedades/${COP_A}/visitas`);
@@ -643,7 +618,7 @@ describe('3i · sincronización app ↔ consola, contra la base', () => {
       (x) => x.autorizacionId === desdeLaApp,
     );
     expect(v?.estado).toBe('vigente');
-    const app = await con(residente).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
+    const app = await con(residentePropio).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
     expect(
       (app.body as { id: string; situacion: string; motivoRechazo: string | null }[]).find(
         (a) => a.id === desdeLaApp,
@@ -660,14 +635,14 @@ describe('3i · sincronización app ↔ consola, contra la base', () => {
     );
     expect(rechazo.status, JSON.stringify(rechazo.body)).toBe(201);
 
-    const app = await con(residente).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
+    const app = await con(residentePropio).get(`/copropiedades/${COP_A}/mi/autorizaciones`);
     expect(
       (app.body as { id: string; situacion: string; motivoRechazo: string | null }[]).find(
         (a) => a.id === desdeLaApp,
       ),
     ).toMatchObject({ situacion: 'rechazada', motivoRechazo: motivo });
 
-    const avisos = await con(residente).get(`/copropiedades/${COP_A}/mi/notificaciones`);
+    const avisos = await con(residentePropio).get(`/copropiedades/${COP_A}/mi/notificaciones`);
     expect(avisos.status).toBe(200);
     expect(
       (
@@ -678,7 +653,7 @@ describe('3i · sincronización app ↔ consola, contra la base', () => {
 
   it('las notificaciones son de SU copropiedad: otra, con el mismo token, se niega', async () => {
     if (omitida()) return;
-    const ajena = await con(residente).get(`/copropiedades/${COP_B}/mi/notificaciones`);
+    const ajena = await con(residentePropio).get(`/copropiedades/${COP_B}/mi/notificaciones`);
     expect([403, 404]).toContain(ajena.status);
     // Y la visita rechazada de ESTA vivienda no aparece en la lista del portero
     // como de otra: la consola la sigue viendo, anulada.

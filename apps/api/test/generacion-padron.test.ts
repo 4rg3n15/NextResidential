@@ -6,6 +6,8 @@ import { GenerarViviendas } from '../src/padron/aplicacion/generar-viviendas';
 import { BOM_UTF8, ExportarPadron } from '../src/padron/aplicacion/exportar-padron';
 import type { ContextoTenant } from '../src/autenticacion/dominio/claims';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { COP_COMPARTIDA, OTRO_FICHERO, interferir } from './interferencia';
+import { copropiedadDeLaCorrida } from './copropiedad-propia';
 
 /**
  * La generación del padrón **contra base real**, que es donde vive lo único que
@@ -23,7 +25,12 @@ import { URL_BASE, exigirBase } from './base-exigida';
  *
  * Se OMITE si no hay base, y lo dice: una omisión no es un verde.
  */
-const COP = '10000000-0000-4000-8000-000000000001';
+/**
+ * 15-S5 · DT-15M-C01 · una copropiedad PROPIA de la corrida. En COP_A, «el rastro
+ * más reciente» podía ser el de `padron-edicion-pg`, que genera a la vez con otro
+ * plan, y las torres 1, 2 y 3 eran de todos. Aquí nadie más escribe.
+ */
+let COP = '';
 
 let pool: Pool | undefined;
 let disponible = false;
@@ -67,11 +74,9 @@ beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
   pool = new Pool({ connectionString: URL_BASE, max: 4 });
   try {
-    const { rows } = await pool.query<{ id: string }>(
-      'SELECT id FROM public.usuarios WHERE copropiedad_id = $1 LIMIT 1',
-      [COP],
-    );
-    actorId = rows[0]?.id ?? '';
+    const propia = await copropiedadDeLaCorrida(pool, `Padrón ${marca}`);
+    COP = propia.id;
+    actorId = propia.ctx.usuarioId;
     disponible = actorId !== '';
   } catch {
     disponible = false;
@@ -122,6 +127,16 @@ describe('generación del padrón contra base', () => {
 
   it('el rastro de quién generó y con qué plan queda en la misma transacción', async () => {
     if (!disponible || pool === undefined) return;
+    // 15-S5 · lo que hace `padron-edicion-pg` a la vez: generar en COP_A con OTRO plan.
+    await interferir('padron-generado', () =>
+      (pool as Pool).query(
+        `INSERT INTO public.auditoria_seguridad (copropiedad_id_actor, copropiedad_id_objetivo,
+                usuario_id, tipo, recurso, identificador_solicitado, resultado, creado_por)
+         VALUES ($1, $1, $2, 'generacion_de_padron', 'interferencia 15-S5',
+                 'Sin agrupaciones, 3 viviendas', 'permitido', $2)`,
+        [COP_COMPARTIDA, OTRO_FICHERO],
+      ),
+    );
     const { rows } = await pool.query<{ identificador_solicitado: string }>(
       `SELECT identificador_solicitado FROM public.auditoria_seguridad
         WHERE tipo = 'generacion_de_padron' AND copropiedad_id_objetivo = $1

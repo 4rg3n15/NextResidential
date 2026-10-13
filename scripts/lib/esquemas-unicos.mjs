@@ -69,7 +69,8 @@ if (chocan.length > 0) {
       '  primera y el cliente generado describe la forma equivocada, sin dar ningún error.\n' +
       '  Renombre una, o borre la que esté muerta.',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(`esquemas: ${porNombre.size} DTO con nombre único en ${RAIZ}`);
 }
-
-console.log(`esquemas: ${porNombre.size} DTO con nombre único en ${RAIZ}`);

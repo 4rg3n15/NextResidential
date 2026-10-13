@@ -96,7 +96,8 @@ if (sinCota.length > 0) {
       '  que quepa en el límite de payload y lo persiste. Declare @MaxLength(n)\n' +
       '  o @Length(min, n) junto al @IsString().',
   );
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(`longitud por campo: ${total} campo(s) @IsString(), todos con cota declarada`);
 }
-
-console.log(`longitud por campo: ${total} campo(s) @IsString(), todos con cota declarada`);

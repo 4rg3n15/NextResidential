@@ -549,10 +549,33 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
   tener la autorización del representante** (409) hasta que ése venza o lo
   revoque su titular: la base admite un consentimiento vigente por persona, y
   el representante no revoca lo que no autorizó.
-- **DT-15X-07 · `equipos.e2e` cayó una vez en macOS con «socket hang up»**
+- **DT-15X-07 · `equipos.e2e` cayó una vez en macOS con «socket hang up»** ·
+  **CERRADO en la 15-S5** (H-15S5-07): volvió a salir en la CI de macOS del
+  PR #56; en macOS un doble en `127.0.0.1:0` y `crearApp` en la comodín podían
+  compartir puerto. `crearApp` escucha ya en `127.0.0.1`.
   («A.3 · … probar sin volver a escribir la clave no inventa un rechazo», CI
   del PR #52 sobre `ab48efa`, paso 7). No se reproduce en Linux ni volvió a
   salir. **Sin causa raíz**: lo digo así en vez de llamarlo intermitente.
+  - **15-S5 · lo que se probó para reproducirlo.**
+    - **Pasadas:** 140 de `equipos.e2e`, cada una en su proceso de vitest.
+      - 60 de seis en seis, sobre 4 núcleos con carga ~10.
+      - 80 de ocho en ocho.
+    - **Resultado:** 135 en verde. **Ningún «socket hang up» ni `ECONNRESET`**.
+    - **Las cinco rojas** fueron de una sola ronda, con el banco negativo
+      corriendo a la vez (carga 15):
+      - tres por el plazo de 5 s de la primera prueba, que arranca la app
+        dentro de la prueba;
+      - dos porque vitest no cargó un módulo a tiempo.
+    - **Medido aparte, un mecanismo que da exactamente ese mensaje** con esta
+      pila: el agente HTTP de Node 22 conserva la conexión y el servidor se
+      reabre en el MISMO puerto antes de que el cliente procese el cierre.
+      - Sin pausa entre el cierre y la nueva petición: 300 de 300.
+      - Con diez vueltas del bucle de eventos en medio: 0 de 300.
+      - En `equipos.e2e` esa ventana sólo existe entre pruebas, con el arranque
+        de una app en medio, así que no se puede dar por causa.
+    - Detalle en
+      [`ETAPA-15S5-estabilidad-de-pruebas.md`](ETAPA-15S5-estabilidad-de-pruebas.md)
+      §2 (T7). **Sigue abierta.**
 - **DT-15X-08 · La autorización del representante no caduca sola a los 18.**
   Su plantilla vence ese día (`suprimirEn`), pero el consentimiento sigue
   vigente: una captura de visita de la misma persona podría reutilizarlo.

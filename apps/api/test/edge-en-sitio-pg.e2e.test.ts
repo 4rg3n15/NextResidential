@@ -9,6 +9,8 @@ import type { INestApplication } from '@nestjs/common';
 import { COP_A, crearApp, crearFirmante, direccionDe, tokenDe } from './utilidades';
 import { aperturasFisicasPor, sobreDeLectura } from '@ncr/providers';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { interferir, semillaVieja } from './interferencia';
+import { visitaVigenteConPlaca } from './visita-de-la-corrida';
 import { conVehiculoSinDueno } from './vehiculo-sin-dueno';
 import { cargarConfiguracionDeSitio } from '../../edge/src/configuracion/esquema-de-sitio';
 import { componerEdge } from '../../edge/src/composicion';
@@ -45,7 +47,10 @@ import {
  */
 const CAMARA = '90000000-0000-4000-8000-000000000001';
 const CORRIDA = randomBytes(3).toString('hex').toUpperCase();
-const PLACAS = ['PCH2145', 'GBA7890', 'ABC1234', 'CONC001', 'ABC9999', 'XYZ0000', `NO${CORRIDA}`];
+// 15-S5 · la visita es DE ESTA CORRIDA (D-134): la `ABC9999` de la semilla vence
+// a las ocho horas y, con la base vieja, se abría 12 veces y no 15.
+const VISITA = `VI${CORRIDA}`;
+const PLACAS = ['PCH2145', 'GBA7890', 'ABC1234', 'CONC001', VISITA, 'XYZ0000', `NO${CORRIDA}`];
 const MINUTO = 60_000;
 const ABIERTAS = 15;
 const T0 = Date.now();
@@ -62,6 +67,8 @@ const claves: string[] = [];
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
   pool = await conVehiculoSinDueno(new Pool({ connectionString: URL_BASE, max: 3 }));
+  await interferir('semilla-vieja', () => semillaVieja(URL_BASE ?? ''));
+  await visitaVigenteConPlaca(pool, VISITA);
   const firmante = await crearFirmante();
   app = await crearApp(firmante, undefined, {
     PROVEEDOR_DE_EQUIPOS: 'simulado',

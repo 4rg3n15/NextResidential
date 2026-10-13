@@ -499,18 +499,17 @@ export const crearApp = async (
    * petición— y el servidor queda sin escuchar al final. Con esta línea, 300
    * peticiones producen **un `listen()` y ningún `close()`**.
    *
-   * Cientos de bind/close por fichero, en paralelo con los demás ficheros de la
-   * suite, es una carrera esperando a ocurrir: la URL se fija en el constructor
-   * de `supertest` y la conexión se abre después, así que basta con que otra
-   * petición cierre el servidor en medio para que el cliente encuentre el
-   * socket muerto. Eso es exactamente `socket hang up`, y explica por qué solo
-   * aparecía a veces y por qué reejecutar «lo arreglaba».
+   * Cientos de bind/close por fichero, en paralelo, son una carrera: basta con
+   * que otra petición cierre el servidor entre el constructor de `supertest` y
+   * la conexión para que el cliente encuentre el socket muerto. Con el servidor
+   * escuchando de antemano, `supertest` no monta ni derriba nada.
    *
-   * Con el servidor escuchando de antemano, `app.address()` nunca es nulo,
-   * `supertest` no monta ni derriba nada y la única forma de cerrar el
-   * servidor es el `app.close()` del `afterAll`.
+   * Y en `127.0.0.1`, no en la comodín (DT-15X-07, 15-S5): en macOS un doble
+   * de otro fichero en `127.0.0.1:0` podía quedarse el MISMO puerto y recibir
+   * él la petición, que cerraba sin responder: el mismo `socket hang up`
+   * (`servidores-en-loopback.test.ts`).
    */
-  await app.listen(0);
+  await app.listen(0, '127.0.0.1');
   return app;
 };
 

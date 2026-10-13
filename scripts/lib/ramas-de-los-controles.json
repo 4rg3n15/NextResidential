@@ -12,6 +12,7 @@
   "scripts/lib/escanear-secretos.mjs": 2,
   "scripts/lib/esquemas-unicos.mjs": 0,
   "scripts/lib/estabilidad.mjs": 13,
+  "scripts/lib/ficheros-de-la-pasada.mjs": 0,
   "scripts/lib/flutter-sin-secretos.mjs": 8,
   "scripts/lib/frontera-append-only.mjs": 1,
   "scripts/lib/frontera-conexiones.mjs": 0,

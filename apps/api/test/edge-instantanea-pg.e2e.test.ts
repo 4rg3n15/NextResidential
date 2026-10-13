@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import type { INestApplication } from '@nestjs/common';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { OTRO_FICHERO, interferir } from './interferencia';
 import { cabecerasDelEdge } from './edge-de-prueba';
 import { VersionesPg } from '../src/edge/infraestructura/versiones-pg';
 
@@ -104,6 +105,14 @@ describe.skipIf(URL_BASE === undefined)('la instantánea del Edge contra la base
    * servidor que nunca dijera «sin cambios» sigue en rojo.
    */
   it('mientras nada cambie, «sin cambios» con la versión vigente', async () => {
+    // 15-S5 · lo que hacen a la vez `mis-visitas-revocacion` y compañía: cambiar MIRA.
+    await interferir('regla-nueva', () =>
+      (pool as Pool).query(
+        `INSERT INTO public.listas_negras (copropiedad_id, placa, motivo, estado, creado_por, actualizado_por)
+         VALUES ($1, $2, 'interferencia 15-S5', 'activa', $3, $3)`,
+        [COP_A, `I${CORRIDA}`, OTRO_FICHERO],
+      ),
+    );
     let r = await pedir(COP_A, version).expect(200);
     for (let intento = 1; r.body.sinCambios !== true && intento < 10; intento += 1) {
       expect(r.body.version).toBeGreaterThan(version);

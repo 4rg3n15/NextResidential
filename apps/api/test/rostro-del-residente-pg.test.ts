@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
+import type { PoolClient } from 'pg';
 import { POLITICA_DEL_ROSTRO } from '../src/residente/aplicacion/politica-del-rostro';
 import { ipDePrueba } from './banco-del-hogar-pg';
 import { bancoConTerminales } from './terminales-de-rostro-pg';
 import type { Sesion } from './banco-del-hogar-pg';
+import { interferenciaActiva, sesionAjenaParada } from './interferencia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -66,30 +68,49 @@ describe('15-X · D2 · mi rostro', () => {
    * a la vez cuando los dos esperan un cerrojo en la transacción del alta: en
    * el consentimiento o en el rostro anterior, según quién llegó primero.
    */
+  /**
+   * 15-S5 · DT-15M-C01 · cuántas sesiones esperan, directa o indirectamente, a
+   * la que tiene `cerrojo`: las peticiones de ESTA prueba y nadie más. Contar
+   * en `pg_stat_activity` por el texto del SQL contaba también a otras.
+   */
+  const detrasDe = async (cerrojo: PoolClient): Promise<number> => {
+    const { rows } = await cerrojo.query<{ n: number }>(
+      `WITH RECURSIVE cadena(pid) AS (
+         SELECT a.pid FROM pg_stat_activity a WHERE pg_backend_pid() = ANY(pg_blocking_pids(a.pid))
+         UNION
+         SELECT a.pid FROM pg_stat_activity a, cadena c WHERE c.pid = ANY(pg_blocking_pids(a.pid))
+       ) SELECT count(*)::int AS n FROM cadena`,
+    );
+    return rows[0]?.n ?? 0;
+  };
+
   const aLaVez = async (quien: Sesion, bloqueo: string, params: unknown[]) => {
     const cerrojo = await banco.pool.connect();
+    // 15-S5 · una sesión de otro fichero parada con el mismo SQL, en la misma base.
+    const ajenas = interferenciaActiva('sesion-ajena-parada')
+      ? await Promise.all(
+          [1, 2].map(() =>
+            sesionAjenaParada(banco.pool, 'INSERT INTO public.consentimientos_biometricos'),
+          ),
+        )
+      : [];
+    const soltar = async () => {
+      for (const s of ajenas) await s();
+    };
     try {
       await cerrojo.query('BEGIN');
       await cerrojo.query(bloqueo, params);
       const dos = [1, 2].map(() => pedir(quien.token, 'post', ruta(), cuerpo()).then((x) => x));
-      for (let i = 0; i < 200; i += 1) {
-        const { rows } = await banco.pool.query<{ n: string }>(
-          `SELECT count(*)::text AS n FROM pg_stat_activity
-            WHERE wait_event_type = 'Lock' AND query ILIKE ANY($1::text[])`,
-          [
-            [
-              '%INSERT INTO public.consentimientos_biometricos%',
-              "%SET estado = 'pendiente_supresion'%",
-            ],
-          ],
-        );
-        if (Number(rows[0]?.n ?? '0') >= 2) break;
+      for (let i = 0; i < 200 && (await detrasDe(cerrojo)) < 2; i += 1) {
         await new Promise((listo) => setTimeout(listo, 25));
       }
+      // 15-S5 · las DOS peticiones de esta prueba esperan detrás del cerrojo al soltarlo.
+      expect(await detrasDe(cerrojo), 'las dos peticiones esperaban').toBeGreaterThanOrEqual(2);
       await cerrojo.query('COMMIT');
       return (await Promise.all(dos)).map((x) => x.status).sort();
     } finally {
       cerrojo.release();
+      await soltar();
     }
   };
 

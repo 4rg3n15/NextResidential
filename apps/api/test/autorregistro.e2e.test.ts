@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TIEMPO_MINIMO_DE_REGISTRO_FALLIDO_MS } from '../src/cuentas/aplicacion/registrar-residente';
 import { DOMINIO_SINTETICO } from '../src/cuentas/dominio/correo-sintetico';
 import { COP_B } from './utilidades';
+import { OTRO_FICHERO, interferir } from './interferencia';
 import { NUEVA, POLITICA, bancoDelHogar } from './banco-del-hogar-pg';
 import type { Sesion } from './banco-del-hogar-pg';
 
@@ -151,6 +152,15 @@ describe('15-W · D2 · «Crear cuenta» con código de plaza', () => {
   it('incorrecto, usado, de otro conjunto o de uno inexistente: la MISMA respuesta y el tiempo mínimo', async () => {
     if (omitida()) return;
     const parte = String(codigos[1]).slice(cop.codigo.length + 1);
+    // 15-S5 · lo que deja en El Roble un fallo sin IP de otra corrida: «ip:desconocida».
+    await interferir('fallo-sin-ip', () =>
+      banco.pool.query(
+        `INSERT INTO public.bitacora_de_residentes (copropiedad_id, ocurrido_en, tipo, detalle, creado_por)
+         VALUES ($1, now(), 'registro_codigo_incorrecto', 'ip:desconocida', $2)`,
+        [COP_B, OTRO_FICHERO],
+      ),
+    );
+    const desde = new Date();
     const intentos = [
       `${cop.codigo}-AAAA-AAAA`, // incorrecto
       String(codigos[0]), // usado
@@ -171,10 +181,12 @@ describe('15-W · D2 · «Crear cuenta» con código de plaza', () => {
     }
     for (const c of cuerpos) expect(c).toEqual(cuerpos[0]);
     // El fallo en El Roble cuenta para SU registro, con un HMAC de la IP: nunca la IP.
+    // 15-S5 · DT-15M-C01 · las de ESTOS intentos: El Roble guarda las de todas las corridas.
     const huellas = await banco.pool.query<{ detalle: string }>(
       `SELECT detalle FROM public.bitacora_de_residentes
-        WHERE copropiedad_id = ANY($1::uuid[]) AND tipo = 'registro_codigo_incorrecto'`,
-      [[cop.id, COP_B]],
+        WHERE copropiedad_id = ANY($1::uuid[]) AND tipo = 'registro_codigo_incorrecto'
+          AND creado_en >= $2`,
+      [[cop.id, COP_B], desde],
     );
     expect(huellas.rows.length).toBeGreaterThanOrEqual(2);
     for (const h of huellas.rows) expect(h.detalle).toMatch(/^ip:[0-9a-f]{16}$/);

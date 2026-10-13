@@ -132,9 +132,10 @@ if (violaciones.length > 0) {
   for (const v of violaciones) {
     console.log(`   ${v.fichero}: '${v.especificador}' entra en '${v.modulo}' por dentro`);
   }
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log(
+    `OK frontera-modulos: ${modulos.length} módulos (${modulos.join(', ')}), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)`,
+  );
 }
-
-console.log(
-  `OK frontera-modulos: ${modulos.length} módulos (${modulos.join(', ')}), ninguna importación entra por dentro y un solo Pool de PostgreSQL (D-66)`,
-);

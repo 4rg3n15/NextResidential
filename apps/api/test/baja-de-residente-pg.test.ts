@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { Pool } from 'pg';
+import { randomBytes } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { ADMINISTRADOR_DE_CUENTAS, PROVEEDOR_DE_IDENTIDAD } from '../src/cuentas';
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { ProveedorDeIdentidadFalso } from './dobles/proveedor-de-identidad';
 import { URL_BASE, exigirBase } from './base-exigida';
+import { interferir } from './interferencia';
+import { copropiedadDeLaCorrida } from './copropiedad-propia';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -30,6 +33,12 @@ let app: INestApplication | undefined;
 let disponible = false;
 let superadmin = '';
 let proveedor: ProveedorDeIdentidadFalso | undefined;
+/**
+ * 15-S5 · DT-15M-C01 · una copropiedad PROPIA, con su código corto. En COP_A,
+ * `residentes-y-vehiculos-pg` le cambia el código mientras ésta entra con él, y
+ * el primer ingreso salía 401 (interferencia `codigo-de-a`).
+ */
+let COP = '';
 
 beforeAll(async () => {
   if (URL_BASE === undefined || URL_BASE === '') return;
@@ -41,6 +50,7 @@ beforeAll(async () => {
     disponible = false;
     return;
   }
+  COP = (await copropiedadDeLaCorrida(pool, `Baja ${SUFIJO}`)).id;
   const firmante = await crearFirmante();
   proveedor = new ProveedorDeIdentidadFalso(firmante, async (authUserId) => {
     const { rows } = await (pool as Pool).query<{ c: Record<string, unknown> }>(
@@ -86,16 +96,23 @@ const comoSuper = (metodo: 'get' | 'post', ruta: string) =>
 const uno = async <T extends object>(sql: string, p: unknown[]): Promise<T | undefined> =>
   (await (pool as Pool).query<T>(sql, p)).rows[0];
 
-/** El código corto de A: el que tenga, o uno asignado por la ruta de configuración (D1). */
-const CODIGO_DE_A = async (): Promise<string> => {
+/** El código corto de la copropiedad: el que tenga, o uno asignado por la ruta de configuración (D1). */
+const CODIGO_PROPIO = async (): Promise<string> => {
   const fila = await uno<{ codigo: string | null }>(
     'SELECT codigo_corto AS codigo FROM public.copropiedades WHERE id = $1',
-    [COP_A],
+    [COP],
+  );
+  // 15-S5 · lo que hace `residentes-y-vehiculos-pg` a la vez: cambiarle el código a A.
+  await interferir('codigo-de-a', () =>
+    uno('UPDATE public.copropiedades SET codigo_corto = $2 WHERE id = $1', [
+      COP_A,
+      `I${SUFIJO.slice(-6)}`,
+    ]),
   );
   if (fila?.codigo !== null && fila?.codigo !== undefined) return fila.codigo;
-  const codigo = `B${SUFIJO.slice(-5)}`;
+  const codigo = `B${randomBytes(3).toString('hex').toUpperCase()}`;
   const r = await http()
-    .patch(`/copropiedades/${COP_A}/configuracion`)
+    .patch(`/copropiedades/${COP}/configuracion`)
     .set('Authorization', `Bearer ${superadmin}`)
     .send({ codigoCorto: codigo });
   expect(r.status, JSON.stringify(r.body)).toBe(200);
@@ -113,10 +130,10 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     const vivienda = await uno<{ id: string }>(
       `INSERT INTO public.viviendas (copropiedad_id, identificador, agrupacion, creado_por, actualizado_por)
        VALUES ($1, $2, 'C9', $3, $3) RETURNING id`,
-      [COP_A, `B${SUFIJO}`, SUPER],
+      [COP, `B${SUFIJO}`, SUPER],
     );
     viviendaId = vivienda?.id ?? '';
-    const alta = await comoSuper('post', `/copropiedades/${COP_A}/residentes/cuentas`).send({
+    const alta = await comoSuper('post', `/copropiedades/${COP}/residentes/cuentas`).send({
       usuario,
       contrasenaInicial: INICIAL,
       nombre: `Residente de baja ${SUFIJO}`,
@@ -127,12 +144,12 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     const acceso = await http()
       .post('/auth/acceso')
       .set('x-ncr-origen', '198.51.100.77')
-      .send({ codigo: await CODIGO_DE_A(), usuario, contrasena: INICIAL });
+      .send({ codigo: await CODIGO_PROPIO(), usuario, contrasena: INICIAL });
     expect(acceso.status, JSON.stringify(acceso.body)).toBe(200);
     // Con su titular activo, la vivienda ya no se ofrece a otra primera cuenta.
     const libres = await comoSuper(
       'get',
-      `/copropiedades/${COP_A}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
+      `/copropiedades/${COP}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
     );
     expect((libres.body as { id: string }[]).map((v) => v.id)).not.toContain(viviendaId);
   });
@@ -141,12 +158,12 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     if (omitida()) return;
     const sin = await comoSuper(
       'post',
-      `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/baja`,
+      `/copropiedades/${COP}/residentes/cuentas/${usuarioId}/baja`,
     ).send({});
     expect(sin.status).toBe(400);
     const corto = await comoSuper(
       'post',
-      `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/baja`,
+      `/copropiedades/${COP}/residentes/cuentas/${usuarioId}/baja`,
     ).send({ motivo: 'x' });
     expect(corto.status).toBe(400);
     expect(JSON.stringify(corto.body)).toMatch(/al menos 5 caracteres/);
@@ -169,7 +186,7 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     if (omitida()) return;
     const baja = await comoSuper(
       'post',
-      `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/baja`,
+      `/copropiedades/${COP}/residentes/cuentas/${usuarioId}/baja`,
     ).send({ motivo: 'Se mudó de la copropiedad' });
     expect(baja.status, JSON.stringify(baja.body)).toBe(200);
     expect(baja.body).toMatchObject({ dadaDeBaja: true, plantillasSuprimidas: 0 });
@@ -189,7 +206,7 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     const constancia = await uno<{ n: string }>(
       `SELECT count(*)::text AS n FROM public.auditoria_seguridad
         WHERE recurso = 'residentes/baja' AND usuario_id = $1 AND copropiedad_id_objetivo = $2`,
-      [SUPER, COP_A],
+      [SUPER, COP],
     );
     expect(Number(constancia?.n ?? '0')).toBeGreaterThan(0);
 
@@ -198,14 +215,14 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     const acceso = await http()
       .post('/auth/acceso')
       .set('x-ncr-origen', '198.51.100.78')
-      .send({ codigo: await CODIGO_DE_A(), usuario, contrasena: INICIAL });
+      .send({ codigo: await CODIGO_PROPIO(), usuario, contrasena: INICIAL });
     // 401 o 403: lo que importa es que NO sale token. (403 = el gancho
     // rechazó la cuenta inactiva; 401 = el proveedor no la reconoce.)
     expect([401, 403]).toContain(acceso.status);
     expect(JSON.stringify(acceso.body)).not.toContain('accessToken');
 
     // La lista la enseña «de baja», no la borra (RN-19).
-    const lista = await comoSuper('get', `/copropiedades/${COP_A}/residentes/cuentas`);
+    const lista = await comoSuper('get', `/copropiedades/${COP}/residentes/cuentas`);
     const fila = (lista.body as { usuarioId: string; activa: boolean }[]).find(
       (c) => c.usuarioId === usuarioId,
     );
@@ -215,7 +232,7 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     // estar sin titular y la administración puede entregar otra primera cuenta.
     const libres = await comoSuper(
       'get',
-      `/copropiedades/${COP_A}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
+      `/copropiedades/${COP}/residentes/viviendas-sin-titular?q=B${SUFIJO}`,
     );
     expect(libres.status, JSON.stringify(libres.body)).toBe(200);
     expect((libres.body as { id: string }[]).map((v) => v.id)).toContain(viviendaId);
@@ -225,7 +242,7 @@ describe('C9 · baja de un residente con motivo (RN-19, CA-02)', () => {
     if (omitida()) return;
     const otra = await comoSuper(
       'post',
-      `/copropiedades/${COP_A}/residentes/cuentas/${usuarioId}/baja`,
+      `/copropiedades/${COP}/residentes/cuentas/${usuarioId}/baja`,
     ).send({ motivo: 'Segunda vez, por error' });
     expect(otra.status).toBe(404);
   });

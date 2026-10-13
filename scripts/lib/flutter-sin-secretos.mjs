@@ -137,7 +137,8 @@ if (hallazgos.length > 0) {
   console.error(`FALLO ${hallazgos.length} hallazgo(s) en el binario de Flutter:`);
   for (const h of hallazgos) console.error(`  · ${h}`);
   console.error('\nTodo lo compilado en Flutter es extraíble: no hay ofuscación que lo arregle.');
-  process.exit(1);
+  // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+  process.exitCode = 1;
+} else {
+  console.log('sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS');
 }
-
-console.log('sin secretos: la app no nombra ni incrusta ninguna llave que omita la RLS');

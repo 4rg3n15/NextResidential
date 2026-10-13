@@ -161,77 +161,77 @@ if (soloSaltadas) {
     }
     total += d.saltadas;
   }
-  if (total === 0) {
-    console.log('  ninguna prueba saltada');
-    process.exit(0);
-  }
-  if (indebidas.length === 0) {
+  // 15-S5 · DT-15S2-11 · sin process.exit: la lista de saltadas no tiene tope y se
+  // lee por un pipe; el código de salida va en exitCode (patrón de metricas.mjs).
+  if (total === 0) console.log('  ninguna prueba saltada');
+  else if (indebidas.length === 0) {
     console.log(`  las ${total} están DECLARADAS y se ejercen en otro paso`);
-    process.exit(0);
+  } else {
+    console.error(
+      `\n  ${indebidas.length} saltada(s) SIN declarar. Una prueba que no se ejecuta no falla:\n` +
+        '  se descuenta del total y el resumen sigue diciendo «passed». O se arregla lo que\n' +
+        '  impide ejecutarla, o se declara aquí con el paso que sí la ejerce.',
+    );
+    process.exitCode = 1;
   }
-  console.error(
-    `\n  ${indebidas.length} saltada(s) SIN declarar. Una prueba que no se ejecuta no falla:\n` +
-      '  se descuenta del total y el resumen sigue diciendo «passed». O se arregla lo que\n' +
-      '  impide ejecutarla, o se declara aquí con el paso que sí la ejerce.',
-  );
-  process.exit(1);
-}
+} else {
+  const siete = delPaso7();
 
-const siete = delPaso7();
-
-if (siete.size === 0) {
-  console.error(
-    'FALLO el paso 7 no dejó ninguna línea RECUENTO: sin ella no hay nada que comparar,\n' +
-      '  y una comparación que no compara nada es el defecto que este control persigue.',
-  );
-  process.exit(1);
-}
-if (cinco.size === 0) {
-  console.error(
-    `FALLO no se encontró ningún ${INFORME}. O la suite del paso 5 no corrió, o no se le\n` +
-      '  pidió el informe JSON. En ninguno de los dos casos hay verde.',
-  );
-  process.exit(1);
-}
-
-const CAMPOS = ['pruebas', 'verdes', 'rojas', 'saltadas'];
-const divergen = [];
-for (const [paquete, b] of siete) {
-  const a = cinco.get(paquete);
-  if (a === undefined) {
-    divergen.push({ paquete, motivo: 'el paso 5 no dejó informe de este paquete', a: null, b });
-    continue;
+  if (siete.size === 0) {
+    console.error(
+      'FALLO el paso 7 no dejó ninguna línea RECUENTO: sin ella no hay nada que comparar,\n' +
+        '  y una comparación que no compara nada es el defecto que este control persigue.',
+    );
+    process.exit(1);
   }
-  const distintos = CAMPOS.filter((c) => a[c] !== b[c]);
-  if (distintos.length > 0)
-    divergen.push({ paquete, motivo: `difieren: ${distintos.join(', ')}`, a, b });
-}
-
-const comoTexto = (x) => (x === null ? '(ausente)' : CAMPOS.map((c) => `${c}=${x[c]}`).join(' '));
-
-if (divergen.length > 0) {
-  console.error('FALLO los dos recuentos del mismo paquete NO coinciden:\n');
-  for (const d of divergen) {
-    console.error(`  ✗ ${d.paquete} — ${d.motivo}`);
-    console.error(`      paso 5 (turbo)   : ${comoTexto(d.a)}`);
-    console.error(`      paso 7 (directo) : ${comoTexto(d.b)}`);
-    // D-100 aplicado aquí: la divergencia se NOMBRA. Sin esto habría que
-    // reproducirla para saber qué prueba se quedó fuera.
-    for (const s of d.a?.nombresSaltadas ?? [])
-      console.error(`      ⤷ saltada: ${s.nombre} · ${s.fichero}`);
+  if (cinco.size === 0) {
+    console.error(
+      `FALLO no se encontró ningún ${INFORME}. O la suite del paso 5 no corrió, o no se le\n` +
+        '  pidió el informe JSON. En ninguno de los dos casos hay verde.',
+    );
+    process.exit(1);
   }
-  console.error(
-    '\n  Los dos pasos ejecutan la MISMA suite por caminos distintos. Si discrepan,\n' +
-      '  uno de los dos NO está ejecutando lo que cree, y las dos posibilidades son\n' +
-      '  un falso verde. La causa de D-112 fue que `turbo.json` no declaraba las\n' +
-      '  variables de entorno de las que dependen las pruebas: turbo las filtraba y\n' +
-      '  vitest saltaba en silencio las que necesitan base de datos. Compruebe `env`\n' +
-      '  en las tareas `test` y `test:cobertura` de turbo.json.',
-  );
-  process.exit(1);
-}
 
-console.log(
-  `recuentos: ${siete.size} paquete(s) con el mismo resultado por los dos caminos ` +
-    `(turbo y vitest directo) · ${[...siete.values()].reduce((s, x) => s + x.pruebas, 0)} pruebas`,
-);
+  const CAMPOS = ['pruebas', 'verdes', 'rojas', 'saltadas'];
+  const divergen = [];
+  for (const [paquete, b] of siete) {
+    const a = cinco.get(paquete);
+    if (a === undefined) {
+      divergen.push({ paquete, motivo: 'el paso 5 no dejó informe de este paquete', a: null, b });
+      continue;
+    }
+    const distintos = CAMPOS.filter((c) => a[c] !== b[c]);
+    if (distintos.length > 0)
+      divergen.push({ paquete, motivo: `difieren: ${distintos.join(', ')}`, a, b });
+  }
+
+  const comoTexto = (x) => (x === null ? '(ausente)' : CAMPOS.map((c) => `${c}=${x[c]}`).join(' '));
+
+  if (divergen.length > 0) {
+    console.error('FALLO los dos recuentos del mismo paquete NO coinciden:\n');
+    for (const d of divergen) {
+      console.error(`  ✗ ${d.paquete} — ${d.motivo}`);
+      console.error(`      paso 5 (turbo)   : ${comoTexto(d.a)}`);
+      console.error(`      paso 7 (directo) : ${comoTexto(d.b)}`);
+      // D-100 aplicado aquí: la divergencia se NOMBRA. Sin esto habría que
+      // reproducirla para saber qué prueba se quedó fuera.
+      for (const s of d.a?.nombresSaltadas ?? [])
+        console.error(`      ⤷ saltada: ${s.nombre} · ${s.fichero}`);
+    }
+    console.error(
+      '\n  Los dos pasos ejecutan la MISMA suite por caminos distintos. Si discrepan,\n' +
+        '  uno de los dos NO está ejecutando lo que cree, y las dos posibilidades son\n' +
+        '  un falso verde. La causa de D-112 fue que `turbo.json` no declaraba las\n' +
+        '  variables de entorno de las que dependen las pruebas: turbo las filtraba y\n' +
+        '  vitest saltaba en silencio las que necesitan base de datos. Compruebe `env`\n' +
+        '  en las tareas `test` y `test:cobertura` de turbo.json.',
+    );
+    // 15-S5 · DT-15S2-11 · exitCode y no exit: la salida llega entera al lector (patrón de metricas.mjs).
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `recuentos: ${siete.size} paquete(s) con el mismo resultado por los dos caminos ` +
+        `(turbo y vitest directo) · ${[...siete.values()].reduce((s, x) => s + x.pruebas, 0)} pruebas`,
+    );
+  }
+}
