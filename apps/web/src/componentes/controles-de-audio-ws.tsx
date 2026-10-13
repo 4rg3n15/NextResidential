@@ -14,6 +14,7 @@ import type {
   OpcionesDelCanalWs,
 } from '@/lib/audio/canal-por-websocket';
 import { urlDelAudio } from '@/lib/origen-directo';
+import { usarAvisoSinAudio } from '@/lib/audio/aviso-sin-audio';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -173,6 +174,7 @@ export const ControlesDeAudioWs = ({
 
   const hablando = estado.fase === 'hablando';
   const cerrado = estado.fase === 'cerrado';
+  const sinAudio = usarAvisoSinAudio(hablando, niveles.tramasEnviadas);
   return (
     <div
       className="flex flex-col gap-2 rounded-tarjeta border border-borde px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-marca"
@@ -247,6 +249,12 @@ export const ControlesDeAudioWs = ({
       </div>
       <Medidor rotulo="Recibiendo del equipo · nivel" nivel={niveles.recibiendo} />
       <Medidor rotulo="Enviando · nivel" nivel={hablando ? niveles.enviando : 0} />
+      {sinAudio ? (
+        <p className="text-distintivo text-peligro-texto" role="alert">
+          Pulse para hablar: no se está enviando audio. Compruebe el micrófono del navegador y
+          vuelva a pulsar.
+        </p>
+      ) : null}
       {semiduplex ? (
         <p className="text-distintivo text-aviso-texto" role="status">
           Equipo semidúplex (medido): mientras usted habla no oye al equipo. Turno de palabra:{' '}

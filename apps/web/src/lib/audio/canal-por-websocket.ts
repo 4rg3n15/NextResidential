@@ -41,6 +41,8 @@ export type EstadoDelCanalWs =
 export interface NivelesDelCanal {
   readonly recibiendo: number;
   readonly enviando: number;
+  /** DT-15S4-02 (15-S6) · tramas que SALIERON por el socket desde que se pulsó; 0 es «no se envía». */
+  readonly tramasEnviadas?: number;
 }
 
 /** RMS (0…1) de muestras en coma flotante: lo mismo para lo que llega y lo que sale. */
@@ -93,6 +95,7 @@ export class CanalDeAudioPorWebSocket {
   private terminado = false;
   private manosLibres = false;
   private readonly niveles = { recibiendo: 0, enviando: 0, avisado: -Infinity, voz: -Infinity };
+  private tramasEnviadas = 0;
 
   constructor(private readonly opciones: OpcionesDelCanalWs) {
     this.contexto = (opciones.crearContexto ?? (() => new AudioContext()))();
@@ -236,10 +239,12 @@ export class CanalDeAudioPorWebSocket {
     this.opciones.alNiveles?.({
       recibiendo: this.niveles.recibiendo,
       enviando: this.captura === null ? 0 : this.niveles.enviando,
+      tramasEnviadas: this.tramasEnviadas,
     });
   }
 
   private capturar(flujo: MediaStream): () => void {
+    this.tramasEnviadas = 0;
     const fuente = this.contexto.createMediaStreamSource(flujo);
     const procesador = this.contexto.createScriptProcessor(MUESTRAS_POR_BLOQUE, 1, 1);
     let pendiente: Uint8Array = new Uint8Array(0);
@@ -256,7 +261,11 @@ export class CanalDeAudioPorWebSocket {
         BYTES_POR_TRAMA,
       );
       pendiente = resto;
-      for (const trama of trozos) if (this.socket.readyState === 1) this.socket.send(trama);
+      for (const trama of trozos) {
+        if (this.socket.readyState !== 1) continue;
+        this.socket.send(trama);
+        this.tramasEnviadas += 1;
+      }
     };
     // Sin destino algunos navegadores no procesan; con ganancia 0 no se oye a sí mismo.
     const silencio = this.contexto.createGain();
