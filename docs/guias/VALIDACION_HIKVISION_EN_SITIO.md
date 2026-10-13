@@ -87,7 +87,7 @@ charset=UTF-8`, el cuerpo con espacio de nombres y `version="2.0"` y el
   Al primer uso, acepte los permisos de **cámara** (foto del visitante, hito 3) y de **red local** (H-SITIO-11: sin él, «No hay conexión con el servidor» aunque Safari abra la API). Si la app no llega, «Cambiar servidor» con la dirección que sí abrió Safari. Con Apple ID gratuito la app caduca a los 7 días.
 
 - [ ] **Superadministrador** con MFA inscrito (arranque en frío: `scripts/registrar-copropiedad.mjs` y `scripts/aprovisionar-rol.mjs`).
-- [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (2).
+- [ ] **La copropiedad de prueba**, desde Configuración → Ajustes de plataforma (superadministrador): **código corto** (p. ej. `MIRA`; es el que teclean app y consola, D1), tipo y etiquetas de vivienda, **teléfono de portería** (D7) y tope de vehículos propios (5 por vivienda desde la 15-Z1; antes 2).
 - [ ] **Un residente de prueba** (Residentes → Nuevo residente: usuario, contraseña inicial y **su vivienda**; desde la 15-W la primera cuenta de cada vivienda nace asignada a ella y es su titular) y **un portero de prueba** (Porteros) con turno de hoy.
 - [ ] **Credenciales de servicio de los tres equipos**, en mano, y sus IP fijas. Nunca en el repositorio ni en la hoja.
 - [ ] **Una carpeta de sitio FUERA del repositorio**, p. ej. `$HOME/ncr-sitio`. Ahí van las capturas, la bitácora de la API, la hoja y el informe. `--capturar` se niega a escribir dentro del repositorio (sale con 2).
@@ -143,7 +143,7 @@ Por cada equipo escribe las dos peticiones (`401` y después `200`, las dos con 
    1. código de la copropiedad, usuario y contraseña inicial;
    2. cambio de contraseña;
    3. primer ingreso (15-W): nombres, documento de adulto, teléfono y fecha de nacimiento; la vivienda ya viene asignada y no se pide código;
-   4. ocupantes: el titular declara de 1 a 4 plazas (el tope, contándose) y después puede añadir o retirar las libres.
+   4. ocupantes: el titular declara de 1 a 10 plazas (el tope por omisión desde la 15-Z1, contándose; antes 4) y después puede añadir o retirar las libres.
 
    En Perfil, «Llamar a portería» tiene que marcar el número registrado.
 

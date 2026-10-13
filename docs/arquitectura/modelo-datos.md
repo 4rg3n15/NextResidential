@@ -168,7 +168,7 @@ erDiagram
         interval margen_cache_reglas
         interval umbral_latido_dispositivo
         interval plazo_consentimiento
-        smallint tope_de_plazas_por_vivienda "4 por omisión, de 1 a 20 · 0056"
+        smallint tope_de_plazas_por_vivienda "10 por omisión (0058; 4 en la 0056), de 1 a 20"
     }
     usuarios {
         uuid id PK
@@ -643,22 +643,29 @@ Solo se listan las columnas propias; las de §4 (identidad, tenant, auditoría, 
 
 #### `copropiedades` — _sin `copropiedad_id` (es el tenant)_ · auditoría ✔ · baja lógica ✖ (usa `estado_tenant`)
 
-| Columna                       | Tipo                                               | Restricción                         | Justificación                                               |
-| ----------------------------- | -------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------- |
-| `nombre`                      | `text NOT NULL`                                    | `length <= 200`                     |                                                             |
-| `nit`                         | `text NOT NULL`                                    | `UNIQUE`, formato normalizado       | Identidad legal del tenant                                  |
-| `zona_horaria`                | `text NOT NULL DEFAULT 'America/Bogota'`           | `CHECK` contra `pg_timezone_names`  | Interpreta `PatronRecurrencia` y horarios de zona           |
-| `estado`                      | `estado_tenant NOT NULL DEFAULT 'activa'`          |                                     |                                                             |
-| `version_reglas_actual`       | `bigint NOT NULL DEFAULT 0`                        | `CHECK >= 0`                        | Monótona · hueco **H-07** de la ETAPA 00                    |
-| `politica_contingencia_edge`  | `politica_contingencia NOT NULL DEFAULT 'denegar'` |                                     | CU-04 3a · denegar por defecto                              |
-| `umbral_confianza_placa`      | `numeric(4,3) NOT NULL DEFAULT 0.850`              | `CHECK BETWEEN 0 AND 1`             | `[SUPUESTO]` **S-05**                                       |
-| `margen_cache_reglas`         | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-03** · KPI-31                              |
-| `umbral_latido_dispositivo`   | `interval NOT NULL DEFAULT '5 minutes'`            | `CHECK > '0'`                       | `[SUPUESTO]` **S-06** · CA-26                               |
-| `plazo_consentimiento`        | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-04** · CU-02 3a                            |
-| `retencion_eventos`           | `interval NOT NULL DEFAULT '24 months'`            | `CHECK > '0'`                       | **D-21** · Ley 1581, finalidad                              |
-| `retencion_evidencia`         | `interval NOT NULL DEFAULT '90 days'`              | `CHECK > '0'`                       | **D-21** · minimización                                     |
-| `margen_supresion_plantilla`  | `interval NOT NULL DEFAULT '24 hours'`             | **`CHECK > '0' AND <= '24 hours'`** | **D-21** · RN-11 como **cota superior**                     |
-| `tope_de_plazas_por_vivienda` | `smallint NOT NULL DEFAULT 4` · **0056**           | `CHECK BETWEEN 1 AND 20`            | **D-W10** · `[SUPUESTO]` **S-15W-03** · contando al titular |
+| Columna                       | Tipo                                               | Restricción                         | Justificación                                                       |
+| ----------------------------- | -------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| `nombre`                      | `text NOT NULL`                                    | `length <= 200`                     |                                                                     |
+| `nit`                         | `text NOT NULL`                                    | `UNIQUE`, formato normalizado       | Identidad legal del tenant                                          |
+| `zona_horaria`                | `text NOT NULL DEFAULT 'America/Bogota'`           | `CHECK` contra `pg_timezone_names`  | Interpreta `PatronRecurrencia` y horarios de zona                   |
+| `estado`                      | `estado_tenant NOT NULL DEFAULT 'activa'`          |                                     |                                                                     |
+| `version_reglas_actual`       | `bigint NOT NULL DEFAULT 0`                        | `CHECK >= 0`                        | Monótona · hueco **H-07** de la ETAPA 00                            |
+| `politica_contingencia_edge`  | `politica_contingencia NOT NULL DEFAULT 'denegar'` |                                     | CU-04 3a · denegar por defecto                                      |
+| `umbral_confianza_placa`      | `numeric(4,3) NOT NULL DEFAULT 0.850`              | `CHECK BETWEEN 0 AND 1`             | `[SUPUESTO]` **S-05**                                               |
+| `margen_cache_reglas`         | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-03** · KPI-31                                      |
+| `umbral_latido_dispositivo`   | `interval NOT NULL DEFAULT '5 minutes'`            | `CHECK > '0'`                       | `[SUPUESTO]` **S-06** · CA-26                                       |
+| `plazo_consentimiento`        | `interval NOT NULL DEFAULT '24 hours'`             | `CHECK > '0'`                       | `[SUPUESTO]` **S-04** · CU-02 3a                                    |
+| `retencion_eventos`           | `interval NOT NULL DEFAULT '24 months'`            | `CHECK > '0'`                       | **D-21** · Ley 1581, finalidad                                      |
+| `retencion_evidencia`         | `interval NOT NULL DEFAULT '90 days'`              | `CHECK > '0'`                       | **D-21** · minimización                                             |
+| `margen_supresion_plantilla`  | `interval NOT NULL DEFAULT '24 hours'`             | **`CHECK > '0' AND <= '24 hours'`** | **D-21** · RN-11 como **cota superior**                             |
+| `tope_de_plazas_por_vivienda` | `smallint NOT NULL DEFAULT 10` · **0056, 0058**    | `CHECK BETWEEN 1 AND 20`            | **D-W10** · **D-Z2** (0058; antes S-15W-03) · contando al titular   |
+| `tope_vehiculos_propios`      | `smallint NOT NULL DEFAULT 5` · **0038, 0058**     | `CHECK BETWEEN 0 AND 20`            | **D5 a** · ADR-026 · **D-Z1** (0058; antes 2) · por vivienda (C-67) |
+
+**15-Z1 · migración 0058.** Los dos DEFAULT suben (2 → 5 vehículos, 4 → 10 plazas) y
+las copropiedades que estaban EXACTAMENTE en el valor anterior pasan al nuevo con
+una fila de `auditoria_seguridad` por cambio («migración 0058 · …»), que hace la
+migración idempotente y a la reversión exacta (`[SUPUESTO]` S-15Z1-01). Función
+`app.aplicar_topes_por_omision_0058`, probada en `99n_topes_por_omision_5_y_10.sql`.
 
 **15-W · migración 0056.** El tope de plazas por omisión de toda vivienda sin
 tope propio. Lo cambia **sólo el superadministrador**: `tg_tope_de_plazas_de_la_copropiedad`
@@ -1810,7 +1817,7 @@ Prueba: `supabase/policies/tests/99l_autorregistro_y_menores.sql` §1 · `packag
 
 **Una columna más, no una tabla más.** El menor ocupa la plaza con `persona_id`, al lado de `usuario_id`, y `CHECK (num_nonnulls(usuario_id, persona_id) <= 1)` impide que la ocupen las dos; libre es «ni una ni otra». Así el tope cuenta las plazas activas de una sola tabla (`app.plazas_activas`), las ocupe quien las ocupe. La clave ajena es **compuesta**, `(copropiedad_id, persona_id)` (D-06): una plaza no puede apuntar a una persona de otra copropiedad.
 
-**El tope, con el patrón del tope de vehículos (ADR-026) y no con `FOR UPDATE`** (`[CONTRADICCIÓN]` C-59). `tg_tope_de_plazas` toma un bloqueo consultivo de transacción por vivienda antes de contar: la segunda alta espera a que la primera confirme y, en `READ COMMITTED`, cada sentencia del disparador toma su propia instantánea, así que la cuenta ya la incluye. Un `FOR UPDATE` sobre `viviendas` exigiría que la política de edición de viviendas dejara pasar a quien inserta la plaza, y la API la inserta en nombre del titular, que no edita viviendas. Medido: 20 altas simultáneas sobre la cuarta plaza, entra una (`99l_plazas_concurrentes.sh`).
+**El tope, con el patrón del tope de vehículos (ADR-026) y no con `FOR UPDATE`** (`[CONTRADICCIÓN]` C-59). `tg_tope_de_plazas` toma un bloqueo consultivo de transacción por vivienda antes de contar: la segunda alta espera a que la primera confirme y, en `READ COMMITTED`, cada sentencia del disparador toma su propia instantánea, así que la cuenta ya la incluye. Un `FOR UPDATE` sobre `viviendas` exigiría que la política de edición de viviendas dejara pasar a quien inserta la plaza, y la API la inserta en nombre del titular, que no edita viviendas. Medido: 20 altas simultáneas sobre la última plaza (la cuarta en la 15-W; la décima desde la 15-Z1), entra una (`99l_plazas_concurrentes.sh`); y sobre el quinto vehículo propio, entra uno (`99n_vehiculos_concurrentes.sh`).
 
 Lo no obvio:
 

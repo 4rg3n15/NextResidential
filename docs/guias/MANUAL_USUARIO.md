@@ -195,7 +195,8 @@ todos con el mensaje genérico, porque nada dice de qué conjunto son.
 
 **Cada vivienda tiene plazas**, contando la del titular, y cada plaza libre es
 un código con el que otra persona crea su cuenta. El titular las gestiona desde
-la app hasta el **tope**: **4 por omisión** (ADR-038).
+la app hasta el **tope**: **10 por omisión** (D-Z2, ronda 15-Z1; hasta ella eran 4,
+ADR-038).
 
 - **El tope de toda la copropiedad:** Configuración → bloque **«Hogares»** →
   «Plazas por vivienda (contando al titular)» → **«Cambiar tope»**, de 1 a 20,
@@ -640,7 +641,7 @@ la pantalla de zonas informa, no reserva.
 
 ### Ocupantes: las plazas de su vivienda
 
-En la app, **Perfil → «Ocupantes»**. Arriba, el cupo: **«Plazas: 3 de 4»**
+En la app, **Perfil → «Ocupantes»**. Arriba, el cupo: **«Plazas: 3 de 10»**
 —cuántas tiene y cuántas puede tener, contándose usted—. Cada plaza dice quién
 la ocupa, o **«Plaza libre»** con su código.
 
