@@ -53,9 +53,12 @@ export const sondasDeLectorLentoDeSitio = async ({ raiz, banco, ok, mal }) => {
     },
   ];
   for (const g of guiones) {
+    // Sin la cobertura del paso 9 (ídem 41, 15-S5): los guiones de sitio y sus
+    // módulos (`vispera-de-sitio`, `ensayo-plataforma`…) son herramientas, no
+    // controles; medidos aquí entrarían en el trinquete de ramas sin base.
     const r = await conLectorLento('node', g.args, {
       cwd: raiz,
-      env: process.env,
+      env: { ...process.env, NODE_V8_COVERAGE: '' },
       esperaMs: 8000,
       conError: true,
     });
