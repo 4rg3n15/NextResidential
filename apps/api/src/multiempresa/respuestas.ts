@@ -148,7 +148,10 @@ export class ConfiguracionDeCopropiedadDto {
   })
   telefonoPorteria!: string | null;
 
-  @ApiProperty({ example: 2, description: 'D5 a · vehículos propios por vivienda.' })
+  @ApiProperty({
+    example: 5,
+    description: 'D5 a · vehículos propios ACTIVOS por vivienda (5 por omisión desde la 15-Z1).',
+  })
   topeVehiculosPropios!: number;
 
   @ApiProperty({

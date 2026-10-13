@@ -23,7 +23,7 @@ import type { TopeDePlazas } from './consultas';
  * copropiedad (Configuración) o uno propio que pone aquí el superadministrador,
  * con motivo, a petición del hogar.
  *
- * «Plazas: 3 de 4» se lee de la API y no se calcula: `activas` incluye la
+ * «Plazas: 3 de 10» se lee de la API y no se calcula: `activas` incluye la
  * plaza del titular y sólo la base sabe cuántas están vivas. Tampoco se decide
  * aquí que el tope no baje de las activas: lo garantiza la base bajo su
  * bloqueo y responde 409; la consola lo EXPLICA en el diálogo y enseña el

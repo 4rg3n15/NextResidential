@@ -11,10 +11,12 @@ import { exito, fallo } from '../compartido/resultado';
  * nadie de otra vivienda se declare conviviente.
  *
  * Desde la 15-W la declaración ya NO es definitiva (D-W10): el TITULAR gestiona
- * las plazas de su vivienda —añade y retira las libres— hasta un tope de 4 en
- * total, contándose a sí mismo ([SUPUESTO] S-15W-03). Más plazas las autoriza el
- * superadministrador, subiendo el tope de ESA vivienda. La decisión final del
- * tope es de la base (`tg_tope_de_plazas`, 0056): aquí se decide para explicar.
+ * las plazas de su vivienda —añade y retira las libres— hasta un tope de 10 en
+ * total, contándose a sí mismo (D-Z2, 15-Z1; de la 15-W a la 15-Z1 eran 4,
+ * [SUPUESTO] S-15W-03). Más plazas las autoriza el superadministrador, subiendo
+ * el tope de ESA vivienda. La decisión final del tope es de la base
+ * (`tg_tope_de_plazas`, 0056; valor por omisión en la 0058): aquí se decide
+ * para explicar.
  *
  * El código no se guarda en ninguna parte (ADR-025): se deriva de la plaza y de
  * su generación con una llave de la copropiedad. Este fichero decide su FORMA
@@ -26,8 +28,8 @@ import { exito, fallo } from '../compartido/resultado';
 export const OCUPANTES_MINIMO = 1;
 /** Cota absoluta de la plataforma: ningún tope la supera. */
 export const OCUPANTES_MAXIMO = 20;
-/** D-W10 · S-15W-03 · el tope de una vivienda que nadie amplió, contando al titular. */
-export const PLAZAS_POR_DEFECTO = 4;
+/** D-W10 · D-Z2 (15-Z1) · el tope de una vivienda que nadie amplió, contando al titular. */
+export const PLAZAS_POR_DEFECTO = 10;
 
 /** El texto que la app y la consola muestran en Ocupantes. Uno solo. */
 export const avisoDeOcupantes = (tope: number): string =>

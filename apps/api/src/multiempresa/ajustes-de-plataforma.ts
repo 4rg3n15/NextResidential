@@ -23,8 +23,12 @@ import { codigoCorto } from './codigo-corto';
 
 export const TOPE_VEHICULOS_MINIMO = 0;
 export const TOPE_VEHICULOS_MAXIMO = 20;
-/** D5 a · el valor por omisión que fija la migración 0038. */
-export const TOPE_VEHICULOS_POR_OMISION = 2;
+/**
+ * D5 a · D-Z1 (15-Z1) · el valor por omisión que fija la migración 0058 (la
+ * 0038 lo fijó en 2). Se cuenta POR VIVIENDA: así lo cuenta
+ * `app.tg_tope_vehiculos_propios` (C-67), no por residente.
+ */
+export const TOPE_VEHICULOS_POR_OMISION = 5;
 /** D5 c · el único modo de aprobación de terceros activo hoy (ADR-027). */
 export const APROBACION_DE_TERCEROS = 'automatica' as const;
 

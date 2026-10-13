@@ -14,8 +14,18 @@ import {
 } from './ocupantes';
 
 describe('plazas del titular (D-W10, D4 bis)', () => {
-  it('el tope por omisión es 4, contando al titular (S-15W-03)', () => {
-    expect(PLAZAS_POR_DEFECTO).toBe(4);
+  it('el tope por omisión es 10, contando al titular (D-Z2, 15-Z1; antes 4, S-15W-03)', () => {
+    expect(PLAZAS_POR_DEFECTO).toBe(10);
+  });
+  it('9 de 10: cabe una más; 10 de 10: la undécima no', () => {
+    expect(decidirNuevaPlaza({ activas: 9, tope: PLAZAS_POR_DEFECTO })).toEqual({
+      ok: true,
+      valor: 10,
+    });
+    expect(decidirNuevaPlaza({ activas: 10, tope: PLAZAS_POR_DEFECTO })).toEqual({
+      ok: false,
+      error: 'TOPE_ALCANZADO',
+    });
   });
   it('3 de 4: cabe una más, y quedan 4', () => {
     expect(decidirNuevaPlaza({ activas: 3, tope: 4 })).toEqual({ ok: true, valor: 4 });

@@ -3562,8 +3562,8 @@ export interface components {
              */
             telefonoPorteria: string | null;
             /**
-             * @description D5 a · vehículos propios por vivienda.
-             * @example 2
+             * @description D5 a · vehículos propios ACTIVOS por vivienda (5 por omisión desde la 15-Z1).
+             * @example 5
              */
             topeVehiculosPropios: number;
             /**
