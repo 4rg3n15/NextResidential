@@ -55,7 +55,7 @@ describe('abrirPuertoMientrasArranca', () => {
     await abierto?.cerrar();
 
     const real = createServer((_q, r) => r.end('ok'));
-    await new Promise<void>((listo) => real.listen(puerto, listo));
+    await new Promise<void>((listo) => real.listen(puerto, '127.0.0.1', listo));
     const r = await fetch(`http://127.0.0.1:${String(puerto)}/`);
     expect(await r.text()).toBe('ok');
     await new Promise<void>((listo) => {
@@ -66,7 +66,8 @@ describe('abrirPuertoMientrasArranca', () => {
 
   it('si el puerto está ocupado no insiste: devuelve null y el listen de Nest dirá por qué', async () => {
     const ocupante = createServer();
-    await new Promise<void>((listo) => ocupante.listen(0, listo));
+    // DT-15S5-07 (15-S6) · en 127.0.0.1, nunca en la comodín (H-15S5-07).
+    await new Promise<void>((listo) => ocupante.listen(0, '127.0.0.1', listo));
     const { port } = ocupante.address() as AddressInfo;
 
     expect(await abrirPuertoMientrasArranca(port)).toBeNull();
