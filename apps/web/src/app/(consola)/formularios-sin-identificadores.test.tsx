@@ -527,6 +527,9 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'declarar (número), añadir (sin cuerpo) y retirar (motivo): la plaza viaja en la ruta desde su fila (hogar/plazas-del-hogar.test.tsx)',
   'mi/visitas/pantalla.tsx':
     'revocar: la autorización viaja en la ruta desde su fila; sólo se teclea el motivo (hogar/revocar-visita.test.tsx)',
+  // 15-Y3 · el rostro del residente y el de un menor del hogar (ADR-039).
+  'mi/rostro/pantalla-de-rostro.tsx':
+    'la foto se mide en el aparato y las casillas son de la política; el menor viaja en la ruta; retirar no lleva cuerpo; prueba propia del cuerpo enviado (rostro/pantalla-de-rostro.test.tsx)',
   'mi/perfil/editar-perfil.tsx':
     'datos personales y de contacto en texto; el correo exige «@» y el teléfono cifras, que el barrido no teclea',
   // 15-Y1 · el primer ingreso en la consola, con los mismos campos que la app.
