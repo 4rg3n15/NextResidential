@@ -5,6 +5,7 @@ import { sesionActual } from '@/lib/sesion/servidor';
 import { EstadoSinPermiso } from '@/componentes/estados';
 import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { PantallaDePorteria } from './pantalla';
+import { ActividadPorVivienda } from '@/componentes/actividad-por-vivienda';
 
 /** G2 (15-N) · `?atender=<id>` del aviso de otra pantalla; sólo un UUID, nada más. */
 const elementoPedido = (valor: string | string[] | undefined): string | undefined =>
@@ -37,12 +38,16 @@ const Porteria = async ({
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
   // Otros fallos (15-M) · la llave reinicia el estado al cambiar de copropiedad.
+  // 15-Z3 (D-Z3) · la actividad por vivienda, debajo de lo que se atiende: la
+  // pantalla de arriba es para mirar el evento; esto es para saber quién tiene gente.
   return (
-    <PantallaDePorteria
-      key={alcance.copropiedadId}
-      copropiedadId={alcance.copropiedadId}
-      atender={elementoPedido((await searchParams).atender)}
-    />
+    <div key={alcance.copropiedadId} className="space-y-6">
+      <PantallaDePorteria
+        copropiedadId={alcance.copropiedadId}
+        atender={elementoPedido((await searchParams).atender)}
+      />
+      <ActividadPorVivienda copropiedadId={alcance.copropiedadId} />
+    </div>
   );
 };
 

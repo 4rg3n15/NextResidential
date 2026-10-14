@@ -5,6 +5,7 @@ import { sesionActual } from '@/lib/sesion/servidor';
 import { alcanceActivo, motivoSinCopropiedad } from '../copropiedad';
 import { TableroOperativo } from './tablero-operativo';
 import { EstadoSinPermiso } from '@/componentes/estados';
+import { ActividadPorVivienda } from '@/componentes/actividad-por-vivienda';
 import { navegacionDe, rutaInicialDe } from '@/lib/navegacion';
 import type { Rol } from '@ncr/contracts';
 
@@ -39,7 +40,15 @@ const Tablero = async (): Promise<JSX.Element> => {
     return <EstadoSinPermiso descripcion={motivoSinCopropiedad(alcance)} />;
   }
 
-  return <TableroOperativo copropiedadId={copropiedadId} />;
+  // 15-Z3 (D-Z3) · la actividad por vivienda, para el administrador y el
+  // superadministrador de la copropiedad elegida. La central no la alcanza
+  // (S-15Z3-01): no se le pinta una tarjeta que la API le negaría.
+  return (
+    <div className="space-y-6">
+      <TableroOperativo copropiedadId={copropiedadId} />
+      {rol === 'operador_central' ? null : <ActividadPorVivienda copropiedadId={copropiedadId} />}
+    </div>
+  );
 };
 
 export default Tablero;

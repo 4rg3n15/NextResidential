@@ -143,6 +143,10 @@ Es el rol de **plataforma**: no pertenece a ninguna copropiedad y las ve todas.
 2. **Dispositivos** — terminales caídas o degradadas. El sistema las marca solo,
    cada cinco minutos, sin que nadie abra la pantalla.
 3. **Informes → Auditoría de sistema** — quién cambió qué configuración.
+4. **Actividad por vivienda** (15-Z3) — en el tablero de la copropiedad
+   elegida, qué viviendas tienen vehículos en visita activa y visitantes en
+   este momento, con el criterio al pie (P-41). También la ve el administrador
+   y el portero; la central, no.
 
 > **Una cosa que no puede hacer, y es a propósito:** borrar. No hay borrado
 > físico en ninguna parte donde haya historial (RN-19). Las cosas se
@@ -422,6 +426,15 @@ videoportero, use **Guardia virtual** (§5). «Última orden: …» dice lo que
   bloqueada, usted lo ve arriba, en todas las pantallas: quién, por qué, desde
   cuándo y a qué hora vuelve sola a normal (§3.4). El portero no puede
   revertirla; si no debería seguir así, avise a la administración.
+- **Actividad por vivienda** (15-Z3). Debajo de todo, una tabla con cada
+  vivienda y dos cifras: «N vehículos en visita activa · M visitantes en este
+  momento». Sale ordenada por actividad; puede ordenarla por torre y vivienda y
+  filtrar por torre. Se actualiza sola cada 15 segundos. Sólo cifras: ningún
+  nombre ni placa. **Qué significa «en este momento»** lo dice la propia tabla
+  al pie: visitantes con visita vigente cuyo último paso permitido por la
+  portería fue un ingreso sin salida registrada después. Si un equipo no
+  reporta la salida, el visitante sigue contando hasta que vence su visita
+  (P-41).
 
 En Portería **no hay audio**: hablar con el visitante por el videoportero se
 hace desde Guardia virtual.
