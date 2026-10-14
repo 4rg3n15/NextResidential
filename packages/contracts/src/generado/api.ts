@@ -2372,6 +2372,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/tablero/actividad-por-vivienda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Por vivienda: vehículos en visita activa y visitantes en este momento (D-Z3). Sólo recuentos. */
+        get: operations["ActividadController_leer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/tablero/dispositivos": {
         parameters: {
             query?: never;
@@ -3013,6 +3030,35 @@ export interface components {
             personaId: string;
             /** @description Siempre vacío: el motor no lee nombres (minimización) */
             nombre: string;
+        };
+        ActividadDeViviendaDto: {
+            /** Format: uuid */
+            viviendaId: string;
+            /** @example 302 */
+            identificador: string;
+            /** @example Torre 3 */
+            agrupacion: string | null;
+            /**
+             * @description Vehículos en visita activa en esta vivienda.
+             * @example 1
+             */
+            vehiculosEnVisita: number;
+            /**
+             * @description Visitantes dentro en este momento, según el criterio.
+             * @example 2
+             */
+            visitantesAhora: number;
+        };
+        ActividadPorViviendaDto: {
+            /** @description Qué significa «en este momento» con los datos que hay (P-41). La pantalla lo enseña tal cual. */
+            criterio: string;
+            /**
+             * Format: date-time
+             * @description El instante con que se juzgó.
+             */
+            ahora: string;
+            /** @description Todas las viviendas activas, ordenadas por actividad. */
+            filas: components["schemas"]["ActividadDeViviendaDto"][];
         };
         AgregarAcompananteDto: {
             /**
@@ -10572,6 +10618,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccesosPorHoraDto"];
+                };
+            };
+        };
+    };
+    ActividadController_leer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActividadPorViviendaDto"];
                 };
             };
         };
