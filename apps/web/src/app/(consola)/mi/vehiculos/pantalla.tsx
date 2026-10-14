@@ -9,18 +9,22 @@ import { EstadoVacio } from '@/componentes/estados';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo, DistintivoDePlaca } from '@/componentes/ui/distintivo';
 import { CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
-import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { cliente, desenvolver, mensajeDeFallo } from '@/lib/api/cliente';
 import { clavesDelResidente, useMisVehiculos } from '@/lib/api/residente';
 import type { MiVehiculo } from '@/lib/api/residente';
+import { textoDeEliminacion } from '@/lib/hogar';
 import { estadoDeConsulta } from '../comunes';
+import { EditarVehiculo } from '../hogar/editar-vehiculo';
 import { NuevoVehiculo } from './nuevo-vehiculo';
 
 const TarjetaDeVehiculo = ({
   v,
-  alDarDeBaja,
+  alEditar,
+  alEliminar,
 }: {
   readonly v: MiVehiculo;
-  readonly alDarDeBaja: (v: MiVehiculo) => void;
+  readonly alEditar: (v: MiVehiculo) => void;
+  readonly alEliminar: (v: MiVehiculo) => void;
 }): JSX.Element => {
   const descripcion = [v.marca, v.modelo, v.color]
     .filter((x): x is string => x !== null)
@@ -43,9 +47,12 @@ const TarjetaDeVehiculo = ({
         ) : null}
         {/* 15-Z2 (DT-15W-02) · los de la administración no se tocan desde aquí: la API contestaría 404. */}
         {v.activo && v.origen === 'propio' ? (
-          <div className="flex justify-end">
-            <Boton variante="fantasma" tamano="sm" onClick={() => alDarDeBaja(v)}>
-              Dar de baja
+          <div className="flex justify-end gap-2">
+            <Boton variante="fantasma" tamano="sm" onClick={() => alEditar(v)}>
+              Editar
+            </Boton>
+            <Boton variante="fantasma" tamano="sm" onClick={() => alEliminar(v)}>
+              Eliminar
             </Boton>
           </div>
         ) : null}
@@ -55,14 +62,15 @@ const TarjetaDeVehiculo = ({
 };
 
 /**
- * M-3 · «Mis vehículos». El residente registra los suyos y los da de baja;
- * el tope por vivienda, la placa duplicada (RN-04) y la vivienda inactiva
- * (RN-13) los decide el servidor y aquí sólo se lee su explicación. La baja
- * no borra: el vehículo queda desactivado y se sigue viendo (RN-19).
+ * M-3 · «Mis vehículos». El residente registra los suyos y, desde la 15-Y2
+ * como en la app, los edita y los elimina; el tope por vivienda, la placa
+ * duplicada (RN-04) y la vivienda inactiva (RN-13) los decide el servidor y
+ * aquí sólo se lee su explicación. «Eliminar» borra sólo si el vehículo no
+ * tiene historial; si lo tiene, el servidor lo deja dado de baja y se sigue
+ * viendo (RN-19), y la pantalla dice cuál de las dos cosas pasó.
  *
- * [SUPUESTO] S-156 · la baja del residente no pide motivo: la ruta
- * `…/mi/vehiculos/{id}/desactivacion` no lo recibe, igual que en la app. El
- * motivo obligatorio es de las bajas que hace la administración (C4/C9).
+ * [SUPUESTO] S-156 · la eliminación del residente no pide motivo, igual que
+ * en la app. El motivo obligatorio es de las bajas de la administración.
  */
 export const PantallaDeMisVehiculos = ({
   copropiedadId,
@@ -72,9 +80,11 @@ export const PantallaDeMisVehiculos = ({
   const consultas = useQueryClient();
   const vehiculos = useMisVehiculos(copropiedadId);
   const [alta, setAlta] = useState(false);
+  const [edicion, setEdicion] = useState<MiVehiculo | null>(null);
   const [baja, setBaja] = useState<MiVehiculo | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [aviso, setAviso] = useState<string | null>(null);
   const lista = vehiculos.data ?? [];
   const activos = lista.filter((v) => v.activo).length;
 
@@ -82,20 +92,26 @@ export const PantallaDeMisVehiculos = ({
     await consultas.invalidateQueries({ queryKey: clavesDelResidente.raiz(copropiedadId) });
   };
 
-  const darDeBaja = async (): Promise<void> => {
+  const avisar = async (mensaje: string): Promise<void> => {
+    await refrescar();
+    setAviso(mensaje);
+  };
+
+  const eliminar = async (): Promise<void> => {
     if (baja === null) return;
     setEnviando(true);
     setError(undefined);
+    setAviso(null);
     try {
-      desenvolver(
-        await cliente.POST('/copropiedades/{id}/mi/vehiculos/{vehiculoId}/desactivacion', {
+      const r = desenvolver(
+        await cliente.DELETE('/copropiedades/{id}/mi/vehiculos/{vehiculoId}', {
           params: { path: { id: copropiedadId, vehiculoId: baja.id } },
         }),
       );
       setBaja(null);
-      await refrescar();
+      await avisar(textoDeEliminacion(r.resultado, baja.placa));
     } catch (fallo) {
-      setError(fallo instanceof ErrorDeApi ? fallo.message : 'No hay conexión con el servidor.');
+      setError(mensajeDeFallo(fallo));
     } finally {
       setEnviando(false);
     }
@@ -124,9 +140,14 @@ export const PantallaDeMisVehiculos = ({
       ) : null}
       <div className="grid gap-3 md:grid-cols-2">
         {lista.map((v) => (
-          <TarjetaDeVehiculo key={v.id} v={v} alDarDeBaja={setBaja} />
+          <TarjetaDeVehiculo key={v.id} v={v} alEditar={setEdicion} alEliminar={setBaja} />
         ))}
       </div>
+      {aviso !== null ? (
+        <p role="status" className="text-secundario text-exito-texto">
+          {aviso}
+        </p>
+      ) : null}
 
       <NuevoVehiculo
         copropiedadId={copropiedadId}
@@ -135,19 +156,22 @@ export const PantallaDeMisVehiculos = ({
         alRegistrar={() => void refrescar()}
       />
 
+      <EditarVehiculo
+        copropiedadId={copropiedadId}
+        vehiculo={edicion}
+        alCerrar={() => setEdicion(null)}
+        alGuardar={(mensaje) => void avisar(mensaje)}
+      />
+
       <DialogoDeConfirmacion
         abierto={baja !== null}
-        titulo="Dar de baja el vehículo"
-        descripcion={
-          baja === null
-            ? ''
-            : `La placa ${baja.placa} dejará de reconocerse en la entrada. El vehículo no se borra: queda desactivado en tu historial.`
-        }
-        etiquetaConfirmar="Dar de baja"
+        titulo={baja === null ? '' : `¿Eliminar ${baja.placa}?`}
+        descripcion="Dejará de abrir la talanquera y libera un cupo de su vivienda. Si el vehículo ya tiene historial en el conjunto, queda dado de baja y su historial se conserva."
+        etiquetaConfirmar="Eliminar"
         sinMotivo
         enviando={enviando}
         error={error}
-        alConfirmar={() => void darDeBaja()}
+        alConfirmar={() => void eliminar()}
         alCancelar={() => {
           setBaja(null);
           setError(undefined);

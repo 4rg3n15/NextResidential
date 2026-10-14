@@ -3,6 +3,7 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { EstadoVacio } from '@/componentes/estados';
 import { Boton } from '@/componentes/ui/boton';
@@ -13,8 +14,10 @@ import {
   useMisAutorizaciones,
   useMisUltimosVisitantes,
 } from '@/lib/api/residente';
-import type { VisitanteReciente } from '@/lib/api/residente';
+import type { MiAutorizacion, VisitanteReciente } from '@/lib/api/residente';
+import { cliente, desenvolver, mensajeDeFallo } from '@/lib/api/cliente';
 import { fechaCorta } from '@/lib/fechas';
+import { MOTIVO_MINIMO_DE_REVOCACION, sePuedeRevocar, textoDeRevocacion } from '@/lib/hogar';
 import { Aviso, FilaDeAutorizacion, Seccion, estadoDeConsulta } from '../comunes';
 import { NuevaVisita } from './nueva-visita';
 import { VolverAAutorizar } from './volver-a-autorizar';
@@ -73,6 +76,11 @@ export const PantallaDeMisVisitas = ({
   const ultimos = useMisUltimosVisitantes(copropiedadId);
   const [nueva, setNueva] = useState(false);
   const [volver, setVolver] = useState<VisitanteReciente | null>(null);
+  // 15-Y2 · revocar una visita vigente o programada, con motivo (D-W6), como en la app.
+  const [revocando, setRevocando] = useState<MiAutorizacion | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const puedeAutorizar = hogar.data?.puedeAutorizar ?? false;
   const lista = autorizaciones.data ?? [];
@@ -80,6 +88,28 @@ export const PantallaDeMisVisitas = ({
 
   const refrescar = (): void => {
     void consultas.invalidateQueries({ queryKey: clavesDelResidente.raiz(copropiedadId) });
+  };
+
+  const revocar = async (motivo: string): Promise<void> => {
+    if (revocando === null) return;
+    setEnviando(true);
+    setError(undefined);
+    setAviso(null);
+    try {
+      const r = desenvolver(
+        await cliente.POST('/copropiedades/{id}/mi/visitas/{autorizacionId}/revocacion', {
+          params: { path: { id: copropiedadId, autorizacionId: revocando.id } },
+          body: { motivo },
+        }),
+      );
+      setRevocando(null);
+      setAviso(textoDeRevocacion(r));
+      refrescar();
+    } catch (fallo) {
+      setError(mensajeDeFallo(fallo));
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -130,10 +160,25 @@ export const PantallaDeMisVisitas = ({
           <Tarjeta>
             <ul className="px-5" aria-label="Mis autorizaciones">
               {lista.map((a) => (
-                <FilaDeAutorizacion key={a.id} a={a} />
+                <FilaDeAutorizacion
+                  key={a.id}
+                  a={a}
+                  accion={
+                    sePuedeRevocar(a) ? (
+                      <Boton variante="fantasma" tamano="sm" onClick={() => setRevocando(a)}>
+                        Revocar
+                      </Boton>
+                    ) : undefined
+                  }
+                />
               ))}
             </ul>
           </Tarjeta>
+        ) : null}
+        {aviso !== null ? (
+          <p role="status" className="text-secundario text-exito-texto">
+            {aviso}
+          </p>
         ) : null}
       </Seccion>
 
@@ -148,6 +193,20 @@ export const PantallaDeMisVisitas = ({
         visitante={volver}
         alCerrar={() => setVolver(null)}
         alRegistrar={refrescar}
+      />
+      <DialogoDeConfirmacion
+        abierto={revocando !== null}
+        titulo={revocando === null ? '' : `¿Revocar la visita de ${revocando.visitante}?`}
+        descripcion="Ya no podrá entrar con esta autorización, y su foto sale de los equipos."
+        etiquetaConfirmar="Revocar"
+        minimoMotivo={MOTIVO_MINIMO_DE_REVOCACION}
+        enviando={enviando}
+        error={error}
+        alConfirmar={(motivo) => void revocar(motivo)}
+        alCancelar={() => {
+          setRevocando(null);
+          setError(undefined);
+        }}
       />
     </div>
   );

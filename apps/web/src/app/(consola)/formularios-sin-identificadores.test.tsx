@@ -515,7 +515,18 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
   'mi/vehiculos/nuevo-vehiculo.tsx':
     'placa, color, modelo, marca y tipo en texto; los ocupantes son casillas con los residentes que devuelve la API',
   'mi/vehiculos/pantalla.tsx':
-    'dar de baja: el vehículo viaja en la ruta desde su tarjeta; no hay campos',
+    'eliminar: el vehículo viaja en la ruta desde su tarjeta; no hay campos (hogar/vehiculo-propio.test.tsx)',
+  // 15-Y2 · el hogar del residente en la consola, con los mismos campos y textos que la app.
+  'mi/hogar/editar-vehiculo.tsx':
+    'placa, color, modelo y marca en texto; el vehículo viaja en la ruta desde su tarjeta; prueba propia del cuerpo enviado (hogar/vehiculo-propio.test.tsx)',
+  'mi/hogar/formulario-de-menor.tsx':
+    'nombres, apellidos, fecha, parentesco y documento en texto; el tipo de documento y la plaza libre son listas cerradas que devuelve la API; prueba propia del cuerpo enviado (hogar/menores-del-hogar.test.tsx)',
+  'mi/hogar/menores-del-hogar.tsx':
+    'baja y código de traspaso: el menor viaja en la ruta desde su fila; sólo se teclea el motivo (hogar/menores-del-hogar.test.tsx)',
+  'mi/hogar/plazas-del-hogar.tsx':
+    'declarar (número), añadir (sin cuerpo) y retirar (motivo): la plaza viaja en la ruta desde su fila (hogar/plazas-del-hogar.test.tsx)',
+  'mi/visitas/pantalla.tsx':
+    'revocar: la autorización viaja en la ruta desde su fila; sólo se teclea el motivo (hogar/revocar-visita.test.tsx)',
   'mi/perfil/editar-perfil.tsx':
     'datos personales y de contacto en texto; el correo exige «@» y el teléfono cifras, que el barrido no teclea',
   // 15-Y1 · el primer ingreso en la consola, con los mismos campos que la app.

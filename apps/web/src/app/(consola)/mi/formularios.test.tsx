@@ -227,25 +227,6 @@ describe('mis vehículos (M-3)', () => {
       'pídeselo a la administración',
     );
   });
-
-  it('dar de baja: el vehículo viaja en la ruta, sin cuerpo', async () => {
-    respuestaDeEscritura = { desactivado: true };
-    render(
-      <Envoltura>
-        <PantallaDeMisVehiculos copropiedadId={COP} />
-      </Envoltura>,
-    );
-    // 15-Z2 (DT-15W-02) · el de la administración se ve sin «Dar de baja»; el propio, con él.
-    expect(await screen.findByText('ADM456')).toBeTruthy();
-    expect(screen.getByText('Lo registró la administración')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'Dar de baja' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Dar de baja' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Dar de baja' }).at(-1)!);
-    await waitFor(async () => expect((await escrituras(espia)).length).toBe(1));
-    const [e] = await escrituras(espia);
-    expect(e?.ruta).toBe(`/copropiedades/${COP}/mi/vehiculos/${VEHICULO_ID}/desactivacion`);
-    expect(e?.cuerpo).toBeNull();
-  });
 });
 
 describe('mi perfil (M-8)', () => {
