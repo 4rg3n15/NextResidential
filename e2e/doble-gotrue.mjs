@@ -31,6 +31,7 @@ import { createServer } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { authenticator } from 'otplib';
+import { atenderAdministracion } from './doble-gotrue-admin.mjs';
 
 /**
  * La contraseña se SORTEA en cada corrida y no se versiona. No es cosmética:
@@ -261,6 +262,17 @@ export const arrancarDobleGotrue = async ({ usuarios = [USUARIO], claimsDe } = {
     }
 
     if (ruta === '/auth/v1/logout') return responder(204, {});
+    // 15-Y1 · la administración de usuarios, que «Crear cuenta» y el alta del titular necesitan.
+    const admin = atenderAdministracion({
+      ruta,
+      metodo: peticion.method,
+      cuerpo,
+      cabeceras: peticion.headers,
+      usuarios,
+      factoresPorUsuario,
+      responder,
+    });
+    if (admin) return undefined;
     return responder(404, { error_code: 'not_found' });
   });
 

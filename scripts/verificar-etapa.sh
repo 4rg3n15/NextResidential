@@ -1250,6 +1250,19 @@ if [[ "$CON_BASE" == "1" ]]; then
     mal "el recorrido no detecta algún defecto de sitio (ver /tmp/ncr-recorrido-negativo.log)"
     grep -E "✗|✓" /tmp/ncr-recorrido-negativo.log | head -8 | sed 's/^/     /'
   fi
+  paso "13d · el recorrido del RESIDENTE en la consola: crear cuenta, primer ingreso, contraseña (requiere --con-base)"
+  # 15-Y1 (P-23) · el residente sin app usa la consola desde su teléfono. Se
+  # recorre a 360 px con la API real, la base y el doble de GoTrue con
+  # administración de usuarios: el titular que la administración creó entra,
+  # cambia la contraseña obligada y completa su primer ingreso; un adulto crea
+  # su cuenta con un código de plaza; un código inválido y un menor no crean nada.
+  if NCR_REUTILIZAR_CONSOLA=1 con_limite "$LIMITE_LARGO" node e2e/recorrido-residente-web.mjs \
+       >/tmp/ncr-recorrido-residente.log 2>&1; then
+    ok "el residente crea su cuenta, entra, completa su primer ingreso y cambia su contraseña desde la consola"
+  else
+    mal "el recorrido del residente en la consola falla (ver /tmp/ncr-recorrido-residente.log)"
+    grep -E "✗" /tmp/ncr-recorrido-residente.log | head -8 | sed 's/^/     /'
+  fi
 fi
 
 paso "14 · estabilidad: la suite da lo mismo tres veces seguidas"
