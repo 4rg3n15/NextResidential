@@ -103,7 +103,12 @@ const base = z.object({
    * mandar la sesión en claro por la red, y ningún despliegue debe tenerlo a
    * mano.
    */
-  COOKIE_SEGURA: z.enum(['true', 'false']).optional(),
+  COOKIE_SEGURA: z
+    .union([z.enum(['true', 'false']), z.literal('')])
+    .optional()
+    // DT-15S1-C01 (15-Z2) · vacía es «sin la línea», como las de Netlify y
+    // RECUPERACION_POR_CORREO: manda NODE_ENV. Un valor distinto sigue parando.
+    .transform((v) => (v === '' ? undefined : v)),
 
   /**
    * Origen del puente de video SÓLO si se expone directamente al navegador.

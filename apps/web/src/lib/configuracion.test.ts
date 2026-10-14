@@ -130,6 +130,21 @@ describe('lo que hace fallar el arranque', () => {
     ).toContain('bucle local');
   });
 
+  it('COOKIE_SEGURA vacía es «sin la línea»: la consola arranca y manda NODE_ENV (DT-15S1-C01)', () => {
+    // Un `.env` con `COOKIE_SEGURA=` (la variable declarada y sin valor) es la
+    // forma en que un panel de despliegue deja una variable «apagada». Antes
+    // tumbaba la consola; vale lo mismo que no escribirla (como las de Netlify).
+    expect(validarEntorno({ ...COMPLETO, COOKIE_SEGURA: '' }).cookieSegura).toBeUndefined();
+    expect(
+      validarEntorno({
+        ...COMPLETO,
+        NODE_ENV: 'production' as const,
+        API_URL: 'https://api.ejemplo.co',
+        COOKIE_SEGURA: '',
+      }).cookieSegura,
+    ).toBeUndefined();
+  });
+
   it('un valor que no es true ni false NO se interpreta: la consola no arranca', () => {
     // «0», «no», «off» o un espacio de más son las formas habituales de creer
     // que se apagó algo. Cualquiera de ellas debe detener el proceso con un
