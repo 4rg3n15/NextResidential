@@ -6,7 +6,7 @@ import type { Sesion } from './banco-del-hogar-pg';
  * ═════════════════════════════════════════════════════════════════════════════
  * RONDA 15-W · D4 bis · LAS PLAZAS LAS GESTIONA EL TITULAR (D-W10, S-15W-03)
  *
- * El titular añade plazas hasta el tope de su vivienda —4 por omisión,
+ * El titular añade plazas hasta el tope de su vivienda —4 aquí (fijado; 10 por omisión desde la 15-Z1),
  * contándose a sí mismo— y retira las LIBRES; la plaza 1, la suya, nunca. La
  * decisión final es del disparador de la base, también ante peticiones
  * simultáneas. El superadministrador amplía el tope de una vivienda concreta o
@@ -50,6 +50,14 @@ describe('15-W · D4 bis · las plazas del titular', () => {
   it('prepara: el titular declara 2 y un adulto entra con el código de la plaza 2', async () => {
     if (omitida()) return;
     cop = await banco.copropiedadPropia();
+    // 15-Z1 · el tope por omisión pasó a 10 (D-Z2): esta prueba fija 4 en SU
+    // copropiedad para seguir probando el tope de la 15-W con esas cifras; el
+    // 10 por omisión lo prueban la 99n y residentes-y-vehiculos-pg.
+    const fijado = await banco.comoSuper('put', `/copropiedades/${cop.id}/tope-de-plazas`, {
+      tope: 4,
+      motivo: 'Prueba con el tope de la 15-W',
+    });
+    expect(fijado.status, JSON.stringify(fijado.body)).toBe(200);
     casa = await banco.vivienda(cop.id, '1');
     titular = await banco.titular(cop.id, casa, `tit.${s}`);
     await banco.completarAlta(cop.id, titular.token, banco.perfil(1));
