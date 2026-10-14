@@ -1,0 +1,8 @@
+{
+  "$comentario": "15-Y3 · LOS UMBRALES DE CALIDAD DE UNA CAPTURA, EN UN SOLO SITIO. Los lee la consola web (apps/web/src/lib/biometria/medidas.ts, por UMBRALES_DE_CALIDAD de @ncr/contracts) y los verifica la app (apps/mobile/test/dominio/umbrales_compartidos_test.dart) contra sus constantes de Dart (dominio/calidad_de_captura.dart). Todo en 0..1. Cambiarlos aquí sin cambiar Dart rompe la prueba de paridad a propósito.",
+  "nitidezMinima": 0.45,
+  "iluminacionMinima": 0.25,
+  "iluminacionMaxima": 0.85,
+  "proporcionMinima": 0.15,
+  "proporcionMaxima": 0.75
+}

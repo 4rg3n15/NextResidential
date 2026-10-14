@@ -14,6 +14,23 @@
  */
 export type { components, operations, paths } from './generado/api';
 
+import umbralesDeCalidad from './umbrales-de-calidad.json';
+
+/**
+ * 15-Y3 · los umbrales de calidad de una captura (nitidez, iluminación y
+ * proporción del rostro, en 0..1), en UN solo fichero para la consola y la
+ * app: la consola los lee de aquí; la app, que no puede importar un JSON sin
+ * empaquetarlo, los repite en Dart y los contrasta en una prueba de paridad.
+ * Es el único valor de ejecución del paquete, y es un dato, no código.
+ */
+export const UMBRALES_DE_CALIDAD = {
+  nitidezMinima: umbralesDeCalidad.nitidezMinima,
+  iluminacionMinima: umbralesDeCalidad.iluminacionMinima,
+  iluminacionMaxima: umbralesDeCalidad.iluminacionMaxima,
+  proporcionMinima: umbralesDeCalidad.proporcionMinima,
+  proporcionMaxima: umbralesDeCalidad.proporcionMaxima,
+} as const;
+
 import type { components } from './generado/api';
 
 /**
