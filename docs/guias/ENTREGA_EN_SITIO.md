@@ -677,6 +677,7 @@ _15-S4 (2026-10-10). Detalle, cifras y fuentes en
 **Lo que cambia para la próxima visita.**
 
 1. **No dé por buena la línea «sessionId: rechazado» de `pnpm sitio:audio`.**
+   _Desde la 15-S6 el guion ya no la escribe: dice «400 de causa no determinada» cuando no lo demuestra (VALIDACION §8.4.4)._
    El 09/10 salió en los dos equipos por un 400 ajeno al `sessionId` (C-65). Lo
    que vale es la sesión de la guardia. Para el diagnóstico: `--segundos=1` y
    Enter en cuanto pregunte.

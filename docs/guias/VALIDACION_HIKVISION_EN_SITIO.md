@@ -1009,15 +1009,15 @@ terminal no oía al operador; el operador no oía al equipo mientras hablaba— 
 mide con **`pnpm sitio:audio -- --equipo=<familia o nombre>`**, que usa el
 mismo adaptador que la guardia (el del WebSocket) y no guarda audio.
 
-| #   | Qué hacer                                                                                                                                                                                                        | Resultado (anótelo) |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| 1   | `pnpm sitio:audio -- --equipo=videoportero`: anote **formato, muestreo, tasa y volumen del altavoz** (sólo lectura)                                                                                              |                     |
-| 2   | La línea **`sessionId:`** — `usado` (el equipo lo acepta), `rechazado` (lo rechazó y se siguió sin él) o `no lo dio el equipo`; y los **estados HTTP** de `open`, `audioData` y `close`                          |                     |
-| 3   | La **bajada**: bytes por segundo y nivel en dBFS escuchando; ponga a alguien a hablar delante del equipo y repita: el nivel debe subir                                                                           |                     |
-| 4   | El **tono de 2 s**: ¿se oyó en el equipo? Si **no**, es FALLO: con `sessionId: rechazado` o `usado` ya se descartó la sesión; mire el volumen del altavoz y el formato                                           |                     |
-| 5   | La línea **`dúplex:`** — `completo` (la bajada siguió mientras sonaba el tono) o `semiduplex` (calló). Es lo que explica no oír al equipo mientras se habla                                                      |                     |
-| 6   | Lo mismo con **`--equipo=terminal`**. Si dice «NO es G.711», la consola no puede hablarle: sólo con **autorización del cliente**, `--pasar-a-g711 --respaldo=$HOME/ncr-sitio/respaldo` (respaldo primero)        |                     |
-| 7   | En la consola de guardia: **«Manos libres»** y hablar sin pulsar; los medidores **Recibiendo** y **Enviando** se mueven a la vez en un equipo dúplex. Medir < 2 s (KPI-33) con la palmada de la fila 4 de §8.4.1 |                     |
+| #   | Qué hacer                                                                                                                                                                                                                                                                                                                                                                    | Resultado (anótelo) |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | `pnpm sitio:audio -- --equipo=videoportero`: anote **formato, muestreo, tasa y volumen del altavoz** (sólo lectura)                                                                                                                                                                                                                                                          |                     |
+| 2   | La línea **`sessionId:`** (15-S6) — `usado` · `no lo dio el equipo` · `rechazado (demostrado: sin él, 2xx)` · `400 de causa no determinada (igual sin sessionId)` · `400 de causa no determinada (no se repitió sin sessionId)`; y los **estados HTTP** de `open`, `audioData` y `close`. Un 400 sólo se le atribuye al `sessionId` si la misma petición, sin él, obtuvo 2xx |                     |
+| 3   | La **bajada**: bytes por segundo y nivel en dBFS escuchando; ponga a alguien a hablar delante del equipo y repita: el nivel debe subir                                                                                                                                                                                                                                       |                     |
+| 4   | El **tono de 2 s**: pulse Enter cuando esté junto al equipo; el tono va en una **segunda sesión abierta en ese momento** (15-S6), con su `PUT` recién abierto. ¿Se oyó? Si **no**, es FALLO; mire el volumen del altavoz, el formato y la línea `⚠ subida rechazada N veces` si aparece (reaperturas con pausa de 250 ms y tope 3: si lo supera, el tono se detiene)        |                     |
+| 5   | La línea **`dúplex:`** — `completo` (la bajada siguió mientras sonaba el tono) o `semiduplex` (calló). Es lo que explica no oír al equipo mientras se habla                                                                                                                                                                                                                  |                     |
+| 6   | Lo mismo con **`--equipo=terminal`**. Si dice «NO es G.711», la consola no puede hablarle: sólo con **autorización del cliente**, `--pasar-a-g711 --respaldo=$HOME/ncr-sitio/respaldo` (respaldo primero)                                                                                                                                                                    |                     |
+| 7   | En la consola de guardia: **«Manos libres»** y hablar sin pulsar; los medidores **Recibiendo** y **Enviando** se mueven a la vez en un equipo dúplex. Medir < 2 s (KPI-33) con la palmada de la fila 4 de §8.4.1                                                                                                                                                             |                     |
 
 **Por qué el `sessionId`** ([SUPUESTO] S-15S2-02): el DS-KD9633 lo devuelve en
 `open` y hasta la 15-S1 no se usaba. Ahora se manda en `audioData` y `close`;
@@ -1027,10 +1027,29 @@ de los dos casos es el de cada equipo, sin tocar código.
 > **Corrección de la 15-S4 (medido el 09/10, §10).** El `sessionId` ya no es un
 > supuesto: lo documenta el fabricante (S-15S2-02, documentado) y las sesiones
 > de la guardia lo usaron con 200 en los dos equipos. **La línea
-> «`sessionId: rechazado`» de `pnpm sitio:audio` no es fiable**: el 09/10 la
+> «`sessionId: rechazado`» de `pnpm sitio:audio` no era fiable**: el 09/10 la
 > dio en los dos equipos por un 400 que siguió igual sin el `sessionId`
-> (C-65, DT-15S4-01). Por eso, en la fila 4, un «NO» con «rechazado» **no**
-> descarta nada: lo que vale es la sesión de la guardia (§10.3).
+> (C-65, DT-15S4-01). Lo que vale es la sesión de la guardia (§10.3).
+>
+> **Corrección de la 15-S6.** `pnpm sitio:audio` ya no la escribe así. Lo que
+> cada veredicto significa ahora:
+>
+> - `usado`: el equipo aceptó `audioData` y `close` con el `sessionId`.
+> - `no lo dio el equipo`: `open` no trajo `sessionId`; nada cambia.
+> - `rechazado (demostrado: sin él, 2xx)`: la misma petición, repetida sin el
+>   `sessionId`, obtuvo 2xx. Sólo entonces el 400 era del `sessionId`.
+> - `400 de causa no determinada (igual sin sessionId)`: lo del 09/10. El 400
+>   siguió sin el `sessionId`; la causa está en otro sitio (el `PUT` ocioso,
+>   DT-15S4-01).
+> - `400 de causa no determinada (no se repitió sin sessionId)`: no hubo
+>   ocasión de repetir; no se afirma nada.
+>
+> Y el guion ya no deja el `PUT` ocioso: escucha en una sesión, y abre OTRA
+> para el tono cuando usted pulsa Enter. Si una subida es rechazada, reabre con
+> una pausa de 250 ms y como mucho 3 veces; después detiene el tono y lo dice.
+> La línea `dúplex:` se mide desde que se entregó la primera trama del tono,
+> no desde un plazo fijo (DT-15S5-08): una subida que tarda en arrancar ya no
+> convierte un semidúplex en «indeterminado». `--simulado` lo ensaya sin equipo.
 
 #### 8.4.2 · Las salidas del videoportero (15-P · P3)
 
@@ -1290,7 +1309,8 @@ Consecuencias para lo construido, sin cambiar código:
    «Enviando» se mueva y comprobar en el registro que la sesión cierra con
    «tramos» > 0 y «bytesSubidos» > 0. Repetirlo justo después de una sesión
    cuyo primer PUT dé 401.
-5. **`pnpm sitio:audio` sin la espera:** `--segundos=1` y Enter en cuanto
-   pregunte, para que el tono salga en los primeros segundos, por el mismo
-   `PUT` que abrió `open`. Si así «se oyó: SÍ» y «sessionId: usado», el 400 de
-   las 20:19 no era del `sessionId` (C-65, DT-15S4-01).
+5. **`pnpm sitio:audio -- --equipo=… --segundos=1`** en los dos equipos (15-S6).
+   Resultado esperado: «se oyó: SÍ», «sessionId: usado» y «estados HTTP» sin
+   400; `dúplex: completo` o `semiduplex`, no «indeterminado». Si sale «400 de
+   causa no determinada», anote la línea entera de estados HTTP: el 400 no es
+   del `sessionId` y hay que mirar el `PUT` (DT-15S4-01).
