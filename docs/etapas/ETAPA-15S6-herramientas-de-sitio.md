@@ -362,11 +362,12 @@ de la sonda, no medido aquí.
 #56). PR hacia `develop`, sin fusionar; es la primera de la cadena y las
 siguientes la contienen.
 
-| Commit    | Qué                                                                                                                                                 |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `c687723` | DT-15S5-07: los dos servidores de prueba de `apps/api/src` escuchan en `127.0.0.1`                                                                  |
-| `701ff36` | DT-15S5-08 y DT-15S4-01: el diagnóstico mide desde la primera trama entregada, abre el tono tras el Enter y no culpa al `sessionId` sin demostrarlo |
-| `1a65cba` | DT-15S5-01 y -02: los guiones de sitio terminan con `exitCode`; `sitio:audio --simulado`; la sonda del lector lento por guion                       |
-| `b813cbb` | DT-15S4-02: «no se está enviando audio» en la consola                                                                                               |
-| `45c5db3` | La sonda lanza los guiones de sitio sin `NODE_V8_COVERAGE` (la primera corrida del verificador, FALLIDA)                                            |
-| cierre    | `chore(etapa-15s6): cierre de etapa` — guías, informe y ESTADO                                                                                      |
+| Commit     | Qué                                                                                                                                                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `c687723`  | DT-15S5-07: los dos servidores de prueba de `apps/api/src` escuchan en `127.0.0.1`                                                                                                                                                        |
+| corrección | El ocupante de «si el puerto está ocupado» vuelve a la comodín: en macOS, en `127.0.0.1` no bloqueaba la comodín que abre la API y la prueba salió roja en la CI del PR #57. Es la única excepción a DT-15S5-07, justificada en la prueba |
+| `701ff36`  | DT-15S5-08 y DT-15S4-01: el diagnóstico mide desde la primera trama entregada, abre el tono tras el Enter y no culpa al `sessionId` sin demostrarlo                                                                                       |
+| `1a65cba`  | DT-15S5-01 y -02: los guiones de sitio terminan con `exitCode`; `sitio:audio --simulado`; la sonda del lector lento por guion                                                                                                             |
+| `b813cbb`  | DT-15S4-02: «no se está enviando audio» en la consola                                                                                                                                                                                     |
+| `45c5db3`  | La sonda lanza los guiones de sitio sin `NODE_V8_COVERAGE` (la primera corrida del verificador, FALLIDA)                                                                                                                                  |
+| cierre     | `chore(etapa-15s6): cierre de etapa` — guías, informe y ESTADO                                                                                                                                                                            |
