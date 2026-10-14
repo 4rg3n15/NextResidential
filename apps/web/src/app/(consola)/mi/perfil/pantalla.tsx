@@ -7,17 +7,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/tarjeta';
-import {
-  clavesDelResidente,
-  useMiPerfil,
-  useMiVivienda,
-  useMisOcupantes,
-} from '@/lib/api/residente';
+import { clavesDelResidente, useMiPerfil, useMiVivienda } from '@/lib/api/residente';
 import type { PerfilDelResidente } from '@/lib/api/residente';
 import { fechaCorta } from '@/lib/fechas';
 import { Seccion, estadoDeConsulta, legible, tituloDeVivienda } from '../comunes';
 import { EditarPerfil, TIPOS_DE_DOCUMENTO } from './editar-perfil';
 import { CambiarContrasena } from './cambiar-contrasena';
+import { PlazasDelHogar } from '../hogar/plazas-del-hogar';
 
 const TIPO_DE_DOCUMENTO: Readonly<Record<string, string>> = Object.fromEntries(
   TIPOS_DE_DOCUMENTO.map((t) => [t.valor, t.etiqueta]),
@@ -43,9 +39,8 @@ const documentoDe = (p: PerfilDelResidente): string =>
 
 /**
  * M-8 · «Perfil»: mis datos (editables), mi conjunto con el teléfono de la
- * portería, mis ocupantes con los códigos de las plazas libres y los atajos.
- * Cambiar de vivienda y cambiar la contraseña quedan fuera de esta entrega:
- * exigen flujos que la consola no tiene todavía (se declara en el informe).
+ * portería, las plazas del hogar (15-Y2) y los atajos. La contraseña se cambia
+ * aquí desde la 15-Y1; cambiar de vivienda sigue fuera de la consola.
  */
 export const PantallaDeMiPerfil = ({
   copropiedadId,
@@ -55,7 +50,6 @@ export const PantallaDeMiPerfil = ({
   const consultas = useQueryClient();
   const perfil = useMiPerfil(copropiedadId);
   const hogar = useMiVivienda(copropiedadId);
-  const ocupantes = useMisOcupantes(copropiedadId);
   const [editando, setEditando] = useState<PerfilDelResidente | null>(null);
   // 15-Y1 · cambiar la contraseña desde aquí, como en la app.
   const [cambiandoContrasena, setCambiandoContrasena] = useState(false);
@@ -136,39 +130,11 @@ export const PantallaDeMiPerfil = ({
         </>
       ) : null}
 
-      {ocupantes.data?.declarada === true ? (
-        <Tarjeta>
-          <CabeceraDeTarjeta
-            titulo={`Ocupantes: ${String(ocupantes.data.declarados)}`}
-            descripcion="El titular añade o retira plazas desde la app, hasta el tope de la vivienda; para más, la administración."
-          />
-          <CuerpoDeTarjeta>
-            <ul aria-label="Plazas de ocupante">
-              {ocupantes.data.plazas.map((plaza) => (
-                <li
-                  key={plaza.id}
-                  className="flex items-center gap-3 border-b border-borde-suave py-2 last:border-b-0"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutro-suave text-distintivo font-bold text-neutro-texto"
-                  >
-                    {plaza.numero}
-                  </span>
-                  <span className="text-cuerpo text-texto">
-                    {plaza.libre ? 'Plaza libre' : (plaza.ocupante ?? 'Ocupada')}
-                  </span>
-                  {plaza.libre && plaza.codigo !== null ? (
-                    <span className="ml-auto font-mono text-secundario text-texto-apagado">
-                      Código: {plaza.codigo}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </CuerpoDeTarjeta>
-        </Tarjeta>
-      ) : null}
+      {/* 15-Y2 · las plazas del hogar, con sus acciones, como «Ocupantes» en la app. */}
+      <PlazasDelHogar
+        copropiedadId={copropiedadId}
+        vivienda={hogar.data === undefined ? 'tu vivienda' : tituloDeVivienda(hogar.data.vivienda)}
+      />
 
       <Tarjeta>
         <CabeceraDeTarjeta

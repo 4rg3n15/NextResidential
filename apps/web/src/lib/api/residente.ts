@@ -29,6 +29,9 @@ export type MiEvento = Esquemas['MiEventoDto'];
 export type MiNotificacion = Esquemas['MiNotificacionDto'];
 export type PerfilDelResidente = Esquemas['PerfilDelResidenteDto'];
 export type MisOcupantes = Esquemas['MisOcupantesDto'];
+export type PlazaDeOcupante = Esquemas['PlazaDeOcupanteDto'];
+/** 15-Y2 · los menores del hogar (ADR-038). */
+export type MenorDelHogar = Esquemas['MenorDelHogarDto'];
 export type PeriodoDeHistorial = 'hoy' | 'semana' | 'mes' | 'todo';
 
 export const clavesDelResidente = {
@@ -122,4 +125,12 @@ export const useMisOcupantes = (copropiedadId: string): UseQueryResult<MisOcupan
     queryKey: [...clavesDelResidente.raiz(copropiedadId), 'ocupantes'] as const,
     queryFn: async () =>
       desenvolver(await cliente.GET('/copropiedades/{id}/mi/ocupantes', ruta(copropiedadId))),
+  });
+
+/** 15-Y2 · los menores de mi vivienda: edad, documento enmascarado y plaza (ADR-038). */
+export const useMisMenores = (copropiedadId: string): UseQueryResult<MenorDelHogar[]> =>
+  useQuery({
+    queryKey: [...clavesDelResidente.raiz(copropiedadId), 'menores'],
+    queryFn: async () =>
+      desenvolver(await cliente.GET('/copropiedades/{id}/mi/menores', ruta(copropiedadId))),
   });

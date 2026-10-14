@@ -7,6 +7,10 @@ export const COP = '10000000-0000-4000-8000-000000000001';
 export const VEHICULO_ID = '50000000-0000-4000-8000-0000000000c1';
 export const AUTORIZACION_ID = '60000000-0000-4000-8000-0000000000d1';
 export const RESIDENTE_ID = '20000000-0000-4000-8000-0000000000a1';
+export const MENOR_ID = '20000000-0000-4000-8000-0000000000a3';
+export const PLAZA_1 = '90000000-0000-4000-8000-0000000000b1';
+export const PLAZA_2 = '90000000-0000-4000-8000-0000000000b2';
+export const PLAZA_3 = '90000000-0000-4000-8000-0000000000b3';
 
 export const HOGAR = {
   vivienda: {
@@ -150,14 +154,55 @@ export const RESPUESTAS: Readonly<Record<string, unknown>> = {
     telefonoPorteria: '6011234567',
   },
   [`/api/ncr/copropiedades/${COP}/mi/ocupantes`]: {
-    declarados: 2,
+    declarados: 3,
     declarada: true,
     aviso: '',
+    tope: 4,
+    esTitular: true,
     plazas: [
-      { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Ana Pérez' },
-      { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null },
+      {
+        id: PLAZA_1,
+        numero: 1,
+        libre: false,
+        codigo: null,
+        ocupante: 'Ana Pérez',
+        sinCuenta: false,
+      },
+      {
+        id: PLAZA_2,
+        numero: 2,
+        libre: true,
+        codigo: 'ABCD-EFGH',
+        ocupante: null,
+        sinCuenta: false,
+      },
+      // 15-Y2 · la plaza de un menor: ocupada, sin cuenta.
+      {
+        id: PLAZA_3,
+        numero: 3,
+        libre: false,
+        codigo: null,
+        ocupante: 'Sofía Pérez',
+        sinCuenta: true,
+      },
     ],
   },
+  [`/api/ncr/copropiedades/${COP}/mi/menores`]: [
+    {
+      residenteId: MENOR_ID,
+      nombres: 'Sofía',
+      apellidos: 'Pérez',
+      nombreCompleto: 'Sofía Pérez',
+      fechaNacimiento: '2015-08-21',
+      edad: 11,
+      tipoDocumento: 'tarjeta_identidad',
+      documento: '••••5678',
+      parentesco: 'Hija',
+      plazaId: PLAZA_3,
+      plazaNumero: 3,
+      tieneRostro: false,
+    },
+  ],
 };
 
 export const respuesta = (cuerpo: unknown, status = 200): Response =>

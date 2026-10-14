@@ -197,8 +197,8 @@ describe('lo que cada pantalla debe decir', () => {
     expect(screen.getByRole('link', { name: 'Llamar a portería' }).getAttribute('href')).toBe(
       'tel:6011234567',
     );
-    expect(screen.getByText(/Ocupantes: 2/)).toBeTruthy();
-    expect(screen.getByText('Código: ABCD-EFGH')).toBeTruthy();
+    expect(screen.getByText('Plazas: 3 de 4')).toBeTruthy();
+    expect(screen.getByText('ABCD-EFGH')).toBeTruthy();
     expect(screen.getByText(/Casa 42 · Manzana B · Titular/)).toBeTruthy();
   });
 
