@@ -161,3 +161,29 @@ export class EstadoDeDispositivosDto {
   @ApiProperty({ example: 1 }) degradados!: number;
   @ApiProperty({ example: 0 }) caidos!: number;
 }
+
+/** 15-Z3 (D-Z3) · una vivienda con sus recuentos de actividad. */
+export class ActividadDeViviendaDto {
+  @ApiProperty({ format: 'uuid' }) viviendaId!: string;
+  @ApiProperty({ example: '302' }) identificador!: string;
+  @ApiProperty({ type: String, nullable: true, example: 'Torre 3' }) agrupacion!: string | null;
+  @ApiProperty({ example: 1, description: 'Vehículos en visita activa en esta vivienda.' })
+  vehiculosEnVisita!: number;
+  @ApiProperty({ example: 2, description: 'Visitantes dentro en este momento, según el criterio.' })
+  visitantesAhora!: number;
+}
+
+export class ActividadPorViviendaDto {
+  @ApiProperty({
+    description:
+      'Qué significa «en este momento» con los datos que hay (P-41). La pantalla lo enseña tal cual.',
+  })
+  criterio!: string;
+  @ApiProperty({ type: String, format: 'date-time', description: 'El instante con que se juzgó.' })
+  ahora!: string;
+  @ApiProperty({
+    type: [ActividadDeViviendaDto],
+    description: 'Todas las viviendas activas, ordenadas por actividad.',
+  })
+  filas!: ActividadDeViviendaDto[];
+}

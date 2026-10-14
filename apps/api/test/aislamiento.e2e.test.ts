@@ -711,6 +711,8 @@ describe('cobertura tras la ETAPA 09-A', () => {
     const tablero = rutas.filter((r) => r.ruta.includes('/tablero/'));
     expect(tablero.map((r) => r.ruta).sort()).toEqual([
       '/copropiedades/:id/tablero/accesos-por-hora',
+      // 15-Z3 · la actividad por vivienda entró sola, como las tres de la 09-A.
+      '/copropiedades/:id/tablero/actividad-por-vivienda',
       '/copropiedades/:id/tablero/dispositivos',
       '/copropiedades/:id/tablero/indicadores',
     ]);

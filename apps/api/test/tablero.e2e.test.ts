@@ -150,12 +150,14 @@ describe('GET /copropiedades/:id/tablero/dispositivos', () => {
 });
 
 describe('cobertura de la ETAPA 09-A', () => {
-  it('las tres rutas del tablero entraron solas en la enumeración del enrutador', () => {
+  it('las cuatro rutas del tablero entraron solas en la enumeración del enrutador', () => {
     // Es lo que hace que la suite de aislamiento las recorra sin que nadie las
     // añada a mano: si esto falla, hay endpoints fuera del recorrido de fuga.
+    // 15-Z3 · la cuarta es la actividad por vivienda.
     const tablero = enumerarRutas(app).filter((r) => r.ruta.includes('/tablero/'));
     expect(tablero.map((r) => `${r.metodo} ${r.ruta}`).sort()).toEqual([
       'GET /copropiedades/:id/tablero/accesos-por-hora',
+      'GET /copropiedades/:id/tablero/actividad-por-vivienda',
       'GET /copropiedades/:id/tablero/dispositivos',
       'GET /copropiedades/:id/tablero/indicadores',
     ]);
@@ -163,7 +165,12 @@ describe('cobertura de la ETAPA 09-A', () => {
 
   it('el tablero de otra copropiedad responde 404, no 403 ni datos', async () => {
     const token = await comoAdmin();
-    for (const ruta of ['indicadores', 'accesos-por-hora', 'dispositivos']) {
+    for (const ruta of [
+      'indicadores',
+      'accesos-por-hora',
+      'dispositivos',
+      'actividad-por-vivienda',
+    ]) {
       const res = await request(app.getHttpServer())
         .get(`/copropiedades/${COP_B}/tablero/${ruta}`)
         .set('Authorization', `Bearer ${token}`);

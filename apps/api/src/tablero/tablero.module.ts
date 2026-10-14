@@ -21,6 +21,14 @@ import { RepositorioTableroPg } from './infraestructura/repositorio-tablero-pg';
 import { TableroController } from './presentacion/tablero.controller';
 import { DispositivosController } from './presentacion/dispositivos.controller';
 import { PROVEEDOR_DE_OPERACIONES } from './infraestructura/composicion-de-operaciones';
+import {
+  ACTIVIDAD_POR_VIVIENDA,
+  ConsultarActividadPorVivienda,
+} from './aplicacion/actividad-por-vivienda';
+import type { ActividadPorVivienda } from './aplicacion/actividad-por-vivienda';
+import { ActividadPorViviendaEnMemoria } from './infraestructura/actividad-por-vivienda-en-memoria';
+import { ActividadPorViviendaPg } from './infraestructura/actividad-por-vivienda-pg';
+import { ActividadController } from './presentacion/actividad.controller';
 
 /**
  * Raíz de composición del tablero.
@@ -43,7 +51,7 @@ export class TableroModule {
       module: TableroModule,
       // 15-L · el alcance de equipos (el equipo es de la copropiedad de la ruta).
       imports: [EquiposModule.registrar()],
-      controllers: [TableroController, DispositivosController],
+      controllers: [TableroController, DispositivosController, ActividadController],
       providers: [
         PROVEEDOR_DE_OPERACIONES,
         {
@@ -91,8 +99,23 @@ export class TableroModule {
           useFactory: (repo: RepositorioTablero, reloj: Reloj, senales: LectorDeSenales) =>
             new ConsultarDispositivos(repo, reloj, senales),
         },
+        // 15-Z3 · la actividad por vivienda sigue el mismo interruptor que el tablero.
+        {
+          provide: ACTIVIDAD_POR_VIVIENDA,
+          inject: [CONFIGURACION, Pool],
+          useFactory: (configuracion: Configuracion, pool: Pool): ActividadPorVivienda =>
+            configuracion.PERSISTENCIA_DE_EVENTOS === 'postgres'
+              ? new ActividadPorViviendaPg(pool)
+              : new ActividadPorViviendaEnMemoria(),
+        },
+        {
+          provide: ConsultarActividadPorVivienda,
+          inject: [ACTIVIDAD_POR_VIVIENDA, RELOJ],
+          useFactory: (puerto: ActividadPorVivienda, reloj: Reloj) =>
+            new ConsultarActividadPorVivienda(puerto, reloj),
+        },
       ],
-      exports: [REPOSITORIO_TABLERO],
+      exports: [REPOSITORIO_TABLERO, ACTIVIDAD_POR_VIVIENDA],
     };
   }
 }
