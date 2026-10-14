@@ -19,7 +19,8 @@ import { CopropiedadDesconocida } from './casos-de-uso';
  * ingreso y no una salida. Eso exige que los equipos REPORTEN la salida: donde
  * no lo hagan, el visitante «sigue dentro» hasta que vence su visita. Es una
  * aproximación declarada, igual que el «dentro ahora» del tablero; la decisión
- * de negocio queda abierta en P-41.
+ * de negocio queda abierta en P-41. El texto no lleva el código: la pantalla
+ * lo enseña tal cual y ninguna pantalla muestra códigos del proyecto.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
@@ -27,7 +28,7 @@ export const CRITERIO_DE_ACTIVIDAD =
   'Visitantes con autorización vigente en este instante cuyo último paso permitido por la ' +
   'portería, dentro de esa vigencia, fue un ingreso sin salida registrada después. Vehículos: ' +
   'los de esos visitantes cuya visita tiene placa o cuyo ingreso fue por placa. Si un equipo ' +
-  'no reporta la salida, el visitante cuenta hasta que vence su visita (P-41).';
+  'no reporta la salida, el visitante cuenta hasta que vence su visita.';
 
 export interface ActividadDeVivienda {
   readonly viviendaId: string;

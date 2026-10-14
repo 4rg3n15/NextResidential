@@ -65,7 +65,9 @@ describe('GET /copropiedades/:id/tablero/actividad-por-vivienda', () => {
       vehiculosEnVisita: 1,
       visitantesAhora: 2,
     });
-    expect(res.body.criterio).toMatch(/P-41/);
+    // Sin códigos del proyecto: la consola lo enseña tal cual (el recorrido de la consola lo exige).
+    expect(res.body.criterio).toMatch(/vence su visita/);
+    expect(res.body.criterio).not.toMatch(/P-\d+/);
     expect(Date.parse(res.body.ahora)).not.toBeNaN();
     // Sólo recuentos: ningún nombre, documento ni placa.
     expect(Object.keys(res.body.filas[0]).sort()).toEqual(

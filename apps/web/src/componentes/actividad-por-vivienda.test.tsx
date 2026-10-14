@@ -34,7 +34,7 @@ const FILAS = [
   },
 ];
 const RESPUESTA = {
-  criterio: 'Visitantes con ingreso sin salida registrada (P-41).',
+  criterio: 'Visitantes con ingreso sin salida registrada.',
   ahora: '2026-10-14T15:00:00.000Z',
   filas: FILAS,
 };
