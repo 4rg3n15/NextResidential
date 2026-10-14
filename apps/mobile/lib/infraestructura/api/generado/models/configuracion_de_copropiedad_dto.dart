@@ -79,7 +79,7 @@ class ConfiguracionDeCopropiedadDto {
   /// D7 · teléfono al que llama el botón «Portería» de la app.
   final String? telefonoPorteria;
 
-  /// D5 a · vehículos propios por vivienda.
+  /// D5 a · vehículos propios ACTIVOS por vivienda (5 por omisión desde la 15-Z1).
   final num topeVehiculosPropios;
 
   /// H4 · IP (o redes CIDR) del computador de portería
