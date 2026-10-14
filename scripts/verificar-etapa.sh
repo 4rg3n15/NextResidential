@@ -1250,7 +1250,7 @@ if [[ "$CON_BASE" == "1" ]]; then
     mal "el recorrido no detecta algún defecto de sitio (ver /tmp/ncr-recorrido-negativo.log)"
     grep -E "✗|✓" /tmp/ncr-recorrido-negativo.log | head -8 | sed 's/^/     /'
   fi
-  paso "13d · el recorrido del RESIDENTE en la consola: crear cuenta, primer ingreso, contraseña y el hogar (requiere --con-base)"
+  paso "13d · el recorrido del RESIDENTE en la consola: crear cuenta, primer ingreso, contraseña, el hogar y el rostro (requiere --con-base)"
   # 15-Y1 (P-23) · el residente sin app usa la consola desde su teléfono. Se
   # recorre a 360 px con la API real, la base y el doble de GoTrue con
   # administración de usuarios: el titular que la administración creó entra,
@@ -1258,10 +1258,11 @@ if [[ "$CON_BASE" == "1" ]]; then
   # su cuenta con un código de plaza; un código inválido y un menor no crean nada.
   # 15-Y2 · y el hogar: el titular añade una plaza y comparte su código, registra
   # y edita a un menor, edita y elimina un vehículo y revoca una visita; quien no
-  # es titular no ve «Añadir plaza» ni «Retirar».
+  # es titular no ve «Añadir plaza» ni «Retirar». 15-Y3 · y el rostro: con una
+  # cámara falsa determinista, el titular registra su rostro y lo retira.
   if NCR_REUTILIZAR_CONSOLA=1 con_limite "$LIMITE_LARGO" node e2e/recorrido-residente-web.mjs \
        >/tmp/ncr-recorrido-residente.log 2>&1; then
-    ok "el residente crea su cuenta, entra, completa su primer ingreso, cambia su contraseña y gestiona su hogar desde la consola"
+    ok "el residente crea su cuenta, entra, completa su primer ingreso, cambia su contraseña, gestiona su hogar y registra su rostro desde la consola"
   else
     mal "el recorrido del residente en la consola falla (ver /tmp/ncr-recorrido-residente.log)"
     grep -E "✗" /tmp/ncr-recorrido-residente.log | head -8 | sed 's/^/     /'

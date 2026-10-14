@@ -18,7 +18,10 @@
  *   7 · (15-Y2) el titular añade una plaza y comparte su código, registra y
  *       edita a un menor, registra, edita y elimina un vehículo y revoca una
  *       visita suya;
- *   8 · (15-Y2) quien no es titular no ve «Añadir plaza» ni «Retirar».
+ *   8 · (15-Y2) quien no es titular no ve «Añadir plaza» ni «Retirar»;
+ *   9 · (15-Y3) el titular registra su rostro con la cámara frontal (falsa y
+ *       determinista), la política aceptada, y lo retira; nada de la imagen
+ *       queda en el navegador. Tras cada alta se invita y «Ahora no» pasa.
  *
  * Nada sensible queda en el navegador: se comprueba que ni la contraseña ni el
  * código de plaza aparecen en `localStorage` ni `sessionStorage`.
@@ -44,7 +47,12 @@ import {
   tokenAal2,
 } from './residente-web/acciones.mjs';
 import { codigoInvalidoYMenor } from './residente-web/cuenta.mjs';
-import { hogarDelOcupante, hogarDelTitular, visitaDelTitular } from './residente-web/hogar.mjs';
+import { pasosDelHogar } from './residente-web/hogar.mjs';
+import {
+  argumentosDeCamaraFalsa,
+  ficheroDeCamaraFalsa,
+  rostroDelTitular,
+} from './residente-web/rostro.mjs';
 import {
   arrancarApi,
   arrancarConsola,
@@ -115,9 +123,11 @@ const principal = async () => {
   const base = `http://127.0.0.1:${String(puertoWeb)}`;
   if (!(await esperar(`${base}/acceso`, 'la consola', mal))) return;
   const llamar = api(puertoApi);
-  const navegador = await chromium.launch(
-    ejecutable === undefined ? {} : { executablePath: ejecutable },
-  );
+  // 15-Y3 · una cámara falsa determinista (tablero de ajedrez) para «Mi rostro».
+  const navegador = await chromium.launch({
+    ...(ejecutable === undefined ? {} : { executablePath: ejecutable }),
+    args: argumentosDeCamaraFalsa(ficheroDeCamaraFalsa(sufijo)),
+  });
   const usuarioTitular = `titular.${sufijo}`;
   const usuarioOcupante = `ocupante.${sufijo}`;
   let codigoDePlaza = '';
@@ -207,8 +217,15 @@ const principal = async () => {
           fecha: '1992-03-14',
         });
         await p2.getByRole('button', { name: 'Crear cuenta' }).click();
-        await primerIngreso(p2, { nombres: `Ocupante ${sufijo}`, apellidos: `Prueba ${sufijo}` });
+        const invitado = await primerIngreso(p2, {
+          nombres: `Ocupante ${sufijo}`,
+          apellidos: `Prueba ${sufijo}`,
+        });
         ok('la cuenta se crea con el código de plaza, entra sola y completa su primer ingreso');
+        afirmar(
+          invitado,
+          '15-Y3 · tras el alta se invita a registrar el rostro y «Ahora no» deja pasar',
+        );
         await sinSecretos(p2, [DEL_OCUPANTE, codigoDePlaza]);
       },
       p2,
@@ -231,32 +248,33 @@ const principal = async () => {
     });
     await c3.close();
 
-    paso('7 · 15-Y2 · el hogar del titular: plaza, código, menor, vehículo y visita');
-    const titular = { usuario: usuarioTitular, contrasena: OTRA };
-    const { visita } = await visitaDelTitular(llamar, MIRA, titular, sufijo);
-    afirmar(
-      visita.estado === 201 && visita.cuerpo.creada === true,
-      `el titular registra por la API la visita que va a revocar (${String(visita.estado)})`,
-    );
-    const c4 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
-    const p4 = await c4.newPage();
-    await bloque(
-      'hogar del titular',
-      () => hogarDelTitular({ pagina: p4, base, titular, sufijo, ok, afirmar }),
-      p4,
-    );
-    await c4.close();
-
-    paso('8 · 15-Y2 · el hogar visto por quien no es titular');
-    const c5 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
-    const p5 = await c5.newPage();
     const ocupante = { usuario: usuarioOcupante, contrasena: DEL_OCUPANTE };
+    const titular = { usuario: usuarioTitular, contrasena: OTRA };
+    await pasosDelHogar({
+      navegador,
+      base,
+      llamar,
+      titular,
+      ocupante,
+      sufijo,
+      ok,
+      afirmar,
+      bloque,
+      paso,
+    });
+
+    paso('9 · 15-Y3 · el rostro del titular con la cámara frontal (falsa): registrar y retirar');
+    const c6 = await navegador.newContext({
+      viewport: { width: 360, height: 740 },
+      permissions: ['camera'],
+    });
+    const p6 = await c6.newPage();
     await bloque(
-      'hogar del ocupante',
-      () => hogarDelOcupante({ pagina: p5, base, ocupante, sufijo, afirmar }),
-      p5,
+      'rostro del titular',
+      () => rostroDelTitular({ pagina: p6, base, titular, ok, afirmar }),
+      p6,
     );
-    await c5.close();
+    await c6.close();
   } finally {
     await navegador.close();
     await lectura.end();

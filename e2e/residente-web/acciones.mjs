@@ -77,7 +77,7 @@ export const llenarCrearCuenta = async (pagina, { usuario, correo, contrasena, c
   await pagina.getByLabel(/He leído y acepto/).check();
 };
 
-/** Espera el primer ingreso (por ENCABEZADO: el menú repite «Mi vivienda» en un enlace oculto a 360 px), lo completa y espera el inicio. */
+/** Espera el primer ingreso (por ENCABEZADO: el menú repite «Mi vivienda» en un enlace oculto a 360 px), lo completa y espera el inicio. Devuelve si se invitó a registrar el rostro. */
 export const primerIngreso = async (pagina, { nombres, apellidos }) => {
   await pagina.getByRole('heading', { name: 'Primer ingreso' }).waitFor({ timeout: 60_000 });
   await pagina.getByLabel('Nombres').fill(nombres);
@@ -92,7 +92,14 @@ export const primerIngreso = async (pagina, { nombres, apellidos }) => {
   await pagina.getByLabel('Teléfono').fill('3001234567');
   await pagina.getByLabel('Fecha de nacimiento').fill('1990-05-17');
   await pagina.getByRole('button', { name: 'Guardar y continuar' }).click();
-  await pagina.getByRole('heading', { name: 'Mi vivienda' }).waitFor({ timeout: 60_000 });
+  // 15-Y3 · tras el alta, la invitación del rostro (una vez): «Ahora no» deja pasar al inicio.
+  const inicio = pagina.getByRole('heading', { name: 'Mi vivienda' });
+  const invitacion = pagina.getByRole('heading', { name: 'Entre con su rostro' });
+  await inicio.or(invitacion).first().waitFor({ timeout: 60_000 });
+  const invitado = await invitacion.isVisible();
+  if (invitado) await pagina.getByRole('button', { name: 'Ahora no' }).click();
+  await inicio.waitFor({ timeout: 60_000 });
+  return invitado;
 };
 
 /** `true` si ninguno de los secretos quedó en `localStorage` ni `sessionStorage`. */
@@ -184,3 +191,13 @@ export const secretosFuera = async (afirmar, pagina, secretos) =>
     await almacenesSinSecretos(pagina, secretos),
     'ni la contraseña ni el código de plaza quedan en localStorage o sessionStorage',
   );
+
+/** 15-Y3 · entra y llega al inicio: si la invitación del rostro aparece (otro navegador), «Ahora no». */
+export const entrarAlInicio = async (pagina, base, usuario, contrasena) => {
+  await entrar(pagina, base, usuario, contrasena);
+  const inicio = pagina.getByRole('heading', { name: 'Mi vivienda' });
+  const invitacion = pagina.getByRole('heading', { name: 'Entre con su rostro' });
+  await inicio.or(invitacion).first().waitFor({ timeout: 60_000 });
+  if (await invitacion.isVisible()) await pagina.getByRole('button', { name: 'Ahora no' }).click();
+  await inicio.waitFor({ timeout: 60_000 });
+};

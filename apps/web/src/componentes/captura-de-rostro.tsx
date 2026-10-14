@@ -59,22 +59,38 @@ export const CapturaDeRostro = ({
   };
   useEffect(() => cerrarCamara, []);
 
+  // El `<video>` se monta DESPUÉS de abrir la cámara: el flujo se le conecta cuando ya existe.
+  useEffect(() => {
+    const v = video.current;
+    const f = flujo.current;
+    if (!camaraAbierta || v === null || f === null) return;
+    v.srcObject = f;
+    void v.play().catch(() => undefined);
+  }, [camaraAbierta]);
+
   const abrirCamara = async (): Promise<void> => {
     if (camara === null) return;
     setAviso(null);
     try {
-      const f = await camara.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      flujo.current = f;
+      flujo.current = await camara.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       setCamaraAbierta(true);
-      const v = video.current;
-      if (v !== null) {
-        v.srcObject = f;
-        await v.play().catch(() => undefined);
-      }
     } catch {
       setAviso(CAMARA_NEGADA);
     }
   };
+
+  /** Hasta que llegue el primer fotograma (o 3 s): capturar antes da una imagen vacía. */
+  const primerFotograma = (v: HTMLVideoElement): Promise<void> =>
+    v.readyState >= 2
+      ? Promise.resolve()
+      : new Promise((resolver) => {
+          const listo = (): void => {
+            v.removeEventListener('loadeddata', listo);
+            resolver();
+          };
+          v.addEventListener('loadeddata', listo);
+          setTimeout(listo, 3000);
+        });
 
   const leer = async (fuente: ImageBitmapSource): Promise<void> => {
     setAviso(null);
@@ -97,6 +113,7 @@ export const CapturaDeRostro = ({
   const tomarFoto = async (): Promise<void> => {
     const v = video.current;
     if (v === null) return;
+    await primerFotograma(v);
     await leer(v);
     cerrarCamara();
   };
