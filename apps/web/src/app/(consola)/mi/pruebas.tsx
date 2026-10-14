@@ -200,7 +200,7 @@ export const RESPUESTAS: Readonly<Record<string, unknown>> = {
     equipos: [{ nombre: 'Terminal de la portería', estado: 'pendiente' }],
     politica: {
       version: VERSION_POLITICA_ROSTRO,
-      texto: 'Política provisional del rostro (P-39).',
+      texto: 'Política provisional del rostro.',
     },
   },
   [`/api/ncr/copropiedades/${COP}/mi/menores/${MENOR_ID}/rostro`]: {
@@ -212,7 +212,7 @@ export const RESPUESTAS: Readonly<Record<string, unknown>> = {
     equiposConRostro: 1,
     equiposConMiRostro: 0,
     equipos: [],
-    politica: { version: 'menor-1', texto: 'Política provisional del rostro del menor (P-39).' },
+    politica: { version: 'menor-1', texto: 'Política provisional del rostro del menor.' },
   },
   [`/api/ncr/copropiedades/${COP}/mi/menores`]: [
     {
