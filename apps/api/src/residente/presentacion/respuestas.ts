@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SITUACIONES_DE_VISITA, TIPOS_DE_NOTIFICACION } from '../aplicacion/mis-notificaciones';
 import type { SituacionDeVisita, TipoDeNotificacion } from '../aplicacion/mis-notificaciones';
+import { ORIGENES_DE_VEHICULO } from '../aplicacion/puertos';
+import type { OrigenDeVehiculo } from '../aplicacion/puertos';
 
 /**
  * DTOs de salida de la superficie del residente.
@@ -80,6 +82,13 @@ export class MiVehiculoDto {
   @ApiProperty({ type: String, nullable: true }) color!: string | null;
   @ApiProperty({ type: Boolean }) esPrincipal!: boolean;
   @ApiProperty({ type: Boolean }) activo!: boolean;
+  @ApiProperty({
+    enum: ORIGENES_DE_VEHICULO,
+    description:
+      '15-Z2 (DT-15W-02) · «propio» lo registró el hogar y se edita y elimina desde la app; ' +
+      '«administracion» sólo se ve.',
+  })
+  origen!: OrigenDeVehiculo;
 }
 
 export class MiAutorizacionDto {

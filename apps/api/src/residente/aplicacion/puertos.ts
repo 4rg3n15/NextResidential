@@ -69,6 +69,10 @@ export interface MiembroDeFamilia {
   readonly activo: boolean;
 }
 
+/** 15-Z2 (DT-15W-02) · quién lo registró: el hogar lo edita y elimina; el de la administración sólo se ve. */
+export const ORIGENES_DE_VEHICULO = ['propio', 'administracion'] as const;
+export type OrigenDeVehiculo = (typeof ORIGENES_DE_VEHICULO)[number];
+
 export interface VehiculoDelResidente {
   readonly id: string;
   readonly placa: string;
@@ -77,6 +81,7 @@ export interface VehiculoDelResidente {
   readonly color: string | null;
   readonly esPrincipal: boolean;
   readonly activo: boolean;
+  readonly origen: OrigenDeVehiculo;
 }
 
 export interface AutorizacionDelResidente {

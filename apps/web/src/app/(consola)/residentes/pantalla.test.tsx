@@ -75,8 +75,10 @@ const respuestas: Record<string, unknown> = {
       telefonoPorteria: null,
     },
   [`/api/ncr/copropiedades/${COP}/viviendas/${VIVIENDA}/ocupantes`]: [
-    { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Ana Pérez' },
-    { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null },
+    { id: 'p1', numero: 1, libre: false, codigo: null, ocupante: 'Ana Pérez', sinCuenta: false },
+    { id: 'p2', numero: 2, libre: true, codigo: 'ABCD-EFGH', ocupante: null, sinCuenta: false },
+    // 15-Z2 (DT-15W-04) · un menor sin cuenta ocupa su plaza: la consola lo dice.
+    { id: 'p3', numero: 3, libre: false, codigo: null, ocupante: 'Sofía Pérez', sinCuenta: true },
   ],
 };
 
@@ -130,6 +132,16 @@ describe('panel de residentes (15-I)', () => {
     // 15-W · la ficha de plazas de la vivienda dice cuántas tiene y cuántas puede tener.
     expect(await screen.findByText('Plazas: 2 de 4')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Cambiar tope' })).toBeTruthy();
+  });
+
+  it('15-Z2 (DT-15W-04) · la plaza de un menor sin cuenta se distingue de la ocupada por una cuenta', async () => {
+    render(envolver(<PantallaDeResidentes copropiedadId={COP} />));
+    const selector = await screen.findByLabelText('Vivienda');
+    await waitFor(() => expect(within(selector).getAllByRole('option')).toHaveLength(2));
+    fireEvent.change(selector, { target: { value: VIVIENDA } });
+    expect(await screen.findByText('Sofía Pérez')).toBeTruthy();
+    expect(screen.getByText('Sin cuenta (menor)')).toBeTruthy();
+    expect(screen.queryAllByText('Sin cuenta (menor)')).toHaveLength(1);
   });
 
   it('3.1 · el alta del titular envía usuario, contraseña inicial y vivienda por la API, sin correo', async () => {

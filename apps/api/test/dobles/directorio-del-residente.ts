@@ -118,6 +118,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           color: 'Blanco',
           esPrincipal: true,
           activo: true,
+          origen: 'propio',
         },
       ],
       autorizaciones: [
@@ -175,6 +176,7 @@ const DATOS: ReadonlyMap<string, Datos> = new Map([
           color: 'Negro',
           esPrincipal: true,
           activo: true,
+          origen: 'administracion',
         },
       ],
       autorizaciones: [

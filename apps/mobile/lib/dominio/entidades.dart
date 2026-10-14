@@ -107,6 +107,10 @@ class MiembroDeFamilia {
   final bool activo;
 }
 
+/// 15-Z2 (DT-15W-02) · quién registró el vehículo: el hogar («propio», el
+/// residente lo edita y elimina) o la administración (sólo se ve).
+enum OrigenDeVehiculo { propio, administracion }
+
 class Vehiculo {
   const Vehiculo({
     required this.id,
@@ -116,6 +120,7 @@ class Vehiculo {
     required this.color,
     required this.esPrincipal,
     required this.activo,
+    this.origen = OrigenDeVehiculo.propio,
   });
 
   final String id;
@@ -125,6 +130,10 @@ class Vehiculo {
   final String? color;
   final bool esPrincipal;
   final bool activo;
+  final OrigenDeVehiculo origen;
+
+  /// Sólo los propios se editan y eliminan desde la app (DT-15W-02).
+  bool get esPropio => origen == OrigenDeVehiculo.propio;
 
   String get descripcion => [marca, modelo, color].whereType<String>().join(' · ');
 }

@@ -71,6 +71,10 @@ describe('15-W · D5 · editar y eliminar un vehículo propio', () => {
     expect(sinUso.body.registrado, JSON.stringify(sinUso.body)).toBe(true);
     v1 = String(conPlaca.body.id);
     v2 = String(sinUso.body.id);
+    // 15-Z2 (DT-15W-02) · la lista dice de quién es cada vehículo: los suyos, «propio».
+    const lista = await banco.con(suyo.token, 'get', RUTA);
+    expect(lista.status).toBe(200);
+    expect(lista.body.map((v: { origen: string }) => v.origen)).toEqual(['propio', 'propio']);
   });
 
   it('sin historial la placa cambia por el objeto de valor; tipo, vivienda o estado → 400; la de otro activo → 409', async () => {

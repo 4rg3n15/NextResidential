@@ -53,6 +53,18 @@ export const RESPUESTAS: Readonly<Record<string, unknown>> = {
       color: 'Gris',
       esPrincipal: true,
       activo: true,
+      origen: 'propio',
+    },
+    // 15-Z2 (DT-15W-02) · lo registró la administración: se ve, no se toca.
+    {
+      id: '50000000-0000-4000-8000-00000000adm1',
+      placa: 'ADM456',
+      marca: null,
+      modelo: null,
+      color: null,
+      esPrincipal: false,
+      activo: true,
+      origen: 'administracion',
     },
   ],
   [`/api/ncr/copropiedades/${COP}/mi/autorizaciones`]: [
