@@ -25,8 +25,20 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { authenticator } from 'otplib';
 import { arrancarDobleGotrue } from './doble-gotrue.mjs';
+import {
+  SUPERADMIN,
+  almacenesSinSecretos,
+  api,
+  bloqueCon,
+  codigoDePlazaLibre,
+  crearTitular,
+  entrar,
+  registroDeMenor,
+  llenarCrearCuenta,
+  primerIngreso,
+  tokenAal2,
+} from './residente-web/acciones.mjs';
 import {
   arrancarApi,
   arrancarConsola,
@@ -45,13 +57,6 @@ const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { Pool } = createRequire(resolve(raiz, 'apps/api', 'package.json'))('pg');
 const MIRA = '10000000-0000-4000-8000-000000000001';
 const BASE = 'ncr_recorrido_residente';
-const SUPERADMIN = {
-  id: '00000000-0000-4000-8000-0000000000a2',
-  correo: 'superadmin@nextcontrol.invalid',
-  contrasena: `Ncr-${randomBytes(12).toString('base64url')}`,
-  rol: 'superadministrador',
-  copropiedadId: null,
-};
 const sufijo = randomBytes(3).toString('hex');
 const INICIAL = `Inicial#${sufijo}Aa`;
 const DEL_TITULAR = `Titular#${sufijo}Bb`;
@@ -66,90 +71,12 @@ const mal = (m) => {
 };
 const paso = (m) => console.log(`\n▸ ${m}`);
 const afirmar = (c, m) => (c ? ok(m) : mal(m));
-/** Un bloque que falla no tumba el recorrido: se dice cuál, dónde estaba la página y qué decía. */
-const bloque = async (etiqueta, fn, pagina) => {
-  try {
-    await fn();
-  } catch (e) {
-    mal(`${etiqueta}: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
-    if (pagina !== undefined) {
-      const texto = await pagina
-        .evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 1400))
-        .catch(() => '');
-      console.log(`     · en ${pagina.url()} · «${texto}»`);
-    }
-  }
-};
-
-/** El superadministrador con `aal2`, por HTTP contra el doble: contraseña, factor, verificación. */
-const tokenAal2 = async (doble) => {
-  const j = async (ruta, cuerpo, token) =>
-    (
-      await fetch(`${doble.url}${ruta}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(cuerpo),
-      })
-    ).json();
-  const aal1 = (
-    await j('/auth/v1/token?grant_type=password', {
-      email: SUPERADMIN.correo,
-      password: SUPERADMIN.contrasena,
-    })
-  ).access_token;
-  const factor = await j('/auth/v1/factors', { friendly_name: 'recorrido' }, aal1);
-  await j(`/auth/v1/factors/${factor.id}/challenge`, {}, aal1);
-  const v = await j(
-    `/auth/v1/factors/${factor.id}/verify`,
-    { code: authenticator.generate(factor.totp.secret) },
-    aal1,
-  );
-  return v.access_token;
-};
-
-const api = (puerto) => async (metodo, ruta, token, cuerpo) => {
-  const r = await fetch(`http://127.0.0.1:${String(puerto)}${ruta}`, {
-    method: metodo,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
-  });
-  return { estado: r.status, cuerpo: await r.json().catch(() => ({})) };
-};
-
-const entrar = async (pagina, base, usuario, contrasena) => {
-  await pagina.goto(`${base}/acceso`);
-  await pagina.getByLabel('Usuario').fill(usuario);
-  await pagina.getByLabel('Código de la copropiedad').fill('MIRA');
-  await pagina.getByLabel('Contraseña', { exact: true }).fill(contrasena);
-  await pagina.locator('form button[type="submit"]').click();
-};
-
-const primerIngreso = async (pagina, nombres) => {
-  await pagina.getByRole('heading', { name: 'Primer ingreso' }).waitFor({ timeout: 60_000 });
-  await pagina.getByLabel('Nombres').fill(nombres);
-  await pagina.getByLabel('Apellidos').fill(`Prueba ${sufijo}`);
-  await pagina
-    .getByLabel('Número de documento')
-    .fill(`9${sufijo}${String(Date.now()).slice(-5)}`.replace(/\D/g, '').slice(0, 12));
-  await pagina.getByLabel('Teléfono').fill('3001234567');
-  await pagina.getByLabel('Fecha de nacimiento').fill('1990-05-17');
-  await pagina.getByRole('button', { name: 'Guardar y continuar' }).click();
-  await pagina.getByRole('heading', { name: 'Mi vivienda' }).waitFor({ timeout: 60_000 });
-};
-
-const sinSecretosEnElNavegador = async (pagina, secretos) => {
-  const guardado = await pagina.evaluate(
-    () =>
-      JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)),
-  );
+const bloque = bloqueCon(mal);
+const sinSecretos = async (pagina, secretos) =>
   afirmar(
-    secretos.every((s) => !guardado.includes(s)),
+    await almacenesSinSecretos(pagina, secretos),
     'ni la contraseña ni el código de plaza quedan en localStorage o sessionStorage',
   );
-};
 
 const principal = async () => {
   nombrarVolcado('ncr-recorrido-residente');
@@ -202,19 +129,10 @@ const principal = async () => {
   try {
     paso('2 · la administración crea al titular con su vivienda y contraseña inicial (D-W9)');
     const admin = await tokenAal2(doble);
-    const libres = await llamar(
-      'GET',
-      `/copropiedades/${MIRA}/residentes/viviendas-sin-titular`,
-      admin,
-    );
-    const vivienda = libres.cuerpo[0];
-    if (vivienda === undefined)
-      throw new Error(`sin viviendas sin titular (${String(libres.estado)})`);
-    const alta = await llamar('POST', `/copropiedades/${MIRA}/residentes/cuentas`, admin, {
+    const { alta, vivienda } = await crearTitular(llamar, admin, MIRA, {
       usuario: usuarioTitular,
-      contrasenaInicial: INICIAL,
+      inicial: INICIAL,
       nombre: `Titular ${sufijo}`,
-      viviendaId: vivienda.id,
     });
     afirmar(
       alta.estado === 201,
@@ -234,22 +152,12 @@ const principal = async () => {
         await pagina.getByLabel('Contraseña nueva', { exact: true }).fill(DEL_TITULAR);
         await pagina.getByLabel('Repite la contraseña nueva', { exact: true }).fill(DEL_TITULAR);
         await pagina.getByRole('button', { name: 'Cambiar y continuar' }).click();
-        // ADR-037 §1 y §5 · la cuenta del titular nace asignada a su vivienda, y la
-        // PERSONA se completa en el primer ingreso: tras el cambio obligado, la
-        // puerta de `/mi` pide ese alta y después ve su vivienda.
-        // Por encabezado, no por texto: el menú repite «Mi vivienda» en un enlace oculto a 360 px.
-        const llegada = pagina.getByRole('heading', { name: /Primer ingreso|Mi vivienda/ }).first();
-        await llegada.waitFor({ timeout: 60_000 });
-        if (((await llegada.textContent()) ?? '').includes('Primer ingreso')) {
-          await primerIngreso(pagina, `Titular ${sufijo}`);
-          ok(
-            'tras el cambio obligado, el titular completa su primer ingreso en la consola y ve «Mi vivienda»',
-          );
-        } else {
-          mal(
-            'tras el cambio obligado, la consola NO pidió el primer ingreso del titular (ADR-037 §5)',
-          );
-        }
+        // ADR-037 §5 · la cuenta nace asignada; la PERSONA se completa en el primer ingreso.
+        await primerIngreso(pagina, {
+          nombres: `Titular ${sufijo}`,
+          apellidos: `Prueba ${sufijo}`,
+        });
+        ok('tras el cambio obligado, el titular completa su primer ingreso y ve «Mi vivienda»');
         afirmar(
           !(await pagina.evaluate(() => document.documentElement.scrollWidth > 360)),
           'a 360 px no hay desplazamiento horizontal',
@@ -265,30 +173,25 @@ const principal = async () => {
           .first()
           .waitFor({ timeout: 20_000 });
         ok('desde el Perfil cambia la contraseña otra vez');
-        await sinSecretosEnElNavegador(pagina, [INICIAL, DEL_TITULAR, OTRA]);
+        await sinSecretos(pagina, [INICIAL, DEL_TITULAR, OTRA]);
       },
       pagina,
     );
     await contexto.close();
 
     paso('4 · el titular declara ocupantes y comparte el código de una plaza');
-    const sesion = await llamar('POST', '/auth/acceso', '', {
-      codigo: 'MIRA',
+    const plaza = await codigoDePlazaLibre(llamar, MIRA, {
       usuario: usuarioTitular,
       contrasena: OTRA,
     });
     afirmar(
-      sesion.estado === 200 || sesion.estado === 201,
-      `el titular entra por la API con la contraseña del Perfil (${String(sesion.estado)})`,
+      plaza.sesion.estado === 200 || plaza.sesion.estado === 201,
+      `el titular entra por la API con la contraseña del Perfil (${String(plaza.sesion.estado)})`,
     );
-    const token = sesion.cuerpo.accessToken;
-    const plazas = await llamar('POST', `/copropiedades/${MIRA}/mi/ocupantes`, token, {
-      numero: 2,
-    });
-    codigoDePlaza = (plazas.cuerpo.plazas ?? []).find((p) => p.libre)?.codigo ?? '';
+    codigoDePlaza = plaza.codigo;
     afirmar(
       codigoDePlaza !== '',
-      `hay un código de plaza libre para compartir (${String(plazas.estado)})`,
+      `hay un código de plaza libre para compartir (${String(plaza.plazas.estado)})`,
     );
 
     paso(
@@ -301,20 +204,17 @@ const principal = async () => {
       async () => {
         await p2.goto(`${base}/acceso`);
         await p2.getByRole('link', { name: /Crear cuenta con el código/ }).click();
-        await p2.getByText('Tratamiento de sus datos').waitFor({ timeout: 20_000 });
-        await p2.getByLabel('Usuario').fill(usuarioOcupante);
-        await p2
-          .getByLabel('Correo de contacto', { exact: true })
-          .fill(`ocupante.${sufijo}@ejemplo.invalid`);
-        await p2.getByLabel('Contraseña', { exact: true }).fill(DEL_OCUPANTE);
-        await p2.getByLabel('Confirme la contraseña').fill(DEL_OCUPANTE);
-        await p2.getByLabel('Código de invitación').fill(codigoDePlaza);
-        await p2.getByLabel('Fecha de nacimiento').fill('1992-03-14');
-        await p2.getByLabel(/He leído y acepto/).check();
+        await llenarCrearCuenta(p2, {
+          usuario: usuarioOcupante,
+          correo: `ocupante.${sufijo}@ejemplo.invalid`,
+          contrasena: DEL_OCUPANTE,
+          codigo: codigoDePlaza,
+          fecha: '1992-03-14',
+        });
         await p2.getByRole('button', { name: 'Crear cuenta' }).click();
-        await primerIngreso(p2, `Ocupante ${sufijo}`);
+        await primerIngreso(p2, { nombres: `Ocupante ${sufijo}`, apellidos: `Prueba ${sufijo}` });
         ok('la cuenta se crea con el código de plaza, entra sola y completa su primer ingreso');
-        await sinSecretosEnElNavegador(p2, [DEL_OCUPANTE, codigoDePlaza]);
+        await sinSecretos(p2, [DEL_OCUPANTE, codigoDePlaza]);
       },
       p2,
     );
@@ -327,16 +227,13 @@ const principal = async () => {
       'código inválido',
       async () => {
         await p3.goto(`${base}/acceso/crear-cuenta`);
-        await p3.getByText('Tratamiento de sus datos').waitFor({ timeout: 20_000 });
-        await p3.getByLabel('Usuario').fill(`otro.${sufijo}`);
-        await p3
-          .getByLabel('Correo de contacto', { exact: true })
-          .fill(`otro.${sufijo}@ejemplo.invalid`);
-        await p3.getByLabel('Contraseña', { exact: true }).fill(DEL_OCUPANTE);
-        await p3.getByLabel('Confirme la contraseña').fill(DEL_OCUPANTE);
-        await p3.getByLabel('Código de invitación').fill('MIRA-0000-0000');
-        await p3.getByLabel('Fecha de nacimiento').fill('1992-03-14');
-        await p3.getByLabel(/He leído y acepto/).check();
+        await llenarCrearCuenta(p3, {
+          usuario: `otro.${sufijo}`,
+          correo: `otro.${sufijo}@ejemplo.invalid`,
+          contrasena: DEL_OCUPANTE,
+          codigo: 'MIRA-0000-0000',
+          fecha: '1992-03-14',
+        });
         await p3.getByRole('button', { name: 'Crear cuenta' }).click();
         // `p[role="alert"]`, no cualquier `role=alert`: Next.js pinta un anunciador de rutas vacío con ese papel.
         const aviso = p3.locator('p[role="alert"]');
@@ -365,16 +262,7 @@ const principal = async () => {
       },
       p3,
     );
-    const menor = await llamar('POST', '/auth/registro', '', {
-      usuario: `menor.${sufijo}`,
-      correo: `menor.${sufijo}@ejemplo.invalid`,
-      contrasena: DEL_OCUPANTE,
-      confirmacion: DEL_OCUPANTE,
-      codigoDeInvitacion: codigoDePlaza,
-      fechaNacimiento: '2012-01-01',
-      aceptaTratamientoDeDatos: true,
-      versionPolitica: '2026-10-provisional-1',
-    });
+    const menor = await registroDeMenor(llamar, codigoDePlaza, `menor.${sufijo}`);
     const { rows } = await lectura.query(
       'SELECT count(*)::int AS n FROM public.usuarios WHERE nombre_usuario = $1',
       [`menor.${sufijo}`],
