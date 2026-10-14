@@ -5,7 +5,7 @@ import { sesionActual } from '@/lib/sesion/servidor';
 import { EstadoSinPermiso } from '@/componentes/estados';
 
 export type AmbitoDelResidente =
-  | { readonly ok: true; readonly copropiedadId: string }
+  | { readonly ok: true; readonly copropiedadId: string; readonly usuarioId: string }
   | { readonly ok: false; readonly elemento: JSX.Element };
 
 /**
@@ -35,5 +35,5 @@ export const ambitoDelResidente = async (): Promise<AmbitoDelResidente> => {
       ),
     };
   }
-  return { ok: true, copropiedadId: sesion.copropiedadId };
+  return { ok: true, copropiedadId: sesion.copropiedadId, usuarioId: sesion.usuarioId };
 };

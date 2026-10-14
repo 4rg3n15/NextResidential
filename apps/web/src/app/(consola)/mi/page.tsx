@@ -13,7 +13,7 @@ const MiVivienda = async (): Promise<JSX.Element> => {
   if (!ambito.ok) return ambito.elemento;
   // 15-Y1 · como en la app: sin persona en su vivienda, primero el primer ingreso.
   return (
-    <PuertaDelPrimerIngreso copropiedadId={ambito.copropiedadId}>
+    <PuertaDelPrimerIngreso copropiedadId={ambito.copropiedadId} cuenta={ambito.usuarioId}>
       <PantallaDeInicio copropiedadId={ambito.copropiedadId} />
     </PuertaDelPrimerIngreso>
   );

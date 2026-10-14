@@ -159,6 +159,7 @@ export const PantallaDeMiPerfil = ({
         <Tarjeta>
           <ul className="px-5">
             {[
+              ['Mi rostro', '/mi/rostro'],
               ['Mi familia', '/mi/familia'],
               ['Mis vehículos', '/mi/vehiculos'],
               ['Historial de accesos', '/mi/historial'],
