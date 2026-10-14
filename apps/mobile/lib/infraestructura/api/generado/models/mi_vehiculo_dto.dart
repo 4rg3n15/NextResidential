@@ -4,6 +4,8 @@
 
 import 'package:json_annotation/json_annotation.dart';
 
+import 'mi_vehiculo_dto_origen.dart';
+
 part 'mi_vehiculo_dto.g.dart';
 
 @JsonSerializable()
@@ -16,6 +18,7 @@ class MiVehiculoDto {
     required this.color,
     required this.esPrincipal,
     required this.activo,
+    required this.origen,
   });
   
   factory MiVehiculoDto.fromJson(Map<String, Object?> json) => _$MiVehiculoDtoFromJson(json);
@@ -27,6 +30,9 @@ class MiVehiculoDto {
   final String? color;
   final bool esPrincipal;
   final bool activo;
+
+  /// 15-Z2 (DT-15W-02) · «propio» lo registró el hogar y se edita y elimina desde la app; «administracion» sólo se ve.
+  final MiVehiculoDtoOrigen origen;
 
   Map<String, Object?> toJson() => _$MiVehiculoDtoToJson(this);
 }

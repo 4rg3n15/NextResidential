@@ -14,6 +14,7 @@ class ModoVigenteDto {
   const ModoVigenteDto({
     required this.id,
     required this.dispositivoId,
+    required this.dispositivoNombre,
     required this.numeroDePuerta,
     required this.modo,
     required this.motivo,
@@ -30,6 +31,9 @@ class ModoVigenteDto {
   
   final String id;
   final String dispositivoId;
+
+  /// 15-Z2 (DT-15R-07) · el nombre del equipo, para que la franja no diga «Puerta N» a secas; null si el equipo ya no está activo
+  final String? dispositivoNombre;
   final num numeroDePuerta;
   final ModoVigenteDtoModo modo;
   final String motivo;

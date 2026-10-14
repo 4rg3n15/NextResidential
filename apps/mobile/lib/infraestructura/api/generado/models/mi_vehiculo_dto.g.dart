@@ -15,6 +15,7 @@ MiVehiculoDto _$MiVehiculoDtoFromJson(Map<String, dynamic> json) =>
       color: json['color'] as String?,
       esPrincipal: json['esPrincipal'] as bool,
       activo: json['activo'] as bool,
+      origen: MiVehiculoDtoOrigen.fromJson(json['origen'] as String),
     );
 
 Map<String, dynamic> _$MiVehiculoDtoToJson(MiVehiculoDto instance) =>
@@ -26,4 +27,5 @@ Map<String, dynamic> _$MiVehiculoDtoToJson(MiVehiculoDto instance) =>
       'color': instance.color,
       'esPrincipal': instance.esPrincipal,
       'activo': instance.activo,
+      'origen': instance.origen,
     };
