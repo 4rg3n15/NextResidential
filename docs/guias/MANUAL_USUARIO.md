@@ -588,9 +588,11 @@ pantallas, todas bajo `/mi`. No hay ninguna entrada de administración, porterí
 ni guardia, y si escribiera la dirección de una, la API la rechazaría igual. La
 vivienda la resuelve el servidor desde su sesión: nunca viaja en la dirección.
 
-> **Lo de la ronda 15-W está en la app Android.** «Crear cuenta», el primer
-> ingreso, las plazas de la vivienda, los menores, editar y eliminar vehículos y
-> revocar una visita se hacen en la app. En la consola web, por ahora, «Mi
+> **Lo de la ronda 15-W está en la app Android y, desde la 15-Y1, parte en la
+> consola web.** «Crear cuenta», el primer ingreso y cambiar la contraseña se
+> hacen igual en la app y en la consola (abajo, «Desde la consola web»). Las
+> plazas de la vivienda, los menores, editar y eliminar vehículos y revocar una
+> visita siguen sólo en la app hasta la ronda 15-Y2: en la consola, «Mi
 > familia» y las plazas del «Perfil» se ven pero no se cambian, los vehículos
 > sólo se dan de baja y las visitas no se revocan.
 >
@@ -625,6 +627,24 @@ usted incluido (de 1 al tope; podrá cambiarlo después en «Ocupantes»).
    la política de tratamiento de mis datos»**. Sin la casilla el botón no
    responde.
 5. **«Crear cuenta»**. La app entra sola con su cuenta nueva.
+
+**Desde la consola web (15-Y1)**, si no tiene la app —por ejemplo, un iPhone—:
+
+1. Abra la dirección de la consola en Safari o Chrome. En la pantalla de
+   acceso, pulse **«Crear cuenta con el código de tu vivienda»** y llene los
+   mismos seis campos, lea y acepte la política y pulse **«Crear cuenta»**: la
+   consola entra sola. Un código incorrecto, usado o de otro conjunto recibe
+   siempre la misma respuesta: «El código de invitación no es válido o ya se
+   usó». Un menor de edad no envía nada: la fecha de nacimiento lo dice.
+2. **Si usted es el titular**, entre con el código de la copropiedad, su
+   usuario y la contraseña inicial: la consola le obliga a cambiarla antes de
+   seguir, igual que la app.
+3. En el primer ingreso la consola le pide **sus datos** —nombres, apellidos,
+   documento de adulto, teléfono y fecha de nacimiento; el correo es
+   opcional— y después ve «Mi vivienda». Declarar cuántos viven con usted
+   sigue haciéndose en la app hasta la ronda 15-Y2.
+4. Para **cambiar la contraseña** más adelante: **Perfil → «Cambiar
+   contraseña»**. Si la consola le pide volver a entrar, entre con la nueva.
 
 **El primer ingreso, después:** «Complete sus datos» pide nombres, apellidos,
 documento —cédula, cédula de extranjería o pasaporte—, teléfono y fecha de

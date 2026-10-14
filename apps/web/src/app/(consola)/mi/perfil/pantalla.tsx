@@ -17,6 +17,7 @@ import type { PerfilDelResidente } from '@/lib/api/residente';
 import { fechaCorta } from '@/lib/fechas';
 import { Seccion, estadoDeConsulta, legible, tituloDeVivienda } from '../comunes';
 import { EditarPerfil, TIPOS_DE_DOCUMENTO } from './editar-perfil';
+import { CambiarContrasena } from './cambiar-contrasena';
 
 const TIPO_DE_DOCUMENTO: Readonly<Record<string, string>> = Object.fromEntries(
   TIPOS_DE_DOCUMENTO.map((t) => [t.valor, t.etiqueta]),
@@ -56,6 +57,8 @@ export const PantallaDeMiPerfil = ({
   const hogar = useMiVivienda(copropiedadId);
   const ocupantes = useMisOcupantes(copropiedadId);
   const [editando, setEditando] = useState<PerfilDelResidente | null>(null);
+  // 15-Y1 · cambiar la contraseña desde aquí, como en la app.
+  const [cambiandoContrasena, setCambiandoContrasena] = useState(false);
   const p = perfil.data;
   const nombre = p?.nombreCompleto.trim() ?? '';
 
@@ -166,6 +169,25 @@ export const PantallaDeMiPerfil = ({
           </CuerpoDeTarjeta>
         </Tarjeta>
       ) : null}
+
+      <Tarjeta>
+        <CabeceraDeTarjeta
+          titulo="Contraseña"
+          descripcion="Cámbiala cuando quieras; la próxima vez entras con la nueva."
+          accion={
+            cambiandoContrasena ? undefined : (
+              <Boton variante="secundario" tamano="sm" onClick={() => setCambiandoContrasena(true)}>
+                Cambiar contraseña
+              </Boton>
+            )
+          }
+        />
+        {cambiandoContrasena ? (
+          <CuerpoDeTarjeta>
+            <CambiarContrasena alCerrar={() => setCambiandoContrasena(false)} />
+          </CuerpoDeTarjeta>
+        ) : null}
+      </Tarjeta>
 
       <Seccion titulo="Atajos">
         <Tarjeta>
