@@ -5,9 +5,10 @@ import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { EstadoVacio } from '@/componentes/estados';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import { Tarjeta } from '@/componentes/ui/tarjeta';
-import { useMiFamilia } from '@/lib/api/residente';
+import { useMiFamilia, useMiVivienda } from '@/lib/api/residente';
 import type { MiembroDeFamilia } from '@/lib/api/residente';
 import { Aviso, estadoDeConsulta, legible } from '../comunes';
+import { MenoresDelHogar } from '../hogar/menores-del-hogar';
 
 const NIVEL_DE_ACCESO: Readonly<Record<string, string>> = {
   acceso_completo: 'Acceso completo',
@@ -43,16 +44,21 @@ const Miembro = ({ m }: { readonly m: MiembroDeFamilia }): JSX.Element => (
 );
 
 /**
- * M-2 · «Mi familia», sólo lectura: los vincula la administración desde la
- * consola (y las plazas de ocupante, el superadministrador). Un desactivado se
- * ve como tal y no desaparece (RN-19).
+ * M-2 · «Mi familia»: los residentes con cuenta, sólo lectura —los vincula la
+ * administración o entran con un código de plaza—, y desde la 15-Y2 los
+ * menores del hogar, con sus acciones (ADR-038). Un desactivado se ve como tal
+ * y no desaparece (RN-19).
  */
 export const PantallaDeFamilia = ({
   copropiedadId,
+  ahora = () => new Date(),
 }: {
   readonly copropiedadId: string;
+  /** El reloj, inyectable en las pruebas. */
+  readonly ahora?: () => Date;
 }): JSX.Element => {
   const familia = useMiFamilia(copropiedadId);
+  const hogar = useMiVivienda(copropiedadId);
   const miembros = familia.data ?? [];
   const activos = miembros.filter((m) => m.activo).length;
 
@@ -60,7 +66,7 @@ export const PantallaDeFamilia = ({
     <div className="space-y-6">
       <EncabezadoDePantalla
         titulo="Mi familia"
-        descripcion="Las personas registradas en tu vivienda. Los adultos entran con un código de plaza; a los menores los registra un adulto del hogar desde la app."
+        descripcion="Las personas registradas en tu vivienda. Los adultos entran con un código de plaza; a los menores los registra un adulto del hogar desde aquí o desde la app."
         resumen={
           familia.data !== undefined ? (
             <span className="text-secundario text-texto-apagado">
@@ -85,6 +91,11 @@ export const PantallaDeFamilia = ({
           </ul>
         </Tarjeta>
       ) : null}
+      <MenoresDelHogar
+        copropiedadId={copropiedadId}
+        esTitular={hogar.data?.vinculo.esTitular ?? false}
+        ahora={ahora()}
+      />
       <Aviso>Hoy sólo el titular de la vivienda puede autorizar visitantes.</Aviso>
     </div>
   );
