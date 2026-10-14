@@ -42,7 +42,6 @@ import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
 import { sondaDeBaseCorta, sondaDeBaseRepuesta } from './sondas/base-corta.mjs';
 import { sondaDeInformeViejo } from './sondas/informe-viejo.mjs';
 import { sondasDeLectorLentoPorClase } from './sondas/lector-lento-por-clase.mjs';
-import { sondasDeRecorridoDelResidente } from './sondas/recorrido-residente.mjs';
 
 /** 15-S5 · DT-15S2-11 · un representante por clase de guion con salida sin tope. */
 const ESCRITORES_SIN_TOPE = {
@@ -2872,8 +2871,27 @@ try {
     sinNavegador.codigo !== 0 && /no hay Chromium/.test(sinNavegador.salida)
       ? ok('sin Chromium el recorrido falla y lo dice')
       : mal(`sin Chromium el recorrido no falla como debe (codigo ${sinNavegador.codigo})`);
-    // 15-Y1 · el recorrido del residente en la web, con las mismas dos faltas.
-    sondasDeRecorridoDelResidente({ raiz, banco, correr, ok, mal });
+    // 15-Y1 · el recorrido del residente en la web (paso 13d), con las mismas
+    // dos faltas. Va aquí y no en un módulo aparte porque el control que exige
+    // haber visto fallar cada guion lee ESTE fichero, no sus importaciones.
+    const residenteSinBase = correr('node', ['e2e/recorrido-residente-web.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, DATABASE_URL_PRUEBAS: '' },
+    });
+    residenteSinBase.codigo !== 0 && /sin DATABASE_URL_PRUEBAS/.test(residenteSinBase.salida)
+      ? ok('sin base el recorrido del residente falla y dice que NO se ha verificado')
+      : mal(
+          `sin base el recorrido del residente no falla como debe (codigo ${residenteSinBase.codigo})`,
+        );
+    const residenteSinNavegador = correr('node', ['e2e/recorrido-residente-web.mjs'], {
+      timeout: 60_000,
+      env: { ...process.env, NCR_CHROMIUM: join(banco, 'chromium-que-no-existe') },
+    });
+    residenteSinNavegador.codigo !== 0 && /no hay Chromium/.test(residenteSinNavegador.salida)
+      ? ok('sin Chromium el recorrido del residente falla y lo dice')
+      : mal(
+          `sin Chromium el recorrido del residente no falla como debe (codigo ${residenteSinNavegador.codigo})`,
+        );
   }
 
   console.log('\n▸ 37 · la sonda negativa del recorrido sin ninguna sonda NO es un verde (§4)');
