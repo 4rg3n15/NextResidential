@@ -1,3 +1,4 @@
+import type { CodigoDeConflicto } from '@ncr/domain-core';
 import type { MedidasDeCaptura, MotivoRechazoCaptura } from '@ncr/domain-core';
 import { revisarFoto } from '../../visitas';
 import type { EstadoDeMiRostro } from './estado-del-rostro';
@@ -30,8 +31,8 @@ export type ResultadoDeMiRostro =
       readonly explicacion: string;
       readonly motivos?: readonly MotivoRechazoCaptura[];
       readonly reintentarEnS?: number;
-      /** D3 · por qué no se registra el de un menor: su edad. */
-      readonly codigo?: 'EDAD_INSUFICIENTE' | 'YA_ES_MAYOR' | 'SIN_FECHA';
+      /** D3 · por qué no se registra el de un menor: su edad; 15-Z2 · o el código del 409. */
+      readonly codigo?: 'EDAD_INSUFICIENTE' | 'YA_ES_MAYOR' | 'SIN_FECHA' | CodigoDeConflicto;
     };
 
 export type RechazoDelRostro = Extract<ResultadoDeMiRostro, { hecho: false }>;
@@ -52,7 +53,9 @@ export const rechazoAntesDeCapturar = async (
   ahora: Date,
 ): Promise<RechazoDelRostro | null> => {
   if (foto.versionPolitica !== versionVigente) {
-    return rechazo(409, 'La política del rostro cambió: léala y acéptela de nuevo');
+    return rechazo(409, 'La política del rostro cambió: léala y acéptela de nuevo', {
+      codigo: 'POLITICA_CAMBIADA',
+    });
   }
   const revisada = revisarFoto({
     contenidoBase64: foto.contenidoBase64,

@@ -1,3 +1,4 @@
+import type { CodigoDeConflicto } from '@ncr/domain-core';
 import { Inject, Injectable } from '@nestjs/common';
 import { Placa, RELOJ } from '@ncr/domain-core';
 import type { ErrorDominio, Reloj, Resultado } from '@ncr/domain-core';
@@ -35,7 +36,13 @@ export interface CambiosDeVehiculoPropio {
 
 export type ResultadoDeVehiculoEditado =
   | { readonly hecho: true }
-  | { readonly hecho: false; readonly estado: 400 | 404 | 409; readonly explicacion: string };
+  | {
+      readonly hecho: false;
+      readonly estado: 400 | 404 | 409;
+      readonly explicacion: string;
+      /** 15-Z2 · el código del 409. */
+      readonly codigo?: CodigoDeConflicto;
+    };
 
 export { MENSAJE_PLACA_CON_HISTORIAL };
 const NO_ENCONTRADO = { hecho: false, estado: 404, explicacion: 'Vehículo no encontrado' } as const;
@@ -71,7 +78,12 @@ export class EditarYEliminarMiVehiculo {
     if (cambiaPlaca && historial.eventos + historial.autorizaciones > 0) {
       return {
         ok: true,
-        valor: { hecho: false, estado: 409, explicacion: MENSAJE_PLACA_CON_HISTORIAL },
+        valor: {
+          hecho: false,
+          estado: 409,
+          codigo: 'PLACA_CON_HISTORIAL',
+          explicacion: MENSAJE_PLACA_CON_HISTORIAL,
+        },
       };
     }
     if (cambios.ocupantes !== undefined) {
@@ -100,8 +112,18 @@ export class EditarYEliminarMiVehiculo {
       ctx.usuarioId,
     );
     if (!editado.ok) {
-      const estado = editado.error.codigo === 'ENTIDAD_NO_ENCONTRADA' ? 404 : 409;
-      return { ok: true, valor: { hecho: false, estado, explicacion: editado.error.detalle } };
+      if (editado.error.codigo === 'ENTIDAD_NO_ENCONTRADA') {
+        return {
+          ok: true,
+          valor: { hecho: false, estado: 404, explicacion: editado.error.detalle },
+        };
+      }
+      // 15-Z2 · el padrón marca el historial con RN-19 (`regla`): ése es el código.
+      const codigo = editado.error.regla === 'RN-19' ? 'PLACA_CON_HISTORIAL' : 'VEHICULO';
+      return {
+        ok: true,
+        valor: { hecho: false, estado: 409, codigo, explicacion: editado.error.detalle },
+      };
     }
     if (cambios.ocupantes !== undefined) {
       await this.edicion.reemplazarOcupantes(ambito, vehiculoId, cambios.ocupantes, ctx.usuarioId);

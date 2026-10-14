@@ -88,7 +88,9 @@ export class MiRostro {
           ? rechazo(400, 'La foto no sirve para reconocer el rostro', {
               motivos: hecho.valor.motivos,
             })
-          : rechazo(409, 'Otro registro de su rostro terminó antes: vuelva a intentarlo'),
+          : rechazo(409, 'Otro registro de su rostro terminó antes: vuelva a intentarlo', {
+              codigo: 'OTRO_REGISTRO_GANO',
+            }),
       );
     }
     await this.anotar(ctx, cop, 'rostro_registrado', ahora);

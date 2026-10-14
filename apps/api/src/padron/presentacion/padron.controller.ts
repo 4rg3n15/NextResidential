@@ -10,7 +10,8 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, PlanDeGeneracion, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -122,7 +123,7 @@ export class PadronController {
     switch (r.error.codigo) {
       case 'CONFLICTO_DE_CONCURRENCIA':
       case 'INVARIANTE_VIOLADA':
-        throw new ConflictException(r.error.detalle);
+        throw conflicto('PADRON', r.error.detalle);
       case 'ENTIDAD_NO_ENCONTRADA':
         throw new NotFoundException(r.error.detalle);
       case 'OPERACION_NO_PERMITIDA':

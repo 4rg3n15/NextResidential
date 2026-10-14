@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ValidationPipe } from '@nestjs/common';
+import { rechazoDeForma } from './comun/validacion-en-espanol';
 import helmet from 'helmet';
 import type { Configuracion } from './configuracion/esquema';
 import { SaneamientoMiddleware, conservarCuerpoCrudo } from './comun/saneamiento';
@@ -104,6 +105,8 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: false },
+      // 15-Z2 (DT-15W-05) · los 400 de forma, en español y por campo.
+      exceptionFactory: rechazoDeForma,
     }),
   );
 };

@@ -1,3 +1,4 @@
+import type { CodigoDeConflicto } from '@ncr/domain-core';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   MENSAJE_MAYOR_SIN_CUENTA,
@@ -57,19 +58,30 @@ export interface MenorVisible {
 
 export type ResultadoDeMenor =
   | { readonly hecho: true; readonly residenteId: string; readonly codigo?: string }
-  | { readonly hecho: false; readonly estado: 400 | 403 | 404 | 409; readonly explicacion: string };
+  | {
+      readonly hecho: false;
+      readonly estado: 400 | 403 | 404 | 409;
+      readonly explicacion: string;
+      /** 15-Z2 · el código del 409. */
+      readonly codigo?: CodigoDeConflicto;
+    };
 
 const enmascarar = (numero: string): string => `••••${numero.slice(-4)}`;
-const no = (estado: 400 | 403 | 404 | 409, explicacion: string): ResultadoDeMenor => ({
+const no = (
+  estado: 400 | 403 | 404 | 409,
+  explicacion: string,
+  codigo?: CodigoDeConflicto,
+): ResultadoDeMenor => ({
   hecho: false,
   estado,
   explicacion,
+  ...(codigo === undefined ? {} : { codigo }),
 });
 const traducir = (r: MenorEscrito): ResultadoDeMenor => {
   if (r.ok) return { hecho: true, residenteId: r.residenteId };
   if (r.motivo === 'NO_ENCONTRADO') return no(404, 'No encontrado en su vivienda');
-  if (r.motivo === 'PLAZA_OCUPADA') return no(409, 'Esa plaza ya está ocupada');
-  return no(409, 'Ese documento ya pertenece a otra persona o a otra vivienda');
+  if (r.motivo === 'PLAZA_OCUPADA') return no(409, 'Esa plaza ya está ocupada', 'PLAZA_OCUPADA');
+  return no(409, 'Ese documento ya pertenece a otra persona o a otra vivienda', 'DOCUMENTO_EN_USO');
 };
 
 @Injectable()
@@ -185,7 +197,14 @@ export class MenoresDeMiHogar {
     const edad =
       plaza.fechaNacimiento === null ? null : edadEn(plaza.fechaNacimiento, this.reloj.ahora());
     if (edad === null || !puedeTenerCuenta(edad)) {
-      return { ok: true, valor: no(409, 'El código de traspaso es para quien ya cumplió 18 años') };
+      return {
+        ok: true,
+        valor: no(
+          409,
+          'El código de traspaso es para quien ya cumplió 18 años',
+          'TRASPASO_SOLO_MAYOR',
+        ),
+      };
     }
     const codigo = formatearCodigoDeOcupante(
       this.traspasos.codigoDe(cop, plaza.plazaId, plaza.generacion),

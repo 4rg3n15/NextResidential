@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -11,6 +10,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -91,13 +91,13 @@ export class SupervisionDeResidentesController {
       case 'VIVIENDA_NO_ENCONTRADA':
         throw new NotFoundException('Vivienda no encontrada');
       case 'VIVIENDA_CON_TITULAR':
-        throw new ConflictException(VIVIENDA_CON_TITULAR);
+        throw conflicto('VIVIENDA_CON_TITULAR', VIVIENDA_CON_TITULAR);
       case 'DUPLICADO':
-        throw new ConflictException('Ese usuario ya existe en la copropiedad');
+        throw conflicto('USUARIO_DUPLICADO', 'Ese usuario ya existe en la copropiedad');
       case 'FORMATO':
         throw new BadRequestException(r.rechazo.detalle);
       default:
-        throw new ConflictException('El proveedor de identidad no aceptó la cuenta');
+        throw conflicto('PROVEEDOR_DE_IDENTIDAD', 'El proveedor de identidad no aceptó la cuenta');
     }
   }
 
@@ -176,7 +176,7 @@ export class OcupantesDeViviendaController {
     const plazas = await this.ocupantes.anadir(destino, id, viviendaId, dto.cantidad, dto.motivo);
     if (plazas === null) throw new NotFoundException('Vivienda no encontrada');
     if (plazas === 'COTA_DE_LA_PLATAFORMA') {
-      throw new ConflictException('Una vivienda tiene como mucho 20 plazas');
+      throw conflicto('PLAZAS_MAXIMAS', 'Una vivienda tiene como mucho 20 plazas');
     }
     return plazas.map((p) => ({ ...p }));
   }

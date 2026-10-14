@@ -1,3 +1,4 @@
+import type { CodigoDeConflicto } from '@ncr/domain-core';
 import { Inject, Injectable } from '@nestjs/common';
 import { RELOJ, decidirNuevaPlaza, explicacionDelTope } from '@ncr/domain-core';
 import type { ErrorDominio, Reloj, Resultado } from '@ncr/domain-core';
@@ -21,7 +22,13 @@ import type { PlazasDelTitular, TopeCambiado } from './puertos-de-plazas';
  */
 export type ResultadoDePlaza =
   | { readonly hecho: true }
-  | { readonly hecho: false; readonly estado: 403 | 404 | 409; readonly explicacion: string };
+  | {
+      readonly hecho: false;
+      readonly estado: 403 | 404 | 409;
+      readonly explicacion: string;
+      /** 15-Z2 · el código del 409, para que la app decida sin leer el texto. */
+      readonly codigo?: CodigoDeConflicto;
+    };
 
 const NO_ES_TITULAR: ResultadoDePlaza = {
   hecho: false,
@@ -47,7 +54,12 @@ export class PlazasDeMiVivienda {
     const { viviendaId } = r.valor.ambito;
     const cupo = await this.plazas.cupo(copropiedadId, viviendaId, ctx.usuarioId);
     if (!cupo.esTitular) return { ok: true, valor: NO_ES_TITULAR };
-    const tope = { hecho: false, estado: 409, explicacion: explicacionDelTope(cupo.tope) } as const;
+    const tope = {
+      hecho: false,
+      estado: 409,
+      codigo: 'TOPE_DE_PLAZAS',
+      explicacion: explicacionDelTope(cupo.tope),
+    } as const;
     if (!decidirNuevaPlaza(cupo).ok) return { ok: true, valor: tope };
     if ((await this.plazas.anadir(copropiedadId, viviendaId, ctx.usuarioId)) !== 'ANADIDA') {
       return { ok: true, valor: tope };
@@ -80,13 +92,23 @@ export class PlazasDeMiVivienda {
     if (hecho === 'OCUPADA') {
       return {
         ok: true,
-        valor: { hecho: false, estado: 409, explicacion: 'Primero dé de baja a la persona' },
+        valor: {
+          hecho: false,
+          estado: 409,
+          codigo: 'PLAZA_OCUPADA',
+          explicacion: 'Primero dé de baja a la persona',
+        },
       };
     }
     if (hecho === 'ES_LA_DEL_TITULAR') {
       return {
         ok: true,
-        valor: { hecho: false, estado: 409, explicacion: 'La plaza del titular no se retira' },
+        valor: {
+          hecho: false,
+          estado: 409,
+          codigo: 'PLAZA_DEL_TITULAR',
+          explicacion: 'La plaza del titular no se retira',
+        },
       };
     }
     await this.anotar(ctx, copropiedadId, viviendaId, 'plaza_retirada', motivo);

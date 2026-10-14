@@ -10,12 +10,8 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -290,7 +286,7 @@ export class GuardiaController {
        * operador necesita el motivo tal cual para resolverlo (guía §8.4).
        */
       if (error instanceof TransporteDeAudioNoDisponible)
-        throw new ConflictException(error.message);
+        throw conflicto('TRANSPORTE_DE_AUDIO_NO_DISPONIBLE', error.message);
       throw error;
     }
   }
@@ -365,7 +361,8 @@ export class GuardiaController {
       // Antes de abrir el flujo: una vez enviadas las cabeceras ya no hay
       // forma de decir «no». 409 porque el conflicto es con el estado del
       // canal, no con la petición.
-      throw new ConflictException(
+      throw conflicto(
+        'SIN_TRANSPORTE_DE_AUDIO',
         estado.detalleTransporte ?? 'no hay transporte de audio para este operador',
       );
     }
@@ -433,7 +430,8 @@ export class GuardiaController {
     try {
       await this.intercom.enviarAudio(copropiedadId, dispositivoId, ctx.usuarioId, cuerpo);
     } catch (error) {
-      if (error instanceof SinTransporteDeAudio) throw new ConflictException(error.message);
+      if (error instanceof SinTransporteDeAudio)
+        throw conflicto('SIN_TRANSPORTE_DE_AUDIO', error.message);
       throw error;
     }
   }

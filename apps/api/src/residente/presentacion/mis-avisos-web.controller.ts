@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -12,6 +11,7 @@ import {
   Post,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -42,7 +42,7 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
     case 'ENTIDAD_NO_ENCONTRADA':
       throw new NotFoundException(r.error.detalle);
     case 'CONFLICTO_DE_CONCURRENCIA':
-      throw new ConflictException(r.error.detalle);
+      throw conflicto('SUSCRIPCION_WEB_PUSH', r.error.detalle);
     case 'DATO_INVALIDO':
       throw new UnprocessableEntityException(r.error.detalle);
     default:

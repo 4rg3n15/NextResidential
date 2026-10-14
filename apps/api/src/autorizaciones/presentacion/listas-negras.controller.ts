@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -12,6 +11,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -52,7 +52,7 @@ export class ListasNegrasController {
     if (r.ok) return r.valor;
     switch (r.error.codigo) {
       case 'CONFLICTO_DE_CONCURRENCIA':
-        throw new ConflictException(r.error.detalle);
+        throw conflicto('LISTA_NEGRA', r.error.detalle);
       case 'ENTIDAD_NO_ENCONTRADA':
         throw new NotFoundException(r.error.detalle);
       case 'OPERACION_NO_PERMITIDA':

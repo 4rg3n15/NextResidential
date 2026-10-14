@@ -7,6 +7,7 @@
  */
 export * from './compartido/resultado';
 export * from './compartido/errores';
+export * from './compartido/conflictos';
 export * from './puertos/soporte';
 export * from './puertos/repositorios';
 export * from './puertos/proveedores';

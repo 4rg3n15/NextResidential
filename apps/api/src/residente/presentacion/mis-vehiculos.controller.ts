@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -11,6 +10,7 @@ import {
   ParseUUIDPipe,
   Put,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -84,7 +84,7 @@ export class MisVehiculosController {
     if (r.hecho) return { editado: true };
     if (r.estado === 404) throw new NotFoundException(r.explicacion);
     if (r.estado === 400) throw new BadRequestException(r.explicacion);
-    throw new ConflictException(r.explicacion);
+    throw conflicto(r.codigo ?? 'VEHICULO', r.explicacion);
   }
 
   @Delete(':vehiculoId')

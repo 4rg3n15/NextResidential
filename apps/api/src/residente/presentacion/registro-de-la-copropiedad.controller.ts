@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -9,6 +8,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
@@ -66,7 +66,7 @@ export class RegistroDeLaCopropiedadController {
   ): Promise<RegistroReanudadoDto> {
     const destino = await this.aislamiento.exigirAlcance(ctx, id, 'residentes/registro');
     if (!(await this.registro.reanudar(destino, id, dto.motivo.trim()))) {
-      throw new ConflictException('El registro no está suspendido');
+      throw conflicto('REGISTRO_NO_SUSPENDIDO', 'El registro no está suspendido');
     }
     return { reanudado: true };
   }

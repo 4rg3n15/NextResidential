@@ -135,7 +135,10 @@ describe('15-W · §6 · el residente no elige vivienda, persona, titular, rol, 
           .send({ [campo]: valor });
         if (
           r.status !== 400 ||
-          !JSON.stringify(r.body).includes(`property ${campo} should not exist`)
+          // 15-Z2 (DT-15W-05) · en español y por campo: `{ campo, motivo }`.
+          !JSON.stringify(r.body).includes(
+            `{"campo":"${campo}","motivo":"no se admite este campo"}`,
+          )
         )
           aceptados.push(`${clave(e)} · ${campo} → ${String(r.status)}`);
       }

@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   Inject,
@@ -9,6 +8,7 @@ import {
   ParseUUIDPipe,
   Put,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
@@ -75,7 +75,10 @@ export class TopeDePlazasController {
     });
     if (r === 'NO_ENCONTRADA') throw new NotFoundException('Vivienda no encontrada');
     if (r === 'BAJO_LAS_PLAZAS') {
-      throw new ConflictException('El tope no puede quedar por debajo de las plazas activas');
+      throw conflicto(
+        'TOPE_BAJO_LAS_PLAZAS',
+        'El tope no puede quedar por debajo de las plazas activas',
+      );
     }
     return this.ver(destino, id, viviendaId);
   }

@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ConflictException } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiExtraModels,
@@ -111,7 +111,8 @@ export class EdgeController {
       consulta.desde ?? 0,
     );
     if (r.tipo === 'adelantada') {
-      throw new ConflictException(
+      throw conflicto(
+        'CACHE_DEL_EDGE_ADELANTADA',
         `El Edge dice tener la versión ${String(r.desde)} y la nube publicó hasta la ` +
           `${String(r.version)}: reinicie la caché del Edge (DESPLIEGUE_EDGE.md §4.4)`,
       );

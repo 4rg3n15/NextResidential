@@ -1,13 +1,5 @@
-import {
-  ConflictException,
-  Controller,
-  HttpCode,
-  Inject,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Req,
-} from '@nestjs/common';
+import { Controller, HttpCode, Inject, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import { conflicto } from '../../..//comun/conflicto';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -78,13 +70,15 @@ export class AudioController {
       'guardia/intercom/billete',
     );
     if (this.configuracion.GUARDIA_AUDIO_TRANSPORTE !== 'websocket') {
-      throw new ConflictException(
+      throw conflicto(
+        'AUDIO_POR_HTTP',
         'El audio de esta API va por HTTP (GUARDIA_AUDIO_TRANSPORTE=http)',
       );
     }
     const estado = await this.intercom.estado(copropiedadId, dispositivoId, ctx.usuarioId);
     if (estado.estado !== 'abierta' || estado.transporte !== 'equipo') {
-      throw new ConflictException(
+      throw conflicto(
+        'SIN_LA_PALABRA',
         estado.detalleTransporte ?? 'Sin la palabra: pida el canal antes de abrir el audio',
       );
     }

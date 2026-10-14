@@ -109,7 +109,12 @@ describe('EditarYEliminarMiVehiculo · editar (15-W, D5)', () => {
     const r = await caso.editar(ctx, COP, 've-1', { ...CAMBIOS, placa: 'XYZ789' });
     expect(r).toEqual({
       ok: true,
-      valor: { hecho: false, estado: 409, explicacion: MENSAJE_PLACA_CON_HISTORIAL },
+      valor: {
+        hecho: false,
+        estado: 409,
+        codigo: 'PLACA_CON_HISTORIAL',
+        explicacion: MENSAJE_PLACA_CON_HISTORIAL,
+      },
     });
     expect(repo.editarVehiculo).not.toHaveBeenCalled();
   });
@@ -145,7 +150,12 @@ describe('EditarYEliminarMiVehiculo · editar (15-W, D5)', () => {
     repo.editarVehiculo.mockResolvedValueOnce({ tipo: 'placa_con_historial' });
     expect(await caso.editar(ctx, COP, 've-1', { ...CAMBIOS, placa: 'XYZ789' })).toEqual({
       ok: true,
-      valor: { hecho: false, estado: 409, explicacion: MENSAJE_PLACA_CON_HISTORIAL },
+      valor: {
+        hecho: false,
+        estado: 409,
+        codigo: 'PLACA_CON_HISTORIAL',
+        explicacion: MENSAJE_PLACA_CON_HISTORIAL,
+      },
     });
     expect(hechos).toEqual([]);
   });
