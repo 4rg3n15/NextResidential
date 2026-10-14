@@ -22,8 +22,8 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Aislamiento } from '../../multiempresa/aislamiento';
-import { ALCANCE_DE_EQUIPOS } from '../../equipos';
-import type { AlcanceDeEquipos } from '../../equipos';
+import { ALCANCE_DE_EQUIPOS, REPOSITORIO_DE_EQUIPOS } from '../../equipos';
+import type { AlcanceDeEquipos, RepositorioDeEquipos } from '../../equipos';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
 import type { ContextoTenant } from '../../autenticacion';
@@ -67,6 +67,7 @@ export class ModosDePuertaController {
     @Inject(FijarModoDePuerta) private readonly ordenes: FijarModoDePuerta,
     @Inject(REGISTRO_DE_MODOS) private readonly registro: RegistroDeModosDePuerta,
     @Inject(AJUSTES_DE_PUERTAS) private readonly ajustes: AjustesDePuertas,
+    @Inject(REPOSITORIO_DE_EQUIPOS) private readonly equipos: RepositorioDeEquipos,
   ) {}
 
   @Get('modos')
@@ -81,10 +82,18 @@ export class ModosDePuertaController {
   ): Promise<ModosVigentesDto> {
     await this.aislamiento.exigirAlcance(ctx, copropiedadId, 'puertas/modos');
     const vigentes = await this.registro.vigentes(copropiedadId);
+    // 15-Z2 (DT-15R-07) · el nombre del equipo, por el puerto del módulo de
+    // equipos y sólo si hay algo que nombrar: una consulta por respuesta.
+    const nombres = new Map(
+      vigentes.length === 0
+        ? []
+        : (await this.equipos.listar(ctx, copropiedadId)).map((e) => [e.id, e.nombre] as const),
+    );
     return {
       modos: vigentes.map((v) => ({
         id: v.id,
         dispositivoId: v.dispositivoId,
+        dispositivoNombre: nombres.get(v.dispositivoId) ?? null,
         numeroDePuerta: v.numeroDePuerta,
         modo: v.modo,
         motivo: v.motivo,

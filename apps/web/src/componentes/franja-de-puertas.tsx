@@ -61,7 +61,9 @@ export const FranjaDePuertas = ({
             <Icono className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={2} />
             <span>
               <strong>
-                Puerta {String(m.numeroDePuerta)} {m.modo === 'libre' ? 'LIBRE' : 'BLOQUEADA'}
+                {/* 15-Z2 (DT-15R-07) · el equipo por su nombre y la puerta; nunca «Puerta N» a secas. */}
+                {m.dispositivoNombre ?? 'Equipo sin nombre'} · puerta {String(m.numeroDePuerta)}{' '}
+                {m.modo === 'libre' ? 'LIBRE' : 'BLOQUEADA'}
               </strong>{' '}
               desde las {hora(m.desde)}, por {m.operadorNombre ?? `la ${m.rol}`}: «{m.motivo}».
               Vuelve sola a normal a las {hora(m.revierteEn)}.

@@ -15,7 +15,7 @@ import type { AlmacenEvidencia, Bitacora, GeneradorDeId, Reloj } from '@ncr/doma
 import { CONFIGURACION } from '../configuracion/configuracion.module';
 import { ALERTAS_DE_EQUIPO, AbrirAlertaDeEquipo } from './aplicacion/deduplicacion-de-alertas';
 import { AlertasDelCicloDelEquipo } from './aplicacion/alertas-del-ciclo-del-equipo';
-import { ARCHIVO_DE_ALERTAS_DEL_EQUIPO } from '../equipos';
+import { ARCHIVO_DE_ALERTAS_DEL_EQUIPO, EquiposModule } from '../equipos';
 import { ACTOR_INGESTA } from '../comun/actores-de-servicio';
 import type { Configuracion } from '../configuracion/esquema';
 import { Pool } from 'pg';
@@ -62,6 +62,7 @@ import type {
 } from './aplicacion/puertos';
 import { EscalarAlerta } from './aplicacion/escalamiento';
 import { RegistrarAcceso } from './aplicacion/registrar-acceso';
+import { PROVEEDOR_DE_REGISTRAR_ACCESO } from './infraestructura/proveedor-de-registrar-acceso';
 import {
   ConsultarEventos,
   ExportarEventos,
@@ -121,7 +122,7 @@ export class EventosModule {
        * instancia por metadatos idénticos, y la prueba de recorrido facial es
        * lo que lo demuestra: la captura y el reconocimiento ven el mismo dato.
        */
-      imports: [BiometriaModule.registrar()],
+      imports: [BiometriaModule.registrar(), EquiposModule.registrar()],
       controllers: [
         EventosController,
         AlertasController,
@@ -366,46 +367,8 @@ export class EventosModule {
         },
         // Mismo objeto, publicado bajo el puerto que consumen otros módulos.
         { provide: ESCALAMIENTO_DE_ALERTA, useExisting: EscalarAlerta },
-        {
-          provide: RegistrarAcceso,
-          inject: [
-            MOTOR_DE_DECISION,
-            REPOSITORIO_EVENTOS,
-            REPOSITORIO_ALERTAS,
-            CANAL_TIEMPO_REAL,
-            EscalarAlerta,
-            RELOJ,
-            GENERADOR_DE_ID,
-            BITACORA,
-            NOTIFICADOR_PUSH,
-            CONFIGURACION,
-          ],
-          useFactory: (
-            motor: MotorDeDecision,
-            eventos: RepositorioEventos,
-            alertas: RepositorioAlertas,
-            canal: CanalTiempoReal,
-            escalador: EscalarAlerta,
-            reloj: Reloj,
-            ids: GeneradorDeId,
-            bitacora: Bitacora,
-            push: NotificadorPush,
-            config: Configuracion,
-          ) =>
-            new RegistrarAcceso(
-              motor,
-              eventos,
-              alertas,
-              canal,
-              escalador,
-              reloj,
-              ids,
-              bitacora,
-              push,
-              // E5 (15-M) · una alerta por (equipo, tipo) y ventana.
-              { ventanaDeDuplicadosMs: config.ALERTAS_VENTANA_DEDUP_S * 1000 },
-            ),
-        },
+        // 15-Z2 · con el nombre del equipo para el aviso (DT-15R-08); vive aparte.
+        PROVEEDOR_DE_REGISTRAR_ACCESO,
         {
           /**
            * E5 (15-M) · las alertas ligadas a un EQUIPO (la cámara decide sola,
