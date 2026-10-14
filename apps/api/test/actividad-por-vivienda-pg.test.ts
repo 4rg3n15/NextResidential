@@ -138,7 +138,8 @@ const filaDe = async (cop: string, viviendaId: string, en: Date) =>
     (f) => f.viviendaId === viviendaId,
   );
 
-describe('15-Z3 · actividad por vivienda contra PostgreSQL', () => {
+// Como el resto de las pruebas contra base: sin `DATABASE_URL_PRUEBAS` se OMITEN (CI sin base); `--con-base` las exige por `exigirBase`.
+describe.skipIf(!URL_BASE)('15-Z3 · actividad por vivienda contra PostgreSQL', () => {
   it('una vigencia que vence este minuto: cuenta un segundo antes y no cuenta en el límite', async () => {
     const v = await vivienda(COP_A, 'Z3-A', 'Torre 1');
     const vence = minutos(1);

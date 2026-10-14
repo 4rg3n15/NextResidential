@@ -264,6 +264,8 @@ sin avisos con el cliente regenerado; `tsc` y `eslint` limpios.
 
 **`VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe`**
 
+**Tras el cierre (CI del PR #60):** el trabajo `controles` de GitHub Actions, que corre la suite SIN base, ejecutó la prueba `actividad-por-vivienda-pg.test.ts` y seis casos cayeron con «sin base», porque el `describe` no llevaba el `skipIf` que llevan todas las pruebas contra base del proyecto (`--con-base` sigue exigiéndola por `exigirBase`). Es un defecto de la prueba, no del código: se corrigió en un commit posterior al cierre, visto omitirse sin `DATABASE_URL_PRUEBAS` y pasar con ella.
+
 ## 7 · Verificación de seguridad (§2.7)
 
 | Medida               | Cómo queda                                                                                                          |
@@ -304,10 +306,11 @@ contiene). PR hacia `develop`, sin fusionar; fusionar DESPUÉS del PR de la
 15-Z2, con merge commit. La rama se rebasó sobre el cierre de la 15-Z2 antes
 de su primer push (no tenía PR).
 
-| Commit    | Qué                                                                                                                                |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `c034b7d` | Puerto, caso de uso con reloj, adaptador SQL de una sentencia, doble, ruta, DTOs; pruebas unitarias, Pg y e2e; los dos inventarios |
-| `51d4a62` | Tarjeta «Actividad por vivienda» en Portería y en el tablero, con sus pruebas; manual; alias del contrato                          |
-| `8e67ba9` | Contrato y clientes TS y Dart regenerados                                                                                          |
-| `3af2c9b` | `fix(etapa-15z3/tablero)` — el criterio de actividad no lleva códigos del proyecto en el texto que la pantalla enseña              |
-| cierre    | `chore(etapa-15z3): cierre de etapa` — informe, ficha y registro                                                                   |
+| Commit         | Qué                                                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `c034b7d`      | Puerto, caso de uso con reloj, adaptador SQL de una sentencia, doble, ruta, DTOs; pruebas unitarias, Pg y e2e; los dos inventarios                                                                                         |
+| `51d4a62`      | Tarjeta «Actividad por vivienda» en Portería y en el tablero, con sus pruebas; manual; alias del contrato                                                                                                                  |
+| `8e67ba9`      | Contrato y clientes TS y Dart regenerados                                                                                                                                                                                  |
+| `3af2c9b`      | `fix(etapa-15z3/tablero)` — el criterio de actividad no lleva códigos del proyecto en el texto que la pantalla enseña                                                                                                      |
+| `61ca95d`      | `chore(etapa-15z3): cierre de etapa` — informe, ficha y registro                                                                                                                                                           |
+| tras el cierre | `fix(etapa-15z3/pruebas)` — la prueba contra PostgreSQL se omite sin `DATABASE_URL_PRUEBAS`, como sus hermanas (la CI del PR #60, sin base, la ejecutaba y caía con «sin base»; el verificador local, con base, no lo vio) |
