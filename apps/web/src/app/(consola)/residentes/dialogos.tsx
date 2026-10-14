@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Campo } from '@/componentes/ui/campo';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
-import { cliente, desenvolver, mensajeDeFallo } from '@/lib/api/cliente';
+import { ErrorDeApi, cliente, desenvolver, mensajeDeFallo } from '@/lib/api/cliente';
 import { contrasenaValida, motivoDeRechazo } from '@/lib/politica-contrasena';
 import { clavesDeResidentes } from './consultas';
 import type { ViviendaSinTitular } from './consultas';
@@ -80,7 +80,15 @@ export const DialogoDeResidente = ({
       );
       alCerrar();
     } catch (e) {
-      setError(mensajeDeFallo(e));
+      // 15-Z2 (DT-15W-01) · por el código, no por el texto: si otro acaba de
+      // tomar la vivienda, se quita del selector y se pide elegir otra; el
+      // usuario ocupado se dice tal cual y se conserva la vivienda elegida.
+      if (e instanceof ErrorDeApi && e.causa === 'VIVIENDA_CON_TITULAR') {
+        setVivienda(null);
+        setError(`${e.message} Elige otra vivienda.`);
+      } else {
+        setError(mensajeDeFallo(e));
+      }
       void consultas.invalidateQueries({
         queryKey: clavesDeResidentes.viviendasSinTitular(copropiedadId),
       });

@@ -47,9 +47,14 @@ enum ClaseDeFallo {
 }
 
 class Fallo implements Exception {
-  const Fallo(this.clase, this.detalle, {this.detalleTecnico});
+  const Fallo(this.clase, this.detalle, {this.detalleTecnico, this.codigo});
   final ClaseDeFallo clase;
   final String detalle;
+
+  /// 15-Z2 · el código máquina con que la API nombra un 409 (`CodigoDeConflicto`
+  /// del dominio: `POLITICA_CAMBIADA`, `TOPE_DE_PLAZAS`…). La pantalla decide
+  /// por él y muestra `detalle`; `null` cuando la API no lo manda.
+  final String? codigo;
 
   /// H-SITIO-11 · el POR QUÉ técnico de un fallo de red: la URL base con la
   /// que se compiló la app, el tipo de excepción del transporte y su mensaje.

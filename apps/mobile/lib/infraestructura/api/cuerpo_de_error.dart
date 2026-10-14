@@ -27,6 +27,12 @@ Map<Object?, Object?>? _carga(Object? cuerpo) {
 }
 
 /// Los campos rechazados, por nombre. Vacío si el rechazo no es de campos.
+/// 15-Z2 · el `codigo` máquina de un 409 (o de un 400 del rostro), si viene.
+String? codigoDelRechazo(Object? cuerpo) {
+  final codigo = _carga(cuerpo)?['codigo'];
+  return codigo is String && codigo.isNotEmpty ? codigo : null;
+}
+
 Map<String, String> camposDelRechazo(Object? cuerpo) {
   final campos = _carga(cuerpo)?['campos'];
   if (campos is! List) return const {};
