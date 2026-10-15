@@ -32,6 +32,10 @@ export type MisOcupantes = Esquemas['MisOcupantesDto'];
 export type PlazaDeOcupante = Esquemas['PlazaDeOcupanteDto'];
 /** 15-Y2 · los menores del hogar (ADR-038). */
 export type MenorDelHogar = Esquemas['MenorDelHogarDto'];
+/** 15-Y3 · el estado del rostro, nunca la imagen; con la política vigente al leerlo. */
+export type EstadoDeMiRostro = Esquemas['EstadoDeMiRostroDto'];
+export type MiRostroConPolitica = Esquemas['MiRostroConPoliticaDto'];
+export type PoliticaDelRostro = Esquemas['PoliticaDelRostroDto'];
 export type PeriodoDeHistorial = 'hoy' | 'semana' | 'mes' | 'todo';
 
 export const clavesDelResidente = {
@@ -134,3 +138,26 @@ export const useMisMenores = (copropiedadId: string): UseQueryResult<MenorDelHog
     queryFn: async () =>
       desenvolver(await cliente.GET('/copropiedades/{id}/mi/menores', ruta(copropiedadId))),
   });
+
+/**
+ * 15-Y3 · el rostro: el propio (`…/mi/rostro`) o el de un menor del hogar
+ * (`…/mi/menores/:id/rostro`, ADR-039). Estado, equipos y la política vigente;
+ * nunca la imagen. Las opciones se exportan para que la pantalla y la
+ * invitación del primer ingreso consulten lo mismo con la misma clave.
+ */
+export const opcionesDelRostro = (copropiedadId: string, residenteId: string | null) => ({
+  queryKey: [...clavesDelResidente.raiz(copropiedadId), 'rostro', residenteId ?? 'propio'] as const,
+  queryFn: async (): Promise<MiRostroConPolitica> =>
+    desenvolver(
+      residenteId === null
+        ? await cliente.GET('/copropiedades/{id}/mi/rostro', ruta(copropiedadId))
+        : await cliente.GET('/copropiedades/{id}/mi/menores/{residenteId}/rostro', {
+            params: { path: { id: copropiedadId, residenteId } },
+          }),
+    ),
+});
+
+export const useRostro = (
+  copropiedadId: string,
+  residenteId: string | null,
+): UseQueryResult<MiRostroConPolitica> => useQuery(opcionesDelRostro(copropiedadId, residenteId));

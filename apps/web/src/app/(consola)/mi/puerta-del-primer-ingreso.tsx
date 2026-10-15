@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EstadoCargando, EstadoSinPermiso, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { clavesDelResidente } from '@/lib/api/residente';
+import { InvitacionDelRostro } from './invitacion-del-rostro';
 import { PrimerIngreso } from './primer-ingreso';
 
 /**
@@ -12,13 +13,17 @@ import { PrimerIngreso } from './primer-ingreso';
  * `GET …/mi/alta` dice si la cuenta ya tiene persona en su vivienda. Si no la
  * tiene y SÍ tiene vivienda, se completa aquí; si tampoco tiene vivienda, la
  * administración debe asignársela (`SIN_VIVIENDA`). Sólo envuelve el inicio:
- * es donde el residente cae al entrar.
+ * es donde el residente cae al entrar. 15-Y3 · pasada la puerta, la
+ * invitación del rostro, como en la app.
  */
 export const PuertaDelPrimerIngreso = ({
   copropiedadId,
+  cuenta,
   children,
 }: {
   readonly copropiedadId: string;
+  /** 15-Y3 · el usuario, para recordar su «Ahora no» a la invitación del rostro. */
+  readonly cuenta: string;
   readonly children: ReactNode;
 }): JSX.Element => {
   const consultas = useQueryClient();
@@ -40,7 +45,14 @@ export const PuertaDelPrimerIngreso = ({
       () => void alta.refetch(),
     );
   }
-  if (alta.data.viviendaVinculada) return <>{children}</>;
+  // 15-Y3 · con la persona completa, la invitación del rostro (una vez) y luego el inicio.
+  if (alta.data.viviendaVinculada) {
+    return (
+      <InvitacionDelRostro copropiedadId={copropiedadId} cuenta={cuenta}>
+        {children}
+      </InvitacionDelRostro>
+    );
+  }
   if (!alta.data.viviendaAsignada) {
     return (
       <EstadoSinPermiso

@@ -9,7 +9,7 @@
  * el recorrido que lo llama.
  */
 import { randomBytes } from 'node:crypto';
-import { entrar } from './acciones.mjs';
+import { entrarAlInicio } from './acciones.mjs';
 
 /** Una «foto» que el servidor acepta por su tipo real (JPEG) y sus medidas; no es un rostro. */
 const FOTO = {
@@ -45,8 +45,7 @@ const cupoDe = async (pagina) => {
 
 /** El titular, en su navegador: plazas, menor, vehículo y visita. */
 export const hogarDelTitular = async ({ pagina, base, titular, sufijo, ok, afirmar }) => {
-  await entrar(pagina, base, titular.usuario, titular.contrasena);
-  await pagina.getByRole('heading', { name: 'Mi vivienda' }).waitFor({ timeout: 60_000 });
+  await entrarAlInicio(pagina, base, titular.usuario, titular.contrasena);
 
   await pagina.goto(`${base}/mi/perfil`);
   await pagina.getByText(/^Plazas: \d+ de \d+$/).waitFor({ timeout: 60_000 });
@@ -140,8 +139,7 @@ export const hogarDelTitular = async ({ pagina, base, titular, sufijo, ok, afirm
 
 /** Quien no es titular: comparte y registra menores, pero no añade ni retira plazas. */
 export const hogarDelOcupante = async ({ pagina, base, ocupante, sufijo, afirmar }) => {
-  await entrar(pagina, base, ocupante.usuario, ocupante.contrasena);
-  await pagina.getByRole('heading', { name: 'Mi vivienda' }).waitFor({ timeout: 60_000 });
+  await entrarAlInicio(pagina, base, ocupante.usuario, ocupante.contrasena);
   await pagina.goto(`${base}/mi/perfil`);
   await pagina
     .getByText('Sólo el titular de la vivienda añade y retira plazas.')
@@ -159,4 +157,48 @@ export const hogarDelOcupante = async ({ pagina, base, ocupante, sufijo, afirmar
       (await pagina.getByRole('button', { name: 'Añadir menor' }).count()) === 1,
     'el otro adulto ve al menor y puede registrar otro, pero el código de traspaso es del titular',
   );
+};
+
+/** Los pasos 7 y 8 del recorrido: el hogar del titular y el de quien no es titular. */
+export const pasosDelHogar = async ({
+  navegador,
+  base,
+  llamar,
+  titular,
+  ocupante,
+  sufijo,
+  ok,
+  afirmar,
+  bloque,
+  paso,
+}) => {
+  paso('7 · 15-Y2 · el hogar del titular: plaza, código, menor, vehículo y visita');
+  const { visita } = await visitaDelTitular(
+    llamar,
+    '10000000-0000-4000-8000-000000000001',
+    titular,
+    sufijo,
+  );
+  afirmar(
+    visita.estado === 201 && visita.cuerpo.creada === true,
+    `el titular registra por la API la visita que va a revocar (${String(visita.estado)})`,
+  );
+  const c4 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
+  const p4 = await c4.newPage();
+  await bloque(
+    'hogar del titular',
+    () => hogarDelTitular({ pagina: p4, base, titular, sufijo, ok, afirmar }),
+    p4,
+  );
+  await c4.close();
+
+  paso('8 · 15-Y2 · el hogar visto por quien no es titular');
+  const c5 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
+  const p5 = await c5.newPage();
+  await bloque(
+    'hogar del ocupante',
+    () => hogarDelOcupante({ pagina: p5, base, ocupante, sufijo, afirmar }),
+    p5,
+  );
+  await c5.close();
 };

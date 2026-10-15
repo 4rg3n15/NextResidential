@@ -8,6 +8,7 @@ export const VEHICULO_ID = '50000000-0000-4000-8000-0000000000c1';
 export const AUTORIZACION_ID = '60000000-0000-4000-8000-0000000000d1';
 export const RESIDENTE_ID = '20000000-0000-4000-8000-0000000000a1';
 export const MENOR_ID = '20000000-0000-4000-8000-0000000000a3';
+export const VERSION_POLITICA_ROSTRO = 'rostro-1';
 export const PLAZA_1 = '90000000-0000-4000-8000-0000000000b1';
 export const PLAZA_2 = '90000000-0000-4000-8000-0000000000b2';
 export const PLAZA_3 = '90000000-0000-4000-8000-0000000000b3';
@@ -186,6 +187,32 @@ export const RESPUESTAS: Readonly<Record<string, unknown>> = {
         sinCuenta: true,
       },
     ],
+  },
+  // 15-Y3 · el rostro: estado, equipos y política; nunca la imagen.
+  [`/api/ncr/copropiedades/${COP}/mi/rostro`]: {
+    estado: 'sin_rostro',
+    calidad: null,
+    registradoEn: null,
+    venceEn: null,
+    diasParaVencer: null,
+    equiposConRostro: 1,
+    equiposConMiRostro: 0,
+    equipos: [{ nombre: 'Terminal de la portería', estado: 'pendiente' }],
+    politica: {
+      version: VERSION_POLITICA_ROSTRO,
+      texto: 'Política provisional del rostro.',
+    },
+  },
+  [`/api/ncr/copropiedades/${COP}/mi/menores/${MENOR_ID}/rostro`]: {
+    estado: 'sin_rostro',
+    calidad: null,
+    registradoEn: null,
+    venceEn: null,
+    diasParaVencer: null,
+    equiposConRostro: 1,
+    equiposConMiRostro: 0,
+    equipos: [],
+    politica: { version: 'menor-1', texto: 'Política provisional del rostro del menor.' },
   },
   [`/api/ncr/copropiedades/${COP}/mi/menores`]: [
     {

@@ -25,6 +25,8 @@
  * consultarlo—.
  */
 
+import { UMBRALES_DE_CALIDAD } from '@ncr/contracts';
+
 /** Lo medido. Todo en 0..1 salvo el conteo de rostros. */
 export interface MedidasDeCaptura {
   readonly rostrosDetectados: number;
@@ -33,14 +35,40 @@ export interface MedidasDeCaptura {
   readonly proporcionRostro: number;
 }
 
-/** Los mismos umbrales que la app del residente. Un solo sitio, con nombre. */
-export const UMBRALES = {
-  nitidezMinima: 0.45,
-  iluminacionMinima: 0.25,
-  iluminacionMaxima: 0.85,
-  proporcionMinima: 0.15,
-  proporcionMaxima: 0.75,
-} as const;
+/**
+ * Los mismos umbrales que la app del residente, desde UN solo fichero
+ * (`packages/contracts/src/umbrales-de-calidad.json`, 15-Y3): la app los verifica
+ * contra sus constantes en una prueba de paridad, y aquí se leen tal cual.
+ */
+export interface UmbralesDeCalidad {
+  readonly nitidezMinima: number;
+  readonly iluminacionMinima: number;
+  readonly iluminacionMaxima: number;
+  readonly proporcionMinima: number;
+  readonly proporcionMaxima: number;
+}
+
+const enCero1 = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
+
+/** Lee el JSON compartido y se niega a arrancar con un umbral que no sea un número en 0..1. */
+export const umbralesDesde = (fuente: Readonly<Record<string, unknown>>): UmbralesDeCalidad => {
+  const claves = [
+    'nitidezMinima',
+    'iluminacionMinima',
+    'iluminacionMaxima',
+    'proporcionMinima',
+    'proporcionMaxima',
+  ] as const;
+  const salida: Record<string, number> = {};
+  for (const clave of claves) {
+    const v = fuente[clave];
+    if (!enCero1(v)) throw new Error(`umbral de calidad inválido: ${clave}`);
+    salida[clave] = v;
+  }
+  return salida as unknown as UmbralesDeCalidad;
+};
+
+export const UMBRALES: UmbralesDeCalidad = umbralesDesde(UMBRALES_DE_CALIDAD);
 
 export type FalloDeCalidad =
   | 'BORROSA'

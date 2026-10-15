@@ -2,6 +2,9 @@ export const POLITICA_SIN_MICROFONO =
   'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
 export const POLITICA_DE_LA_GUARDIA =
   'camera=(), microphone=(self), geolocation=(), payment=(), usb=()';
+/** 15-Y3 · «Mi rostro» del residente: la cámara del propio origen, y nada más. */
+export const POLITICA_DEL_ROSTRO =
+  'camera=(self), microphone=(), geolocation=(), payment=(), usb=()';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -38,12 +41,21 @@ const nextConfig = {
        * micrófono en la consola compilada: «pulsar para hablar» no podía abrir.
        */
       {
-        source: '/((?!guardia(?:/|$)).*)',
+        source: '/((?!guardia(?:/|$)|mi/rostro(?:/|$)).*)',
         headers: [{ key: 'Permissions-Policy', value: POLITICA_SIN_MICROFONO }],
       },
       {
         source: '/guardia/:ruta*',
         headers: [{ key: 'Permissions-Policy', value: POLITICA_DE_LA_GUARDIA }],
+      },
+      /**
+       * 15-Y3 · el residente registra su rostro con la cámara frontal SÓLO en
+       * `/mi/rostro` (§2.7.7): el resto de sus páginas sigue con la cámara
+       * cerrada, y el micrófono cerrado en todas.
+       */
+      {
+        source: '/mi/rostro',
+        headers: [{ key: 'Permissions-Policy', value: POLITICA_DEL_ROSTRO }],
       },
       {
         // El service worker no se cachea: si el navegador sirve uno viejo, la

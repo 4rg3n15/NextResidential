@@ -1,10 +1,12 @@
 'use client';
 
 import type { JSX } from 'react';
+import Link from 'next/link';
 import { Boton } from '@/componentes/ui/boton';
 import { Distintivo } from '@/componentes/ui/distintivo';
 import type { MenorDelHogar } from '@/lib/api/residente';
 import { detalleDeMenor, yaEsMayor } from '@/lib/hogar';
+import { explicacionDelRostroDelMenor, rostroDelMenorEnLaWeb } from '@/lib/rostro';
 
 export const AVISO_DE_MAYORIA =
   'Ya cumplió 18 años: puede crear su propia cuenta con un código que genera el titular.';
@@ -13,7 +15,8 @@ export const AVISO_DE_MAYORIA =
  * 15-Y2 · la fila de un menor en «Mi familia», como en la app: nombre, detalle
  * (parentesco · edad · documento enmascarado · plaza), «Sin cuenta», y las
  * acciones de cualquier adulto (editar, dar de baja). A los 18 (ADR-038) se
- * avisa, y sólo el titular ve «Código para su cuenta».
+ * avisa, y sólo el titular ve «Código para su cuenta». 15-Y3 · su rostro
+ * (ADR-039): de 15 a 17 el titular lo registra; los demás leen por qué no.
  */
 export const FilaDeMenor = ({
   menor,
@@ -30,6 +33,8 @@ export const FilaDeMenor = ({
 }): JSX.Element => {
   const m = menor;
   const mayor = yaEsMayor(m);
+  const rostro = rostroDelMenorEnLaWeb(m, esTitular);
+  const explicacionDelRostro = explicacionDelRostroDelMenor(rostro);
   return (
     <li
       aria-label={m.nombreCompleto}
@@ -49,7 +54,19 @@ export const FilaDeMenor = ({
         <Distintivo tono="neutro">Sin cuenta</Distintivo>
       </div>
       {mayor ? <p className="text-secundario text-texto">{AVISO_DE_MAYORIA}</p> : null}
+      {explicacionDelRostro !== null ? (
+        <p className="text-secundario text-texto-apagado">{explicacionDelRostro}</p>
+      ) : null}
       <div className="flex flex-wrap justify-end gap-2">
+        {rostro === 'gestionar' ? (
+          <Link
+            href={`/mi/rostro?menor=${m.residenteId}`}
+            prefetch={false}
+            className="inline-flex h-9 items-center rounded-campo border border-borde px-3 text-secundario font-medium text-texto"
+          >
+            {m.tieneRostro ? 'Ver su rostro' : 'Registrar rostro'}
+          </Link>
+        ) : null}
         {mayor && esTitular ? (
           <Boton type="button" variante="secundario" tamano="sm" onClick={() => alPedirCodigo(m)}>
             Código para su cuenta

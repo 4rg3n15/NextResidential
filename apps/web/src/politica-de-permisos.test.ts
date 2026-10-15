@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
-import configuracion, { POLITICA_DE_LA_GUARDIA, POLITICA_SIN_MICROFONO } from '../next.config.mjs';
+import configuracion, {
+  POLITICA_DEL_ROSTRO,
+  POLITICA_DE_LA_GUARDIA,
+  POLITICA_SIN_MICROFONO,
+} from '../next.config.mjs';
 
 /**
  * 15-P · el micrófono SÓLO en la ruta de la guardia (§2.7.7). Se resuelve con
@@ -43,5 +47,14 @@ describe('15-P · Permissions-Policy por ruta', () => {
   it('la cámara sigue cerrada también en la guardia', () => {
     expect(POLITICA_DE_LA_GUARDIA).toContain('camera=()');
     expect(POLITICA_DE_LA_GUARDIA).toContain('microphone=(self)');
+  });
+
+  it('15-Y3 · la cámara del propio origen SÓLO en «Mi rostro»; el micrófono, no; el resto del residente, cerrada', async () => {
+    expect(POLITICA_DEL_ROSTRO).toContain('camera=(self)');
+    expect(POLITICA_DEL_ROSTRO).toContain('microphone=()');
+    expect(await politicaDe('/mi/rostro')).toEqual([POLITICA_DEL_ROSTRO]);
+    for (const ruta of ['/mi', '/mi/familia', '/mi/rostros', '/mi/rostro-falso', '/rostro']) {
+      expect(await politicaDe(ruta), ruta).toEqual([POLITICA_SIN_MICROFONO]);
+    }
   });
 });

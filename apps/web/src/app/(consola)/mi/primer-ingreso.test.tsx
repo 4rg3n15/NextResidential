@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PuertaDelPrimerIngreso } from './puerta-del-primer-ingreso';
+import { claveDeAhoraNo } from '@/lib/rostro';
 import { motivosLocales } from './primer-ingreso';
 
 /**
@@ -70,11 +71,15 @@ const envolver = (nodo: JSX.Element) =>
       {nodo}
     </QueryClientProvider>,
   );
-const puerta = () => (
-  <PuertaDelPrimerIngreso copropiedadId={COP}>
-    <p>Inicio del residente</p>
-  </PuertaDelPrimerIngreso>
-);
+// 15-Y3 · la invitación del rostro ya se respondió en este navegador: aquí se prueba la PUERTA.
+const puerta = () => {
+  localStorage.setItem(claveDeAhoraNo('u-prueba'), 'si');
+  return (
+    <PuertaDelPrimerIngreso copropiedadId={COP} cuenta="u-prueba">
+      <p>Inicio del residente</p>
+    </PuertaDelPrimerIngreso>
+  );
+};
 const escribir = (etiqueta: string | RegExp, valor: string) =>
   fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: valor } });
 

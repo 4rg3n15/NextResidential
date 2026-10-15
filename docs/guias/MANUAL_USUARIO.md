@@ -595,10 +595,10 @@ vivienda la resuelve el servidor desde su sesión: nunca viaja en la dirección.
 > app y en la consola, con los mismos textos (abajo, «Desde la consola web»).
 > Lo único que sigue sólo en la app es **cambiar de vivienda**.
 >
-> **El rostro del residente (ronda 15-X), también sólo en la app.** «Mi rostro»
-> y el rostro de un menor del hogar no están en la consola web hasta la ronda
-> 15-Y (DT-15X-01). En producción eso deja **sin rostro a quien sólo usa la
-> consola**, como el residente con iPhone (P-23).
+> **El rostro del residente (ronda 15-X), en la app y, desde la 15-Y3, en la
+> consola web** («Mi rostro» y el rostro de un menor del hogar; abajo, «El
+> rostro desde la consola web»). El residente con iPhone (P-23) ya puede
+> registrarlo desde Safari.
 
 ### Su cuenta
 
@@ -672,6 +672,32 @@ usted incluido (de 1 al tope; podrá cambiarlo después en «Ocupantes»).
    pide un motivo y, al confirmar, la foto del visitante sale de los equipos
    y la consola dice de cuántos. La visita recurrente no existe en el
    servidor (DT-15R-03): tampoco en la consola.
+
+**El rostro desde la consola web (15-Y3)**, con lo mismo que la app:
+
+9. **Al terminar su primer ingreso**, la consola le invita una vez: «Entre con
+   su rostro» → **«Registrar mi rostro»** o **«Ahora no»**. «Ahora no» se
+   recuerda en ese navegador; siempre puede volver desde **Perfil → «Mi
+   rostro»**.
+10. **«Mi rostro»** muestra su estado (sin rostro, registrado, activo en
+    tantos equipos, por vencer, en retiro) y los equipos de la portería que lo
+    reconocen. Para registrarlo o renovarlo: **«Abrir la cámara»** (la
+    frontal; en el iPhone Safari pide permiso la primera vez) y **«Tomar
+    foto»**, o **«Elegir una foto»** del aparato. La foto se revisa en el
+    navegador antes de enviarse, con los mismos criterios que la app: si sale
+    movida, oscura, quemada, lejos o con más de una persona, la consola le
+    dice qué repetir. Si el navegador no sabe contar rostros, usted confirma
+    el encuadre con una casilla. Después lea la **política del tratamiento de
+    su rostro** y marque la casilla; si la política cambió desde la última vez,
+    la casilla aparece desmarcada y hay que leerla de nuevo. Pulse
+    **«Registrar mi rostro»** (o «Renovar mi rostro»). La imagen no se guarda
+    en el navegador: sale hacia el servidor y se descarta.
+11. **«Retirar mi rostro»** confirma y lo borra de inmediato, también de los
+    equipos de la portería.
+12. **El rostro de un menor** (de 15 a 17 años): el titular lo registra desde
+    **Mi familia → «Registrar rostro»** en la fila del menor, con las dos
+    declaraciones de representante legal además de la política. Otro adulto
+    lee «Lo registra el titular del hogar»; a un menor de 15 no se le ofrece.
 
 **El primer ingreso, después:** «Complete sus datos» pide nombres, apellidos,
 documento —cédula, cédula de extranjería o pasaporte—, teléfono y fecha de
