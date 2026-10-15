@@ -38,7 +38,8 @@ describe('ProveedorDeJwks contra un servidor real', () => {
       respuesta.writeHead(404, { 'content-type': 'text/plain' });
       respuesta.end('404 page not found');
     });
-    await new Promise<void>((listo) => servidor.listen(0, listo));
+    // DT-15S5-07 (15-S6) · en 127.0.0.1, nunca en la comodín (H-15S5-07).
+    await new Promise<void>((listo) => servidor.listen(0, '127.0.0.1', listo));
     const direccion = servidor.address();
     base = `http://127.0.0.1:${typeof direccion === 'object' && direccion ? direccion.port : 0}`;
   });

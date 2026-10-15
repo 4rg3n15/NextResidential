@@ -55,7 +55,7 @@ describe('abrirPuertoMientrasArranca', () => {
     await abierto?.cerrar();
 
     const real = createServer((_q, r) => r.end('ok'));
-    await new Promise<void>((listo) => real.listen(puerto, listo));
+    await new Promise<void>((listo) => real.listen(puerto, '127.0.0.1', listo));
     const r = await fetch(`http://127.0.0.1:${String(puerto)}/`);
     expect(await r.text()).toBe('ok');
     await new Promise<void>((listo) => {
@@ -66,6 +66,11 @@ describe('abrirPuertoMientrasArranca', () => {
 
   it('si el puerto está ocupado no insiste: devuelve null y el listen de Nest dirá por qué', async () => {
     const ocupante = createServer();
+    // La ÚNICA excepción a DT-15S5-07, a propósito: el ocupante tiene que
+    // ocupar lo mismo que abre `abrirPuertoMientrasArranca` —la comodín, como
+    // la API en producción—. En 127.0.0.1 no lo bloquea en macOS (BSD deja
+    // abrir la comodín con una dirección concreta ocupada) y la prueba salió
+    // roja en la CI de macOS del PR #57 con la 15-S6. No atiende peticiones.
     await new Promise<void>((listo) => ocupante.listen(0, listo));
     const { port } = ocupante.address() as AddressInfo;
 

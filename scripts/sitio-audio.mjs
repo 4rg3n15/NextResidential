@@ -24,6 +24,10 @@
  * Lee `apps/api/.env` —el de la API— y elige los equipos como `sitio:ensayo`:
  * primero el registro de la consola (DATABASE_URL + EQUIPOS_LLAVE), si no, el
  * `.env`. Salida: 0 sin fallos · 1 algún fallo · 2 configuración incompleta.
+ *
+ * 15-S6 · `--simulado`: un videoportero simulado EN RED (el de las pruebas del
+ * paquete), sin `.env` ni equipo: para ensayar el guion y para que el
+ * verificador lo vea terminar. No vale como medida.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { createRequire } from 'node:module';
@@ -44,9 +48,12 @@ const salir = (mensaje, codigo = 2) => {
   process.exit(codigo);
 };
 
+const simulado = args.includes('--simulado');
 const rutaEnv = resolve(RAIZ, valor('env') ?? 'apps/api/.env');
-if (!existsSync(rutaEnv)) salir(`no existe ${rutaEnv}: copie apps/api/.env.example y rellénelo`);
-process.loadEnvFile(rutaEnv);
+if (!simulado) {
+  if (!existsSync(rutaEnv)) salir(`no existe ${rutaEnv}: copie apps/api/.env.example y rellénelo`);
+  process.loadEnvFile(rutaEnv);
+}
 const compilado = join(RAIZ, 'packages/providers/dist/operacion.js');
 if (!existsSync(compilado))
   salir('falta compilar el paquete de equipos: pnpm --filter @ncr/providers build');
@@ -89,16 +96,56 @@ const persona = {
 
 const pedidas = (valor('equipo') ?? 'terminal,videoportero').split(',');
 const ROTULO = { terminal: 'la terminal', videoportero: 'el videoportero' };
+const fueraDelRepo = (ruta, que) => {
+  const r = resolve(ruta);
+  if (r === RAIZ || r.startsWith(RAIZ + sep))
+    salir(`${que} va fuera del repositorio: use $HOME/ncr-sitio`);
+  return r;
+};
+
+/** `--simulado`: el videoportero simulado en red, con la credencial de las pruebas del paquete. */
+const simuladoDeAudio = async () => {
+  const credencial = { usuario: 'servicio', clave: 'clave-de-prueba' };
+  const equipo = await P.videoporteroDeAudioEnRed({
+    ...credencial,
+    semiduplex: args.includes('--semiduplex'),
+  });
+  const ficha = { familia: 'videoportero', nombre: 'Videoportero simulado', host: '127.0.0.1' };
+  return {
+    equipos: [{ ...ficha, ...credencial, puerto: equipo.puerto, puerta: 1, tiempoLimiteMs: 5000 }],
+    cerrar: () => equipo.cerrar(),
+  };
+};
 
 const principal = async () => {
-  decir(`pnpm sitio:audio · ${new Date().toISOString()}`);
+  // 15-S6 · lo que puede hacer `salir` se juzga ANTES de medir: después perdería la salida.
+  const destino = fueraDelRepo(
+    valor('informe') ??
+      join(
+        homedir(),
+        'ncr-sitio',
+        `audio-${new Date().toISOString().slice(0, 16).replace(':', '')}.md`,
+      ),
+    'el informe',
+  );
+  const respaldo = args.includes('--pasar-a-g711')
+    ? fueraDelRepo(
+        valor('respaldo') ??
+          salir('--pasar-a-g711 exige --respaldo=<carpeta fuera del repositorio>'),
+        'el respaldo',
+      )
+    : null;
+  decir(
+    `pnpm sitio:audio · ${new Date().toISOString()}${simulado ? ' · SIMULADO: no vale como medida' : ''}`,
+  );
+  const sim = simulado ? await simuladoDeAudio() : null;
   let pool = null;
-  if ((process.env.DATABASE_URL ?? '') !== '') {
+  if (!simulado && (process.env.DATABASE_URL ?? '') !== '') {
     const { Pool } = createRequire(join(RAIZ, 'apps/api/package.json'))('pg');
     pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 2 });
     pool.on('error', (e) => decir(`   ⚠ la base cortó una conexión: ${e.message}`));
   }
-  const elegidos = await elegirEquipos({ sim: null, pool, entorno: process.env, decir, salir });
+  const elegidos = await elegirEquipos({ sim, pool, entorno: process.env, decir, salir });
   await pool?.end();
   const equipos = elegidos.equipos.filter(
     (e) =>
@@ -128,14 +175,9 @@ const principal = async () => {
       decir(`  ✗ no declara canal de audio (HTTP ${String(lista.estado)}): contingencia ADR-01`);
       continue;
     }
-    if (args.includes('--pasar-a-g711')) {
+    if (respaldo !== null) {
       // B4 · nunca sin respaldo escrito, nunca sin autorización, nunca sin releer.
-      const respaldo = valor('respaldo');
-      if (respaldo === null)
-        salir('--pasar-a-g711 exige --respaldo=<carpeta fuera del repositorio>');
-      const carpeta = resolve(respaldo);
-      if (carpeta === RAIZ || carpeta.startsWith(RAIZ + sep))
-        salir('el respaldo va fuera del repositorio');
+      const carpeta = respaldo;
       if ((await respaldar({ P, equipos: [e], carpeta, decir })) > 0) {
         fallos += 1;
         decir('  ✗ sin respaldo no se cambia nada');
@@ -176,23 +218,13 @@ const principal = async () => {
     if (d.fallo) fallos += 1;
   }
 
-  const destino = resolve(
-    valor('informe') ??
-      join(
-        homedir(),
-        'ncr-sitio',
-        `audio-${new Date().toISOString().slice(0, 16).replace(':', '')}.md`,
-      ),
-  );
-  if (destino === RAIZ || destino.startsWith(RAIZ + sep)) {
-    salir('el informe NO se escribe dentro del repositorio: use $HOME/ncr-sitio');
-  }
+  await sim?.cerrar();
   mkdirSync(dirname(destino), { recursive: true, mode: 0o700 });
   writeFileSync(destino, `# Audio en sitio\n\n\`\`\`\n${salida.join('\n')}\n\`\`\`\n`, {
     mode: 0o600,
   });
   console.log(`informe: ${destino}`);
-  process.exit(fallos === 0 ? 0 : 1);
+  process.exitCode = fallos === 0 ? 0 : 1; // DT-15S5-01: exitCode, no exit (16 KB en macOS)
 };
 
 await principal();

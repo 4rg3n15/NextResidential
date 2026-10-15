@@ -248,5 +248,5 @@ for (const senal of ['SIGINT', 'SIGTERM']) process.on(senal, () => proceso.kill(
 proceso.on('exit', (codigo) => {
   limpiar('al cerrar');
   chmodSync(rutaYaml, 0o600);
-  process.exit(codigo ?? 0);
+  process.exitCode = codigo ?? 0; // 15-S6 · la misma clase que DT-15S5-01: exitCode al final
 });
