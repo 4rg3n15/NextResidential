@@ -46,11 +46,10 @@
  * consola si ya hay `.next`).
  * ═════════════════════════════════════════════════════════════════════════════
  */
-import { spawn, spawnSync } from 'node:child_process';
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createServer as servidorHttp } from 'node:http';
-import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +57,21 @@ import { deflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
 import { authenticator } from 'otplib';
 import { arrancarDobleGotrue } from './doble-gotrue.mjs';
+import {
+  arrancarApi,
+  arrancarConsola,
+  cerrarTodo,
+  chromiumDelEntorno,
+  claimsDesdeLaBase,
+  entornoDePsql,
+  esperar,
+  lanzar,
+  prepararBase,
+  puertoLibre,
+  servidores,
+  urlDe,
+  volcar,
+} from './arnes-de-recorrido.mjs';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const raizApi = process.env.NCR_RAIZ_API ?? raiz;
@@ -112,8 +126,6 @@ const PORTERO = {
   copropiedadId: MIRA,
 };
 
-const procesos = [];
-const servidores = [];
 /** Lo que el puente de los equipos simulados no pudo servir: se enseña al final. */
 const erroresDeEquipo = [];
 let fallos = 0;
@@ -132,84 +144,6 @@ const bloque = async (etiqueta, fn) => {
   } catch (e) {
     mal(`${etiqueta}: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
   }
-};
-
-const puertoLibre = () =>
-  new Promise((listo) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => listo(port));
-    });
-  });
-
-const chromiumDelEntorno = () => {
-  const explicito = process.env.NCR_CHROMIUM;
-  if (explicito !== undefined && explicito !== '') return existsSync(explicito) ? explicito : null;
-  const raices = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers'].filter(
-    (r) => typeof r === 'string' && r.length > 0 && existsSync(r),
-  );
-  for (const base of raices) {
-    for (const carpeta of readdirSync(base).filter((d) => d.startsWith('chromium'))) {
-      const hallado = [
-        join(base, carpeta, 'chrome-linux', 'chrome'),
-        join(base, carpeta, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
-        join(base, carpeta, 'chrome'),
-      ].find((ruta) => existsSync(ruta));
-      if (hallado !== undefined) return hallado;
-    }
-  }
-  try {
-    return existsSync(chromium.executablePath()) ? undefined : null;
-  } catch {
-    return null;
-  }
-};
-
-const lanzar = (comando, args, opciones) => {
-  const proceso = spawn(comando, args, { ...opciones, stdio: ['ignore', 'pipe', 'pipe'] });
-  const salida = [];
-  proceso.stdout.on('data', (d) => salida.push(String(d)));
-  proceso.stderr.on('data', (d) => salida.push(String(d)));
-  procesos.push({ proceso, salida, nombre: opciones.nombre ?? comando });
-  return { proceso, salida };
-};
-
-const volcar = () => {
-  for (const { nombre, salida } of procesos) {
-    writeFileSync(`/tmp/ncr-recorrido-${nombre}.log`, salida.join(''));
-  }
-  console.log('   · salida completa en /tmp/ncr-recorrido-{api,web}.log');
-};
-
-const cerrarTodo = async () => {
-  for (const { proceso } of procesos) {
-    try {
-      process.kill(-proceso.pid, 'SIGKILL');
-    } catch {
-      try {
-        proceso.kill('SIGKILL');
-      } catch {
-        /* ya no está */
-      }
-    }
-  }
-  for (const s of servidores) await new Promise((listo) => s.close(() => listo()));
-};
-
-const esperar = async (url, etiqueta, intentos = 120) => {
-  for (let i = 0; i < intentos; i += 1) {
-    try {
-      const r = await fetch(url);
-      if (r.status < 500) return true;
-    } catch {
-      /* todavía no escucha */
-    }
-    await new Promise((listo) => setTimeout(listo, 1000));
-  }
-  mal(`${etiqueta} no llegó a responder en ${String(intentos)} s`);
-  volcar();
-  return false;
 };
 
 // ── Imagen sintética: nítida, bien iluminada, sin rostro de nadie ───────────
@@ -306,33 +240,6 @@ const equipoPorHttp = async (guion) => {
 };
 
 // ── Base propia ──────────────────────────────────────────────────────────────
-const urlDe = (base, rol) => {
-  const u = new URL(process.env.DATABASE_URL_PRUEBAS ?? '');
-  u.pathname = `/${base}`;
-  if (rol !== undefined) u.searchParams.set('options', `-c role=${rol}`);
-  return u.toString();
-};
-
-/** Los mismos valores por omisión que `supabase/verificar.sh`: un solo servidor. */
-const entornoDePsql = () => ({
-  ...process.env,
-  PGHOST: process.env.PGHOST ?? '/var/tmp/ncr/sock',
-  PGPORT: process.env.PGPORT ?? '55432',
-  PGUSER: process.env.PGUSER ?? 'postgres',
-});
-
-/** Huella de lo que construye la plantilla: migraciones y semillas, por contenido. */
-const huellaDelEsquema = () => {
-  const h = createHash('sha256');
-  for (const dir of ['supabase/migrations', 'supabase/seed']) {
-    for (const f of readdirSync(resolve(raiz, dir)).sort()) {
-      if (!f.endsWith('.sql')) continue;
-      h.update(f).update(readFileSync(resolve(raiz, dir, f)));
-    }
-  }
-  return `ncr-esquema-${h.digest('hex').slice(0, 32)}`;
-};
-
 /** El número de portero de una cuenta, leído de la copia del recorrido. */
 const numeroDelPortero = (correo) =>
   spawnSync(
@@ -345,129 +252,6 @@ const numeroDelPortero = (correo) =>
     ],
     { encoding: 'utf8', env: entornoDePsql() },
   ).stdout.trim();
-
-const prepararBase = () => {
-  // La plantilla se migra y siembra UNA vez; cada recorrido parte de una copia
-  // recién hecha, así que ni hereda lo que dejó el anterior ni ensucia la base
-  // de la suite.
-  const psql = (sql) =>
-    spawnSync('psql', ['-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-Atqc', sql], {
-      encoding: 'utf8',
-      env: entornoDePsql(),
-    });
-  /**
-   * 15-L · la plantilla lleva la HUELLA de las migraciones y semillas con que
-   * se hizo, y se rehace si cambian. Antes bastaba con que existiera: con una
-   * migración nueva (la 0042), el recorrido corría contra un esquema viejo y
-   * fallaba por algo que no era la consola.
-   */
-  const huella = huellaDelEsquema();
-  const existe = psql(
-    `SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = '${BASE_PLANTILLA}'`,
-  );
-  if (existe.status !== 0) {
-    throw new Error(`psql no alcanza la base de pruebas: ${existe.stderr.trim()}`);
-  }
-  if (existe.stdout.trim() !== huella || process.env.NCR_RECREAR_PLANTILLA === '1') {
-    const r = spawnSync('bash', ['supabase/verificar.sh', '--con-semillas', '--modo-supabase'], {
-      cwd: raiz,
-      encoding: 'utf8',
-      env: { ...entornoDePsql(), PGDATABASE: BASE_PLANTILLA },
-    });
-    writeFileSync('/tmp/ncr-recorrido-base.log', `${r.stdout}${r.stderr}`);
-    if (r.status !== 0)
-      throw new Error('no se pudo migrar la base (ver /tmp/ncr-recorrido-base.log)');
-    const marca = psql(`COMMENT ON DATABASE ${BASE_PLANTILLA} IS '${huella}'`);
-    if (marca.status !== 0)
-      throw new Error(`no se pudo marcar la plantilla: ${marca.stderr.trim()}`);
-  }
-  // Dos órdenes separadas: `psql -c` con varias sentencias las mete en UNA
-  // transacción, y ni DROP ni CREATE DATABASE se admiten dentro de una.
-  for (const sql of [
-    `DROP DATABASE IF EXISTS ${BASE}`,
-    `CREATE DATABASE ${BASE} TEMPLATE ${BASE_PLANTILLA} OWNER ${DUENO_SIMULADO}`,
-    `DO $$ BEGIN
-       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${ROL_DE_LA_API}') THEN
-         CREATE ROLE ${ROL_DE_LA_API} NOLOGIN NOSUPERUSER BYPASSRLS INHERIT;
-       END IF;
-     END $$`,
-    `GRANT ${DUENO_SIMULADO} TO ${ROL_DE_LA_API}`,
-    `GRANT ${ROL_DE_LA_API} TO CURRENT_USER`,
-  ]) {
-    const r = psql(sql);
-    if (r.status !== 0) throw new Error(`no se pudo copiar la plantilla: ${r.stderr.trim()}`);
-  }
-};
-
-// ── API y consola ───────────────────────────────────────────────────────────
-const arrancarApi = (doble, puerto, puertoWeb) => {
-  const cwd = resolve(raizApi, 'apps/api');
-  const url = urlDe(BASE, ROL_DE_LA_API);
-  const entorno = {
-    ...process.env,
-    NODE_ENV: 'production',
-    PORT: String(puerto),
-    SUPABASE_URL: doble.url,
-    SUPABASE_PUBLISHABLE_KEY: 'publicable-de-prueba',
-    SUPABASE_SECRET_KEY: 'secreta-de-prueba',
-    SUPABASE_JWKS_URL: doble.jwksUrl,
-    DATABASE_URL: url,
-    DATABASE_POOLER_URL: url,
-    PERSISTENCIA_DE_EVENTOS: 'postgres',
-    /**
-     * Anexo 15-K · el adaptador REAL (`HikvisionProvider`) hablando Digest por
-     * HTTP con los equipos simulados. Con `simulado` las órdenes las atendía el
-     * MockProvider y nunca llegaban al equipo: H-SITIO-13 y 15 no se podían ver.
-     */
-    PROVEEDOR_DE_EQUIPOS: 'hikvision', // kpi-11-exento: nombre del adaptador, no del protocolo
-    INGESTA_FIRMA_SECRETO: SECRETO_DE_INGESTA,
-    BIOMETRIA_LLAVE: 'llave-de-biometria-para-el-recorrido-32+',
-    BIOMETRIA_LLAVE_REF: 'env:BIOMETRIA_LLAVE',
-    EQUIPOS_LLAVE: 'llave-de-equipos-para-el-recorrido-32+++',
-    EQUIPOS_LLAVE_REF: 'env:EQUIPOS_LLAVE',
-    CORS_ALLOWED_ORIGINS: `http://127.0.0.1:${String(puertoWeb)}`,
-    PLANIFICADOR_HABILITADO: 'false',
-  };
-  if (!existsSync(resolve(cwd, 'dist/main.js'))) {
-    console.log('   · compilando la API (no hay dist)');
-    const b = spawnSync('pnpm', ['--filter', '@ncr/api...', 'build'], { cwd: raizApi });
-    if (b.status !== 0) throw new Error('no compila la API');
-  }
-  return lanzar('node', ['dist/main.js'], { cwd, env: entorno, detached: true, nombre: 'api' });
-};
-
-const arrancarConsola = (doble, puertoApi, puertoWeb) => {
-  const cwd = resolve(raizWeb, 'apps/web');
-  const binDeNext = resolve(
-    dirname(createRequire(resolve(cwd, 'package.json')).resolve('next/package.json')),
-    'dist/bin/next',
-  );
-  const entorno = {
-    ...process.env,
-    NODE_ENV: 'production',
-    API_URL: `http://127.0.0.1:${String(puertoApi)}`,
-    SUPABASE_URL: doble.url,
-    SUPABASE_PUBLISHABLE_KEY: 'publicable-de-prueba',
-  };
-  const reutilizar =
-    process.env.NCR_REUTILIZAR_CONSOLA === '1' && existsSync(resolve(cwd, '.next/BUILD_ID'));
-  if (!reutilizar) {
-    console.log('   · compilando la consola');
-    const b = spawnSync('node', [binDeNext, 'build'], { cwd, env: entorno, encoding: 'utf8' });
-    if (b.status !== 0) {
-      writeFileSync('/tmp/ncr-recorrido-build-web.log', `${b.stdout}${b.stderr}`);
-      throw new Error('no compila la consola (ver /tmp/ncr-recorrido-build-web.log)');
-    }
-  }
-  // 15-L (H6) · el servidor de PRODUCCIÓN de la consola, que fija la IP del
-  // navegador en `X-Forwarded-For`; `next start` a secas se la dejaría poner a él.
-  return lanzar('node', ['servidor.mjs', '-H', '127.0.0.1', '-p', String(puertoWeb)], {
-    cwd,
-    env: entorno,
-    detached: true,
-    nombre: 'web',
-  });
-};
 
 /** El Edge firma lo que ingesta; el recorrido firma con el secreto de SU API. */
 const ingestarLectura = async (puertoApi, dispositivoId, placa) =>
@@ -597,7 +381,13 @@ const principal = async () => {
     mal('sin DATABASE_URL_PRUEBAS no hay base: el recorrido de la consola NO se ha verificado');
   }
   if (ejecutable === null || sinBase) return;
-  prepararBase();
+  prepararBase({
+    raiz,
+    base: BASE,
+    plantilla: BASE_PLANTILLA,
+    dueno: DUENO_SIMULADO,
+    rolDeLaApi: ROL_DE_LA_API,
+  });
   ok(`base ${BASE} recién copiada de la plantilla migrada y sembrada`);
 
   paso('1 · equipos simulados por HTTP, con Digest');
@@ -640,23 +430,42 @@ const principal = async () => {
   const lectura = new Pool({ connectionString: urlDe(BASE), max: 2 });
   // 15-O · como todo pool del repositorio: un corte se anota, no tumba.
   lectura.on('error', () => undefined);
-  const doble = await arrarcarDoble(lectura);
+  const doble = await arrancarDobleGotrue({
+    usuarios: [SUPERADMIN, PORTERO],
+    claimsDe: claimsDesdeLaBase(lectura),
+  });
   ok(`escuchando en ${doble.url}`);
 
   const puertoApi = await puertoLibre();
   const puertoWeb = await puertoLibre();
   paso('3 · API real sobre la base propia, con el adaptador real contra los equipos simulados');
-  const api = arrancarApi(doble, puertoApi, puertoWeb);
-  if (!(await esperar(`http://127.0.0.1:${String(puertoApi)}/health`, 'la API'))) return;
+  const api = arrancarApi({
+    raizApi,
+    doble,
+    puerto: puertoApi,
+    puertoWeb,
+    base: BASE,
+    rolDeLaApi: ROL_DE_LA_API,
+    entorno: {
+      /**
+       * Anexo 15-K · el adaptador REAL (`HikvisionProvider`) hablando Digest por
+       * HTTP con los equipos simulados. Con `simulado` las órdenes las atendía el
+       * MockProvider y nunca llegaban al equipo: H-SITIO-13 y 15 no se podían ver.
+       */
+      PROVEEDOR_DE_EQUIPOS: 'hikvision', // kpi-11-exento: nombre del adaptador, no del protocolo
+      INGESTA_FIRMA_SECRETO: SECRETO_DE_INGESTA,
+    },
+  });
+  if (!(await esperar(`http://127.0.0.1:${String(puertoApi)}/health`, 'la API', mal))) return;
   afirmar(
     /proveedor de equipos activo: hikvision/.test(api.salida.join('')), // kpi-11-exento: nombre del adaptador
     'la API arranca con el adaptador REAL: las órdenes viajan por HTTP y Digest a los equipos simulados',
   );
 
   paso('4 · consola compilada');
-  arrancarConsola(doble, puertoApi, puertoWeb);
+  arrancarConsola({ raizWeb, doble, puertoApi, puertoWeb });
   const base = `http://127.0.0.1:${String(puertoWeb)}`;
-  if (!(await esperar(`${base}/acceso`, 'la consola'))) return;
+  if (!(await esperar(`${base}/acceso`, 'la consola', mal))) return;
   ok(`consola en ${base}`);
 
   const navegador = await chromium.launch(
@@ -704,24 +513,6 @@ const principal = async () => {
   }
   volcar();
 };
-
-const arrarcarDoble = (lectura) =>
-  arrancarDobleGotrue({
-    usuarios: [SUPERADMIN, PORTERO],
-    /**
-     * Lo que hace Supabase: llamar al gancho con el evento y usar los claims
-     * que devuelve. Se le pasan SIN rol ni copropiedad: si la base no conoce
-     * al usuario, el token sale sin ellos y la API falla cerrada, que es lo
-     * que haría en producción.
-     */
-    claimsDe: async (authUserId, { rol, usuario_id, copropiedad_id, copropiedades, ...base }) => {
-      const { rows } = await lectura.query(
-        'SELECT public.custom_access_token_hook($1::jsonb) AS r',
-        [JSON.stringify({ user_id: authUserId, claims: base, authentication_method: 'password' })],
-      );
-      return rows[0]?.r?.claims ?? base;
-    },
-  });
 
 /** Ficha: diagnóstico, corrección del modo de control y nuevo diagnóstico. */
 const diagnosticarYCorregir = async (pagina, camara) => {

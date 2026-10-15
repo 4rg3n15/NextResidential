@@ -518,6 +518,9 @@ const SIN_FORMULARIO: Readonly<Record<string, string>> = {
     'dar de baja: el vehículo viaja en la ruta desde su tarjeta; no hay campos',
   'mi/perfil/editar-perfil.tsx':
     'datos personales y de contacto en texto; el correo exige «@» y el teléfono cifras, que el barrido no teclea',
+  // 15-Y1 · el primer ingreso en la consola, con los mismos campos que la app.
+  'mi/primer-ingreso.tsx':
+    'nombres, apellidos, documento, teléfono, fecha y correo en texto; el tipo de documento es una lista cerrada; prueba propia del cuerpo enviado (primer-ingreso.test.tsx)',
   /**
    * ETAPA 15-M (C10, C4, C9) · la apertura por equipo, la baja de un equipo y
    * la baja de un residente. El equipo o el residente viajan en la RUTA (o en

@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { sesionActual } from '@/lib/sesion/servidor';
 import { claimsVisibles } from '@/lib/sesion/porteria';
 import { rutaInicialDe } from '@/lib/navegacion';
@@ -21,6 +22,8 @@ const AVISOS: Readonly<Record<string, string>> = {
   patrullaje:
     'La sesión se cerró tras cinco códigos de patrullaje incorrectos. Entra de nuevo con tu contraseña.',
   sesion: 'Tu sesión de portería terminó. Vuelve a entrar.',
+  // 15-Y1 · el residente cambió su contraseña desde el Perfil y el proveedor no renovó la sesión.
+  cambio: 'Contraseña cambiada. Vuelve a entrar con la nueva.',
 };
 
 /** Página de acceso; con el cambio pendiente (ADR-023), directamente en ese paso. */
@@ -55,6 +58,18 @@ const Acceso = async ({
         pasoInicial={cambioPendiente ? 'cambio' : 'credenciales'}
         recuperacionPorCorreo={despliegue().recuperacionPorCorreo}
       />
+      {cambioPendiente ? null : (
+        // 15-Y1 (P-23) · el residente sin app crea su cuenta desde aquí.
+        <p className="mt-6 text-secundario text-texto-apagado">
+          ¿Eres residente y no tienes cuenta?{' '}
+          <Link
+            href="/acceso/crear-cuenta"
+            className="font-medium text-marca-texto underline underline-offset-2"
+          >
+            Crear cuenta con el código de tu vivienda
+          </Link>
+        </p>
+      )}
     </MarcoDeAcceso>
   );
 };
