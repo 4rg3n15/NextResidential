@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Get,
   Inject,
@@ -12,6 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
 import { Roles } from '../../comun/decoradores';
@@ -81,11 +81,11 @@ export class AutorizacionesController {
     switch (r.error.codigo) {
       case 'CONFLICTO_DE_CONCURRENCIA':
       case 'INVARIANTE_VIOLADA':
-        throw new ConflictException(r.error.detalle);
+        throw conflicto('AUTORIZACION', r.error.detalle);
       case 'ENTIDAD_NO_ENCONTRADA':
         throw new NotFoundException(r.error.detalle);
       case 'OPERACION_NO_PERMITIDA':
-        throw new ConflictException(r.error.detalle);
+        throw conflicto('OPERACION_NO_PERMITIDA', r.error.detalle);
       default:
         throw new BadRequestException(r.error.detalle);
     }

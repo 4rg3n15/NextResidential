@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -10,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -138,7 +138,10 @@ export class PuentesController {
       throw new NotFoundException('No hay un Edge activo con ese identificador');
     }
     if (resultado === 'otro_puente') {
-      throw new ConflictException('Ya hay otro Edge puente en esta copropiedad: desmárquelo antes');
+      throw conflicto(
+        'OTRO_EDGE_PUENTE',
+        'Ya hay otro Edge puente en esta copropiedad: desmárquelo antes',
+      );
     }
     this.rutas.olvidar();
     return { puente: dto.puente };

@@ -1,7 +1,7 @@
+import { esCodigoDeConflicto } from '@ncr/domain-core';
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -16,6 +16,7 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import {
@@ -63,7 +64,7 @@ export const exigirRostro = <E = EstadoDeMiRostro>(
     respuesta.setHeader('Retry-After', String(r.reintentarEnS ?? 60));
     throw new HttpException(r.explicacion, HttpStatus.TOO_MANY_REQUESTS);
   }
-  throw new ConflictException(r.explicacion);
+  throw conflicto(esCodigoDeConflicto(r.codigo) ? r.codigo : 'ROSTRO', r.explicacion);
 };
 
 /**

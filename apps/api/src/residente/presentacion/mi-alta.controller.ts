@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -12,6 +11,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { explicacionDelTope } from '@ncr/domain-core';
@@ -212,7 +212,7 @@ export class MiAltaController {
     }
     if (r.motivo === 'SUPERA_EL_TOPE') {
       const vistos = desenvolver(await this.verOcupantes.ejecutar(destino, copropiedadId));
-      throw new ConflictException(explicacionDelTope(vistos.tope));
+      throw conflicto('TOPE_DE_PLAZAS', explicacionDelTope(vistos.tope));
     }
     throw new BadRequestException('El número de ocupantes va de 1 a 20');
   }

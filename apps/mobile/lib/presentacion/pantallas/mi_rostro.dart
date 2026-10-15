@@ -127,8 +127,16 @@ class _EstadoDeMiRostro extends State<PantallaDeMiRostro> {
         if (sinRed) _descartarFoto();
         _aviso = (texto: sinRed ? avisoSinConexionDelRostro : f.detalle, bien: false);
       });
-      // Un 409 (la política cambió u otro registro ganó): se relee el estado.
-      if (f.clase == ClaseDeFallo.servidor) await _cargar();
+      // 15-Z2 (DT-15X-09) · por el código: la política que cambió desmarca la
+      // casilla en el acto (hay que leer la nueva) y se relee el estado; «otro
+      // registro ganó» sólo relee. Sin código (API anterior), como antes.
+      if (f.codigo == 'POLITICA_CAMBIADA') {
+        setState(() {
+          _acepta = false;
+          _declarado = _sinDeclarar();
+        });
+      }
+      if (f.codigo != null || f.clase == ClaseDeFallo.servidor) await _cargar();
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }

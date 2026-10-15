@@ -82,6 +82,14 @@ export class OrdenDeModoCumplidaDto {
 export class ModoVigenteDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) dispositivoId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      '15-Z2 (DT-15R-07) · el nombre del equipo, para que la franja no diga «Puerta N» a secas; ' +
+      'null si el equipo ya no está activo',
+  })
+  dispositivoNombre!: string | null;
   @ApiProperty() numeroDePuerta!: number;
   @ApiProperty({ enum: ['libre', 'bloqueada'] }) modo!: string;
   @ApiProperty() motivo!: string;

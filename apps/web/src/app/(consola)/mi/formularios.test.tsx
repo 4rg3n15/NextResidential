@@ -235,7 +235,11 @@ describe('mis vehículos (M-3)', () => {
         <PantallaDeMisVehiculos copropiedadId={COP} />
       </Envoltura>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    // 15-Z2 (DT-15W-02) · el de la administración se ve sin «Dar de baja»; el propio, con él.
+    expect(await screen.findByText('ADM456')).toBeTruthy();
+    expect(screen.getByText('Lo registró la administración')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Dar de baja' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Dar de baja' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Dar de baja' }).at(-1)!);
     await waitFor(async () => expect((await escrituras(espia)).length).toBe(1));
     const [e] = await escrituras(espia);

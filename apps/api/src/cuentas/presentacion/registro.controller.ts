@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   HttpCode,
   Inject,
@@ -10,6 +9,7 @@ import {
   ServiceUnavailableException,
   UseInterceptors,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
@@ -85,7 +85,7 @@ export class RegistroController {
       case 'CODIGO':
         throw new BadRequestException(MENSAJE_CODIGO_DE_INVITACION);
       case 'USUARIO_OCUPADO':
-        throw new ConflictException('Ese usuario no está disponible');
+        throw conflicto('USUARIO_NO_DISPONIBLE', 'Ese usuario no está disponible');
       case 'NO_DISPONIBLE':
         throw new ServiceUnavailableException('El registro no está disponible en este momento');
     }

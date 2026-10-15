@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -13,6 +12,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
 import { Contexto } from '../../comun/decoradores/contexto.decorator';
@@ -64,7 +64,7 @@ const rechazoDeTurno = (e: RechazoDeTurno): Error =>
   e.motivo === 'FORMATO'
     ? new BadRequestException(e.detalle)
     : e.motivo === 'TERMINADO'
-      ? new ConflictException('El turno ya terminó: es historia y no se modifica')
+      ? conflicto('TURNO_TERMINADO', 'El turno ya terminó: es historia y no se modifica')
       : new NotFoundException('Turno o portero no encontrado');
 
 const instante = (v: string, campo: string): Date => {

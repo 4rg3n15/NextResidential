@@ -11,6 +11,14 @@ DetalleDeErrorDto _$DetalleDeErrorDtoFromJson(Map<String, dynamic> json) =>
       message: json['message'],
       error: json['error'] as String?,
       statusCode: json['statusCode'] as num?,
+      codigo: json['codigo'] == null
+          ? null
+          : DetalleDeErrorDtoCodigo.fromJson(json['codigo'] as String),
+      campos: (json['campos'] as List<dynamic>?)
+          ?.map(
+            (e) => CampoRechazadoDeFormaDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
     );
 
 Map<String, dynamic> _$DetalleDeErrorDtoToJson(DetalleDeErrorDto instance) =>
@@ -18,4 +26,6 @@ Map<String, dynamic> _$DetalleDeErrorDtoToJson(DetalleDeErrorDto instance) =>
       'message': instance.message,
       'error': instance.error,
       'statusCode': instance.statusCode,
+      'codigo': instance.codigo,
+      'campos': instance.campos,
     };

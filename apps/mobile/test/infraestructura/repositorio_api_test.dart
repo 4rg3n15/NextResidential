@@ -266,7 +266,7 @@ void main() {
       expect(familia.last.nivelAcceso, isNull);
     });
 
-    test('vehículos: la placa y el principal', () async {
+    test('vehículos: la placa, el principal y el origen (15-Z2: sólo «propio» se edita)', () async {
       final (repo, _) = await montar(
         (_, _) => json(200, [
           {
@@ -277,12 +277,25 @@ void main() {
             'color': null,
             'esPrincipal': true,
             'activo': true,
+            'origen': 'propio',
+          },
+          {
+            'id': 'v-2',
+            'placa': 'ADM456',
+            'marca': null,
+            'modelo': null,
+            'color': null,
+            'esPrincipal': false,
+            'activo': true,
+            'origen': 'administracion',
           },
         ]),
       );
       final vehiculos = await repo.misVehiculos();
-      expect(vehiculos.single.placa, 'ABC123');
-      expect(vehiculos.single.esPrincipal, isTrue);
+      expect(vehiculos.first.placa, 'ABC123');
+      expect(vehiculos.first.esPrincipal, isTrue);
+      expect(vehiculos.first.esPropio, isTrue);
+      expect(vehiculos.last.esPropio, isFalse);
     });
 
     test('autorizaciones: las fechas se parsean y los acompañantes se cuentan', () async {

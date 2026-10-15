@@ -128,13 +128,19 @@ class _Vehiculo extends StatelessWidget {
                   const SizedBox(width: 6),
                   const Distintivo(texto: 'Desactivado', pareja: Paleta.neutroSuave),
                 ],
+                if (!v.esPropio) ...[
+                  const SizedBox(width: 6),
+                  const Distintivo(texto: 'Lo registró la administración', pareja: Paleta.neutroSuave),
+                ],
               ],
             ),
             if (v.descripcion.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(v.descripcion, style: const TextStyle(color: Paleta.textoSuave)),
             ],
-            if (v.activo && (alEditar != null || alEliminar != null))
+            // DT-15W-02 · los de la administración no se editan ni se eliminan
+            // desde la app: la API contestaría 404 «Vehículo propio no encontrado».
+            if (v.activo && v.esPropio && (alEditar != null || alEliminar != null))
               Align(
                 alignment: Alignment.centerRight,
                 child: Wrap(

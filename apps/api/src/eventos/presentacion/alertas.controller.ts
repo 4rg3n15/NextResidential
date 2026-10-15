@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Get,
   Inject,
@@ -11,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -142,7 +142,7 @@ export class AlertasController {
     const alerta = await this.buscar(copropiedadId, alertaId);
 
     const atendida = alerta.atender(ctx.usuarioId, this.reloj.ahora());
-    if (!atendida.ok) throw new ConflictException(atendida.error.detalle);
+    if (!atendida.ok) throw conflicto('ALERTA_YA_ATENDIDA', atendida.error.detalle);
     await this.alertas.guardar(atendida.valor, ctx.usuarioId);
     return exponer(atendida.valor);
   }

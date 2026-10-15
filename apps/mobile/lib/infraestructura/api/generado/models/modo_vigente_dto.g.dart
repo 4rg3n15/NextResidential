@@ -10,6 +10,7 @@ ModoVigenteDto _$ModoVigenteDtoFromJson(Map<String, dynamic> json) =>
     ModoVigenteDto(
       id: json['id'] as String,
       dispositivoId: json['dispositivoId'] as String,
+      dispositivoNombre: json['dispositivoNombre'] as String?,
       numeroDePuerta: json['numeroDePuerta'] as num,
       modo: ModoVigenteDtoModo.fromJson(json['modo'] as String),
       motivo: json['motivo'] as String,
@@ -28,6 +29,7 @@ Map<String, dynamic> _$ModoVigenteDtoToJson(ModoVigenteDto instance) =>
     <String, dynamic>{
       'id': instance.id,
       'dispositivoId': instance.dispositivoId,
+      'dispositivoNombre': instance.dispositivoNombre,
       'numeroDePuerta': instance.numeroDePuerta,
       'modo': instance.modo,
       'motivo': instance.motivo,

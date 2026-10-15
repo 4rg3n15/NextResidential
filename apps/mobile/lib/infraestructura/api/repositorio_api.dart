@@ -28,6 +28,7 @@ import 'generado/models/foto_de_visita_dto.dart';
 import 'generado/models/foto_de_visita_dto_tipo_mime.dart';
 import 'generado/models/medidas_de_foto_dto.dart';
 import 'generado/models/mi_autorizacion_dto.dart';
+import 'generado/models/mi_vehiculo_dto_origen.dart';
 import 'generado/models/mi_autorizacion_dto_situacion.dart';
 import 'generado/models/mi_evento_dto.dart';
 import 'generado/models/mi_inicio_dto.dart';
@@ -267,6 +268,11 @@ Vehiculo _vehiculoDe(MiVehiculoDto d) => Vehiculo(
       color: d.color,
       esPrincipal: d.esPrincipal,
       activo: d.activo,
+      // 15-Z2 (DT-15W-02) · sólo lo que la API declara «propio» se edita; un
+      // valor desconocido se trata como de la administración (falla cerrado).
+      origen: d.origen == MiVehiculoDtoOrigen.propio
+          ? OrigenDeVehiculo.propio
+          : OrigenDeVehiculo.administracion,
     );
 
 Autorizacion _autorizacionDe(MiAutorizacionDto d) => Autorizacion(

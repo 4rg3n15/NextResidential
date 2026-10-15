@@ -1,5 +1,6 @@
 import { ApiExtraModels, ApiProperty, getSchemaPath } from '@nestjs/swagger';
-import { MOTIVOS_ACCESO } from '@ncr/domain-core';
+import { CODIGOS_DE_CONFLICTO, MOTIVOS_ACCESO } from '@ncr/domain-core';
+import type { CodigoDeConflicto } from '@ncr/domain-core';
 
 /**
  * Cuerpo de error de la API, tal como lo emite `FiltroGlobalDeExcepciones`.
@@ -14,6 +15,11 @@ import { MOTIVOS_ACCESO } from '@ncr/domain-core';
  * la unión real en vez de mentir con `string`: un contrato que promete menos de
  * lo que entrega obliga al consumidor a hacer `as`, y ahí se pierde el tipado.
  */
+export class CampoRechazadoDeFormaDto {
+  @ApiProperty({ example: 'placa' }) campo!: string;
+  @ApiProperty({ example: 'debe ser texto' }) motivo!: string;
+}
+
 export class DetalleDeErrorDto {
   @ApiProperty({
     oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
@@ -28,6 +34,24 @@ export class DetalleDeErrorDto {
 
   @ApiProperty({ type: Number, required: false, example: 400 })
   statusCode?: number;
+
+  @ApiProperty({
+    required: false,
+    enum: CODIGOS_DE_CONFLICTO,
+    description:
+      '15-Z2 · en todo 409 de negocio: el código con que el dominio nombra el conflicto. La ' +
+      'consola y la app deciden por él (qué refrescar, bajo qué campo pintar) y muestran `message`.',
+  })
+  codigo?: CodigoDeConflicto;
+
+  @ApiProperty({
+    required: false,
+    type: [CampoRechazadoDeFormaDto],
+    description:
+      '15-Z2 · en los 400 de forma del ValidationPipe: un renglón por campo rechazado, en ' +
+      'español, con la misma forma que los `campos` de los 400 de regla del alta (15-W).',
+  })
+  campos?: CampoRechazadoDeFormaDto[];
 }
 
 @ApiExtraModels(DetalleDeErrorDto)

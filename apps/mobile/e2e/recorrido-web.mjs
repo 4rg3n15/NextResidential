@@ -192,6 +192,8 @@ const DATOS = {
       color: 'Blanco',
       esPrincipal: true,
       activo: true,
+      // 15-Z2 (DT-15W-02) · el contrato exige el origen: sin él, el DTO generado no parsea la lista.
+      origen: 'propio',
     },
   ],
   // 15-L · la SITUACIÓN la da el servidor (la misma que ve la consola), y la

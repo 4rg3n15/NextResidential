@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   Get,
   Inject,
@@ -10,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Aforo, BITACORA, FranjaHoraria, HorarioDeZona } from '@ncr/domain-core';
 import type { Bitacora, ErrorDominio, Resultado, Zona } from '@ncr/domain-core';
@@ -320,7 +320,7 @@ const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
       throw new NotFoundException(r.error.detalle);
     case 'INVARIANTE_VIOLADA':
     case 'CONFLICTO_DE_CONCURRENCIA':
-      throw new ConflictException(r.error.detalle);
+      throw conflicto('ZONA', r.error.detalle);
     default:
       throw new BadRequestException(r.error.detalle);
   }

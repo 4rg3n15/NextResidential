@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   HttpCode,
   Inject,
@@ -10,6 +9,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -39,7 +39,7 @@ const desenvolver = (
 ): ResultadoDeConfiguracionDto => {
   if (!r.ok) {
     if (r.error.codigo === 'ENTIDAD_NO_ENCONTRADA') throw new NotFoundException(r.error.detalle);
-    throw new ConflictException(r.error.detalle);
+    throw conflicto('CONFIGURACION_EN_SITIO', r.error.detalle);
   }
   const { aplicada, valorAnterior, valorNuevo, detalle } = r.valor;
   return { aplicada, valorAnterior, valorNuevo, detalle };

@@ -29,6 +29,7 @@ import { TEMA_EVENTOS } from './puertos';
 import type { EscalarAlerta } from './escalamiento';
 import { VENTANA_DE_DUPLICADOS_MS, debeAbrirAlerta } from './deduplicacion-de-alertas';
 import { FilaPorClave } from './fila-por-clave';
+import { avisoDeAcceso, type OpcionesDeRegistrarAcceso } from './aviso-al-residente';
 
 export interface HechoEntrante {
   readonly copropiedadId: string;
@@ -122,8 +123,7 @@ export class RegistrarAcceso {
     private readonly ids: GeneradorDeId,
     private readonly bitacora: Bitacora,
     private readonly push?: NotificadorPush,
-    /** E5 (15-M) · ventana de deduplicación de alertas por (equipo, tipo). */
-    private readonly opciones: { readonly ventanaDeDuplicadosMs?: number } = {},
+    private readonly opciones: OpcionesDeRegistrarAcceso = {},
   ) {}
 
   async ejecutar(
@@ -297,17 +297,17 @@ export class RegistrarAcceso {
     return abierta.valor.id;
   }
 
-  /** HU-34 · el residente se entera de lo que pasa en su vivienda. */
+  /** HU-34 · el residente se entera de lo que pasa en su vivienda (texto: `aviso-al-residente.ts`). */
   private async avisarAlResidente(acceso: Acceso): Promise<void> {
     if (this.push === undefined || acceso.viviendaId === null) return;
     try {
+      const nombre = (await this.opciones.nombreDeEquipo?.nombreDe(acceso.dispositivoId)) ?? null;
+      const aviso = avisoDeAcceso(acceso, nombre);
       await this.push.aVivienda(
         acceso.copropiedadId,
         acceso.viviendaId,
-        acceso.permitido ? 'Acceso registrado' : 'Acceso denegado',
-        acceso.permitido
-          ? `Ingreso por ${acceso.metodo} en ${acceso.dispositivoId}.`
-          : `Intento denegado (${acceso.motivo ?? 'sin motivo'}).`,
+        aviso.titulo,
+        aviso.cuerpo,
       );
     } catch (e) {
       this.bitacora.registrar('aviso', 'no se pudo notificar al residente', {

@@ -3401,6 +3401,12 @@ export interface components {
              */
             ipsGuardiaRemota?: string[];
         };
+        CampoRechazadoDeFormaDto: {
+            /** @example placa */
+            campo: string;
+            /** @example debe ser texto */
+            motivo: string;
+        };
         CampoRechazadoDto: {
             campo: string;
             motivo: string;
@@ -3832,6 +3838,13 @@ export interface components {
             error?: string;
             /** @example 400 */
             statusCode?: number;
+            /**
+             * @description 15-Z2 · en todo 409 de negocio: el código con que el dominio nombra el conflicto. La consola y la app deciden por él (qué refrescar, bajo qué campo pintar) y muestran `message`.
+             * @enum {string}
+             */
+            codigo?: "VIVIENDA_CON_TITULAR" | "CUENTA_CON_VIVIENDA" | "USUARIO_NO_DISPONIBLE" | "USUARIO_DUPLICADO" | "PROVEEDOR_DE_IDENTIDAD" | "REGISTRO_NO_SUSPENDIDO" | "TOPE_DE_PLAZAS" | "TOPE_BAJO_LAS_PLAZAS" | "PLAZAS_MAXIMAS" | "PLAZA_OCUPADA" | "PLAZA_DEL_TITULAR" | "DOCUMENTO_EN_USO" | "TRASPASO_SOLO_MAYOR" | "PLACA_CON_HISTORIAL" | "VEHICULO" | "VISITA_NO_REVOCABLE" | "SUSCRIPCION_WEB_PUSH" | "POLITICA_CAMBIADA" | "OTRO_REGISTRO_GANO" | "ROSTRO" | "PADRON" | "AUTORIZACION" | "OPERACION_NO_PERMITIDA" | "LISTA_NEGRA" | "ZONA" | "VISITA" | "ALERTA_YA_ATENDIDA" | "CONFIGURACION_EN_SITIO" | "TURNO_TERMINADO" | "PORTERO_DUPLICADO" | "CUPO_DE_PORTEROS" | "NUMEROS_DE_PORTERO_AGOTADOS" | "SIN_ORIGEN_DE_VIDEO" | "AUDIO_POR_HTTP" | "SIN_LA_PALABRA" | "TRANSPORTE_DE_AUDIO_NO_DISPONIBLE" | "SIN_TRANSPORTE_DE_AUDIO" | "OTRO_EDGE_PUENTE" | "CACHE_DEL_EDGE_ADELANTADA";
+            /** @description 15-Z2 · en los 400 de forma del ValidationPipe: un renglón por campo rechazado, en español, con la misma forma que los `campos` de los 400 de regla del alta (15-W). */
+            campos?: components["schemas"]["CampoRechazadoDeFormaDto"][];
         };
         DispositivoDelTableroDto: {
             /** Format: uuid */
@@ -4824,6 +4837,11 @@ export interface components {
             color: string | null;
             esPrincipal: boolean;
             activo: boolean;
+            /**
+             * @description 15-Z2 (DT-15W-02) · «propio» lo registró el hogar y se edita y elimina desde la app; «administracion» sólo se ve.
+             * @enum {string}
+             */
+            origen: "propio" | "administracion";
         };
         MiVinculoDto: {
             /** Format: uuid */
@@ -4932,6 +4950,8 @@ export interface components {
             id: string;
             /** Format: uuid */
             dispositivoId: string;
+            /** @description 15-Z2 (DT-15R-07) · el nombre del equipo, para que la franja no diga «Puerta N» a secas; null si el equipo ya no está activo */
+            dispositivoNombre: string | null;
             numeroDePuerta: number;
             /** @enum {string} */
             modo: "libre" | "bloqueada";

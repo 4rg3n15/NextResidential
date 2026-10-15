@@ -1,6 +1,5 @@
 import {
   Body,
-  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -11,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../comun/decoradores';
@@ -68,8 +68,9 @@ export class TitularesController {
     });
     if (r === 'ASIGNADA') return { asignada: true };
     if (r === 'CUENTA_INEXISTENTE') throw new NotFoundException('Cuenta no encontrada');
-    if (r === 'CUENTA_CON_VIVIENDA') throw new ConflictException('Esa cuenta ya tiene vivienda');
-    if (r === 'CON_TITULAR') throw new ConflictException(VIVIENDA_CON_TITULAR);
+    if (r === 'CUENTA_CON_VIVIENDA')
+      throw conflicto('CUENTA_CON_VIVIENDA', 'Esa cuenta ya tiene vivienda');
+    if (r === 'CON_TITULAR') throw conflicto('VIVIENDA_CON_TITULAR', VIVIENDA_CON_TITULAR);
     throw new NotFoundException('Vivienda no encontrada');
   }
 

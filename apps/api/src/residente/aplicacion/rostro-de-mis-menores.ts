@@ -137,7 +137,9 @@ export class RostroDeMisMenores {
           ? rechazo(400, 'La foto no sirve para reconocer el rostro', {
               motivos: hecho.valor.motivos,
             })
-          : rechazo(409, 'Otro registro de este rostro terminó antes: vuelva a intentarlo'),
+          : rechazo(409, 'Otro registro de este rostro terminó antes: vuelva a intentarlo', {
+              codigo: 'OTRO_REGISTRO_GANO',
+            }),
       );
     }
     await this.anotar(ctx, cop, viviendaId, 'rostro_de_menor_registrado', residenteId, ahora);

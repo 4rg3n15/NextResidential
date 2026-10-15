@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -13,6 +12,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -48,7 +48,7 @@ const exigir = (r: ResultadoDeMenor): Extract<ResultadoDeMenor, { hecho: true }>
   if (r.estado === 400) throw new BadRequestException(r.explicacion);
   if (r.estado === 403) throw new ForbiddenException(r.explicacion);
   if (r.estado === 404) throw new NotFoundException(r.explicacion);
-  throw new ConflictException(r.explicacion);
+  throw conflicto(r.codigo ?? 'DOCUMENTO_EN_USO', r.explicacion);
 };
 
 /**

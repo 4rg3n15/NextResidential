@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -13,6 +12,7 @@ import {
   Query,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -60,7 +60,7 @@ export const desenvolver = <T>(r: Resultado<T, ErrorDominio>): T => {
       throw new ForbiddenException(r.error.detalle);
     case 'CONFLICTO_DE_CONCURRENCIA':
     case 'INVARIANTE_VIOLADA':
-      throw new ConflictException(r.error.detalle);
+      throw conflicto('VISITA', r.error.detalle);
     default:
       throw new BadRequestException(r.error.detalle);
   }

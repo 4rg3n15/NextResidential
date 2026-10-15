@@ -190,8 +190,9 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         color: string | null;
         es_principal: boolean;
         estado: string;
+        origen_registro: string;
       }>(
-        `SELECT id, placa, marca, modelo, color, es_principal, estado
+        `SELECT id, placa, marca, modelo, color, es_principal, estado, origen_registro
            FROM public.vehiculos
           WHERE copropiedad_id = $1 AND vivienda_id = $2
           ORDER BY es_principal DESC, placa ASC`,
@@ -205,6 +206,8 @@ export class DirectorioDelResidentePg implements DirectorioDelResidente {
         color: f.color,
         esPrincipal: f.es_principal,
         activo: f.estado === 'activo',
+        // DT-15W-02 · 'residente' en la base (0038) es «propio» para el hogar.
+        origen: f.origen_registro === 'residente' ? 'propio' : 'administracion',
       }));
     });
   }

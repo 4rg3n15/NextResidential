@@ -42,7 +42,11 @@ class RelojFijo implements Reloj {
 }
 
 /// La pestaña de vehículos con las acciones de verdad sobre un hogar falso.
-Future<ControladorDeVista<List<Vehiculo>>> montar(WidgetTester t, HogarFalso hogar) async {
+Future<ControladorDeVista<List<Vehiculo>>> montar(
+  WidgetTester t,
+  HogarFalso hogar, {
+  List<Vehiculo> lista = const [gris],
+}) async {
   t.view.physicalSize = const Size(1000, 2000);
   t.view.devicePixelRatio = 1.0;
   addTearDown(t.view.reset);
@@ -50,7 +54,7 @@ Future<ControladorDeVista<List<Vehiculo>>> montar(WidgetTester t, HogarFalso hog
   final vehiculos = ControladorDeVista<List<Vehiculo>>(
     leer: () async {
       lecturas += 1;
-      return lecturas == 1 || hogar.eliminados.isEmpty ? const [gris] : const <Vehiculo>[];
+      return lecturas == 1 || hogar.eliminados.isEmpty ? lista : const <Vehiculo>[];
     },
   );
   await vehiculos.cargarAhora();
@@ -83,7 +87,29 @@ Future<ControladorDeVista<List<Vehiculo>>> montar(WidgetTester t, HogarFalso hog
   return vehiculos;
 }
 
+const deLaAdministracion = Vehiculo(
+  id: 'veh-2',
+  placa: 'ADM456',
+  marca: null,
+  modelo: null,
+  color: null,
+  esPrincipal: false,
+  activo: true,
+  origen: OrigenDeVehiculo.administracion,
+);
+
 void main() {
+  testWidgets('15-Z2 (DT-15W-02) · el de la administración se ve, pero no se edita ni se elimina', (
+    t,
+  ) async {
+    final hogar = HogarFalso();
+    await montar(t, hogar, lista: const [gris, deLaAdministracion]);
+    expect(find.byKey(const Key('vehiculos.editar.ABC123')), findsOneWidget);
+    expect(find.byKey(const Key('vehiculos.editar.ADM456')), findsNothing);
+    expect(find.byKey(const Key('vehiculos.eliminar.ADM456')), findsNothing);
+    expect(find.text('Lo registró la administración'), findsOneWidget);
+  });
+
   testWidgets('«Editar» trae los datos; sólo viaja la placa si cambió', (t) async {
     final hogar = HogarFalso();
     await montar(t, hogar);

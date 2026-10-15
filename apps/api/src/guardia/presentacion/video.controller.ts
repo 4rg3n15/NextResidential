@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   BadRequestException,
-  ConflictException,
   Controller,
   HttpCode,
   Inject,
@@ -12,6 +11,7 @@ import {
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -117,7 +117,7 @@ export class VideoController {
     } catch (error) {
       if (error instanceof PuenteDeVideoNoConfigurado)
         throw new ServiceUnavailableException(error.message);
-      if (error instanceof SinOrigenDeVideo) throw new ConflictException(error.message);
+      if (error instanceof SinOrigenDeVideo) throw conflicto('SIN_ORIGEN_DE_VIDEO', error.message);
       if (error instanceof PuenteDeVideoFallo) throw new BadGatewayException(error.message);
       throw error;
     }

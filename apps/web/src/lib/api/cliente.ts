@@ -96,14 +96,22 @@ export const rechazosPorCampo = (cuerpo: unknown): Record<string, string> | unde
   if (typeof cuerpo !== 'object' || cuerpo === null) return undefined;
   const mensaje = (cuerpo as CuerpoDeError).mensaje;
   if (typeof mensaje !== 'object' || mensaje === null) return undefined;
-  const lista = (mensaje as { rechazos?: unknown }).rechazos;
+  // 422 de regla: `rechazos: [{ clave, motivo }]`; 400 de forma (15-Z2,
+  // DT-15W-05) y de regla del alta (15-W): `campos: [{ campo, motivo }]`.
+  const lista =
+    (mensaje as { rechazos?: unknown }).rechazos ?? (mensaje as { campos?: unknown }).campos;
   if (!Array.isArray(lista)) return undefined;
   const salida: Record<string, string> = {};
   for (const entrada of lista) {
     if (typeof entrada !== 'object' || entrada === null) continue;
-    const { clave, motivo } = entrada as { clave?: unknown; motivo?: unknown };
-    if (typeof clave === 'string' && typeof motivo === 'string') {
-      salida[clave] = sinCodigosDelProyecto(motivo);
+    const { clave, campo, motivo } = entrada as {
+      clave?: unknown;
+      campo?: unknown;
+      motivo?: unknown;
+    };
+    const nombre = typeof clave === 'string' ? clave : campo;
+    if (typeof nombre === 'string' && typeof motivo === 'string') {
+      salida[nombre] = sinCodigosDelProyecto(motivo);
     }
   }
   return Object.keys(salida).length > 0 ? salida : undefined;

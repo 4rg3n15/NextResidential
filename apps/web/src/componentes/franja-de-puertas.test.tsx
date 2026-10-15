@@ -15,6 +15,7 @@ const EQUIPO = '70000000-0000-4000-8000-000000000001';
 const VIGENTE = {
   id: 'm-1',
   dispositivoId: EQUIPO,
+  dispositivoNombre: 'Portería de A',
   numeroDePuerta: 2,
   modo: 'libre',
   motivo: 'Mudanza del 302',
@@ -56,7 +57,8 @@ describe('15-R · franja de puertas libres o bloqueadas', () => {
   it('el portero ve quién, por qué, desde y hasta cuándo, pero no revierte', async () => {
     envolver(<FranjaDePuertas copropiedadId={COP} rol="portero" />);
     const alerta = await screen.findByRole('alert');
-    expect(alerta.textContent).toMatch(/Puerta 2 LIBRE/);
+    // 15-Z2 (DT-15R-07) · el NOMBRE del equipo y la puerta, nunca «Puerta N» a secas.
+    expect(alerta.textContent).toMatch(/Portería de A · puerta 2 LIBRE/);
     expect(alerta.textContent).toMatch(/Ana Admin/);
     expect(alerta.textContent).toMatch(/«Mudanza del 302»/);
     expect(alerta.textContent).toMatch(/Vuelve sola a normal/);

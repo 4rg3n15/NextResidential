@@ -361,8 +361,10 @@ aunque la pantalla ya no se lo ofrezca a nadie más.
   sigue libre sin que nadie lo sepa es el peor desenlace posible.
 - **Mientras alguna puerta esté libre o bloqueada, toda la consola lo dice.**
   Portería, guardia y administración ven arriba, en todas las pantallas, una
-  **franja roja fija** que no se puede cerrar: «**Puerta N LIBRE** desde las
-  HH:MM, por <quién>: «<motivo>». Vuelve sola a normal a las HH:MM.» Si la
+  **franja roja fija** que no se puede cerrar: «**<Nombre del equipo> · puerta N
+  LIBRE** desde las HH:MM, por <quién>: «<motivo>». Vuelve sola a normal a las
+  HH:MM.» (Desde la 15-Z2 dice el nombre del equipo: con varios videoporteros,
+  «Puerta 1» a secas no decía cuál.) Si la
   reversión automática falló, la franja lo añade: «La reversión automática no
   llegó al equipo (N intentos): se reintenta.» Se actualiza sola cada 30 s.
 - **«Revertir ahora»**, en la misma franja, la devuelve a normal antes de

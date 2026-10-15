@@ -94,7 +94,13 @@ ResultadoDeRegistro rechazoDelRegistro(DioException e) {
       if (campos.isNotEmpty) return RegistroConErrores(campos, politica: politica);
       return RegistroRechazado(detalleDeError(cuerpo) ?? 'Revise los datos', politica: politica);
     case 409:
-      return RegistroRechazado(detalleDeError(cuerpo) ?? 'No se pudo crear la cuenta.');
+      // 15-Z2 (DT-15W-01) · por el código, no por el texto: el usuario ocupado se
+      // pinta bajo «Usuario»; cualquier otro 409 sigue siendo un rechazo general.
+      final texto = detalleDeError(cuerpo) ?? 'No se pudo crear la cuenta.';
+      if (codigoDelRechazo(cuerpo) == 'USUARIO_NO_DISPONIBLE') {
+        return RegistroConErrores({'usuario': texto}, politica: politicaDelRechazo(cuerpo));
+      }
+      return RegistroRechazado(texto);
     case 429:
       return RegistroRechazado(mensajeDeEspera(segundosDeEspera(respuesta)));
   }

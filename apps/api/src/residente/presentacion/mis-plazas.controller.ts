@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   ForbiddenException,
-  ConflictException,
   HttpCode,
   Inject,
   NotFoundException,
@@ -10,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
+import { conflicto } from '../..//comun/conflicto';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { ErrorDominio, Resultado } from '@ncr/domain-core';
@@ -34,7 +34,7 @@ const exigirHecho = (r: ResultadoDePlaza): void => {
   if (r.hecho) return;
   if (r.estado === 403) throw new ForbiddenException(r.explicacion);
   if (r.estado === 404) throw new NotFoundException(r.explicacion);
-  throw new ConflictException(r.explicacion);
+  throw conflicto(r.codigo ?? 'TOPE_DE_PLAZAS', r.explicacion);
 };
 
 /**

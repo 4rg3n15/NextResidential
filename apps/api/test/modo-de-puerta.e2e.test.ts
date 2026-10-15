@@ -118,6 +118,8 @@ describe('C1/C3/C4 · la orden, la vista de la consola y la reversión', () => {
     expect(vista.body.modos).toEqual([
       expect.objectContaining({
         dispositivoId: EQUIPO,
+        // 15-Z2 (DT-15R-07) · la franja dice el NOMBRE del equipo, no «Puerta N» a secas.
+        dispositivoNombre: 'Portería de A',
         numeroDePuerta: 1,
         modo: 'libre',
         motivo: 'Mudanza del 302',

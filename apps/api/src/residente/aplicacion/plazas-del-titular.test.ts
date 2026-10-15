@@ -76,6 +76,7 @@ describe('PlazasDeMiVivienda (15-W, D4 bis)', () => {
       valor: {
         hecho: false,
         estado: 409,
+        codigo: 'TOPE_DE_PLAZAS',
         explicacion:
           'Su vivienda tiene el máximo de 6 plazas. Para más, pídalo a la administración.',
       },

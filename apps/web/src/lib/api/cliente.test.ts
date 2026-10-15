@@ -36,4 +36,18 @@ describe('mensajes de la API sin códigos del proyecto', () => {
       rechazosPorCampo({ mensaje: { rechazos: [{ clave: 'placa', motivo: 'Repetida (RN-04)' }] } }),
     ).toEqual({ placa: 'Repetida' });
   });
+
+  it('15-Z2 (DT-15W-05) · los `campos` de un 400 de forma también van bajo su campo', () => {
+    expect(
+      rechazosPorCampo({
+        mensaje: {
+          message: 'Revise los datos: placa debe ser texto',
+          campos: [
+            { campo: 'placa', motivo: 'debe ser texto' },
+            { campo: 'extra', motivo: 'no se admite este campo' },
+          ],
+        },
+      }),
+    ).toEqual({ placa: 'debe ser texto', extra: 'no se admite este campo' });
+  });
 });

@@ -82,6 +82,8 @@ Fallo falloDeDio(DioException e) {
   }
   final codigo = e.response?.statusCode;
   final detalle = detalleDeError(e.response?.data) ?? e.message ?? 'Error de servidor';
+  // 15-Z2 · el código máquina del 409 viaja con el fallo: la pantalla decide por él.
+  final codigoDeNegocio = codigoDelRechazo(e.response?.data);
   return switch (codigo) {
     // 15-W · el limitador contesta en inglés y sin plazo: aquí, en palabras y
     // con el `Retry-After` que manda.
@@ -94,6 +96,7 @@ Fallo falloDeDio(DioException e) {
     401 => Fallo(ClaseDeFallo.sesionInvalida, detalle),
     403 => Fallo(ClaseDeFallo.sinPermiso, detalle),
     404 => Fallo(ClaseDeFallo.sinVivienda, detalle),
+    409 => Fallo(ClaseDeFallo.servidor, detalle, codigo: codigoDeNegocio),
     _ => Fallo(ClaseDeFallo.servidor, detalle),
   };
 }

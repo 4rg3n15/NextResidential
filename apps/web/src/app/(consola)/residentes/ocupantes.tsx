@@ -125,7 +125,16 @@ export const OcupantesPorVivienda = ({
                 {p.libre ? (
                   <Distintivo tono="neutro">Libre · código {p.codigo}</Distintivo>
                 ) : (
-                  <strong>{p.ocupante}</strong>
+                  <>
+                    <strong>{p.ocupante}</strong>
+                    {/* 15-Z2 (DT-15W-04) · un menor ocupa su plaza sin cuenta: se dice. */}
+                    {p.sinCuenta ? (
+                      <>
+                        {' '}
+                        <Distintivo tono="neutro">Sin cuenta (menor)</Distintivo>
+                      </>
+                    ) : null}
+                  </>
                 )}
               </span>
               <Boton variante="fantasma" tamano="sm" onClick={() => setRetirar(p)}>

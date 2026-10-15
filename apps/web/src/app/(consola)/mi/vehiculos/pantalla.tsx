@@ -33,12 +33,16 @@ const TarjetaDeVehiculo = ({
           <span className="flex gap-1.5">
             {v.esPrincipal ? <Distintivo tono="exito">Principal</Distintivo> : null}
             {!v.activo ? <Distintivo tono="neutro">Desactivado</Distintivo> : null}
+            {v.origen === 'administracion' ? (
+              <Distintivo tono="neutro">Lo registró la administración</Distintivo>
+            ) : null}
           </span>
         </div>
         {descripcion !== '' ? (
           <p className="text-secundario text-texto-apagado">{descripcion}</p>
         ) : null}
-        {v.activo ? (
+        {/* 15-Z2 (DT-15W-02) · los de la administración no se tocan desde aquí: la API contestaría 404. */}
+        {v.activo && v.origen === 'propio' ? (
           <div className="flex justify-end">
             <Boton variante="fantasma" tamano="sm" onClick={() => alDarDeBaja(v)}>
               Dar de baja
