@@ -12,10 +12,16 @@
 
 D5 a: los ocupantes registran vehículos **propios** activos al instante. Hay un
 máximo de **2 por vivienda** (configurable por el superadministrador), sin
-límite por ocupante. Del tercero en adelante sólo los registra el
-superadministrador, y ésos no cuentan para el cupo. ADR-04 exige que una
-invariante concurrente la garantice la base, no un `SELECT` previo: dos
-teléfonos de la misma casa pulsando «Registrar» a la vez no pueden dejar tres.
+límite por ocupante.
+
+> **Enmienda de la ronda 15-Z1 (2026-10-13, D-Z1).** El valor por omisión pasa a
+> **5 por vivienda** (migración 0058). La **unidad** no cambia: el cliente lo dijo
+> «por residente», la base lo cuenta por vivienda, y eso es otra invariante, no
+> otro número (`[CONTRADICCIÓN]` C-67, pendiente P-40). El resto del ADR sigue
+> vigente con 5 donde dice 2. Del tercero en adelante sólo los registra el
+> superadministrador, y ésos no cuentan para el cupo. ADR-04 exige que una
+> invariante concurrente la garantice la base, no un `SELECT` previo: dos
+> teléfonos de la misma casa pulsando «Registrar» a la vez no pueden dejar tres.
 
 ## Decisión
 

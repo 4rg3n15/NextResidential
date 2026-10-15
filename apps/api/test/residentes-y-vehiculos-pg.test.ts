@@ -324,12 +324,13 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
   it('D6/D-W10 · el titular declara de 1 al tope; volver a declararlo es 403', async () => {
     if (omitida()) return;
     const ruta = `/copropiedades/${COP_A}/mi/ocupantes`;
-    const deMas = await con(primero).post(ruta, { numero: 5 });
+    // D-Z2 (15-Z1) · el tope por omisión es 10: la undécima no cabe.
+    const deMas = await con(primero).post(ruta, { numero: 11 });
     expect(deMas.status, JSON.stringify(deMas.body)).toBe(409);
-    expect(JSON.stringify(deMas.body)).toContain('máximo de 4 plazas');
+    expect(JSON.stringify(deMas.body)).toContain('máximo de 10 plazas');
     const r = await con(primero).post(ruta, { numero: 4 });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
-    expect(r.body).toMatchObject({ declarados: 4, tope: 4, esTitular: true });
+    expect(r.body).toMatchObject({ declarados: 4, tope: 10, esTitular: true });
     codigos = r.body.plazas
       .filter((p: { libre: boolean }) => p.libre)
       .map((p: { codigo: string }) => p.codigo);
@@ -722,9 +723,14 @@ describe('15-I · residentes y vehículos propios contra la base real', () => {
   it('D6 · el superadministrador añade y quita ocupantes con rastro; quitar una plaza ocupada da de baja el vínculo', async () => {
     if (omitida()) return;
     const ruta = `/copropiedades/${COP_A}/viviendas/${viviendaId}/ocupantes`;
+    // 15-Z1 · con 10 por omisión las 4 plazas ya no están en el tope: se fija un
+    // tope propio de 4 para seguir probando que la ruta lo sube si hace falta.
+    await (pool as Pool).query('UPDATE public.viviendas SET tope_de_plazas = 4 WHERE id = $1', [
+      viviendaId,
+    ]);
     const anadidas = await comoSuper('post', ruta).send({ cantidad: 1, motivo: 'nace un bebé' });
     expect(anadidas.status, JSON.stringify(anadidas.body)).toBe(200);
-    // Ya estaba en el tope (4): la ruta del superadministrador lo sube a 5 (D4 bis).
+    // Estaba en el tope (4): la ruta del superadministrador lo sube a 5 (D4 bis).
     expect(anadidas.body).toHaveLength(5);
     expect(
       (

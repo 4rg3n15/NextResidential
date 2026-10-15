@@ -27,7 +27,12 @@ El cliente decidió (2026-10-06):
 > total, contándose a sí mismo. El superadministrador puede ampliar el tope de
 > una vivienda concreta.
 
-El tope de 4 contando al titular es `[SUPUESTO]` S-15W-03, tomado del encargo.
+El tope de 4 contando al titular fue `[SUPUESTO]` S-15W-03, tomado del encargo.
+
+> **Enmienda de la ronda 15-Z1 (2026-10-13, D-Z2).** El tope por omisión pasa a
+> **10 en total, contando al titular** (migración 0058; `PLAZAS_POR_DEFECTO`). Ya no
+> es supuesto: lo decidió el cliente. Las viviendas con tope propio y el máximo
+> absoluto de 20 no cambian.
 
 ## Decisión
 

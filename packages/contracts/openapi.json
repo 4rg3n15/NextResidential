@@ -11992,8 +11992,8 @@
           },
           "topeVehiculosPropios": {
             "type": "number",
-            "example": 2,
-            "description": "D5 a · vehículos propios por vivienda."
+            "example": 5,
+            "description": "D5 a · vehículos propios ACTIVOS por vivienda (5 por omisión desde la 15-Z1)."
           },
           "ipsPorteria": {
             "example": [

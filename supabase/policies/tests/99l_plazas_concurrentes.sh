@@ -2,14 +2,15 @@
 # =============================================================================
 # 99l · EL TOPE DE PLAZAS BAJO CONCURRENCIA · RONDA 15-W · D-W10 · ADR-04
 #
-#   «dos inserciones simultáneas sobre la cuarta plaza → solo pasa una»
+#   «dos inserciones simultáneas sobre la décima plaza → solo pasa una»
 #
-# Una vivienda con 3 plazas vivas y tope 4. Veinte conexiones reales intentan a
+# Una vivienda con 9 plazas vivas y tope 10 (el valor por omisión desde la 0058,
+# D-Z2; hasta la 15-Z1 eran 3 y 4). Veinte conexiones reales intentan a
 # la vez añadir una plaza, cada una con su NÚMERO (así ninguna cae por el índice
 # único del número: si cae, es por el tope). Cada transacción espera un instante
 # antes de confirmar, para que todas estén dentro a la vez. Sólo el bloqueo por
 # vivienda del disparador puede garantizar el resultado: un SELECT previo en la
-# API contaría 3 en todas y dejaría pasar las veinte.
+# API contaría 9 en todas y dejaría pasar las veinte.
 #
 # Las plazas no se borran (tg_prohibir_delete): la prueba usa una vivienda
 # propia y, al terminar, retira las suyas. Repetible sobre la misma base.
@@ -30,7 +31,7 @@ SUPER='00000000-0000-4000-8000-000000000002'
 CLAIMS="{\"rol\":\"superadministrador\",\"usuario_id\":\"${SUPER}\",\"copropiedad_id\":null}"
 INTENTOS=20
 
-# Escenario: la vivienda propia (si no existe) con exactamente 3 plazas vivas.
+# Escenario: la vivienda propia (si no existe) con exactamente 9 plazas vivas.
 psql -Atq -v ON_ERROR_STOP=1 >/dev/null <<SQL || { echo "  99l · NO VERIFICADO: no se pudo montar el escenario" >&2; exit 1; }
 BEGIN;
 SET LOCAL request.jwt.claims = '${CLAIMS}';
@@ -43,7 +44,7 @@ UPDATE public.plazas_de_ocupante
        motivo_desactivacion = '99l: limpieza de la corrida anterior'
  WHERE vivienda_id = '${VIVIENDA}' AND estado = 'activo';
 INSERT INTO public.plazas_de_ocupante (copropiedad_id, vivienda_id, numero, creado_por, actualizado_por)
-SELECT '${COPROPIEDAD}', '${VIVIENDA}', n, '${SUPER}', '${SUPER}' FROM generate_series(1, 3) AS n;
+SELECT '${COPROPIEDAD}', '${VIVIENDA}', n, '${SUPER}', '${SUPER}' FROM generate_series(1, 9) AS n;
 COMMIT;
 SQL
 
@@ -54,7 +55,7 @@ for i in $(seq 1 "$INTENTOS"); do
 BEGIN;
 SET LOCAL request.jwt.claims = '${CLAIMS}';
 INSERT INTO public.plazas_de_ocupante (copropiedad_id, vivienda_id, numero, creado_por, actualizado_por)
-VALUES ('${COPROPIEDAD}', '${VIVIENDA}', $((3 + i)), '${SUPER}', '${SUPER}');
+VALUES ('${COPROPIEDAD}', '${VIVIENDA}', $((9 + i)), '${SUPER}', '${SUPER}');
 SELECT pg_sleep(0.2);
 COMMIT;
 SQL
@@ -82,7 +83,7 @@ UPDATE public.plazas_de_ocupante
 COMMIT;
 SQL
 
-echo "  intentos simultáneos sobre la cuarta plaza : ${INTENTOS}"
+echo "  intentos simultáneos sobre la décima plaza : ${INTENTOS}"
 echo "  aceptados                                  : ${aceptados}"
 echo "  rechazados                                 : ${rechazados}"
 echo "  plazas vivas al final                      : ${vivas}"
@@ -91,8 +92,8 @@ if ! [[ "$vivas" =~ ^[0-9]+$ ]] || ! [[ "$aceptados" =~ ^[0-9]+$ ]]; then
   echo "  99l · NO VERIFICADO: no se obtuvo un recuento (vivas='${vivas}', aceptados='${aceptados}')" >&2
   exit 1
 fi
-if [[ "$aceptados" -ne 1 ]] || [[ "$vivas" -ne 4 ]]; then
-  echo "  99l · TOPE INCUMPLIDO: se esperaba 1 aceptada y 4 plazas vivas; hubo ${aceptados} y ${vivas}" >&2
+if [[ "$aceptados" -ne 1 ]] || [[ "$vivas" -ne 10 ]]; then
+  echo "  99l · TOPE INCUMPLIDO: se esperaba 1 aceptada y 10 plazas vivas; hubo ${aceptados} y ${vivas}" >&2
   exit 1
 fi
-echo "  99l · ${INTENTOS} altas simultáneas sobre la cuarta plaza: entra una, el tope se sostiene: ok"
+echo "  99l · ${INTENTOS} altas simultáneas sobre la décima plaza: entra una, el tope se sostiene: ok"

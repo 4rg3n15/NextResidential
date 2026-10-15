@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { AmbitoDelResidente, PerfilValido, VehiculoPropioValido } from '@ncr/domain-core';
+import { PLAZAS_POR_DEFECTO } from '@ncr/domain-core';
 import { COP_A, COP_B } from '../constantes';
+import { TOPE_VEHICULOS_POR_OMISION } from '../../src/multiempresa/ajustes-de-plataforma';
 import {
   PERSONA_R1,
   USUARIO_R1,
@@ -52,7 +54,6 @@ const plaza = (
   usuarioId: string | null,
   ocupante: string | null,
 ): PlazaDeOcupante => ({ id, numero, generacion: 1, usuarioId, ocupante });
-
 const perfil = (nombre: string, telefono: string): PerfilGuardado => ({
   nombres: nombre.split(' ')[0] ?? nombre,
   apellidos: nombre.split(' ').slice(1).join(' ') || null,
@@ -72,7 +73,6 @@ const VIVIENDA_DE: ReadonlyMap<string, string> = new Map([
   [USUARIO_R2, VIVIENDA_2],
   [USUARIO_RB, VIVIENDA_B],
 ]);
-
 /** La persona de cada cuenta, la misma que su vínculo en el directorio. */
 const PERSONA_DE: ReadonlyMap<string, string> = new Map([[USUARIO_R1, PERSONA_R1]]);
 
@@ -107,7 +107,7 @@ export class HogarEnMemoria
     [USUARIO_R2, perfil('Ruiz Vecino', '+573000000002')],
   ]);
   private readonly vehiculos: (VehiculoPropioGuardado & { readonly copropiedadId: string })[] = [];
-  tope = 2;
+  tope = TOPE_VEHICULOS_POR_OMISION;
 
   // ── Alta ──────────────────────────────────────────────────────────────────
   async vocabulario(copropiedadId: string): Promise<VocabularioDeAlta | null> {
@@ -126,7 +126,7 @@ export class HogarEnMemoria
       viviendaId,
       debeDeclararOcupantes: false,
       viviendaAsignada: null,
-      topeDePlazas: viviendaId === null ? null : 4,
+      topeDePlazas: viviendaId === null ? null : PLAZAS_POR_DEFECTO,
     };
   }
   async buscarVivienda(copropiedadId: string): Promise<readonly ViviendaEncontrada[]> {
@@ -152,7 +152,7 @@ export class HogarEnMemoria
     return {
       esPrimerResidente: VIVIENDA_DE.get(usuarioId) === viviendaId,
       declarada: true,
-      tope: 4,
+      tope: PLAZAS_POR_DEFECTO,
       codigoCorto: c === COP_A ? 'COPA' : 'COPB',
     };
   }

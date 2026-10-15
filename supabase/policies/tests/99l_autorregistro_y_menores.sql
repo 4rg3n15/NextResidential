@@ -9,7 +9,8 @@
 --   3 · un adulto de OTRA vivienda no ocupa una plaza de ésta, y sin cuenta sólo
 --       ocupa plaza un menor de la vivienda; la persona reclama su plaza con su
 --       cuenta (traspaso);
---   4 · el titular añade plazas hasta el tope (4) y retira las libres; nadie más
+--   4 · el titular añade plazas hasta el tope (4, fijado aquí: desde la 0058 el
+--       valor por omisión es 10 y lo prueba la 99n) y retira las libres; nadie más
 --       de la vivienda; una plaza que revive también cuenta;
 --   5 · con tope propio de 6 la quinta y la sexta entran; el tope nunca queda
 --       por debajo de las plazas activas;
@@ -32,6 +33,13 @@ BEGIN;
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE hoy_99l ON COMMIT DROP AS
   SELECT (now() AT TIME ZONE 'America/Bogota')::date AS d;
+
+-- 15-Z1 · la prueba se escribió con el tope por omisión de la 15-W (4); desde la
+-- 0058 es 10, así que aquí se fija 4 en la copropiedad (lo cambia sólo la
+-- plataforma) y todo lo de abajo sigue valiendo tal cual. El 10 lo prueba la 99n.
+SET LOCAL request.jwt.claims = '{"rol":"superadministrador","usuario_id":"00000000-0000-4000-8000-000000000002","copropiedad_id":null}';
+UPDATE public.copropiedades SET tope_de_plazas_por_vivienda = 4
+ WHERE id = '10000000-0000-4000-8000-000000000001';
 
 SET LOCAL request.jwt.claims = '{"rol":"administrador","usuario_id":"00000000-0000-4000-8000-000000000010","copropiedad_id":"10000000-0000-4000-8000-000000000001","copropiedades":["10000000-0000-4000-8000-000000000001"]}';
 
