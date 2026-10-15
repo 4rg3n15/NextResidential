@@ -14,7 +14,11 @@
  *   4 · un adulto crea su cuenta con ese código desde «Crear cuenta», entra
  *       solo, completa su primer ingreso y ve su inicio;
  *   5 · un código inválido recibe la respuesta genérica, tal cual;
- *   6 · un menor no crea nada: ni desde la consola ni contra la API.
+ *   6 · un menor no crea nada: ni desde la consola ni contra la API;
+ *   7 · (15-Y2) el titular añade una plaza y comparte su código, registra y
+ *       edita a un menor, registra, edita y elimina un vehículo y revoca una
+ *       visita suya;
+ *   8 · (15-Y2) quien no es titular no ve «Añadir plaza» ni «Retirar».
  *
  * Nada sensible queda en el navegador: se comprueba que ni la contraseña ni el
  * código de plaza aparecen en `localStorage` ni `sessionStorage`.
@@ -28,17 +32,19 @@ import { chromium } from 'playwright';
 import { arrancarDobleGotrue } from './doble-gotrue.mjs';
 import {
   SUPERADMIN,
-  almacenesSinSecretos,
   api,
   bloqueCon,
   codigoDePlazaLibre,
   crearTitular,
   entrar,
-  registroDeMenor,
   llenarCrearCuenta,
   primerIngreso,
+  reportero,
+  secretosFuera,
   tokenAal2,
 } from './residente-web/acciones.mjs';
+import { codigoInvalidoYMenor } from './residente-web/cuenta.mjs';
+import { hogarDelOcupante, hogarDelTitular, visitaDelTitular } from './residente-web/hogar.mjs';
 import {
   arrancarApi,
   arrancarConsola,
@@ -63,20 +69,9 @@ const DEL_TITULAR = `Titular#${sufijo}Bb`;
 const OTRA = `Perfil#${sufijo}Cc`;
 const DEL_OCUPANTE = `Ocupante#${sufijo}Dd`;
 
-let fallos = 0;
-const ok = (m) => console.log(`   ✓ ${m}`);
-const mal = (m) => {
-  console.log(`   ✗ ${m}`);
-  fallos += 1;
-};
-const paso = (m) => console.log(`\n▸ ${m}`);
-const afirmar = (c, m) => (c ? ok(m) : mal(m));
+const { ok, mal, paso, afirmar, fallos } = reportero();
 const bloque = bloqueCon(mal);
-const sinSecretos = async (pagina, secretos) =>
-  afirmar(
-    await almacenesSinSecretos(pagina, secretos),
-    'ni la contraseña ni el código de plaza quedan en localStorage o sessionStorage',
-  );
+const sinSecretos = (pagina, secretos) => secretosFuera(afirmar, pagina, secretos);
 
 const principal = async () => {
   nombrarVolcado('ncr-recorrido-residente');
@@ -223,55 +218,45 @@ const principal = async () => {
     paso('6 · un código inválido y un menor');
     const c3 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
     const p3 = await c3.newPage();
-    await bloque(
-      'código inválido',
-      async () => {
-        await p3.goto(`${base}/acceso/crear-cuenta`);
-        await llenarCrearCuenta(p3, {
-          usuario: `otro.${sufijo}`,
-          correo: `otro.${sufijo}@ejemplo.invalid`,
-          contrasena: DEL_OCUPANTE,
-          codigo: 'MIRA-0000-0000',
-          fecha: '1992-03-14',
-        });
-        await p3.getByRole('button', { name: 'Crear cuenta' }).click();
-        // `p[role="alert"]`, no cualquier `role=alert`: Next.js pinta un anunciador de rutas vacío con ese papel.
-        const aviso = p3.locator('p[role="alert"]');
-        await aviso.waitFor({ timeout: 20_000 });
-        const texto = ((await aviso.textContent()) ?? '').trim();
-        afirmar(
-          texto === 'El código de invitación no es válido o ya se usó',
-          `el código inválido recibe la respuesta genérica del servidor, tal cual («${texto}»)`,
-        );
-        await p3.getByLabel('Fecha de nacimiento').fill('2012-01-01');
-        await p3.getByLabel('Fecha de nacimiento').blur();
-        await p3
-          .getByText(/Las cuentas son para mayores de edad\. Un adulto/)
-          .waitFor({ timeout: 5000 });
-        // Como en la app: el botón responde, pero la fecha de un menor detiene el envío en la consola.
-        await p3.getByRole('button', { name: 'Crear cuenta' }).click();
-        await p3.waitForTimeout(1500);
-        const { rows: otro } = await lectura.query(
-          'SELECT count(*)::int AS n FROM public.usuarios WHERE nombre_usuario = $1',
-          [`otro.${sufijo}`],
-        );
-        afirmar(
-          otro[0].n === 0 && (await p3.getByText('Tratamiento de sus datos').isVisible()),
-          'con la fecha de un menor la consola no envía nada: cero cuentas',
-        );
-      },
+    await codigoInvalidoYMenor({
       p3,
-    );
-    const menor = await registroDeMenor(llamar, codigoDePlaza, `menor.${sufijo}`);
-    const { rows } = await lectura.query(
-      'SELECT count(*)::int AS n FROM public.usuarios WHERE nombre_usuario = $1',
-      [`menor.${sufijo}`],
-    );
-    afirmar(
-      menor.estado === 400 && rows[0].n === 0,
-      `contra la API, un menor recibe 400 y no crea nada (${String(menor.estado)}, ${String(rows[0].n)} filas)`,
-    );
+      base,
+      sufijo,
+      lectura,
+      llamar,
+      codigoDePlaza,
+      contrasena: DEL_OCUPANTE,
+      afirmar,
+      bloque,
+    });
     await c3.close();
+
+    paso('7 · 15-Y2 · el hogar del titular: plaza, código, menor, vehículo y visita');
+    const titular = { usuario: usuarioTitular, contrasena: OTRA };
+    const { visita } = await visitaDelTitular(llamar, MIRA, titular, sufijo);
+    afirmar(
+      visita.estado === 201 && visita.cuerpo.creada === true,
+      `el titular registra por la API la visita que va a revocar (${String(visita.estado)})`,
+    );
+    const c4 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
+    const p4 = await c4.newPage();
+    await bloque(
+      'hogar del titular',
+      () => hogarDelTitular({ pagina: p4, base, titular, sufijo, ok, afirmar }),
+      p4,
+    );
+    await c4.close();
+
+    paso('8 · 15-Y2 · el hogar visto por quien no es titular');
+    const c5 = await navegador.newContext({ viewport: { width: 360, height: 740 } });
+    const p5 = await c5.newPage();
+    const ocupante = { usuario: usuarioOcupante, contrasena: DEL_OCUPANTE };
+    await bloque(
+      'hogar del ocupante',
+      () => hogarDelOcupante({ pagina: p5, base, ocupante, sufijo, afirmar }),
+      p5,
+    );
+    await c5.close();
   } finally {
     await navegador.close();
     await lectura.end();
@@ -288,6 +273,6 @@ try {
   await cerrarTodo();
 }
 console.log(
-  `\nRECORRIDO DEL RESIDENTE EN LA WEB: ${fallos === 0 ? 'completo' : `${String(fallos)} fallo(s)`}`,
+  `\nRECORRIDO DEL RESIDENTE EN LA WEB: ${fallos() === 0 ? 'completo' : `${String(fallos())} fallo(s)`}`,
 );
-process.exitCode = fallos === 0 ? 0 : 1;
+process.exitCode = fallos() === 0 ? 0 : 1;

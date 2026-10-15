@@ -161,3 +161,26 @@ export const registroDeMenor = (llamar, codigoDeInvitacion, usuario) =>
     aceptaTratamientoDeDatos: true,
     versionPolitica: '2026-10-provisional-1',
   });
+
+/** El veredicto del recorrido: ✓ y ✗ por consola, y el recuento de fallos al final. */
+export const reportero = () => {
+  let fallos = 0;
+  const ok = (m) => console.log(`   ✓ ${m}`);
+  const mal = (m) => {
+    console.log(`   ✗ ${m}`);
+    fallos += 1;
+  };
+  return {
+    ok,
+    mal,
+    paso: (m) => console.log(`\n▸ ${m}`),
+    afirmar: (c, m) => (c ? ok(m) : mal(m)),
+    fallos: () => fallos,
+  };
+};
+
+export const secretosFuera = async (afirmar, pagina, secretos) =>
+  afirmar(
+    await almacenesSinSecretos(pagina, secretos),
+    'ni la contraseña ni el código de plaza quedan en localStorage o sessionStorage',
+  );

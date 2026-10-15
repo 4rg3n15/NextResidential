@@ -588,13 +588,12 @@ pantallas, todas bajo `/mi`. No hay ninguna entrada de administración, porterí
 ni guardia, y si escribiera la dirección de una, la API la rechazaría igual. La
 vivienda la resuelve el servidor desde su sesión: nunca viaja en la dirección.
 
-> **Lo de la ronda 15-W está en la app Android y, desde la 15-Y1, parte en la
-> consola web.** «Crear cuenta», el primer ingreso y cambiar la contraseña se
-> hacen igual en la app y en la consola (abajo, «Desde la consola web»). Las
-> plazas de la vivienda, los menores, editar y eliminar vehículos y revocar una
-> visita siguen sólo en la app hasta la ronda 15-Y2: en la consola, «Mi
-> familia» y las plazas del «Perfil» se ven pero no se cambian, los vehículos
-> sólo se dan de baja y las visitas no se revocan.
+> **Lo de la ronda 15-W está en la app Android y, desde las rondas 15-Y1 y
+> 15-Y2, también en la consola web.** «Crear cuenta», el primer ingreso y
+> cambiar la contraseña (15-Y1), y las plazas de la vivienda, los menores,
+> editar y eliminar vehículos y revocar una visita (15-Y2) se hacen igual en la
+> app y en la consola, con los mismos textos (abajo, «Desde la consola web»).
+> Lo único que sigue sólo en la app es **cambiar de vivienda**.
 >
 > **El rostro del residente (ronda 15-X), también sólo en la app.** «Mi rostro»
 > y el rostro de un menor del hogar no están en la consola web hasta la ronda
@@ -641,10 +640,38 @@ usted incluido (de 1 al tope; podrá cambiarlo después en «Ocupantes»).
    seguir, igual que la app.
 3. En el primer ingreso la consola le pide **sus datos** —nombres, apellidos,
    documento de adulto, teléfono y fecha de nacimiento; el correo es
-   opcional— y después ve «Mi vivienda». Declarar cuántos viven con usted
-   sigue haciéndose en la app hasta la ronda 15-Y2.
+   opcional— y después ve «Mi vivienda».
 4. Para **cambiar la contraseña** más adelante: **Perfil → «Cambiar
    contraseña»**. Si la consola le pide volver a entrar, entre con la nueva.
+
+**El hogar desde la consola web (15-Y2)**, con lo mismo que la app:
+
+5. **Plazas**, en **Perfil → «Plazas: 3 de 4»**. Si usted es el titular y aún
+   no declaró cuántos viven en su vivienda, la tarjeta se lo pregunta ahí
+   mismo («¿Cuántas personas viven en tu vivienda?» → «Declarar»). Cada plaza
+   libre muestra su código y un botón **«Compartir»**: en el iPhone abre la
+   hoja de compartir de Safari; en un computador copia el mensaje al
+   portapapeles y lo dice. **«Añadir plaza»** y **«Retirar»** (con motivo, en
+   las plazas libres; nunca la plaza 1) son sólo del titular; los demás leen
+   «Sólo el titular de la vivienda añade y retira plazas».
+6. **Menores**, en **Mi familia → «Menores del hogar»**. Cualquier adulto pulsa
+   **«Añadir menor»** y llena nombres, apellidos, fecha de nacimiento,
+   parentesco, tipo y número de documento (tarjeta de identidad o registro
+   civil) y una **plaza libre**; sin plazas libres, la consola dice a quién
+   pedir una. **«Editar»** cambia nombre, fecha y parentesco; **«Dar de baja»**
+   pide un motivo de al menos 5 letras y libera la plaza. Cuando el menor
+   cumple 18, el titular ve **«Código para su cuenta»**: genera un código de un
+   solo uso con el que crea su propia cuenta en «Crear cuenta» conservando su
+   historial.
+7. **Vehículos**, en **Mis vehículos**: los que registró usted («propio»)
+   llevan **«Editar»** (placa, color, modelo y marca; la placa sólo cambia si
+   el vehículo no tiene historial) y **«Eliminar»**, que borra el vehículo si
+   no tiene historial o lo deja dado de baja si lo tiene, y lo dice. Los que
+   registró la administración se ven y no se tocan.
+8. **Visitas**: cada autorización vigente o programada lleva **«Revocar»**;
+   pide un motivo y, al confirmar, la foto del visitante sale de los equipos
+   y la consola dice de cuántos. La visita recurrente no existe en el
+   servidor (DT-15R-03): tampoco en la consola.
 
 **El primer ingreso, después:** «Complete sus datos» pide nombres, apellidos,
 documento —cédula, cédula de extranjería o pasaporte—, teléfono y fecha de

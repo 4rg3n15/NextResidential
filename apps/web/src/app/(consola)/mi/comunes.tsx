@@ -65,8 +65,14 @@ const TIPO_DE_AUTORIZACION: Readonly<Record<string, string>> = {
   recurrente: 'Recurrente',
 };
 
-/** La fila de una autorización: la misma que la app pinta en inicio y en visitas. */
-export const FilaDeAutorizacion = ({ a }: { readonly a: MiAutorizacion }): JSX.Element => {
+/** La fila de una autorización: la misma que la app pinta en inicio y en visitas. 15-Y2 · con una acción opcional («Revocar»). */
+export const FilaDeAutorizacion = ({
+  a,
+  accion,
+}: {
+  readonly a: MiAutorizacion;
+  readonly accion?: ReactNode;
+}): JSX.Element => {
   const situacion = SITUACION[a.situacion];
   const motivo = a.motivoRechazo?.trim() ?? '';
   return (
@@ -88,7 +94,10 @@ export const FilaDeAutorizacion = ({ a }: { readonly a: MiAutorizacion }): JSX.E
           <p className="text-secundario font-medium text-peligro-texto">Motivo: {motivo}</p>
         ) : null}
       </div>
-      <Distintivo tono={situacion.tono}>{situacion.texto}</Distintivo>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <Distintivo tono={situacion.tono}>{situacion.texto}</Distintivo>
+        {accion}
+      </div>
     </li>
   );
 };

@@ -67,3 +67,24 @@ export const motivoDeFechaDeAdulto = (bruto: string, ahora: Date): string | null
   if (edad === null) return 'Esa fecha todavía no llegó';
   return puedeTenerCuenta(edad) ? null : MENSAJE_CUENTA_DE_MENOR;
 };
+
+export const MENSAJE_MAYOR_SIN_CUENTA =
+  'Una persona mayor de edad crea su propia cuenta con un código de plaza';
+
+/**
+ * 15-Y2 · cortesía de «Añadir menor» y «Editar menor», como la app
+ * (`motivoDeFechaDeMenor` en Dart): la fecha existe, no es futura y, con el
+ * mismo día de margen pero a favor del MENOR, quien ya cumplió 18 no se
+ * registra aquí. `null` si puede viajar; el servidor decide después.
+ */
+export const motivoDeFechaDeMenor = (bruto: string, ahora: Date): string | null => {
+  const fecha = bruto.trim();
+  const forma = motivoDeForma(fecha, 'Escriba la fecha de nacimiento');
+  if (forma !== null) return forma;
+  if (edadEn(fecha, new Date(ahora.getTime() + MARGEN_MS)) === null) {
+    return 'Esa fecha todavía no llegó';
+  }
+  // Nacido hoy con el reloj adelantado: aún no tiene edad, y es un menor.
+  const edad = edadEn(fecha, new Date(ahora.getTime() - MARGEN_MS)) ?? 0;
+  return puedeTenerCuenta(edad) ? MENSAJE_MAYOR_SIN_CUENTA : null;
+};
