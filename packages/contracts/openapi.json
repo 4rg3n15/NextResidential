@@ -8374,6 +8374,42 @@
         ]
       }
     },
+    "/copropiedades/{id}/tablero/actividad-por-vivienda": {
+      "get": {
+        "operationId": "ActividadController_leer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActividadPorViviendaDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Por vivienda: vehículos en visita activa y visitantes en este momento (D-Z3). Sólo recuentos.",
+        "tags": [
+          "tablero"
+        ]
+      }
+    },
     "/copropiedades/{id}/tablero/dispositivos": {
       "get": {
         "operationId": "TableroController_leerDispositivos",
@@ -10292,6 +10328,67 @@
         "required": [
           "personaId",
           "nombre"
+        ]
+      },
+      "ActividadDeViviendaDto": {
+        "type": "object",
+        "properties": {
+          "viviendaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "identificador": {
+            "type": "string",
+            "example": "302"
+          },
+          "agrupacion": {
+            "type": "string",
+            "nullable": true,
+            "example": "Torre 3"
+          },
+          "vehiculosEnVisita": {
+            "type": "number",
+            "example": 1,
+            "description": "Vehículos en visita activa en esta vivienda."
+          },
+          "visitantesAhora": {
+            "type": "number",
+            "example": 2,
+            "description": "Visitantes dentro en este momento, según el criterio."
+          }
+        },
+        "required": [
+          "viviendaId",
+          "identificador",
+          "agrupacion",
+          "vehiculosEnVisita",
+          "visitantesAhora"
+        ]
+      },
+      "ActividadPorViviendaDto": {
+        "type": "object",
+        "properties": {
+          "criterio": {
+            "type": "string",
+            "description": "Qué significa «en este momento» con los datos que hay (P-41). La pantalla lo enseña tal cual."
+          },
+          "ahora": {
+            "type": "string",
+            "format": "date-time",
+            "description": "El instante con que se juzgó."
+          },
+          "filas": {
+            "description": "Todas las viviendas activas, ordenadas por actividad.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActividadDeViviendaDto"
+            }
+          }
+        },
+        "required": [
+          "criterio",
+          "ahora",
+          "filas"
         ]
       },
       "AgregarAcompananteDto": {

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../models/accesos_por_hora_dto.dart';
+import '../models/actividad_por_vivienda_dto.dart';
 import '../models/estado_de_dispositivos_dto.dart';
 import '../models/indicadores_dto.dart';
 
@@ -18,6 +19,12 @@ abstract class TableroApi {
   /// Histograma de accesos del día en la zona de la copropiedad
   @GET('/copropiedades/{id}/tablero/accesos-por-hora')
   Future<AccesosPorHoraDto> tableroControllerLeerAccesosPorHora({
+    @Path('id') required String id,
+  });
+
+  /// Por vivienda: vehículos en visita activa y visitantes en este momento (D-Z3). Sólo recuentos.
+  @GET('/copropiedades/{id}/tablero/actividad-por-vivienda')
+  Future<ActividadPorViviendaDto> actividadControllerLeer({
     @Path('id') required String id,
   });
 

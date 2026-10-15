@@ -29,6 +29,9 @@ export type Indicadores = Esquemas['IndicadoresDto'];
 export type AccesosPorHora = Esquemas['AccesosPorHoraDto'];
 export type FranjaDeAccesos = Esquemas['FranjaDeAccesosDto'];
 export type EstadoDeDispositivos = Esquemas['EstadoDeDispositivosDto'];
+/** 15-Z3 (D-Z3) · actividad por vivienda: recuentos, criterio e instante. */
+export type ActividadPorVivienda = Esquemas['ActividadPorViviendaDto'];
+export type ActividadDeVivienda = Esquemas['ActividadDeViviendaDto'];
 export type DispositivoDelTablero = Esquemas['DispositivoDelTableroDto'];
 export type EventoRegistrado = Esquemas['EventoRegistradoDto'];
 export type PaginaDeEventos = Esquemas['PaginaDeEventosDto'];

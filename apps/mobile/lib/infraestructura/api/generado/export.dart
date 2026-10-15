@@ -34,6 +34,8 @@ export 'models/accionamiento_del_edge_dto.dart';
 export 'models/aceptado_dto.dart';
 export 'models/acompanante_agregado_dto.dart';
 export 'models/acompanante_en_la_instantanea_dto.dart';
+export 'models/actividad_de_vivienda_dto.dart';
+export 'models/actividad_por_vivienda_dto.dart';
 export 'models/agregar_acompanante_dto.dart';
 export 'models/ajustes_de_puertas_dto.dart';
 export 'models/alcance_de_copropiedades_dto.dart';
