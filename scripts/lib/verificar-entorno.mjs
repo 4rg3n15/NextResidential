@@ -33,7 +33,11 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { candidatosDeEjecutable } from './ejecutable-del-sistema.mjs';
+import {
+  candidatosDeEjecutable,
+  necesitaShell,
+  versionEnAgente,
+} from './ejecutable-del-sistema.mjs';
 import { createServer } from 'node:net';
 
 const paquete = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -104,15 +108,33 @@ if (!cumple(nvmrc, paquete.engines.node)) {
 }
 
 /**
- * D-66 · `execFileSync` en Windows no aplica `PATHEXT`, así que `'pnpm'` a secas
- * no encuentra `pnpm.cmd` y el script sin extensión que npm deja para MSYS no
- * lo sabe ejecutar `CreateProcess`. Se prueban los nombres de este sistema.
+ * D-66 · la versión de pnpm, SIN depender de poder lanzar un proceso.
+ *
+ * Dos cosas rompían esto en Windows, una detrás de otra:
+ *
+ *  1. `execFileSync` no aplica `PATHEXT`, así que `'pnpm'` a secas no encuentra
+ *     `pnpm.cmd`, y el fichero sin extensión que npm deja para MSYS es un
+ *     script de shell que `CreateProcess` no sabe ejecutar.
+ *  2. Resuelto el nombre, Node **se niega** a lanzar un `.cmd` sin
+ *     `shell: true` desde la mitigación de CVE-2024-27980: `EINVAL`.
+ *
+ * Por eso se pregunta primero al ENTORNO. `npm_config_user_agent` lo escribe el
+ * propio gestor al ejecutar un guion, así que cuando esto corre como
+ * `pnpm entorno` —el caso del paso 1 del verificador— la respuesta ya está ahí
+ * y no hace falta lanzar nada. El proceso es el plan B, para cuando se invoca
+ * el guion con `node` directamente.
  */
 const versionDePnpm = () => {
+  const delAgente = versionEnAgente(process.env.npm_config_user_agent, 'pnpm');
+  if (delAgente !== null) return delAgente;
+
   let ultimo = null;
   for (const nombre of candidatosDeEjecutable('pnpm')) {
     try {
-      return execFileSync(nombre, ['--version'], { encoding: 'utf8' }).trim();
+      return execFileSync(nombre, ['--version'], {
+        encoding: 'utf8',
+        ...(necesitaShell(nombre) ? { shell: true } : {}),
+      }).trim();
     } catch (e) {
       ultimo = e;
     }

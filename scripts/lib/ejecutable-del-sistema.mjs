@@ -1,5 +1,5 @@
 /**
- * Cómo se llama un ejecutable en cada sistema.
+ * Cómo se llama —y cómo se invoca— un ejecutable en cada sistema.
  *
  * POR QUÉ EXISTE (D-66, reportado desde el despliegue en Windows). Dos controles
  * del utillaje daban un **falso negativo** en Windows con la herramienta
@@ -33,3 +33,36 @@
  */
 export const candidatosDeEjecutable = (base, plataforma = process.platform) =>
   plataforma === 'win32' ? [`${base}.cmd`, `${base}.exe`, base] : [base];
+
+/**
+ * ¿Hay que pasar por el shell para ejecutar `nombre`?
+ *
+ * D-66, SEGUNDA CAPA. Resolver el nombre no bastaba. Desde Node 18.20.2 y
+ * 20.12.2 —la mitigación de CVE-2024-27980, «BatBadBut»— Node **se niega** a
+ * lanzar un `.cmd` o un `.bat` sin `shell: true`, y `execFileSync('pnpm.cmd')`
+ * lanza `EINVAL` en vez de ejecutarlo. El primer arreglo encontraba el nombre
+ * correcto y moría igual, un paso más adelante.
+ *
+ * `shell: true` cambia las reglas de citado, así que **sólo es seguro con
+ * argumentos literales**. Aquí lo son (`['--version']`): nada de lo que se pasa
+ * viene del entorno ni del usuario. Con argumentos variables habría que volver
+ * a `execFile` y resolver el intérprete a mano.
+ */
+export const necesitaShell = (nombre, plataforma = process.platform) =>
+  plataforma === 'win32' && /\.(cmd|bat)$/i.test(nombre);
+
+/**
+ * La versión del gestor de paquetes según `npm_config_user_agent`, que npm,
+ * pnpm y yarn escriben al ejecutar un guion.
+ *
+ * Es la vía PREFERIDA sobre lanzar un proceso: no depende del PATH, ni de
+ * `PATHEXT`, ni de qué puede ejecutar `CreateProcess`. Cuando esto corre como
+ * `pnpm entorno` —que es el caso del paso 1 del verificador— la respuesta ya
+ * está en el entorno y no hace falta preguntar a nadie.
+ *
+ * Formato: `pnpm/9.15.0 npm/? node/v22.22.2 win32 x64`.
+ */
+export const versionEnAgente = (agente, gestor) => {
+  const m = new RegExp(`(?:^|\\s)${gestor}/(\\d+\\.\\d+\\.\\d+[^\\s]*)`).exec(agente ?? '');
+  return m?.[1] ?? null;
+};

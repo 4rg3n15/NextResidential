@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { candidatosDeEjecutable } from '../../../scripts/lib/ejecutable-del-sistema.mjs';
+import {
+  candidatosDeEjecutable,
+  necesitaShell,
+  versionEnAgente,
+} from '../../../scripts/lib/ejecutable-del-sistema.mjs';
 import { buscarFfmpeg } from '../../../scripts/lib/transcodificacion-del-puente.mjs';
 
 /**
@@ -63,5 +67,54 @@ describe('buscarFfmpeg y la extensión de Windows', () => {
 
   it('un PATH vacío no revienta en ninguna plataforma', () => {
     expect(buscarFfmpeg('', soloExe, 'win32')).toBeNull();
+  });
+});
+
+/**
+ * D-66, SEGUNDA CAPA · resolver el nombre no bastaba.
+ *
+ * El primer arreglo encontraba `pnpm.cmd` y moría un paso más adelante: desde
+ * la mitigación de CVE-2024-27980 («BatBadBut», Node 18.20.2 / 20.12.2), Node
+ * se NIEGA a lanzar un `.cmd` o un `.bat` sin `shell: true` y contesta `EINVAL`.
+ * El síntoma en el equipo del usuario fue idéntico al anterior —«pnpm no está
+ * disponible en el PATH»— por una causa distinta, que es justo lo que hace que
+ * este tipo de defecto cueste dos rondas en vez de una.
+ */
+describe('necesitaShell', () => {
+  it('un .cmd o un .bat en Windows exigen shell', () => {
+    expect(necesitaShell('pnpm.cmd', 'win32')).toBe(true);
+    expect(necesitaShell('algo.BAT', 'win32')).toBe(true);
+  });
+
+  it('un .exe no, y en POSIX nada lo exige', () => {
+    // El `.exe` se lanza directamente: la mitigación es sólo para los
+    // intérpretes de lotes, que son los que reinterpretan el citado.
+    expect(necesitaShell('ffmpeg.exe', 'win32')).toBe(false);
+    expect(necesitaShell('pnpm.cmd', 'linux')).toBe(false);
+    expect(necesitaShell('pnpm', 'darwin')).toBe(false);
+  });
+});
+
+describe('versionEnAgente', () => {
+  it('saca la versión de pnpm del agente que el propio gestor escribe', () => {
+    // Es la vía preferida: no depende del PATH, ni de PATHEXT, ni de qué puede
+    // lanzar CreateProcess. Con `pnpm entorno` la respuesta ya está aquí.
+    expect(versionEnAgente('pnpm/9.15.0 npm/? node/v22.22.2 win32 x64', 'pnpm')).toBe('9.15.0');
+  });
+
+  it('no confunde un gestor con otro', () => {
+    // `npm/?` aparece en el agente de pnpm: buscar «npm» sin delimitar daría
+    // un falso positivo, y además `pnpm` contiene `npm` como subcadena.
+    expect(versionEnAgente('pnpm/9.15.0 npm/10.9.4 node/v22.22.2', 'npm')).toBe('10.9.4');
+    expect(versionEnAgente('npm/10.9.4 node/v22.22.2', 'pnpm')).toBeNull();
+  });
+
+  it('sin agente devuelve null y se cae al plan B', () => {
+    expect(versionEnAgente(undefined, 'pnpm')).toBeNull();
+    expect(versionEnAgente('', 'pnpm')).toBeNull();
+  });
+
+  it('admite versiones con etiqueta', () => {
+    expect(versionEnAgente('pnpm/10.0.0-beta.1 node/v22.0.0', 'pnpm')).toBe('10.0.0-beta.1');
   });
 });
