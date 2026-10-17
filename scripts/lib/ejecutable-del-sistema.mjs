@@ -66,3 +66,16 @@ export const versionEnAgente = (agente, gestor) => {
   const m = new RegExp(`(?:^|\\s)${gestor}/(\\d+\\.\\d+\\.\\d+[^\\s]*)`).exec(agente ?? '');
   return m?.[1] ?? null;
 };
+
+/**
+ * El nombre de un binario NATIVO en este sistema.
+ *
+ * Distinto de `candidatosDeEjecutable`, y la diferencia importa: aquél sirve
+ * para BUSCAR algo que pudo instalar npm —donde conviven `.cmd`, `.exe` y el
+ * script de MSYS—; éste da el ÚNICO nombre correcto de un ejecutable compilado,
+ * que es el que hay que escribir al descargarlo y el que hay que nombrar en un
+ * mensaje de error. Usar la lista de candidatos para eso dejaría un `go2rtc.cmd`
+ * en disco, que no es ningún programa.
+ */
+export const nombreDeBinarioNativo = (base, plataforma = process.platform) =>
+  plataforma === 'win32' ? `${base}.exe` : base;

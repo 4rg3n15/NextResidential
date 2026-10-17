@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   candidatosDeEjecutable,
   necesitaShell,
+  nombreDeBinarioNativo,
   versionEnAgente,
 } from '../../../scripts/lib/ejecutable-del-sistema.mjs';
 import { buscarFfmpeg } from '../../../scripts/lib/transcodificacion-del-puente.mjs';
@@ -116,5 +117,38 @@ describe('versionEnAgente', () => {
 
   it('admite versiones con etiqueta', () => {
     expect(versionEnAgente('pnpm/10.0.0-beta.1 node/v22.0.0', 'pnpm')).toBe('10.0.0-beta.1');
+  });
+});
+
+/**
+ * D-66, TERCERA APARICIÓN · `pnpm sitio:video` no encontraba go2rtc en Windows
+ *
+ * El guion decía «no hay go2rtc para win32: descárguelo a mano» **con el
+ * binario ya descargado y en su sitio**, por tres caminos a la vez:
+ * `.sitio/bin/go2rtc` se comprobaba sin `.exe`, el recorrido del PATH igual, y
+ * `GO2RTC_BIN` se leía sólo de `process.env` y no del `.env` del proyecto
+ * —justo lo contrario que `GO2RTC_VERSION`, dos líneas más abajo—.
+ *
+ * Los dos nombres hacen falta y NO son intercambiables: para BUSCAR algo que
+ * pudo instalar npm valen los candidatos; para ESCRIBIR un binario descargado o
+ * nombrarlo en un error, sólo vale el nativo. Usar los candidatos ahí dejaría
+ * un `go2rtc.cmd` en disco, que no es ningún programa.
+ */
+describe('nombreDeBinarioNativo', () => {
+  it('en Windows es .exe, y nunca .cmd', () => {
+    expect(nombreDeBinarioNativo('go2rtc', 'win32')).toBe('go2rtc.exe');
+    expect(nombreDeBinarioNativo('go2rtc', 'win32')).not.toContain('.cmd');
+  });
+
+  it('fuera de Windows es el nombre desnudo', () => {
+    expect(nombreDeBinarioNativo('go2rtc', 'darwin')).toBe('go2rtc');
+    expect(nombreDeBinarioNativo('go2rtc', 'linux')).toBe('go2rtc');
+  });
+
+  it('no se confunde con candidatosDeEjecutable, que sirve para otra cosa', () => {
+    // El primero de los candidatos en Windows es `.cmd`: correcto para buscar
+    // un lanzador de npm, incorrecto como destino de una descarga.
+    expect(candidatosDeEjecutable('go2rtc', 'win32')[0]).toBe('go2rtc.cmd');
+    expect(nombreDeBinarioNativo('go2rtc', 'win32')).toBe('go2rtc.exe');
   });
 });

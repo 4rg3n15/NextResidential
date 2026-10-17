@@ -76,6 +76,7 @@ import {
   politicaDeTranscodificacion,
 } from './lib/transcodificacion-del-puente.mjs';
 import { networkInterfaces } from 'node:os';
+import { candidatosDeEjecutable, nombreDeBinarioNativo } from './lib/ejecutable-del-sistema.mjs';
 
 const RAIZ = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const args = process.argv.slice(2);
@@ -184,16 +185,43 @@ console.log(`✓ configuración: ${rutaYaml} (0600, sin flujos)`);
 console.log(`  API de go2rtc en ${escucha} · medio WebRTC anunciado en ${ip}:${puertoWebrtc}`);
 if (soloConfiguracion) process.exit(0);
 
-/** El binario: GO2RTC_BIN, el PATH, o `.sitio/bin/go2rtc`. */
+/**
+ * El binario: `GO2RTC_BIN`, el PATH, o `.sitio/bin/go2rtc`.
+ *
+ * D-66 (tercera aparición, reportada desde el despliegue en Windows). Tres
+ * cosas impedían encontrarlo allí, y las tres daban el mismo mensaje —«no hay
+ * go2rtc para win32»— con el binario descargado y en su sitio:
+ *
+ *  1. `.sitio/bin/go2rtc` se comprobaba **sin `.exe`**, que es como se llama en
+ *     Windows el fichero que uno acaba de descargar.
+ *  2. El recorrido del PATH, igual.
+ *  3. `GO2RTC_BIN` se leía **sólo de `process.env`**, no del `.env` del
+ *     proyecto, a diferencia de `GO2RTC_VERSION` dos líneas más abajo, que lee
+ *     los dos. Quien la escribía en `apps/api/.env` —lo natural, y lo que dice
+ *     la guía de despliegue— no obtenía ningún efecto y ningún aviso.
+ */
+const nombresDeGo2rtc = candidatosDeEjecutable('go2rtc');
 const enElPath = () => {
   for (const d of (process.env.PATH ?? '').split(delimiter)) {
-    const ruta = join(d, 'go2rtc');
-    if (d !== '' && existsSync(ruta)) return ruta;
+    if (d === '') continue;
+    for (const nombre of nombresDeGo2rtc) {
+      const ruta = join(d, nombre);
+      if (existsSync(ruta)) return ruta;
+    }
   }
   return null;
 };
-const propio = join(carpeta, 'bin', 'go2rtc');
-let binario = process.env.GO2RTC_BIN || enElPath() || (existsSync(propio) ? propio : null);
+const carpetaBin = join(carpeta, 'bin');
+const yaDescargado = () => {
+  for (const nombre of nombresDeGo2rtc) {
+    const ruta = join(carpetaBin, nombre);
+    if (existsSync(ruta)) return ruta;
+  }
+  return null;
+};
+/** Dónde se escribe al descargar, y qué se nombra en el mensaje de error. */
+const propio = join(carpetaBin, nombreDeBinarioNativo('go2rtc'));
+let binario = env.get('GO2RTC_BIN') || process.env.GO2RTC_BIN || enElPath() || yaDescargado();
 
 if (binario === null) {
   const nombre =
@@ -202,7 +230,15 @@ if (binario === null) {
       : platform() === 'linux'
         ? `go2rtc_linux_${arch() === 'arm64' ? 'arm64' : 'amd64'}`
         : null;
-  if (nombre === null) salir(`no hay go2rtc para ${platform()}: descárguelo a mano a ${propio}`);
+  if (nombre === null) {
+    const comoEnWindows =
+      platform() === 'win32'
+        ? ` Descargue \`go2rtc_win64.zip\` de https://github.com/AlexxIT/go2rtc/releases y deje el \`go2rtc.exe\` en esa ruta; o apunte GO2RTC_BIN (en apps/api/.env o en el entorno) al binario.`
+        : '';
+    salir(
+      `no hay descarga automática de go2rtc para ${platform()}: colóquelo en ${propio}.${comoEnWindows}`,
+    );
+  }
   const version = env.get('GO2RTC_VERSION') || process.env.GO2RTC_VERSION || 'latest';
   const url =
     version === 'latest'

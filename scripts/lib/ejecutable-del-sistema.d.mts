@@ -9,3 +9,8 @@ export declare const versionEnAgente: (
   agente: string | undefined,
   gestor: string,
 ) => string | null;
+
+export declare const nombreDeBinarioNativo: (
+  base: string,
+  plataforma?: NodeJS.Platform,
+) => string;
