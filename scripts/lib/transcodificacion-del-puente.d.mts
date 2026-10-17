@@ -11,6 +11,7 @@ export declare const escuchaRtspInterna: (politica: 'auto' | 'nunca') => string;
 export declare const buscarFfmpeg: (
   path: string | undefined,
   existe?: (ruta: string) => boolean,
+  plataforma?: NodeJS.Platform,
 ) => string | null;
 
 export declare const juzgarFfmpeg: (

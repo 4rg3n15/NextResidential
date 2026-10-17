@@ -33,6 +33,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { candidatosDeEjecutable } from './ejecutable-del-sistema.mjs';
 import { createServer } from 'node:net';
 
 const paquete = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -102,8 +103,25 @@ if (!cumple(nvmrc, paquete.engines.node)) {
   problemas.push(`.nvmrc ${nvmrc} contradice engines.node "${paquete.engines.node}"`);
 }
 
+/**
+ * D-66 · `execFileSync` en Windows no aplica `PATHEXT`, así que `'pnpm'` a secas
+ * no encuentra `pnpm.cmd` y el script sin extensión que npm deja para MSYS no
+ * lo sabe ejecutar `CreateProcess`. Se prueban los nombres de este sistema.
+ */
+const versionDePnpm = () => {
+  let ultimo = null;
+  for (const nombre of candidatosDeEjecutable('pnpm')) {
+    try {
+      return execFileSync(nombre, ['--version'], { encoding: 'utf8' }).trim();
+    } catch (e) {
+      ultimo = e;
+    }
+  }
+  throw ultimo ?? new Error('pnpm');
+};
+
 try {
-  const pnpmLocal = execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim();
+  const pnpmLocal = versionDePnpm();
   if (paquete.engines.pnpm && !cumple(pnpmLocal, paquete.engines.pnpm)) {
     problemas.push(`pnpm ${pnpmLocal} queda fuera de engines.pnpm "${paquete.engines.pnpm}"`);
   }

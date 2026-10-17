@@ -19,6 +19,7 @@
  */
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
+import { candidatosDeEjecutable } from './ejecutable-del-sistema.mjs';
 
 /** Dónde escucha el RTSP interno de go2rtc: sólo bucle local. [SUPUESTO] S-15S2-01 · el 8554, libre en el Mac. */
 export const RTSP_INTERNO = '127.0.0.1:8554';
@@ -37,12 +38,23 @@ export const politicaDeTranscodificacion = (valor) => {
 /** El `listen` del RTSP de go2rtc según la política: 127.0.0.1 con `auto`, apagado con `nunca`. */
 export const escuchaRtspInterna = (politica) => (politica === 'auto' ? RTSP_INTERNO : '');
 
-/** ffmpeg en el PATH (o `null`). `existe` se inyecta en las pruebas. */
-export const buscarFfmpeg = (path, existe = existsSync) => {
+/**
+ * ffmpeg en el PATH (o `null`). `existe` y `plataforma` se inyectan en las
+ * pruebas.
+ *
+ * D-66 · buscaba un fichero llamado `ffmpeg` **sin extensión**, que en Windows
+ * no existe: allí sólo está `ffmpeg.exe`. El aviso decía «no está en el PATH»
+ * con ffmpeg instalado, y `--preparar` lo convertía en fallo. go2rtc sí lo
+ * encontraba —resuelve los ejecutables por su cuenta—, así que la
+ * transcodificación funcionaba y lo que mentía era la comprobación previa.
+ */
+export const buscarFfmpeg = (path, existe = existsSync, plataforma = process.platform) => {
   for (const d of (path ?? '').split(delimiter)) {
     if (d === '') continue;
-    const ruta = join(d, 'ffmpeg');
-    if (existe(ruta)) return ruta;
+    for (const nombre of candidatosDeEjecutable('ffmpeg', plataforma)) {
+      const ruta = join(d, nombre);
+      if (existe(ruta)) return ruta;
+    }
   }
   return null;
 };
@@ -66,9 +78,10 @@ export const juzgarFfmpeg = (politica, ruta) => {
   return {
     falta: true,
     frase:
-      'ffmpeg no está en el PATH: instálelo con `brew install ffmpeg` (en Linux, el paquete ' +
-      'ffmpeg) para ver en Chrome los equipos en H.265, o ponga VIDEO_TRANSCODIFICAR=nunca si ' +
-      'sólo usará Safari',
+      'ffmpeg no está en el PATH: instálelo (macOS `brew install ffmpeg`; Linux, el paquete ' +
+      'ffmpeg; Windows `winget install Gyan.FFmpeg` o la compilación de gyan.dev en el PATH) ' +
+      'para ver en Chrome los equipos en H.265, o ponga VIDEO_TRANSCODIFICAR=nunca si sólo ' +
+      'usará Safari',
   };
 };
 
