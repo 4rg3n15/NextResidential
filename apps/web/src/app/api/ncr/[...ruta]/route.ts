@@ -89,6 +89,23 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
       ...(cuerpo === undefined ? {} : { duplex: 'half' }),
       cache: 'no-store',
       signal: peticion.signal,
+      /**
+       * D-67 · SEGUNDA CAPA. El `fetch` de Node (undici) aborta el CUERPO de
+       * una respuesta tras 300 s sin recibir datos, y con el canal de eventos
+       * eso producía `failed to pipe response` ·
+       * `UND_ERR_BODY_TIMEOUT` cada cinco minutos en una
+       * copropiedad tranquila.
+       *
+       * El arreglo de fondo es el latido del propio flujo (`escritor-sse.ts`),
+       * que protege también los intermediarios que no son nuestros. Esto es la
+       * red de seguridad del proxy: `0` desarma el plazo del cuerpo, porque un
+       * flujo abierto NO es una respuesta lenta —no hay nada que esperar— y el
+       * corte lo manda el cliente al cerrar la pestaña, que llega por `signal`.
+       *
+       * El plazo de CABECERAS no se toca: ahí sí tiene sentido rendirse si la
+       * API no contesta.
+       */
+      ...({ bodyTimeout: 0 } as Record<string, unknown>),
     } as RequestInit);
   } catch (e) {
     /**
