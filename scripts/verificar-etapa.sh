@@ -73,6 +73,61 @@ declarado() {
   declarados=$((declarados + 1))
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# D-69 · WINDOWS NO ES UNA SUPERFICIE DE ESTE VERIFICADOR, Y CALLARLO SALE CARO.
+#
+# Ejecutado en el servidor de despliegue (MSYS2/Git Bash sobre Windows 10), el
+# guion dio 15 pasos en rojo y ninguno era un defecto del producto: todos
+# salían de que `spawn('pnpm', …)` sin `shell: true` no arranca `pnpm.cmd`
+# —CreateProcess no aplica PATHEXT, y el fichero sin extensión que npm deja
+# para MSYS es un script de shell—, así que la instalación, la compilación, el
+# lint, los tipos, la suite y la cobertura fallaban con ENOENT, EFTYPE o 127.
+# Es la cuarta aparición de D-66, aquí dentro del propio utillaje.
+#
+# Lo grave no era el rojo: era el ORDEN. El paso 0 borra `dist/`, `.turbo/` y
+# `coverage/` —a propósito, es lo que distingue este guion de `pnpm verificar`—
+# y el paso 3, que debía reconstruirlos, no podía ejecutarse. El verificador
+# dejaba el despliegue sin artefactos y sin forma de regenerarlos: un servidor
+# en marcha que no sobrevive a su próximo reinicio. Una herramienta de
+# verificación que rompe lo que verifica es peor que una que no corre.
+#
+# De ahí que se niegue ANTES de borrar nada, y que diga qué ejecutar en su
+# lugar: en el servidor, `pnpm sitio:ensayo`, que sí está escrito para Windows.
+# `--permitir-windows` existe para quien algún día haga el porte: deja correr
+# el guion a sabiendas, y entonces los rojos sí son datos del porte.
+#
+# §2.8.0 enumera cuatro superficies con shell y exige portabilidad BSD/GNU;
+# `portabilidad.mjs` las comprueba. Windows no está entre ellas y esta negativa
+# lo deja escrito en el único sitio donde no se puede ignorar.
+# ─────────────────────────────────────────────────────────────────────────────
+PERMITIR_WINDOWS=0
+for a in "$@"; do [ "$a" = "--permitir-windows" ] && PERMITIR_WINDOWS=1; done
+case "$(uname -s 2>/dev/null || echo desconocido)" in
+  MINGW* | MSYS* | CYGWIN* | Windows_NT)
+    if [ "$PERMITIR_WINDOWS" = "0" ]; then
+      printf '\n✗ VERIFICACIÓN NO EJECUTADA · este guion no corre en Windows (D-69)\n\n'
+      printf '  El utillaje lanza pnpm con spawn() sin shell, y en Windows eso no\n'
+      printf '  arranca pnpm.cmd: instalación, compilación, lint, tipos, suite y\n'
+      printf '  cobertura fallarían con ENOENT, EFTYPE o 127, y ninguno de esos\n'
+      printf '  rojos sería un defecto del producto.\n\n'
+      printf '  Y el paso 0 borra dist/, .turbo/ y coverage/ ANTES de compilar: si\n'
+      printf '  la compilación no puede correr, este guion dejaría el despliegue sin\n'
+      printf '  artefactos y sin forma de regenerarlos. Por eso se niega aquí, antes\n'
+      printf '  de tocar nada.\n\n'
+      printf '  La verificación de §2.8.0 se ejecuta en macOS o en Linux (CI).\n'
+      printf '  En el servidor de sitio, lo que corresponde es:\n\n'
+      printf '    pnpm build                 # artefactos al día\n'
+      printf '    pnpm sitio:ensayo -- --solo-lectura --informe=C:/ncr-sitio/ensayo.md\n'
+      printf '    pnpm sitio:ensayo          # los nueve pasos por equipo, en sitio\n\n'
+      printf '  Para ensayar el porte a sabiendas: --permitir-windows\n\n'
+      exit 2
+    fi
+    printf '\n⚠ --permitir-windows: se ejecuta en Windows a sabiendas (D-69). Los rojos\n'
+    printf '  del utillaje no son defectos del producto, y el paso 0 va a borrar los\n'
+    printf '  artefactos de este equipo.\n'
+    ;;
+esac
+
 paso "0 · borrando artefactos de compilación (así corre un checkout nuevo)"
 rm -rf packages/*/dist apps/*/dist .turbo packages/*/.turbo apps/*/.turbo
 rm -rf packages/*/coverage apps/*/coverage

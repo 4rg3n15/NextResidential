@@ -22,7 +22,7 @@
  * Va en Node por la regla de portabilidad: desarrollo en macOS, CI en Linux.
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { extname, join, relative, resolve } from 'node:path';
+import { extname, join, relative, resolve, sep } from 'node:path';
 
 const raizRepo = resolve(import.meta.dirname, '..', '..');
 const raiz = resolve(raizRepo, 'apps', 'web', 'src');
@@ -72,6 +72,17 @@ const PATRONES = [
 const RELLENOS_CON_ETIQUETA_BLANCA =
   /\bbg-(?:marca|marca-boton|marca-presionado|peligro-boton|exito-boton|exito-presionado)\b/;
 const EXCEPCION_QR = 'acceso/inscripcion-factor.tsx';
+/**
+ * D-69 · la salvedad se compara con BARRAS NORMALES.
+ *
+ * `relative()` devuelve `apps\web\src\app\acceso\inscripcion-factor.tsx` en
+ * Windows, y `endsWith('acceso/inscripcion-factor.tsx')` era falso: la
+ * salvedad dejaba de aplicar y el control denunciaba el `bg-white` del código
+ * QR —documentado, legítimo y con su comentario al lado— como si fuera un
+ * literal suelto. Un control que cambia de veredicto según el sistema donde
+ * corre no verifica nada: afirma.
+ */
+const conBarrasNormales = (ruta) => ruta.split(sep).join('/');
 
 const hallazgos = [];
 
@@ -100,7 +111,7 @@ for (const fichero of ficheros) {
       );
     }
 
-    if (/\bbg-white\b/.test(linea) && !relativo.endsWith(EXCEPCION_QR)) {
+    if (/\bbg-white\b/.test(linea) && !conBarrasNormales(relativo).endsWith(EXCEPCION_QR)) {
       hallazgos.push(
         `${relativo}:${numero} · \`bg-white\` literal: usa \`bg-tarjeta\` o \`bg-campo\`, que sí cambian con el tema`,
       );
