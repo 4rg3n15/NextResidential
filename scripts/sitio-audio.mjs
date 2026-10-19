@@ -34,10 +34,11 @@ import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { elegirEquipos, numero } from './lib/equipos-del-ensayo.mjs';
 import { respaldar } from './lib/respaldo-en-sitio.mjs';
+import { rutaFueraDelRepo } from './lib/ruta-fuera-del-repo.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -96,12 +97,8 @@ const persona = {
 
 const pedidas = (valor('equipo') ?? 'terminal,videoportero').split(',');
 const ROTULO = { terminal: 'la terminal', videoportero: 'el videoportero' };
-const fueraDelRepo = (ruta, que) => {
-  const r = resolve(ruta);
-  if (r === RAIZ || r.startsWith(RAIZ + sep))
-    salir(`${que} va fuera del repositorio: use $HOME/ncr-sitio`);
-  return r;
-};
+/** D-68 · el mismo control que `sitio-ensayo.mjs`, en un solo sitio y con prueba. */
+const fueraDelRepo = (ruta, que) => rutaFueraDelRepo(ruta, que, RAIZ, salir);
 
 /** `--simulado`: el videoportero simulado en red, con la credencial de las pruebas del paquete. */
 const simuladoDeAudio = async () => {

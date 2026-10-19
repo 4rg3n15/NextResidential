@@ -49,7 +49,7 @@
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ipDelMacHacia } from './lib/red-del-mac.mjs';
 import {
@@ -62,6 +62,7 @@ import { comprobacionesDeLaPlataforma } from './lib/comprobaciones-del-mac.mjs';
 import { comprobacionesDeLaVispera } from './lib/vispera-de-sitio.mjs';
 import { respaldar, restaurar } from './lib/respaldo-en-sitio.mjs';
 import { puenteDelEnsayo } from './lib/transcodificacion-del-puente.mjs';
+import { rutaFueraDelRepo } from './lib/ruta-fuera-del-repo.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -79,15 +80,8 @@ if (!simulado) {
   if (!existsSync(rutaEnv)) salir(`no existe ${rutaEnv}: copie apps/api/.env.example y rellénelo`);
   process.loadEnvFile(rutaEnv);
 }
-const fueraDelRepo = (ruta, que) => {
-  const r = resolve(ruta);
-  if (r === RAIZ || r.startsWith(RAIZ + sep)) {
-    salir(
-      `${que} NO se escribe dentro del repositorio: indique una ruta fuera, p. ej. $HOME/ncr-sitio`,
-    );
-  }
-  return r;
-};
+/** D-68 · el control vive en `lib/ruta-fuera-del-repo.mjs`, con prueba y mensaje con causa. */
+const fueraDelRepo = (ruta, que) => rutaFueraDelRepo(ruta, que, RAIZ, salir);
 
 const compilado = join(RAIZ, 'packages/providers/dist/operacion.js');
 if (!existsSync(compilado))
