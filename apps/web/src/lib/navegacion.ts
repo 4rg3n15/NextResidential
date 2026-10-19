@@ -63,6 +63,8 @@ export const ICONOS_DE_NAVEGACION = [
   'History',
   'Bell',
   'CircleUserRound',
+  // D-71 · el botón «Más» de la barra inferior, en vertical.
+  'Menu',
 ] as const;
 export type NombreDeIcono = (typeof ICONOS_DE_NAVEGACION)[number];
 

@@ -4,6 +4,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Rol, Sesion } from '@ncr/contracts';
+import { BarraInferior } from './barra-inferior';
 import { BarraLateral } from './barra-lateral';
 import { Cabecera } from './cabecera';
 import { ConfiguracionInicial } from './configuracion-inicial';
@@ -42,7 +43,12 @@ export const MarcoDeConsola = ({
         <BarraLateral rol={rol} className="hidden md:flex" />
         <div className="flex min-w-0 flex-1 flex-col">
           <Cabecera sesion={sesion} estadoDelCanal={estado} alcance={alcance} porteria={porteria} />
-          <main id="contenido" className="flex-1 px-6 py-6">
+          {/* D-71 · `pb-24` reserva el hueco de la barra inferior, que es
+              `fixed` y no empuja el contenido: sin ese relleno, los últimos
+              elementos de cada pantalla quedan debajo de los iconos y no se
+              pueden pulsar. Desde `md` la barra no existe y el relleno vuelve
+              al de siempre. */}
+          <main id="contenido" className="flex-1 px-4 pb-24 pt-6 sm:px-6 md:pb-6">
             {children}
           </main>
           {/* Aquí y no en una pantalla concreta: «al entrar» es al entrar, y el
@@ -50,6 +56,7 @@ export const MarcoDeConsola = ({
               no la ruta en la que se esté. */}
           <ConfiguracionInicial copropiedadId={alcance.copropiedadId} rol={rol} />
         </div>
+        <BarraInferior rol={rol} className="md:hidden" />
       </div>
     </ContextoDelCanal.Provider>
   );
