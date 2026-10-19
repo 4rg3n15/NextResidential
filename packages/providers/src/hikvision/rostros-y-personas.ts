@@ -135,12 +135,44 @@ export const bibliotecaDesde = (
 export const operacionesDeclaradasDeLaBiblioteca = (
   capacidadesJson: string | null,
 ): readonly string[] | undefined =>
-  listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFunction'));
+  listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFunction')) ??
+  listaDeclarada(campoDe(capacidadesJson, 'FDLibCap', 'supportFDFunction')) ??
+  listaDeclarada(porNombre(capacidadesJson, /^supportFDFunction$/i));
 
 export const tiposDeclaradosDePersona = (
   capacidadesJson: string | null,
 ): readonly string[] | undefined =>
   listaDeclarada(campoDe(capacidadesJson, 'UserInfo', 'userType'));
+
+/**
+ * D-70 (S-109) · el primer valor cuyo NOMBRE case, a cualquier profundidad.
+ *
+ * Sólo para `supportFDFunction`, y la distinción importa. `supportFunction`
+ * aparece DOS veces en estas respuestas con significados distintos: bajo
+ * `FDLibCap` son las operaciones de la biblioteca de rostros, y bajo
+ * `UserInfo` las de la gestión de personas. Buscar ese nombre suelto leería
+ * una por la otra —y la de personas suele traer «setup», que es justo lo que
+ * el alta no debe elegir aquí—, así que ese queda ATADO a su ruta.
+ * `supportFDFunction` no tiene ese problema: «FD» es Face Data y el nombre
+ * sólo significa una cosa, de modo que puede buscarse donde esté.
+ */
+const porNombre = (json: string | null, patron: RegExp, profundidad = 6): unknown => {
+  if (json === null) return undefined;
+  const bajar = (nodo: unknown, queda: number): unknown => {
+    if (queda < 0 || typeof nodo !== 'object' || nodo === null) return undefined;
+    for (const [clave, valor] of Object.entries(nodo)) if (patron.test(clave)) return valor;
+    for (const valor of Object.values(nodo)) {
+      const hallado = bajar(valor, queda - 1);
+      if (hallado !== undefined) return hallado;
+    }
+    return undefined;
+  };
+  try {
+    return bajar(JSON.parse(json), profundidad);
+  } catch {
+    return undefined;
+  }
+};
 
 /** `raiz[a][b]` de un JSON, o `undefined` si no es JSON o no está. */
 const campoDe = (json: string | null, a: string, b: string): unknown => {

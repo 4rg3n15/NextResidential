@@ -300,9 +300,34 @@ describe('personas y rostros declarados frente a lo que se va a mandar (paso 3, 
     expect(notas).toMatch(/PUT \/ISAPI\/Intelligent\/FDLib\/FDSetUp/);
   });
 
-  it('R3 · si sólo lo declara donde el alta no lo lee, lo dice: el alta usaría setUp', () => {
+  // D-70 (S-109) · esta prueba afirmaba la LIMITACIÓN: el equipo declaraba sus
+  // operaciones en `supportFDFunction` y el alta sólo leía
+  // `FDLibCap.supportFunction`, así que caía en su respaldo —setUp— contra un
+  // equipo que no lo admite. Visto en sitio el 19/10 con el DS-KD9633-WBE6
+  // (V2.3.9): el paso 3 lo reportó, y lo que había que arreglar era el alta.
+  // Ahora lee también `supportFDFunction`, de modo que este mismo equipo pasa
+  // y la nota dice la operación que SÍ va a usar.
+  it('D-70 · declarado sólo en supportFDFunction: el alta lo lee y elige POST, no setUp', () => {
     const j = juzgarPersonasYRostros(
       JSON.stringify({ FDLibCap: { supportFDFunction: 'post,delete,put,get' } }),
+      JSON.stringify({ UserInfo: {} }),
+      L,
+    );
+    expect(j.fallos).toEqual([]);
+    const notas = j.notas.join(' | ');
+    expect(notas).toMatch(/POST \/ISAPI\/Intelligent\/FDLib\/FaceDataRecord/);
+    expect(notas).not.toMatch(/FDSetUp/);
+  });
+
+  // La rama que SIGUE viva, y por qué: el ensayo lee las opciones con
+  // `opciones()`, que acepta cadena O lista; el alta las lee con
+  // `listaDeclarada()`, que sólo acepta cadena. Un equipo que declare
+  // `supportFDFunction` como lista sigue siendo ilegible para el alta, y el
+  // paso 3 tiene que seguir diciéndolo en vez de dar por buena una carga que
+  // no va a entrar.
+  it('S-109 · declarado como LISTA: el alta aún no lo lee, y el paso 3 lo dice', () => {
+    const j = juzgarPersonasYRostros(
+      JSON.stringify({ FDLibCap: { supportFDFunction: ['post', 'delete', 'put', 'get'] } }),
       JSON.stringify({ UserInfo: {} }),
       L,
     );
