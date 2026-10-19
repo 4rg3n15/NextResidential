@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { rechazosPorCampo, sinCodigosDelProyecto, textoDelError } from './cliente';
+import {
+  motivosDeFotoDelError,
+  rechazosPorCampo,
+  sinCodigosDelProyecto,
+  textoDelError,
+} from './cliente';
 
 /**
  * BLOQUE I (15-L) · los rechazos de la API citan la regla que los produce; la
@@ -49,5 +54,51 @@ describe('mensajes de la API sin códigos del proyecto', () => {
         },
       }),
     ).toEqual({ placa: 'debe ser texto', extra: 'no se admite este campo' });
+  });
+});
+
+/**
+ * D-72 · LOS MOTIVOS DEL RECHAZO DE UNA FOTO NO PUEDEN PERDERSE EN EL CLIENTE
+ *
+ * Visto en sitio el 19/10, registrando el rostro de un residente: la pantalla
+ * enseñaba «La foto no sirve para reconocer el rostro» y nada más. La API
+ * estaba devolviendo en ese mismo 400 cuál de las medidas había fallado
+ * —`motivos: ['ILUMINACION']`— y `ErrorDeApi` no los llevaba, así que la
+ * persona repetía la foto a ciegas. Como `rechazosPorCampo`, van DENTRO de
+ * `mensaje`: el filtro global de la API envuelve todo error en `{ estado,
+ * correlacion, mensaje }`, y leerlos del nivel superior es el error fácil.
+ */
+describe('motivosDeFotoDelError', () => {
+  it('los lee de dentro de `mensaje`, que es donde los pone el filtro global', () => {
+    expect(
+      motivosDeFotoDelError({
+        estado: 400,
+        mensaje: { message: 'La foto no sirve', motivos: ['ILUMINACION', 'NITIDEZ'] },
+      }),
+    ).toEqual(['ILUMINACION', 'NITIDEZ']);
+  });
+
+  it('no los busca en el nivel superior: ahí nunca están', () => {
+    expect(motivosDeFotoDelError({ estado: 400, motivos: ['NITIDEZ'] })).toBeUndefined();
+  });
+
+  it('sin motivos no inventa una lista vacía', () => {
+    for (const cuerpo of [
+      undefined,
+      null,
+      'texto',
+      { estado: 400 },
+      { estado: 400, mensaje: 'La foto no sirve' },
+      { estado: 400, mensaje: { motivos: [] } },
+      { estado: 400, mensaje: { motivos: 'ILUMINACION' } },
+    ]) {
+      expect(motivosDeFotoDelError(cuerpo)).toBeUndefined();
+    }
+  });
+
+  it('descarta lo que no sea texto sin tirar el resto', () => {
+    expect(motivosDeFotoDelError({ mensaje: { motivos: ['SIN_ROSTRO', 7, null] } })).toEqual([
+      'SIN_ROSTRO',
+    ]);
   });
 });

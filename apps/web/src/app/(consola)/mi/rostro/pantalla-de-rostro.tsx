@@ -9,6 +9,7 @@ import { DialogoDeConfirmacion } from '@/componentes/dialogo-confirmacion';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { Boton } from '@/componentes/ui/boton';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { MOTIVOS_DE_FOTO } from '../../visitantes/generar-autorizacion';
 import { clavesDelResidente, useRostro } from '@/lib/api/residente';
 import { textosDelRostro, tieneRostro } from '@/lib/rostro';
 import { estadoDeConsulta } from '../comunes';
@@ -22,6 +23,23 @@ interface Aviso {
   readonly texto: string;
   readonly bien: boolean;
 }
+
+/**
+ * D-72 · el mensaje del rechazo CON sus motivos.
+ *
+ * Visto en sitio el 19/10: la pantalla enseñaba «La foto no sirve para
+ * reconocer el rostro» y nada más, mientras la API estaba devolviendo en el
+ * mismo 400 cuál de las medidas había fallado. La persona repetía la foto a
+ * ciegas sin saber si el problema era la luz, el encuadre, la nitidez o que
+ * salía más de un rostro. «Generar autorización» y «Visitas» ya los enseñan
+ * con este mismo diccionario; esta pantalla era la que faltaba.
+ */
+export const conMotivosDeFoto = (fallo: ErrorDeApi): string => {
+  const motivos = fallo.motivosDeFoto ?? [];
+  if (motivos.length === 0) return fallo.message;
+  const porque = motivos.map((m) => MOTIVOS_DE_FOTO[m] ?? m).join(', ');
+  return `${fallo.message}: ${porque}.`;
+};
 
 /**
  * 15-Y3 · «Mi rostro» (y «Rostro de <menor>», ADR-039), como la pantalla de
@@ -99,7 +117,9 @@ export const PantallaDeRostro = ({
         setAviso({ texto: SIN_CONEXION, bien: false });
         return;
       }
-      setAviso({ texto: fallo.message, bien: false });
+      // D-72 · con los motivos, que dicen CUÁL de las medidas falló. Sin
+      // ellos, «la foto no sirve» deja a la persona probando a ciegas.
+      setAviso({ texto: conMotivosDeFoto(fallo), bien: false });
       // 15-Z2 · por el código: la política que cambió desmarca la casilla en el acto y se relee.
       if (fallo.causa === 'POLITICA_CAMBIADA') {
         setAcepta(false);

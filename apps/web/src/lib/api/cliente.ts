@@ -60,6 +60,14 @@ export class ErrorDeApi extends Error {
      * caída», y la pantalla lo dice con su nombre.
      */
     readonly causa?: string,
+    /**
+     * D-72 · los motivos con los que la API rechaza una foto de rostro. Van
+     * aparte de `porCampo` porque no son de un formulario: son por qué ESA
+     * imagen no sirve, y sin ellos «la foto no sirve» es un callejón sin
+     * salida — la persona no sabe si repetirla de frente, con más luz o más
+     * cerca. La API los manda justamente para guiar la siguiente.
+     */
+    readonly motivosDeFoto?: readonly string[],
   ) {
     super(mensaje);
     this.name = 'ErrorDeApi';
@@ -92,6 +100,25 @@ interface CuerpoDeError {
  * excepción. Leerlos del nivel superior es el error fácil: es lo que la suite
  * de la API devolvía antes de registrar el mismo filtro que producción.
  */
+/**
+ * D-72 · los motivos del rechazo de una foto (`mensaje.motivos`), si los trae.
+ *
+ * Como `rechazosPorCampo`, van DENTRO de `mensaje`: el filtro global de la API
+ * envuelve todo error en `{ estado, correlacion, mensaje }`. Leerlos del nivel
+ * superior es el error fácil, y aquí se pagaba caro: la pantalla «Mi rostro»
+ * enseñaba «La foto no sirve para reconocer el rostro» y nada más, mientras la
+ * API estaba diciendo exactamente cuál de las cuatro medidas había fallado.
+ */
+export const motivosDeFotoDelError = (cuerpo: unknown): readonly string[] | undefined => {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return undefined;
+  const mensaje = (cuerpo as CuerpoDeError).mensaje;
+  if (typeof mensaje !== 'object' || mensaje === null) return undefined;
+  const motivos = (mensaje as { motivos?: unknown }).motivos;
+  if (!Array.isArray(motivos)) return undefined;
+  const limpios = motivos.filter((m): m is string => typeof m === 'string');
+  return limpios.length > 0 ? limpios : undefined;
+};
+
 export const rechazosPorCampo = (cuerpo: unknown): Record<string, string> | undefined => {
   if (typeof cuerpo !== 'object' || cuerpo === null) return undefined;
   const mensaje = (cuerpo as CuerpoDeError).mensaje;
@@ -168,6 +195,7 @@ export const desenvolver = <T>(respuesta: {
       cuerpo.correlacion,
       rechazosPorCampo(respuesta.error),
       causaDelError(respuesta.error),
+      motivosDeFotoDelError(respuesta.error),
     );
   }
   if (respuesta.data === undefined) {
