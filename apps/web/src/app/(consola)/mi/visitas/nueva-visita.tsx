@@ -7,15 +7,13 @@ import { CapturaDeFoto } from '@/componentes/captura-de-foto';
 import type { FotoLista } from '@/componentes/captura-de-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
+import { nuevaClaveDeIdempotencia } from '@/lib/clave-de-idempotencia';
 import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import { DURACIONES } from '../../visitantes/generar-autorizacion';
 import { CasillaDeLaFoto, desenlaceDe } from './casilla';
 
 const CLASE_DE_SELECT =
   'h-11 w-full rounded-campo border border-borde bg-campo px-3 text-cuerpo text-texto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto';
-
-/** La misma clave para cada reintento del MISMO formulario (RN-17); una nueva por visita. */
-const nuevaClave = (): string => globalThis.crypto.randomUUID();
 
 /**
  * M-4 · «Nuevo visitante», los mismos campos y el mismo flujo que la app:
@@ -43,7 +41,7 @@ export const NuevaVisita = ({
   const [observaciones, setObservaciones] = useState('');
   const [foto, setFoto] = useState<FotoLista | null>(null);
   const [casilla, setCasilla] = useState(false);
-  const [clave, setClave] = useState(nuevaClave);
+  const [clave, setClave] = useState(nuevaClaveDeIdempotencia);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [exito, setExito] = useState<string | null>(null);
@@ -70,7 +68,7 @@ export const NuevaVisita = ({
     setFoto(null);
     setCasilla(false);
     setError(undefined);
-    setClave(nuevaClave());
+    setClave(nuevaClaveDeIdempotencia());
     setRonda((r) => r + 1);
   };
 

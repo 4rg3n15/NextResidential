@@ -10,6 +10,7 @@ import { fechaCorta } from '@/lib/fechas';
 import { useCuandoAlAbrir } from '@/lib/use-cuando-al-abrir';
 import { DURACIONES } from '../../visitantes/generar-autorizacion';
 import { CasillaDeLaFoto, desenlaceDe } from './casilla';
+import { nuevaClaveDeIdempotencia } from '@/lib/clave-de-idempotencia';
 
 const CLASE_DE_SELECT =
   'h-11 w-full rounded-campo border border-borde bg-campo px-3 text-cuerpo text-texto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-marca-texto';
@@ -34,7 +35,7 @@ export const VolverAAutorizar = ({
   const { fecha, hora, setFecha, setHora } = useCuandoAlAbrir(visitante !== null);
   const [duracion, setDuracion] = useState(120);
   const [casilla, setCasilla] = useState(false);
-  const [clave, setClave] = useState(() => globalThis.crypto.randomUUID());
+  const [clave, setClave] = useState(nuevaClaveDeIdempotencia);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [exito, setExito] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export const VolverAAutorizar = ({
     setCasilla(false);
     setError(undefined);
     setExito(null);
-    setClave(globalThis.crypto.randomUUID());
+    setClave(nuevaClaveDeIdempotencia());
     alCerrar();
   };
 
@@ -73,7 +74,7 @@ export const VolverAAutorizar = ({
       }
       setExito(desenlace.exito ?? null);
       setCasilla(false);
-      setClave(globalThis.crypto.randomUUID());
+      setClave(nuevaClaveDeIdempotencia());
       alRegistrar();
     } catch (fallo) {
       setError(fallo instanceof ErrorDeApi ? fallo.message : 'No hay conexión con el servidor.');
