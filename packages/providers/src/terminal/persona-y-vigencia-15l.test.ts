@@ -58,9 +58,10 @@ describe('la hora que se escribe en el equipo', () => {
 });
 
 describe('el registro UserInfo', () => {
-  it('SIN vigencia y sin puerta es el de antes de la 15-L, byte a byte', () => {
+  it('SIN vigencia y sin puerta: permanente, con las fechas que los equipos exigen (D-75), byte a byte', () => {
     expect(JSON.stringify({ UserInfo: personaEnElEquipo('p7', undefined, null) })).toBe(
-      '{"UserInfo":{"employeeNo":"p7","name":"p7","userType":"normal","Valid":{"enable":false}}}',
+      '{"UserInfo":{"employeeNo":"p7","name":"p7","userType":"normal","Valid":{"enable":false,' +
+        '"beginTime":"2020-01-01T00:00:00","endTime":"2037-12-31T23:59:59","timeType":"local"}}}',
     );
   });
 
@@ -139,7 +140,13 @@ describe('A2 contra el equipo simulado', () => {
           employeeNo: EN_EL_EQUIPO,
           name: EN_EL_EQUIPO,
           userType: 'normal',
-          Valid: { enable: false },
+          // D-75 · sin vigencia viajan igual las fechas: sin ellas los dos equipos rechazan el alta.
+          Valid: {
+            enable: false,
+            beginTime: '2020-01-01T00:00:00',
+            endTime: '2037-12-31T23:59:59',
+            timeType: 'local',
+          },
         },
       }),
     ]);

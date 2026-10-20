@@ -15,7 +15,7 @@ import { desvioDelReloj, desvioEnPalabras } from '../nucleo/reloj-del-equipo';
 import type { VeredictoRemoto } from '../nucleo/verificacion-remota';
 import { recuentoDeLaBiblioteca } from './recuento-de-biblioteca';
 import { confirmada, exigirConfirmacion } from '../equipo/confirmacion-isapi';
-import { personaEnElEquipo } from './persona-en-el-equipo';
+import { personaEnElEquipo, personaYaExiste } from './persona-en-el-equipo';
 import { propositoDeLaCarga, tipoDePersonaConVigencia } from './forma-del-alta';
 import type { AjustesDePersona } from './persona-en-el-equipo';
 import { exigirFotoAdmisible } from './foto-del-rostro';
@@ -515,7 +515,7 @@ export class TerminalFacial implements FaceTemplateProvider, AccessPointProvider
       contenido: persona,
     });
     if (confirmada(respuesta)) return;
-    if (/exist|duplicat/i.test(respuesta.cuerpo)) {
+    if (personaYaExiste(resumenIsapi(respuesta.cuerpo).subStatusCode)) {
       const modificar = rutaPara(
         'modificar la persona a la que pertenece la plantilla',
         'terminal',

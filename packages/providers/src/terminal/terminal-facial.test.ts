@@ -180,7 +180,11 @@ describe('alta de plantilla', () => {
   it('un alta repetida NO es un fallo: la sincronización tiene que poder reintentarse', async () => {
     const { terminal } = montar([
       respuesta(200, OK_XML), // recuento previo
-      respuesta(400, '{"statusString":"employeeNo already exist"}'),
+      // D-75 · como lo contestan los dos equipos: se reconoce por el subStatusCode, no por el texto.
+      respuesta(
+        400,
+        '{"statusCode":6,"statusString":"Invalid Content","subStatusCode":"employeeNoAlreadyExist"}',
+      ),
       respuesta(200, OK_XML),
     ]);
     await expect(
