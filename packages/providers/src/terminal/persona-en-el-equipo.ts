@@ -24,9 +24,10 @@ import type { Vigencia } from '@ncr/domain-core';
  *
  *  4. **El inicio va con margen** (15-X · D0). Ver `MARGEN_DE_INICIO_S`.
  *
- * Sin vigencia, el registro es BYTE A BYTE el de antes de la 15-L
- * (`userType: "normal"`, `Valid.enable: false`), salvo `doorRight`/`RightPlan`
- * cuando la terminal tiene puerta declarada, que no dependen de la vigencia.
+ * Sin vigencia (el rostro del RESIDENTE), la persona es permanente en el
+ * equipo (`userType: "normal"`, `Valid.enable: false`), pero `Valid` lleva
+ * SIEMPRE `beginTime`, `endTime` y `timeType`: ver `VIGENCIA_PERMANENTE`.
+ * `doorRight`/`RightPlan` van cuando la terminal tiene puerta declarada.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 
@@ -61,6 +62,42 @@ export const MARGEN_DE_INICIO_S = 300;
 const PRIMERO = '1970-01-01T00:00:00';
 const ULTIMO = '2037-12-31T23:59:59';
 
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * D-75 · SIN VIGENCIA, `Valid` LLEVA IGUAL SUS FECHAS
+ *
+ * Prueba directa del 20/10 contra los dos equipos: `Valid {enable:false}` SIN
+ * fechas es un alta RECHAZADA y la persona no se crea —terminal DS-K1T344
+ * «required node does not exist.beginTime», videoportero DS-KD9633 «required
+ * element(beginTime)», los dos `MessageParametersLack`—. Con `beginTime`,
+ * `endTime` y `timeType` el alta pasa en los dos. El rostro del residente
+ * quedaba sin persona y sin plantilla, y el residente sin acceso.
+ *
+ * Se conserva `enable: false` —permanente en el equipo, decisión del cliente—
+ * con una fecha FIJA dentro del rango de la guía: con `enable: false` el
+ * equipo no la aplica, así que no depende de su reloj y no arma la compuerta
+ * de reloj (que sigue siendo sólo para las altas CON vigencia). Quien suprime
+ * el rostro sigue siendo la plataforma (RN-11, supresión programada).
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+export const VIGENCIA_PERMANENTE = {
+  enable: false,
+  beginTime: '2020-01-01T00:00:00',
+  endTime: ULTIMO,
+  timeType: 'local',
+} as const;
+
+/**
+ * D-75 · «La persona ya existe» se decide por el `subStatusCode` de la
+ * respuesta (`employeeNoAlreadyExist` en los dos equipos), NUNCA por el texto
+ * libre del cuerpo: «required node does not exist.beginTime» contiene «exist»
+ * y se leía como «ya existe», y una alta rechazada acababa en una MODIFICACIÓN
+ * de una persona inexistente (`employeeNoNotExist` al subir el rostro), con el
+ * motivo verdadero escondido.
+ */
+export const personaYaExiste = (subStatusCode: string | null): boolean =>
+  subStatusCode !== null && /AlreadyExist/i.test(subStatusCode);
+
 export interface AjustesDePersona {
   /** Zona IANA en la que el equipo lleva su reloj. */
   readonly zonaHoraria?: string;
@@ -80,7 +117,7 @@ export interface PersonaEnElEquipo {
   readonly name: string;
   readonly userType: 'normal' | 'visitor';
   readonly Valid:
-    | { readonly enable: false }
+    | typeof VIGENCIA_PERMANENTE
     | {
         readonly enable: true;
         readonly beginTime: string;
@@ -149,7 +186,7 @@ export const personaEnElEquipo = (
       // borrar por API. La identidad vive en `plantillas_biometricas`.
       name: identificador,
       userType: 'normal',
-      Valid: { enable: false },
+      Valid: VIGENCIA_PERMANENTE,
       ...puerta,
     };
   }
