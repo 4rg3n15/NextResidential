@@ -66,11 +66,21 @@ const CAUSAS: readonly Causa[] = [
       '(la lista muestra los que declara; el subflujo x02 es el que ve la consola)',
   },
   {
-    // V5 (15-N) · lo que go2rtc dice cuando el equipo rechaza la credencial RTSP.
+    // V5 (15-N) · lo que go2rtc dice cuando el equipo contesta 401 por RTSP.
+    //
+    // D-73 · y «401» NO quiere decir «credencial mala». Visto en sitio el
+    // 19/10 con el DS-KD9633-WBE6: pedido el canal 102, el equipo contestaba
+    // 401; con la MISMA credencial, el canal 101 servía H.264 a la primera.
+    // Ese modelo no tiene subflujo y contesta 401 a un canal inexistente en
+    // vez de 404. La frase nombra las dos causas y pone el canal delante: es
+    // la más probable cuando la credencial ya entra por HTTP, y se corrige en
+    // la ficha sin tocar el equipo.
     patron: /\b401\b|Unauthorized|wrong user\/pass/i,
     frase:
-      'el equipo rechazó la credencial por RTSP: el usuario de servicio necesita permiso de ' +
-      'vista en vivo en el panel del equipo (Usuarios → permisos → Vista en directo)',
+      'el equipo contestó 401 por RTSP, que puede ser el canal o la credencial. Primero el ' +
+      'canal: cambie el de la ficha al principal (x01) —muchos videoporteros no tienen el ' +
+      'subflujo x02 y contestan 401 en vez de 404—. Si con el x01 sigue igual, entonces es el ' +
+      'permiso: el usuario de servicio necesita vista en vivo en el panel del equipo',
   },
   {
     patron: /\b404\b|Not Found|stream not found/i,

@@ -213,10 +213,16 @@ describe('V5 (15-N) · por qué no hay video, en palabras', () => {
     expect((error as Error).message).toMatch(/Probar conexión/);
   });
 
-  it('«wrong user/pass»: credencial RTSP en palabras', async () => {
+  // D-73 · el 401 de RTSP tiene DOS causas y el canal va primero. En sitio
+  // (19/10, DS-KD9633-WBE6) el equipo contestaba 401 al canal 102 —que no
+  // tiene— y con la misma credencial servía el 101 sin protestar. Decir sólo
+  // «credencial» mandó dos días en la dirección equivocada.
+  it('«wrong user/pass»: el canal primero, la credencial después', async () => {
     const { caso } = conPuenteQue(falla('HTTP 500 · streams: wrong user/pass'));
     const error = await caso.ejecutar(solicitud).catch((e: unknown) => e);
-    expect((error as Error).message).toMatch(/rechazó la credencial por RTSP/);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toMatch(/puede ser el canal o la credencial/);
+    expect(mensaje.indexOf('canal')).toBeLessThan(mensaje.indexOf('permiso'));
   });
 
   it('el puente no alcanzable NO dispara la sonda: es el puente, no el equipo', async () => {

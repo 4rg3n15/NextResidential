@@ -151,7 +151,8 @@ describe.skipIf(binario === null)(
       const res = await whep(OFERTA_SDP_DE_NAVEGADOR, CLAVE_MALA);
       expect(res.status).toBe(502);
       const cuerpo = JSON.stringify(res.body);
-      expect(cuerpo).toMatch(/rechazó la credencial por RTSP/);
+      // D-73 · dos causas posibles, el canal delante.
+      expect(cuerpo).toMatch(/puede ser el canal o la credencial/);
       expect(cuerpo).not.toContain('otra-clave-que-tampoco-debe-salir');
       expect(cuerpo).not.toContain(CLAVE);
     }, 30_000);

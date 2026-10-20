@@ -61,7 +61,7 @@ describe('V5 (15-N) · el título nombra la causa, no sólo el código', () => {
       /no tiene ese canal/,
     ],
     [
-      'el equipo rechazó la credencial por RTSP (la misma que acepta por HTTP)',
+      'el equipo contestó 401 por RTSP, que puede ser el canal o la credencial',
       /credencial de video/,
     ],
     ['el equipo entrega H.265 en el canal 101 y el navegador sólo reproduce H.264', /Códec/],

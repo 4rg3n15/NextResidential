@@ -27,10 +27,13 @@ const CAUSAS: readonly Causa[] = [
     frase: 'el equipo no tiene ese canal de video: elija otro canal en la ficha del equipo',
   },
   {
+    // D-73 · 401 por RTSP tiene dos causas, y el canal va primero: en sitio
+    // (19/10, DS-KD9633-WBE6) el equipo contestaba 401 a un canal que no
+    // tiene, y servía el x01 con la misma credencial sin protestar.
     patron: /\b401\b|rechazó la credencial/i,
     frase:
-      'el equipo rechazó la credencial por RTSP: active la vista en vivo para el usuario de ' +
-      'servicio en el panel del equipo',
+      'el equipo contestó 401 por RTSP: pruebe primero con el canal principal (x01) en la ' +
+      'ficha del equipo; si sigue igual, active la vista en vivo para el usuario de servicio',
   },
 ];
 
@@ -95,8 +98,8 @@ const TITULOS_POR_CAUSA: readonly { readonly patron: RegExp; readonly titulo: st
     titulo: 'El equipo no tiene ese canal',
   },
   {
-    patron: /credencial por RTSP|sólo acepta Digest SHA-256/i,
-    titulo: 'El equipo rechazó la credencial de video',
+    patron: /401 por RTSP|credencial por RTSP|sólo acepta Digest SHA-256/i,
+    titulo: 'El equipo rechazó el canal o la credencial de video',
   },
   {
     patron: /permiso de vista en vivo \(RTSP 403\)/i,
