@@ -151,8 +151,17 @@ describe.skipIf(binario === null)(
       const res = await whep(OFERTA_SDP_DE_NAVEGADOR, CLAVE_MALA);
       expect(res.status).toBe(502);
       const cuerpo = JSON.stringify(res.body);
-      // D-73 · dos causas posibles, el canal delante.
-      expect(cuerpo).toMatch(/puede ser el canal o la credencial/);
+      // D-73 · dos causas posibles, el canal delante. D-142 · aquí la API PREGUNTA al
+      // equipo, así que la frase es la del diagnóstico de la sonda y no la del
+      // traductor de go2rtc. La prueba de D-73 buscaba la de este último y solo
+      // corre con go2rtc real (macOS en CI): se afirma el contenido —las dos
+      // causas y el canal delante—, que es lo que D-73 quería fijar.
+      expect(cuerpo).toMatch(/401 por RTSP/);
+      expect(cuerpo).toMatch(/dos causas posibles/);
+      expect(cuerpo.indexOf('el canal no existe')).toBeGreaterThan(-1);
+      expect(cuerpo.indexOf('el canal no existe')).toBeLessThan(
+        cuerpo.indexOf('permiso de vista en vivo'),
+      );
       expect(cuerpo).not.toContain('otra-clave-que-tampoco-debe-salir');
       expect(cuerpo).not.toContain(CLAVE);
     }, 30_000);
