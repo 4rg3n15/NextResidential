@@ -196,6 +196,23 @@ describe('D-145 · ningún filtro cruza copropiedades', () => {
   });
 });
 
+describe('D-145 · el operador se nombra aunque no sea de la copropiedad (0060)', () => {
+  const CENTRAL = '00000000-0000-4000-8000-000000000012';
+  const SUPERADMIN = '00000000-0000-4000-8000-000000000001';
+  const ADMIN_AJENO = '00000000-0000-4000-8000-000000000020';
+
+  it('el de central asignado a otra y el superadministrador, sí; un administrador ajeno, no', async () => {
+    if (omitida()) return;
+    const resolutor = new ResolutorDeNombresPg(pool as Pool);
+    const ids = { personas: [], viviendas: [], operadores: [CENTRAL, SUPERADMIN, ADMIN_AJENO] };
+    const enLaAjena = await resolutor.resolver(COP_AJENA, ids);
+    expect(enLaAjena.operadores.get(CENTRAL)?.length).toBeGreaterThan(0);
+    expect(enLaAjena.operadores.get(SUPERADMIN)?.length).toBeGreaterThan(0);
+    const enLaPropia = await resolutor.resolver(COP, ids);
+    expect(enLaPropia.operadores.has(ADMIN_AJENO)).toBe(false);
+  });
+});
+
 describe('D-145 · el buscador no escribe en eventos (RN-03, CA-23)', () => {
   it('ni el repositorio, ni el resolutor, ni la 0059 tienen UPDATE o DELETE', () => {
     const raiz = resolve(__dirname, '..', '..', '..');

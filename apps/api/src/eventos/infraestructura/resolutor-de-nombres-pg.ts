@@ -13,8 +13,7 @@ import { SIN_NOMBRES } from '../aplicacion/nombres-de-eventos';
  * D-145 · tres consultas por lotes (`= ANY($2::uuid[])`), parametrizadas
  * (§2.7.4), en una transacción de sólo lectura con los claims de servicio de
  * la copropiedad: la RLS es la segunda barrera y el `copropiedad_id` explícito
- * la primera, también para el operador (sólo los usuarios de ESA copropiedad o
- * los de plataforma, sin copropiedad).
+ * la primera, también para el operador (ver `OPERADORES`).
  */
 const PERSONAS = `
 SELECT p.id, p.nombre_completo AS nombre,
@@ -28,10 +27,20 @@ SELECT v.id, v.identificador AS nombre
   FROM public.viviendas v
  WHERE v.copropiedad_id = $1 AND v.id = ANY($2::uuid[])`;
 
+/**
+ * El operador puede no ser de la copropiedad: el de central la atiende por una
+ * asignación en `roles_usuario`, y el superadministrador no tiene copropiedad.
+ * Se nombra a quien es de ella o tiene o tuvo un rol en ella, y a los
+ * superadministradores; lo mismo que deja leer la RLS del servicio (0060).
+ */
 const OPERADORES = `
 SELECT u.id, u.nombre
   FROM public.usuarios u
- WHERE (u.copropiedad_id = $1 OR u.copropiedad_id IS NULL) AND u.id = ANY($2::uuid[])`;
+ WHERE u.id = ANY($2::uuid[])
+   AND (u.copropiedad_id = $1
+        OR EXISTS (SELECT 1 FROM public.roles_usuario r
+                    WHERE r.usuario_id = u.id
+                      AND (r.copropiedad_id = $1 OR r.rol = 'superadministrador')))`;
 
 export class ResolutorDeNombresPg implements ResolutorDeNombres {
   constructor(private readonly pool: Pool) {}
