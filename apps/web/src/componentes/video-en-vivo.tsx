@@ -186,7 +186,7 @@ export const VideoEnVivo = ({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-distintivo text-texto-secundario">
+      <div className="flex flex-wrap items-center gap-2 text-distintivo text-texto-apagado">
         {fase.tipo === 'reproduciendo' && (
           <>
             <Distintivo tono="exito">En vivo</Distintivo>

@@ -19,6 +19,7 @@ otro sitio por qué ya no están abiertas.
 | AR-03   | Inmutabilidad y rol dedicado demostrados en un clúster local    | **Redactada · pendiente de verificación en su proyecto**       | TI de Grupo Control     |
 | AR-04   | Ciclo de recuperación de contraseña por correo no verificable   | **CERRADA** (15-R, E8): desactivado en producción, no aceptado | —                       |
 | AR-05   | Clave de un equipo expuesta en la visita del 29/09, no rotable  | **Redactada · pendiente de firma**                             | **TI de Grupo Control** |
+| AR-06   | zod 3.24.1 con GHSA-mrhx-c7xc-m3w5 (alto), sin 3.x corregida    | **Aceptada por el cliente** (2026-10-26) · pendiente de firma  | Dirección de proyecto   |
 | H-15B-1 | Credenciales de equipo cifradas en la base (riesgo residual)    | **Redactada · pendiente de firma** · acotada por el Edge       | TI de Grupo Control     |
 
 ---
@@ -170,6 +171,53 @@ de IP; que se detecte un acceso al equipo desde una IP que no sea la del Edge;
 o que la clave pase a ser rotable —entonces se rota y esta entrada se cierra.
 
 Firmado por (TI de Grupo Control): ……………………… · Cargo: ……………………… ·
+Fecha: ………………………
+
+---
+
+## AR-06 · zod 3.24.1 con un aviso alto sin versión 3.x corregida (GHSA-mrhx-c7xc-m3w5)
+
+**Qué pasó.** El 2026-10-26, `pnpm audit --prod --audit-level=high` rompió todo
+PR y `develop` por avisos publicados después del último verde. Seis se
+corrigieron sin cambiar de mayor (D-142: `next` 15.5.28, `body-parser`
+^2.4.0, `multer` ^2.5.0). El séptimo es **zod < 4.6.6**: «uncontrolled resource
+consumption» — un array **sin tope** en el esquema, con muchos elementos
+inválidos, acumula una incidencia por elemento hasta agotar la memoria. No hay
+versión 3.x corregida; el arreglo es zod 4, que es versión mayor y toca la
+validación de configuración de API, Edge y consola.
+
+**Qué se acepta.** Mantener zod 3.24.1 y que la auditoría ignore ese aviso
+(`pnpm.auditConfig.ignoreGhsas` en `package.json`), sin migrar a zod 4 por
+ahora. Decisión del cliente, 2026-10-26.
+
+**Por qué.** [Probable] No hay camino explotable: el aviso exige un `z.array`
+sin `.max()` aplicado a entrada del atacante, y no lo hay. Medido sobre el
+código:
+
+1. `apps/api/src/autenticacion/dominio/claims.ts`: los únicos arrays sobre
+   datos externos (`copropiedades`, `aud`) se analizan **después** de verificar
+   la firma asimétrica del JWT —el atacante no controla su contenido sin la
+   llave— y `copropiedades` lleva `.max(64)`.
+2. `apps/web/src/app/api/sesion/copropiedad/route.ts`: un objeto con un UUID,
+   sin arrays.
+3. `apps/edge/src/configuracion/esquema-de-sitio.ts`: fichero local de la
+   máquina del conjunto, con `.max(64)`.
+4. El resto son esquemas de variables de entorno, que lee el propio proceso al
+   arrancar.
+
+Los DTO de la API se validan con `class-validator`, no con zod, y el tamaño de
+cuerpo está acotado globalmente (§2.7.8).
+
+**Qué lo acota.** La lista de arriba, y el control de la auditoría, que sigue
+rompiendo con cualquier **otro** aviso alto o crítico: se ignora un GHSA por su
+identificador, no un paquete.
+
+**Qué lo reabre.** Un `z.array` sin `.max()` sobre entrada que no venga
+firmada; un uso de zod para validar cuerpos HTTP; o que zod publique una 3.x
+corregida — entonces se sube y esta entrada se cierra. **Revisión a más
+tardar en la ETAPA 16**, con la migración a zod 4 evaluada como tarea propia.
+
+Firmado por (Dirección de proyecto): ……………………… · Cargo: ……………………… ·
 Fecha: ………………………
 
 ---

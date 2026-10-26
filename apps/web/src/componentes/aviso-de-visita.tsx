@@ -62,7 +62,7 @@ export const AvisoDeVisita = ({
     return (
       <div
         role="status"
-        className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border border-borde bg-superficie p-4 shadow-lg sm:inset-x-auto sm:right-4"
+        className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-lg sm:inset-x-auto sm:right-4"
       >
         <p className="text-secundario text-texto">{resumen}</p>
         <div className="mt-2 flex justify-end">
@@ -96,7 +96,7 @@ export const AvisoDeVisita = ({
     <div
       role="alertdialog"
       aria-labelledby="aviso-de-visita-titulo"
-      className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border-2 border-marca-texto bg-superficie p-4 shadow-lg sm:inset-x-auto sm:right-4"
+      className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border-2 border-marca-texto bg-tarjeta p-4 shadow-lg sm:inset-x-auto sm:right-4"
     >
       <div className="flex items-start gap-3">
         <UserRoundCheck

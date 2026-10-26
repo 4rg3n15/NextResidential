@@ -36,6 +36,12 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { arbolDeSonda } from '../../e2e/arbol-de-sonda.mjs';
 import { sinColores } from './sin-colores.mjs';
+import {
+  candidatosDeEjecutable,
+  necesitaShell,
+  nombreDeBinarioNativo,
+  versionEnAgente,
+} from './ejecutable-del-sistema.mjs';
 import { conLectorLento } from './lector-lento.mjs';
 import { sondasDeEstabilidad } from './sondas/estabilidad.mjs';
 import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
@@ -319,6 +325,8 @@ try {
       ['bg-white', 'blanco literal'],
       ['dark:bg-gray-900', 'variante `dark:` suelta'],
       ['bg-[#101010]', 'hexadecimal en la clase'],
+      // D-141 · el fallo contrario: un token que el preset NO declara no pinta nada.
+      ['bg-inexistente', 'token de color que el preset no declara'],
     ]) {
       writeFileSync(sonda, `export const S = () => <div className="${clase}" />;\n`);
       const r = enClon('node', ['scripts/lib/frontera-tema.mjs']);
@@ -3466,6 +3474,33 @@ try {
       }
       rmSync(espejo, { recursive: true, force: true });
     }
+  }
+
+  console.log('\n▸ 42 · el nombre de un ejecutable en Windows (D-66, D-142)');
+  {
+    /**
+     * `ejecutable-del-sistema.mjs` entró con D-66 y sus ramas de Windows no las
+     * ejercía ningún proceso de esta suite: el trinquete de ramas lo denunciaba
+     * en macOS («no está en la base»). Este banco corre en macOS y en Linux,
+     * así que Windows no llega nunca por sí solo; se le pasa la plataforma,
+     * que es justo para lo que el módulo la acepta inyectada.
+     */
+    const iguales = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    iguales(candidatosDeEjecutable('pnpm', 'win32'), ['pnpm.cmd', 'pnpm.exe', 'pnpm']) &&
+    iguales(candidatosDeEjecutable('pnpm', 'darwin'), ['pnpm'])
+      ? ok('en Windows se busca primero `.cmd`, luego `.exe` y al final el nombre desnudo')
+      : mal('los candidatos de ejecutable en Windows no son `.cmd`, `.exe`, nombre');
+    necesitaShell('pnpm.cmd', 'win32') && !necesitaShell('pnpm.cmd', 'linux')
+      ? ok('un `.cmd` en Windows pide shell (BatBadBut) y fuera de Windows no')
+      : mal('`necesitaShell` no distingue un `.cmd` en Windows');
+    nombreDeBinarioNativo('go2rtc', 'win32') === 'go2rtc.exe' &&
+    nombreDeBinarioNativo('go2rtc', 'linux') === 'go2rtc'
+      ? ok('el binario nativo se llama `.exe` en Windows y sin extensión fuera')
+      : mal('el nombre del binario nativo no depende de la plataforma');
+    versionEnAgente('pnpm/9.15.0 npm/? node/v22.22.2 win32 x64', 'pnpm') === '9.15.0' &&
+    versionEnAgente(undefined, 'pnpm') === null
+      ? ok('la versión de pnpm se lee del agente de usuario, y sin agente no se inventa')
+      : mal('`versionEnAgente` no lee la versión o inventa una sin agente');
   }
 
   console.log('\n▸ 28 · las cuatro grietas del escaneo de secretos (ETAPA 13)');
