@@ -319,6 +319,8 @@ try {
       ['bg-white', 'blanco literal'],
       ['dark:bg-gray-900', 'variante `dark:` suelta'],
       ['bg-[#101010]', 'hexadecimal en la clase'],
+      // D-141 · el fallo contrario: un token que el preset NO declara no pinta nada.
+      ['bg-inexistente', 'token de color que el preset no declara'],
     ]) {
       writeFileSync(sonda, `export const S = () => <div className="${clase}" />;\n`);
       const r = enClon('node', ['scripts/lib/frontera-tema.mjs']);

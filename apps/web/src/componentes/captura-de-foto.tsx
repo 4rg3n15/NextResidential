@@ -121,7 +121,7 @@ export const CapturaDeFoto = ({
             const fichero = e.target.files?.[0];
             if (fichero !== undefined) void leer(fichero);
           }}
-          className="block w-full text-secundario file:mr-4 file:rounded-campo file:border-0 file:bg-superficie file:px-4 file:py-2"
+          className="block w-full text-secundario file:mr-4 file:rounded-campo file:border-0 file:bg-lienzo file:text-texto file:px-4 file:py-2"
         />
       </label>
 

@@ -84,6 +84,57 @@ const EXCEPCION_QR = 'acceso/inscripcion-factor.tsx';
  */
 const conBarrasNormales = (ruta) => ruta.split(sep).join('/');
 
+/**
+ * D-141 · una clase de color que nombra un token INEXISTENTE.
+ *
+ * Los avisos emergentes de visita y de atención en vivo salían con fondo
+ * transparente y el texto montado sobre la pantalla: usaban `bg-superficie`, y
+ * el preset no tiene ningún `superficie`. Tailwind no se queja de una clase
+ * que no conoce —simplemente no emite nada—, así que compila, pasa las
+ * pruebas y no pinta. Los patrones de arriba buscan colores que SOBRAN; este
+ * busca los que FALTAN, que es el fallo contrario y nadie lo veía.
+ *
+ * Los tokens se leen del FUENTE del preset (`temas.ts` y la escala de
+ * `tailwind-preset.ts`), no de su `dist/`: un artefacto puede envejecer y el
+ * fuente no (§2.8.0). Se recorre `TEMA_CLARO` porque `coloresDelPreset()`
+ * deriva las clases de él; `DEFAULT` no forma parte del nombre.
+ */
+const fuente = (ruta) => readFileSync(resolve(raizRepo, ruta), 'utf8');
+const desde = (texto, marca) => texto.slice(texto.indexOf(marca) + marca.length);
+
+const tokensDeColor = new Set();
+{
+  const pila = [];
+  const paleta = desde(fuente('packages/config/src/temas.ts'), 'TEMA_CLARO: PaletaDeTema = {');
+  for (const m of paleta.matchAll(/(\w+):\s*\{|(\w+):\s*'|\}/g)) {
+    if (m[1] !== undefined) pila.push(m[1]);
+    else if (m[2] !== undefined)
+      tokensDeColor.add([...pila, m[2]].filter((p) => p !== 'DEFAULT').join('-'));
+    else if (pila.pop() === undefined) break;
+  }
+}
+/** La escala tipográfica comparte prefijo con el color: `text-cuerpo` es un tamaño. */
+const tamanosDeTexto = new Set(
+  [
+    ...desde(fuente('packages/config/src/tailwind-preset.ts'), 'export const tipografia = {')
+      .split('\n} as const;')[0]
+      .matchAll(/^\s+(\w+): \[/gm),
+  ].map((m) => m[1]),
+);
+/**
+ * Sufijos de esos prefijos que no son color: grosores, lados, alineación, tamaños de Tailwind.
+ * La coma y el corchete quedan fuera del arranque: `transition-[color,border-color]` nombra
+ * propiedades CSS, no clases.
+ */
+const SIN_COLOR =
+  /^(?:\d+|[xytrblse](?:-\d+)?|xs|sm|base|lg|\d?xl|left|center|right|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip|solid|dashed|dotted|double|hidden|none|collapse|separate|inset|foco|transparent|current|inherit|white|black)$/;
+const CLASE_DE_COLOR =
+  /(?<![\w,[-])(?:[\w-]+:)*(bg|text|border|ring-offset|ring)-([\w-]+)(?:\/[\w.]+)?(?![\w-])/g;
+const colorDeclarado = (prefijo, nombre) =>
+  tokensDeColor.has(nombre) ||
+  SIN_COLOR.test(nombre) ||
+  (prefijo === 'text' && tamanosDeTexto.has(nombre));
+
 const hallazgos = [];
 
 for (const fichero of ficheros) {
@@ -103,6 +154,14 @@ for (const fichero of ficheros) {
 
     for (const [patron, motivo] of PATRONES) {
       if (patron.test(linea)) hallazgos.push(`${relativo}:${numero} · ${motivo}`);
+    }
+
+    for (const [clase, prefijo, nombre] of linea.matchAll(CLASE_DE_COLOR)) {
+      if (!colorDeclarado(prefijo, nombre)) {
+        hallazgos.push(
+          `${relativo}:${numero} · \`${clase}\` nombra un token que el preset no declara: Tailwind no emite nada y el elemento queda sin ese estilo`,
+        );
+      }
     }
 
     if (/\btext-white\b/.test(linea) && !RELLENOS_CON_ETIQUETA_BLANCA.test(linea)) {

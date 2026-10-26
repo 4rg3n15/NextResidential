@@ -177,7 +177,7 @@ export const AtencionEnVivo = ({
         <div
           role="alertdialog"
           aria-labelledby="aviso-de-atencion-titulo"
-          className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border-2 border-marca-texto bg-superficie p-4 shadow-lg sm:inset-x-auto sm:right-4"
+          className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-tarjeta border-2 border-marca-texto bg-tarjeta p-4 shadow-lg sm:inset-x-auto sm:right-4"
         >
           <div className="flex items-start gap-3">
             <BellRing

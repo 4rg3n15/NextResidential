@@ -104,7 +104,7 @@ export const PantallaDeListasNegras = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Listas negras</h1>
-          <p className="text-sm text-texto-suave">
+          <p className="text-sm text-texto-apagado">
             Un veto activo niega el paso aunque haya una autorización vigente.
             <Ayuda texto="El veto manda sobre cualquier permiso: aunque el residente autorice la visita, la persona vetada no pasa hasta que alguien lo levante." />
           </p>

@@ -77,7 +77,7 @@ export const CampoCanalDeVideo = ({
           </option>
         ))}
       </select>
-      <span className="text-distintivo text-texto-secundario">
+      <span className="text-distintivo text-texto-apagado">
         Los canales que el equipo declaró al sondearlo. El subflujo (x02) es el que ve la consola;
         H.264 es el códec que reproduce el navegador.
       </span>

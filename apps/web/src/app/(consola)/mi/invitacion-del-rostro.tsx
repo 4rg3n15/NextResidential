@@ -58,7 +58,7 @@ export const InvitacionDelRostro = ({
           <Link
             href="/mi/rostro"
             prefetch={false}
-            className="inline-flex h-11 items-center justify-center rounded-campo bg-marca px-4 font-medium text-blanco"
+            className="inline-flex h-11 items-center justify-center rounded-campo bg-marca-boton px-4 font-medium text-white hover:bg-marca-presionado"
           >
             Registrar mi rostro
           </Link>

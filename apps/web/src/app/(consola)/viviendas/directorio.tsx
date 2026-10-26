@@ -319,9 +319,9 @@ export const DirectorioDeViviendas = ({
         </p>
       ) : null}
 
-      <section className="space-y-3 rounded-tarjeta border border-borde bg-superficie p-4">
+      <section className="space-y-3 rounded-tarjeta border border-borde bg-tarjeta p-4">
         <div className="flex flex-wrap items-center gap-4">
-          <h2 className="text-subtitulo font-medium text-texto">Viviendas de la copropiedad</h2>
+          <h2 className="text-seccion font-medium text-texto">Viviendas de la copropiedad</h2>
           {/* El buscador es del SERVIDOR y no de esta lista, y hay uno solo. La
               API acota a 500 filas: un filtro que solo mirara lo ya descargado
               diría «sin resultados» sobre un padrón que sí tiene la vivienda. */}
