@@ -14,7 +14,7 @@ import type { Rol } from '@ncr/contracts';
  * consulta. Si el navegador no deja guardar (modo privado, almacenamiento
  * bloqueado), la vista sigue limpia mientras dure la página, y nada falla.
  *
- * PENDIENTE DE DEFINICIÓN · que la API niegue al portero el historial anterior
+ * PENDIENTE DE DEFINICIÓN (P-42) · que la API niegue al portero el historial anterior
  * a su día. Hoy el corte es de la interfaz: la API le sigue respondiendo el
  * rango que pida (la autorización por rol de `/eventos` no cambia en este PR).
  */
