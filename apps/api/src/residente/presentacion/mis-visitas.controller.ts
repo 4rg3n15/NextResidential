@@ -176,7 +176,9 @@ export class MisVisitasController {
   @Post(':autorizacionId/repeticion')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Roles('residente')
-  @ApiOperation({ summary: 'Vuelvo a autorizar a un visitante anterior con su foto (F6)' })
+  @ApiOperation({
+    summary: 'Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143)',
+  })
   @ApiOkResponse({ type: MiVisitaGeneradaDto })
   async repetir(
     @Contexto() ctx: ContextoTenant,
@@ -191,7 +193,7 @@ export class MisVisitasController {
           autorizacionId,
           inicio: new Date(dto.inicio),
           duracionMinutos: dto.duracionMinutos,
-          casillaMarcada: dto.casillaMarcada,
+          casillaMarcada: dto.casillaMarcada ?? false,
           claveDeIdempotencia: dto.claveDeIdempotencia,
         }),
       ),

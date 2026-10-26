@@ -6216,7 +6216,7 @@
             "bearer": []
           }
         ],
-        "summary": "Vuelvo a autorizar a un visitante anterior con su foto (F6)",
+        "summary": "Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143)",
         "tags": [
           "residente"
         ]
@@ -18249,7 +18249,6 @@
         "required": [
           "inicio",
           "duracionMinutos",
-          "casillaMarcada",
           "claveDeIdempotencia"
         ]
       },

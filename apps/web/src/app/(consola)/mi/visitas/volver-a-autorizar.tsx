@@ -20,6 +20,9 @@ const CLASE_DE_SELECT =
  * placa y foto de su autorización anterior; sólo se dice cuándo viene y se
  * marca la casilla otra vez (C-42). El visitante viaja en la RUTA desde su
  * tarjeta: nadie teclea un identificador.
+ *
+ * D-143 · si vino sólo con placa no hay foto que consentir: la casilla no se
+ * pide ni se envía, y la visita vuelve a valer por la placa.
  */
 export const VolverAAutorizar = ({
   copropiedadId,
@@ -40,7 +43,8 @@ export const VolverAAutorizar = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const [exito, setExito] = useState<string | null>(null);
 
-  const completo = visitante !== null && casilla && fecha !== '' && hora !== '';
+  const conFoto = visitante?.tieneFoto ?? false;
+  const completo = visitante !== null && (casilla || !conFoto) && fecha !== '' && hora !== '';
 
   const cerrar = (): void => {
     setCasilla(false);
@@ -62,12 +66,12 @@ export const VolverAAutorizar = ({
           body: {
             inicio: new Date(`${fecha}T${hora}:00`).toISOString(),
             duracionMinutos: duracion,
-            casillaMarcada: casilla,
+            ...(conFoto ? { casillaMarcada: casilla } : {}),
             claveDeIdempotencia: clave,
           },
         }),
       );
-      const desenlace = desenlaceDe(r);
+      const desenlace = desenlaceDe(r, conFoto);
       if (desenlace.error !== undefined) {
         setError(desenlace.error);
         return;
@@ -87,7 +91,11 @@ export const VolverAAutorizar = ({
     <DialogoDeFormulario
       abierto={visitante !== null}
       titulo="Volver a autorizar"
-      descripcion="Se usan de nuevo su nombre, su documento, su placa y su foto. Sólo falta decir cuándo viene."
+      descripcion={
+        conFoto
+          ? 'Se usan de nuevo su nombre, su documento, su placa y su foto. Sólo falta decir cuándo viene.'
+          : 'Se usan de nuevo su nombre, su documento y su placa. Sólo falta decir cuándo viene.'
+      }
       etiquetaEnviar={enviando ? 'Autorizando…' : 'Autorizar de nuevo'}
       enviando={enviando}
       error={error}
@@ -146,14 +154,16 @@ export const VolverAAutorizar = ({
             ))}
           </select>
         </label>
-        <div className="sm:col-span-2">
-          <CasillaDeLaFoto
-            nombre={visitante?.visitante ?? ''}
-            marcada={casilla}
-            alCambiar={setCasilla}
-          />
-        </div>
-        {!casilla ? (
+        {conFoto ? (
+          <div className="sm:col-span-2">
+            <CasillaDeLaFoto
+              nombre={visitante?.visitante ?? ''}
+              marcada={casilla}
+              alCambiar={setCasilla}
+            />
+          </div>
+        ) : null}
+        {conFoto && !casilla ? (
           <p className="text-secundario text-texto-apagado sm:col-span-2">
             Falta: marcar la casilla.
           </p>

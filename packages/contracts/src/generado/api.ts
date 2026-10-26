@@ -1722,7 +1722,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Vuelvo a autorizar a un visitante anterior con su foto (F6) */
+        /** Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143) */
         post: operations["MisVisitasController_repetir"];
         delete?: never;
         options?: never;
@@ -5489,7 +5489,7 @@ export interface components {
             /** Format: date-time */
             inicio: string;
             duracionMinutos: number;
-            casillaMarcada: boolean;
+            casillaMarcada?: boolean;
             claveDeIdempotencia: string;
         };
         ReservaDelDiaDto: {

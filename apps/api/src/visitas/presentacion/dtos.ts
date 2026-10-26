@@ -187,9 +187,11 @@ export class RepetirVisitaDto {
   @Max(DURACION_MAXIMA_MINUTOS, { message: 'La visita no puede durar más de 24 horas' })
   duracionMinutos!: number;
 
-  @ApiProperty()
+  /** D-143 · sólo si la visita anterior tenía foto: una de sólo placa no la pide. */
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean()
-  casillaMarcada!: boolean;
+  casillaMarcada?: boolean;
 
   @ApiProperty({ minLength: 8, maxLength: 128 })
   @IsString()

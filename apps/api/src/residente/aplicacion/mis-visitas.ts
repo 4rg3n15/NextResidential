@@ -169,6 +169,9 @@ export interface EntradaDeRepeticion {
  * F6 · «Volver a autorizar»: copia nombre, documento, placa y la FOTO de una
  * visita anterior de SU vivienda, y sólo pide cuándo y cuánto. La casilla se
  * vuelve a marcar: cada autorización lleva su propia constancia (ADR-032).
+ *
+ * D-143 · una visita que vino sólo con placa también se repite: sin foto, con
+ * su placa y sin casilla, por la misma regla de `revisarForma`.
  */
 export class VolverAAutorizar {
   constructor(
@@ -190,12 +193,13 @@ export class VolverAAutorizar {
       entrada.autorizacionId,
     );
     if (esFallo(anterior)) return anterior;
-    const { foto, calidad } = anterior.valor;
-    if (foto === null || calidad === null) {
+    const { foto, calidad, placa } = anterior.valor;
+    const conFoto = foto !== null && calidad !== null;
+    if (!conFoto && placa === null) {
       return fallo(
         errorDominio(
           'DATO_INVALIDO',
-          'Esa visita no tiene una foto que se pueda reutilizar: genere una nueva',
+          'Esa visita no tiene foto ni placa que se puedan reutilizar: genere una nueva',
         ),
       );
     }
@@ -204,9 +208,9 @@ export class VolverAAutorizar {
       documento: anterior.valor.documento,
       inicio: entrada.inicio,
       duracionMinutos: entrada.duracionMinutos,
-      placa: anterior.valor.placa,
+      placa,
       observaciones: null,
-      foto: { ...foto, calidadPrevia: calidad },
+      foto: conFoto ? { ...foto, calidadPrevia: calidad } : null,
       casillaMarcada: entrada.casillaMarcada,
       claveDeIdempotencia: entrada.claveDeIdempotencia,
     });

@@ -3,10 +3,14 @@ import { esFallo, exito } from '@ncr/domain-core';
 import type { ContextoTenant } from '../../autenticacion';
 import type { RevocarAutorizacion } from '../../autorizaciones';
 import { MENSAJE_PLACA_O_FOTO } from '../../visitas';
-import type { AvisoDeVisitas, RegistrarRostroDeVisita } from '../../visitas';
+import type {
+  AvisoDeVisitas,
+  DatosParaVolverAAutorizar,
+  RegistrarRostroDeVisita,
+} from '../../visitas';
 import type { ResolverMiAmbito } from './casos-de-uso';
 import type { CrearMiAutorizacion } from './crear-mi-autorizacion';
-import { GenerarMiVisita } from './mis-visitas';
+import { GenerarMiVisita, VolverAAutorizar } from './mis-visitas';
 import type { EntradaDeMiVisita } from './mis-visitas';
 import type { AutorizacionesDelResidente } from './puertos';
 
@@ -127,5 +131,60 @@ describe('D-143 · GenerarMiVisita: placa o foto', () => {
     const r = await m.caso.ejecutar(ctx, COP, entrada({ placa: 'ABC123', foto: FOTO }));
     expect(esFallo(r)).toBe(true);
     expect(m.crear.ejecutar).not.toHaveBeenCalled();
+  });
+});
+
+describe('D-143 · «Volver a autorizar» una visita que vino sólo con placa', () => {
+  const repetir = (datos: object) => {
+    const m = montar();
+    const anterior = { ejecutar: vi.fn(async () => exito(datos)) };
+    const caso = new VolverAAutorizar(
+      como<ResolverMiAmbito>(m.resolver),
+      como<DatosParaVolverAAutorizar>(anterior),
+      m.caso,
+    );
+    return { ...m, caso };
+  };
+  const PETICION = {
+    autorizacionId: 'a-0',
+    inicio: AHORA,
+    duracionMinutos: 60,
+    casillaMarcada: false,
+    claveDeIdempotencia: 'clave-2',
+  };
+  const SOLO_PLACA = {
+    visitante: 'Ana',
+    documento: '12345',
+    placa: 'ABC123',
+    foto: null,
+    calidad: null,
+  };
+
+  it('se repite con su placa, sin casilla y sin nada biométrico', async () => {
+    const m = repetir(SOLO_PLACA);
+    const r = await m.caso.ejecutar(ctx, COP, PETICION);
+    expect(r.ok && r.valor).toEqual({ creada: true, id: 'a-1', repetida: false });
+    expect(m.crear.ejecutar).toHaveBeenCalledWith(
+      ctx,
+      COP,
+      expect.objectContaining({ placa: 'ABC123', permiteAccesoVehicular: true }),
+    );
+    expect(m.rostro.ejecutar).not.toHaveBeenCalled();
+  });
+
+  it('sin foto ni placa guardadas no se repite, con el motivo', async () => {
+    const r = await repetir({ ...SOLO_PLACA, placa: null }).caso.ejecutar(ctx, COP, PETICION);
+    expect(esFallo(r) && r.error.detalle).toMatch(/no tiene foto ni placa/);
+  });
+
+  it('con foto guardada, la casilla se sigue exigiendo', async () => {
+    const conFoto = {
+      ...SOLO_PLACA,
+      foto: { contenidoBase64: JPEG, tipoMime: 'image/jpeg' },
+      calidad: 88,
+    };
+    expect(esFallo(await repetir(conFoto).caso.ejecutar(ctx, COP, PETICION))).toBe(true);
+    const r = await repetir(conFoto).caso.ejecutar(ctx, COP, { ...PETICION, casillaMarcada: true });
+    expect(r.ok && r.valor.creada).toBe(true);
   });
 });

@@ -11,15 +11,15 @@ class RepetirVisitaDto {
   const RepetirVisitaDto({
     required this.inicio,
     required this.duracionMinutos,
-    required this.casillaMarcada,
     required this.claveDeIdempotencia,
+    this.casillaMarcada,
   });
   
   factory RepetirVisitaDto.fromJson(Map<String, Object?> json) => _$RepetirVisitaDtoFromJson(json);
   
   final DateTime inicio;
   final num duracionMinutos;
-  final bool casillaMarcada;
+  final bool? casillaMarcada;
   final String claveDeIdempotencia;
 
   Map<String, Object?> toJson() => _$RepetirVisitaDtoToJson(this);

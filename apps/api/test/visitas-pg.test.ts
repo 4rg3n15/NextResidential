@@ -461,6 +461,30 @@ describe('D-143 · visita con placa y sin foto', () => {
     );
     expect(Number(plantillas?.n)).toBe(0);
   });
+
+  it('app · y se vuelve a autorizar por la placa, sin casilla ni foto', async () => {
+    if (omitida()) return;
+    const ultimas = await con(residente).get(`/copropiedades/${COP_A}/mi/visitas/ultimas`);
+    const anterior = (
+      ultimas.body as { autorizacionId: string; visitante: string; tieneFoto: boolean }[]
+    ).find((v) => v.visitante === `Con placa ${CORRIDA}`);
+    expect(anterior?.tieneFoto).toBe(false);
+    const r = await con(residente).post(
+      `/copropiedades/${COP_A}/mi/visitas/${anterior?.autorizacionId ?? ''}/repeticion`,
+      {
+        inicio: new Date(Date.now() + 86_400_000).toISOString(),
+        duracionMinutos: 60,
+        claveDeIdempotencia: `repite-placa-${CORRIDA}-${randomUUID()}`,
+      },
+    );
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ creada: true });
+    const nueva = await fila<{ placa: string | null; foto: string | null }>(
+      'SELECT placa, evidencia_foto_id AS foto FROM public.autorizaciones WHERE id = $1',
+      [r.body.id as string],
+    );
+    expect(nueva).toEqual({ placa: `W${CORRIDA}`, foto: null });
+  });
 });
 
 describe('F5 y F7 · la lista', () => {

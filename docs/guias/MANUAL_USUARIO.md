@@ -867,8 +867,10 @@ En la consola se envía con **«Registrar visita»**; mientras falte algo, el
 formulario dice qué («Falta: …»).
 
 **Últimos visitantes → Volver a autorizar**: para alguien que ya vino, se
-copian sus datos y su foto y sólo se le pide fecha, hora, duración y la casilla.
-Sin foto guardada no se puede: se registra como visitante nuevo.
+copian sus datos, su placa y su foto y sólo se le pide fecha, hora, duración y
+la casilla. Si vino sólo con placa, se vuelve a autorizar por la placa y no hay
+casilla que marcar. Sin foto ni placa guardadas no se puede: se registra como
+visitante nuevo.
 
 Debería llevarle **menos de un minuto** (KPI-10).
 

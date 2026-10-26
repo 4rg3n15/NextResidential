@@ -306,7 +306,7 @@ abstract class ResidenteApi {
     @Path('id') required String id,
   });
 
-  /// Vuelvo a autorizar a un visitante anterior con su foto (F6)
+  /// Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143)
   @POST('/copropiedades/{id}/mi/visitas/{autorizacionId}/repeticion')
   Future<MiVisitaGeneradaDto> misVisitasControllerRepetir({
     @Path('id') required String id,

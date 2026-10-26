@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PantallaDeMisVisitas } from './pantalla';
+import { VolverAAutorizar } from './volver-a-autorizar';
 import { AUTORIZACION_ID, COP, Envoltura, escrituras, servidorFalso } from '../pruebas';
 
 /**
@@ -104,5 +105,38 @@ describe('D-143 · «Nuevo visitante» con placa y sin foto', () => {
     fireEvent.click(dialogo().getByRole('button', { name: 'Foto de prueba' }));
     expect(dialogo().getByLabelText(/Declaro que Carla Ruiz me autorizó/)).toBeTruthy();
     expect(registrar().disabled).toBe(true);
+  });
+});
+
+describe('D-143 · «Volver a autorizar» a quien vino sólo con placa', () => {
+  it('no pide la casilla, envía sin ella y dice que entra por la placa', async () => {
+    render(
+      <Envoltura>
+        <VolverAAutorizar
+          copropiedadId={COP}
+          visitante={{
+            autorizacionId: AUTORIZACION_ID,
+            visitante: 'Carla Ruiz',
+            documento: '12345678',
+            ultimaVisita: '2026-09-20T15:00:00.000Z',
+            placa: 'ABC123',
+            tieneFoto: false,
+          }}
+          alCerrar={() => undefined}
+          alRegistrar={() => undefined}
+        />
+      </Envoltura>,
+    );
+    expect(dialogo().queryByLabelText(/Declaro que/)).toBeNull();
+    const boton = dialogo().getByRole('button', {
+      name: 'Autorizar de nuevo',
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(boton.disabled).toBe(false));
+    fireEvent.click(boton);
+    await waitFor(async () => expect((await escrituras(espia)).length).toBe(1));
+    const [e] = await escrituras(espia);
+    expect(e?.ruta).toBe(`/copropiedades/${COP}/mi/visitas/${AUTORIZACION_ID}/repeticion`);
+    expect(e?.cuerpo).not.toHaveProperty('casillaMarcada');
+    expect(await screen.findByText(/Sin foto: entra por la placa/)).toBeTruthy();
   });
 });

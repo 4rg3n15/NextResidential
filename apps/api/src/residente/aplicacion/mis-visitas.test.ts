@@ -231,7 +231,7 @@ describe('VolverAAutorizar · F6', () => {
     );
   });
 
-  it('una visita sin foto guardada no se puede repetir; ni una de otra vivienda', async () => {
+  it('sin foto ni placa guardadas no se puede repetir; ni una de otra vivienda', async () => {
     expect(
       esFallo(await montarRepeticion({ ...DATOS, foto: null }).caso.ejecutar(ctx, COP, PETICION)),
     ).toBe(true);
