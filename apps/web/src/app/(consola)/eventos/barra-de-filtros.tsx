@@ -54,6 +54,12 @@ export interface PropiedadesDeBarra {
   readonly borrar: () => void;
   /** Al portero no se le ofrecen fechas: ve su día (D-145). */
   readonly delPortero: boolean;
+  /**
+   * Vivienda y persona salen del padrón, que sólo lee la administración
+   * (`padron/viviendas` y `padron/personas`): al portero y a la central se les
+   * negaría con 403. Sin padrón no se ofrecen; los demás filtros, sí.
+   */
+  readonly conPadron: boolean;
   readonly rangoAjustado: boolean;
   readonly equipos: readonly { readonly id: string; readonly nombre: string }[];
   readonly operadores: readonly { readonly id: string; readonly nombre: string }[];
@@ -65,11 +71,12 @@ export const BarraDeFiltros = ({
   cambiar,
   borrar,
   delPortero,
+  conPadron,
   rangoAjustado,
   equipos,
   operadores,
 }: PropiedadesDeBarra): JSX.Element => {
-  const viviendas = useViviendas(copropiedadId, { estado: '', busqueda: '' });
+  const viviendas = useViviendas(copropiedadId, { estado: '', busqueda: '' }, conPadron);
   const zonas = useZonas(copropiedadId);
   // El nombre de la persona elegida sólo se conoce si se eligió aquí; si vino
   // en el enlace, la URL lleva el identificador y nada más (no datos personales).
@@ -122,18 +129,20 @@ export const BarraDeFiltros = ({
           </option>
         ))}
       </Seleccion>
-      <Seleccion
-        etiqueta="Vivienda"
-        valor={f.viviendaId}
-        alCambiar={(viviendaId) => cambiar({ viviendaId })}
-        todos="Todas"
-      >
-        {(viviendas.data?.viviendas ?? []).map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.identificador}
-          </option>
-        ))}
-      </Seleccion>
+      {conPadron ? (
+        <Seleccion
+          etiqueta="Vivienda"
+          valor={f.viviendaId}
+          alCambiar={(viviendaId) => cambiar({ viviendaId })}
+          todos="Todas"
+        >
+          {(viviendas.data?.viviendas ?? []).map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.identificador}
+            </option>
+          ))}
+        </Seleccion>
+      ) : null}
       <Seleccion
         etiqueta="Zona"
         valor={f.zonaId}
@@ -213,19 +222,21 @@ export const BarraDeFiltros = ({
           Escriba la placa completa (5 a 8 letras o números) para buscarla.
         </span>
       ) : null}
-      <div className="w-full max-w-sm">
-        <BuscadorDePersonas
-          copropiedadId={copropiedadId}
-          etiqueta="Persona"
-          ayuda="Residente o visitante, por nombre o documento."
-          permitirAlta={false}
-          elegida={elegida}
-          alElegir={(p) => {
-            setNombrePersona(p);
-            cambiar({ personaId: p?.id ?? '' });
-          }}
-        />
-      </div>
+      {conPadron ? (
+        <div className="w-full max-w-sm">
+          <BuscadorDePersonas
+            copropiedadId={copropiedadId}
+            etiqueta="Persona"
+            ayuda="Residente o visitante, por nombre o documento."
+            permitirAlta={false}
+            elegida={elegida}
+            alElegir={(p) => {
+              setNombrePersona(p);
+              cambiar({ personaId: p?.id ?? '' });
+            }}
+          />
+        </div>
+      ) : null}
       <Boton variante="secundario" onClick={borrar} disabled={!hayFiltros(f)}>
         Borrar filtros
       </Boton>

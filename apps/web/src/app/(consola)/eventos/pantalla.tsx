@@ -29,6 +29,9 @@ import {
 import { useOperadoresVistos } from './operadores-vistos';
 import { useVistaDelPortero } from './vista-del-portero';
 
+/** Quién lee el padrón (viviendas y personas) en la API. */
+const ROLES_CON_PADRON: readonly Rol[] = ['administrador', 'superadministrador'];
+
 /**
  * Eventos y alertas · ETAPA 15-L (Bloque B) · buscador y vistas D-145.
  *
@@ -57,7 +60,13 @@ export const PantallaDeEventos = ({
   /** La consulta de la URL con la que se abrió la página. */
   readonly parametros?: string;
 }): JSX.Element => {
-  const [filtros, setFiltros] = useState<FiltrosDeEventos>(() => filtrosDeLaUrl(parametros));
+  const conPadron = ROLES_CON_PADRON.includes(rol);
+  // Un enlace con vivienda o persona, abierto por quien no lee el padrón, no
+  // deja un filtro activo que no puede ver ni quitar.
+  const [filtros, setFiltros] = useState<FiltrosDeEventos>(() => {
+    const f = filtrosDeLaUrl(parametros);
+    return conPadron ? f : { ...f, viviendaId: '', personaId: '' };
+  });
   const [enVivo, setEnVivo] = useState<EstadoDelCanal>('conectando');
   const vista = useVistaDelPortero(copropiedadId, rol);
   const clientes = useQueryClient();
@@ -225,6 +234,7 @@ export const PantallaDeEventos = ({
             cambiar={(parcial) => setFiltros((f) => ({ ...f, ...parcial }))}
             borrar={() => setFiltros(SIN_FILTROS)}
             delPortero={vista.delPortero}
+            conPadron={conPadron}
             rangoAjustado={rango.ajustado}
             equipos={listaDeEquipos}
             operadores={operadores}

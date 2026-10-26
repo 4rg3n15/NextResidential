@@ -388,7 +388,8 @@ siquiera desde la base de datos (RN-03).
 
 **El buscador de «Eventos y alertas»** (D-145). Filtre por fecha **y hora**
 —siempre en hora de Bogotá, mire desde donde mire—, tipo, equipo, vivienda,
-persona (residente o visitante, buscada por nombre o documento), zona,
+persona (residente o visitante, buscada por nombre o documento; vivienda y
+persona sólo para la administración, que es quien lee el padrón), zona,
 resultado, motivo, **placa**, **operador**, **método** (placa, rostro,
 tarjeta, a mano, remoto) e **identificación** (conocida o desconocida). La
 placa se escribe como venga: `abc-123` encuentra `ABC123`; a medio escribir no
@@ -464,7 +465,8 @@ administración». Es literal: **ningún evento se borra** (RN-03); la
 administración lo sigue viendo todo. «Limpiar» se recuerda en ese navegador
 hasta el final del día; las **alertas abiertas no se limpian**: siguen ahí hasta
 que alguien las atiende. Los demás filtros del buscador (§3.5) los tiene
-todos, menos las fechas.
+todos menos las fechas, la vivienda y la persona: esos dos salen del padrón,
+que es de la administración.
 
 En Portería **no hay audio**: hablar con el visitante por el videoportero se
 hace desde Guardia virtual.

@@ -71,17 +71,20 @@ const FILAS: ElementoDeLineaDeTiempo[] = [
 
 let lineas: URL[] = [];
 let alertas = 0;
+let todas: URL[] = [];
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(AHORA);
   lineas = [];
   alertas = 0;
+  todas = [];
   window.localStorage.clear();
   window.history.replaceState(null, '', '/eventos');
   vi.stubGlobal(
     'fetch',
     vi.fn(async (p: Request) => {
       const url = new URL(p.url);
+      todas.push(url);
       let cuerpo: unknown = [];
       if (url.pathname.endsWith('/linea-de-tiempo')) {
         lineas.push(url);
@@ -240,5 +243,30 @@ describe('D-145 · cada fila dice quién, cómo y con qué', () => {
     expect(
       within(screen.getByLabelText('Operador')).getByRole('option', { name: 'Pedro Portero' }),
     ).toBeDefined();
+  });
+});
+
+describe('D-145 · vivienda y persona salen del padrón: sólo para quien lo lee', () => {
+  it.each(['portero', 'operador_central'] as const)(
+    '%s: sin esos dos filtros y sin pedir el padrón (que le daría 403)',
+    async (rol) => {
+      await montada(rol, `viviendaId=${PERSONA}&personaId=${PERSONA}&placa=ABC123`);
+      expect(screen.queryByLabelText('Vivienda')).toBeNull();
+      expect(screen.queryByRole('combobox', { name: /Persona/ })).toBeNull();
+      expect(todas.some((u) => u.pathname.includes('/padron/'))).toBe(false);
+      // Y el enlace no le deja un filtro que no puede ver ni quitar.
+      const q = ultimaLinea().searchParams;
+      expect([q.has('viviendaId'), q.has('personaId'), q.get('placa')]).toEqual([
+        false,
+        false,
+        'ABC123',
+      ]);
+    },
+  );
+
+  it('la administración sí los tiene', async () => {
+    await montada('administrador');
+    expect(screen.getByLabelText('Vivienda')).toBeDefined();
+    expect(screen.getByRole('combobox', { name: /Persona/ })).toBeDefined();
   });
 });
