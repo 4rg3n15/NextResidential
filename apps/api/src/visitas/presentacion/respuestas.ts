@@ -69,7 +69,7 @@ export const aGenerada = (r: ResultadoDeVisita): VisitaGeneradaDto => {
       sincronizada: t.sincronizada,
       detalle: t.detalle,
     })),
-    avisoDeSincronizacion: r.avisoDeSincronizacion,
+    avisoDeSincronizacion: r.avisoDeSincronizacion ?? null,
     confirmacionDePlaca: r.confirmacionDePlaca,
   };
 };

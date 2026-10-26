@@ -6123,7 +6123,7 @@
             "bearer": []
           }
         ],
-        "summary": "Autorizo a un visitante con su foto y la casilla (F1, F4)",
+        "summary": "Autorizo a un visitante con su placa o su foto y la casilla (F1, F4, D-143)",
         "tags": [
           "residente"
         ]
@@ -8967,7 +8967,7 @@
             "bearer": []
           }
         ],
-        "summary": "Genera la autorización de un visitante con su foto (F1, F2, F3, F4)",
+        "summary": "Genera la autorización de un visitante con su placa o su foto (F1–F4, D-143)",
         "tags": [
           "visitas"
         ]
@@ -15047,7 +15047,7 @@
           },
           "casillaMarcada": {
             "type": "boolean",
-            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria."
+            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora."
           },
           "nombre": {
             "type": "string",
@@ -15079,12 +15079,10 @@
         "required": [
           "inicio",
           "duracionMinutos",
-          "casillaMarcada",
           "nombre",
           "tipoDocumento",
           "documento",
-          "viviendaId",
-          "foto"
+          "viviendaId"
         ]
       },
       "GrupoProyectadoDto": {
@@ -16314,7 +16312,7 @@
           },
           "casillaMarcada": {
             "type": "boolean",
-            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria."
+            "description": "La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora."
           },
           "nombre": {
             "type": "string",
@@ -16339,10 +16337,8 @@
         "required": [
           "inicio",
           "duracionMinutos",
-          "casillaMarcada",
           "nombre",
           "documento",
-          "foto",
           "claveDeIdempotencia"
         ]
       },

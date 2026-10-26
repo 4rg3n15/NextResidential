@@ -42,6 +42,8 @@ const JPEG = Buffer.concat([
 ]).toString('base64');
 const MEDIDAS = { rostrosDetectados: 1, nitidez: 0.9, iluminacion: 0.6, proporcionRostro: 0.4 };
 
+const FOTO = { contenidoBase64: JPEG, tipoMime: 'image/jpeg', medidas: MEDIDAS };
+
 const ENTRADA: EntradaDeMiVisita = {
   nombre: 'Ana',
   documento: '12345',
@@ -49,7 +51,7 @@ const ENTRADA: EntradaDeMiVisita = {
   duracionMinutos: 120,
   placa: 'ABC123',
   observaciones: null,
-  foto: { contenidoBase64: JPEG, tipoMime: 'image/jpeg', medidas: MEDIDAS },
+  foto: FOTO,
   casillaMarcada: true,
   claveDeIdempotencia: 'clave-1',
 };
@@ -125,13 +127,13 @@ describe('GenerarMiVisita · F1 desde la app', () => {
       esFallo(
         await m.caso.ejecutar(ctx, COP, {
           ...ENTRADA,
-          foto: { ...ENTRADA.foto, tipoMime: 'image/gif' },
+          foto: { ...FOTO, tipoMime: 'image/gif' },
         }),
       ),
     ).toBe(true);
     const mala = await m.caso.ejecutar(ctx, COP, {
       ...ENTRADA,
-      foto: { ...ENTRADA.foto, medidas: { ...MEDIDAS, rostrosDetectados: 0 } },
+      foto: { ...FOTO, medidas: { ...MEDIDAS, rostrosDetectados: 0 } },
     });
     expect(mala.ok && !mala.valor.creada && 'motivosDeFoto' in mala.valor).toBe(true);
     expect(m.resolver.ejecutar).not.toHaveBeenCalled();

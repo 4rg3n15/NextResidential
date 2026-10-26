@@ -92,11 +92,14 @@ describe('nuevo visitante (M-4)', () => {
     escribir(/Número de documento/, '12345678');
     escribir(/Fecha de la visita/, '2026-09-30');
     escribir(/Hora de llegada/, '15:30');
-    escribir(/Placa \(opcional\)/, 'abc-123');
     escribir(/Observaciones/, 'Trae paquete');
     expect(enviar('Registrar visita').disabled).toBe(true);
-    expect(dialogo().getByText(/Falta: una foto que sirva, marcar la casilla/)).toBeTruthy();
+    expect(dialogo().getByText(/Falta: la placa o una foto que sirva/)).toBeTruthy();
     fireEvent.click(dialogo().getByRole('button', { name: 'Foto de prueba' }));
+    // D-143 · con foto, la casilla pasa a ser obligatoria.
+    expect(enviar('Registrar visita').disabled).toBe(true);
+    expect(dialogo().getByText(/Falta: marcar la casilla/)).toBeTruthy();
+    escribir(/Placa del vehículo/, 'abc-123');
     fireEvent.click(dialogo().getByLabelText(/Declaro que Carla Ruiz me autorizó a usar su foto/));
     expect(enviar('Registrar visita').disabled).toBe(false);
     fireEvent.click(enviar('Registrar visita'));

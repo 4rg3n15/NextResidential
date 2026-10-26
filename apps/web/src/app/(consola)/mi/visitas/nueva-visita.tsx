@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { CapturaDeFoto } from '@/componentes/captura-de-foto';
 import type { FotoLista } from '@/componentes/captura-de-foto';
+import { AvisoPlacaOFoto, fotoYCasilla, hayPlacaOFoto } from '@/componentes/placa-o-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { nuevaClaveDeIdempotencia } from '@/lib/clave-de-idempotencia';
@@ -17,10 +18,10 @@ const CLASE_DE_SELECT =
 
 /**
  * M-4 · «Nuevo visitante», los mismos campos y el mismo flujo que la app:
- * nombre, documento, cuándo viene y cuánto dura, placa opcional, observaciones
- * para la portería, la foto (reducida y medida en este navegador, con la misma
- * captura que «Generar autorización») y la casilla. Sin foto que sirva o sin
- * casilla no se envía nada. Un rechazo de negocio llega como 200 con motivo.
+ * nombre, documento, cuándo viene y cuánto dura, observaciones para la
+ * portería y la placa o la foto (reducida y medida en este navegador, con la
+ * misma captura que «Generar autorización»): al menos una (D-143). La casilla
+ * sólo con foto (RN-10). Un rechazo de negocio llega como 200 con motivo.
  */
 export const NuevaVisita = ({
   copropiedadId,
@@ -54,8 +55,8 @@ export const NuevaVisita = ({
     documento.trim().length < 4 ? 'el documento' : null,
     fecha === '' || hora === '' ? 'cuándo viene' : null,
     placaNormalizada.length > 8 ? 'una placa de 8 caracteres o menos' : null,
-    foto === null ? 'una foto que sirva' : null,
-    casilla ? null : 'marcar la casilla',
+    hayPlacaOFoto(placaNormalizada, foto) ? null : 'la placa o una foto que sirva',
+    foto !== null && !casilla ? 'marcar la casilla' : null,
   ].filter((x): x is string => x !== null);
   const completo = faltan.length === 0;
 
@@ -79,7 +80,7 @@ export const NuevaVisita = ({
   };
 
   const registrar = async (): Promise<void> => {
-    if (!completo || foto === null) return;
+    if (!completo) return;
     setEnviando(true);
     setError(undefined);
     setExito(null);
@@ -94,13 +95,12 @@ export const NuevaVisita = ({
             duracionMinutos: duracion,
             placa: placaNormalizada === '' ? null : placaNormalizada,
             observaciones: observaciones.trim() === '' ? null : observaciones.trim(),
-            foto,
-            casillaMarcada: casilla,
+            ...fotoYCasilla(foto, casilla),
             claveDeIdempotencia: clave,
           },
         }),
       );
-      const desenlace = desenlaceDe(r);
+      const desenlace = desenlaceDe(r, foto !== null);
       if (desenlace.error !== undefined) {
         setError(desenlace.error);
         return;
@@ -181,11 +181,11 @@ export const NuevaVisita = ({
           </select>
         </label>
         <Campo
-          etiqueta="Placa (opcional)"
+          etiqueta="Placa del vehículo"
           name="placa"
           value={placa}
           onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-          ayuda="Sólo si entra en vehículo. Se guarda en mayúsculas, sin espacios ni guiones."
+          ayuda="Si entra en vehículo: con la placa, la cámara le da paso en el horario de la visita. Se guarda en mayúsculas, sin espacios ni guiones."
         />
         <label className="block space-y-1.5 sm:col-span-2">
           <span className="block text-secundario font-medium text-texto">
@@ -201,11 +201,21 @@ export const NuevaVisita = ({
           />
         </label>
         <div className="sm:col-span-2">
-          <CapturaDeFoto key={ronda} alCambiar={setFoto} />
+          <AvisoPlacaOFoto cumplido={hayPlacaOFoto(placaNormalizada, foto)} />
         </div>
         <div className="sm:col-span-2">
-          <CasillaDeLaFoto nombre={nombre} marcada={casilla} alCambiar={setCasilla} />
+          <CapturaDeFoto
+            key={ronda}
+            alCambiar={setFoto}
+            etiqueta="Foto frontal del visitante (opcional si hay placa)"
+          />
         </div>
+        {/* La casilla es el consentimiento de la FOTO (RN-10): sin foto, no se pide. */}
+        {foto !== null ? (
+          <div className="sm:col-span-2">
+            <CasillaDeLaFoto nombre={nombre} marcada={casilla} alCambiar={setCasilla} />
+          </div>
+        ) : null}
         {!completo ? (
           <p className="text-secundario text-texto-apagado sm:col-span-2">
             Falta: {faltan.join(', ')}.

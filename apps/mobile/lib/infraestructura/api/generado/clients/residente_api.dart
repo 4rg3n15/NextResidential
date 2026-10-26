@@ -293,7 +293,7 @@ abstract class ResidenteApi {
     @Body() required AltaDeMiViviendaDto body,
   });
 
-  /// Autorizo a un visitante con su foto y la casilla (F1, F4)
+  /// Autorizo a un visitante con su placa o su foto y la casilla (F1, F4, D-143)
   @POST('/copropiedades/{id}/mi/visitas')
   Future<MiVisitaGeneradaDto> misVisitasControllerCrear({
     @Path('id') required String id,

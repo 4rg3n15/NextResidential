@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { esFallo } from '@ncr/domain-core';
-import { GenerarVisitaDto, MENSAJE_DURACION_MINIMA, RepetirVisitaDto } from './dtos';
+import { GenerarVisitaDto, MENSAJE_DURACION_MINIMA, MiVisitaDto, RepetirVisitaDto } from './dtos';
 import { revisarForma } from '../aplicacion/generar-visita';
 
 /**
@@ -57,13 +57,56 @@ describe('duración de la visita · el DTO rechaza 0 minutos con palabras', () =
 });
 
 describe('duración de la visita · la capa de aplicación también la exige', () => {
-  it('revisarForma(true, 0) falla nombrando la hora de fin', () => {
-    const r = revisarForma(true, 0);
+  const forma = (duracionMinutos: number) =>
+    revisarForma({ casillaMarcada: true, duracionMinutos, placa: 'ABC123', conFoto: true });
+
+  it('una duración de 0 falla nombrando la hora de fin', () => {
+    const r = forma(0);
     expect(esFallo(r)).toBe(true);
     if (esFallo(r)) expect(r.error.detalle).toMatch(/más de cero minutos.*posterior/);
   });
 
   it('y una duración negativa, igual', () => {
-    expect(esFallo(revisarForma(true, -30))).toBe(true);
+    expect(esFallo(forma(-30))).toBe(true);
+  });
+});
+
+/**
+ * D-143 · la FORMA admite una visita sin foto y sin casilla: que llegue la
+ * placa o la foto lo exige el caso de uso (`revisarForma`), no el DTO (§2.7.3).
+ */
+describe('D-143 · el DTO deja pasar una visita sólo con placa', () => {
+  const sinFoto = {
+    nombre: cuerpoValido.nombre,
+    tipoDocumento: cuerpoValido.tipoDocumento,
+    documento: cuerpoValido.documento,
+    viviendaId: cuerpoValido.viviendaId,
+    inicio: cuerpoValido.inicio,
+    duracionMinutos: cuerpoValido.duracionMinutos,
+  };
+
+  it('GenerarVisitaDto sin foto ni casilla, con placa: forma válida', async () => {
+    const dto = plainToInstance(GenerarVisitaDto, { ...sinFoto, placa: 'ABC123' });
+    expect(await mensajesDe(dto)).toEqual([]);
+  });
+
+  it('MiVisitaDto sin foto ni casilla, con placa: forma válida', async () => {
+    const dto = plainToInstance(MiVisitaDto, {
+      nombre: sinFoto.nombre,
+      documento: sinFoto.documento,
+      inicio: sinFoto.inicio,
+      duracionMinutos: sinFoto.duracionMinutos,
+      placa: 'ABC123',
+      claveDeIdempotencia: 'clave-estable-1',
+    });
+    expect(await mensajesDe(dto)).toEqual([]);
+  });
+
+  it('una foto que llega sigue validándose entera', async () => {
+    const dto = plainToInstance(GenerarVisitaDto, {
+      ...cuerpoValido,
+      foto: { ...cuerpoValido.foto, tipoMime: 'image/gif' },
+    });
+    expect((await validate(dto)).map((e) => e.property)).toContain('foto');
   });
 });
