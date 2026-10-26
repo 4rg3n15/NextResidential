@@ -270,3 +270,18 @@ describe('D-145 · vivienda y persona salen del padrón: sólo para quien lo lee
     expect(screen.getByRole('combobox', { name: /Persona/ })).toBeDefined();
   });
 });
+
+describe('D-145 · el «Limpiar» guardado se aplica ANTES de enseñar nada', () => {
+  it('no pide el día entero ni enseña lo anterior al corte, aunque la API o la caché lo traigan', async () => {
+    window.localStorage.setItem(`ncr.eventos.limpiadoEn.${COP}`, '2026-10-26T02:30:00.000Z');
+    montar('portero');
+    expect(await screen.findByText('Nada todavía')).toBeDefined();
+    // La API de prueba devuelve las tres filas (02:00 UTC) aunque se pida desde
+    // las 02:30: la vista no las enseña.
+    expect(screen.queryByText('Laura Gómez · residente')).toBeNull();
+    expect(lineas.length).toBeGreaterThan(0);
+    expect(lineas.every((u) => u.searchParams.get('desde') === '2026-10-26T02:30:00.000Z')).toBe(
+      true,
+    );
+  });
+});

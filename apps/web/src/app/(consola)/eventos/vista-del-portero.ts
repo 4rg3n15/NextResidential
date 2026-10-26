@@ -44,6 +44,12 @@ const guardar = (copropiedadId: string, d: Date): void => {
 export interface VistaDelPortero {
   readonly delPortero: boolean;
   readonly limpiadoEn: Date | null;
+  /**
+   * `false` mientras el portero no tiene leído su «Limpiar» guardado: hasta
+   * entonces no se pide ni se enseña nada, para no mostrar el día entero un
+   * instante (p. ej. desde la caché) antes de aplicar el corte.
+   */
+  readonly lista: boolean;
   /** El reloj de la vista: avanza cada minuto para cortar a medianoche sin recargar. */
   readonly ahora: Date;
   readonly limpiar: () => void;
@@ -52,12 +58,14 @@ export interface VistaDelPortero {
 export const useVistaDelPortero = (copropiedadId: string, rol: Rol): VistaDelPortero => {
   const delPortero = ROLES_CON_VISTA_LIMPIABLE.includes(rol);
   const [limpiadoEn, setLimpiadoEn] = useState<Date | null>(null);
+  const [leido, setLeido] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
 
   // Se lee tras montar, no al renderizar: el servidor no tiene `localStorage`
   // y leerlo en el primer render haría que cliente y servidor no coincidieran.
   useEffect(() => {
     if (delPortero) setLimpiadoEn(leer(copropiedadId));
+    setLeido(true);
   }, [copropiedadId, delPortero]);
 
   useEffect(() => {
@@ -73,5 +81,11 @@ export const useVistaDelPortero = (copropiedadId: string, rol: Rol): VistaDelPor
     setAhora(ya);
   }, [copropiedadId, delPortero]);
 
-  return { delPortero, limpiadoEn: delPortero ? limpiadoEn : null, ahora, limpiar };
+  return {
+    delPortero,
+    limpiadoEn: delPortero ? limpiadoEn : null,
+    lista: !delPortero || leido,
+    ahora,
+    limpiar,
+  };
 };

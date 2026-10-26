@@ -37,6 +37,9 @@ interface FilaOrden {
 }
 
 // 15-P · el nombre del punto se lee por la clave ajena (0048): el que tenga HOY.
+/** D-144 · la cola mira una hora de órdenes: el techo cubre su tope (2000). */
+const MAXIMO_DE_ORDENES = 2000;
+
 const CAMPOS = `o.id, o.copropiedad_id, o.accion, o.motivo, o.operador_id, o.rol, o.dispositivo_id,
   o.momento, o.evento_id, o.resultado, o.detalle, o.punto_de_acceso_id, o.numero_de_puerta,
   p.nombre AS nombre_del_punto`;
@@ -128,7 +131,7 @@ export class BitacoraDeOrdenesPg implements BitacoraDeOrdenes {
            LEFT JOIN public.puntos_de_acceso p
              ON p.copropiedad_id = o.copropiedad_id AND p.id = o.punto_de_acceso_id
           WHERE o.copropiedad_id = $1 ORDER BY o.momento DESC LIMIT $2`,
-        [copropiedadId, Math.max(1, Math.min(cuantas, 200))],
+        [copropiedadId, Math.max(1, Math.min(cuantas, MAXIMO_DE_ORDENES))],
       );
       return rows.map(aOrden);
     });

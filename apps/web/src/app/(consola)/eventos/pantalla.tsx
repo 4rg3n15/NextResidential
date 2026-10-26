@@ -88,6 +88,7 @@ export const PantallaDeEventos = ({
     // no, la tabla vuelve a «cargando», desmonta la barra de filtros y quien
     // escribía una placa pierde el foco a media palabra.
     placeholderData: (previa) => previa,
+    enabled: vista.lista,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/eventos/linea-de-tiempo', {
@@ -105,6 +106,16 @@ export const PantallaDeEventos = ({
         }),
       ),
   });
+
+  // El corte del portero, también en lo que se ENSEÑA: lo que se conserva de
+  // la consulta anterior mientras llega la nueva (o de la caché) no puede
+  // saltarse su «Limpiar». Las horas son ISO en UTC: se comparan como texto.
+  const recibidas = consulta.data?.elementos ?? [];
+  const filas = !vista.lista
+    ? []
+    : vista.delPortero
+      ? recibidas.filter((e) => e.ocurridoEn >= desde && e.ocurridoEn < hasta)
+      : recibidas;
 
   // B2 · el canal en vivo: cualquier acceso o evento de equipo nuevo vuelve a
   // pedir la línea (con sus filtros).
@@ -223,9 +234,9 @@ export const PantallaDeEventos = ({
       <TablaDeDatos
         titulo="Línea de tiempo"
         columnas={columnasDeEventos(nombreDe)}
-        filas={consulta.data?.elementos ?? []}
+        filas={filas}
         claveDeFila={(e) => `${e.origen}-${e.id}`}
-        cargando={consulta.isLoading}
+        cargando={consulta.isLoading || !vista.lista}
         porPagina={25}
         filtros={
           <BarraDeFiltros

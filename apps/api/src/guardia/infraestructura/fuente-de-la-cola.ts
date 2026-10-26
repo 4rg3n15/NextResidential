@@ -1,6 +1,10 @@
 import { FiltroDeEventos, esFallo } from '@ncr/domain-core';
 import { motivoDelEquipo } from '@ncr/providers';
-import type { RepositorioEventos, RepositorioEventosDeEquipo } from '../../eventos';
+import type {
+  EventoRegistrado,
+  RepositorioEventos,
+  RepositorioEventosDeEquipo,
+} from '../../eventos';
 import type { MaterialDeLaCola } from '../aplicacion/cola-de-atencion';
 import type { FuenteDeLaCola } from '../aplicacion/consultar-cola';
 import type { BitacoraDeOrdenes } from '../aplicacion/apertura-manual';
@@ -15,7 +19,15 @@ import { TIPOS_DE_EQUIPO_QUE_DISPARAN, TIPOS_QUE_TERMINAN_LA_LLAMADA } from '../
  * propio: con base o en memoria es la misma fuente, y la frontera del tenant
  * la pone cada repositorio como siempre.
  */
-export const TOPE_DE_LA_COLA = 200;
+/**
+ * D-144 · con una hora de vigencia, una portería con LPR puede negar más de
+ * una página de accesos (cada placa desconocida que pasa es un negado). Los
+ * negados se recorren por páginas hasta cubrir la ventana entera; los eventos
+ * de equipo y las órdenes, con el mismo tope. Acotado (§2.4: nada sin límite)
+ * y muy por encima de lo que cabe en una hora real.
+ */
+export const TOPE_DE_ACCESOS_EN_LA_VENTANA = 2000;
+const PAGINA_DE_ACCESOS = 200;
 
 export class FuenteDeLaColaPorPuertos implements FuenteDeLaCola {
   constructor(
@@ -25,16 +37,8 @@ export class FuenteDeLaColaPorPuertos implements FuenteDeLaCola {
   ) {}
 
   async material(copropiedadId: string, desde: Date, hasta: Date): Promise<MaterialDeLaCola> {
-    const filtro = FiltroDeEventos.crear({
-      copropiedadId,
-      desde,
-      hasta,
-      resultado: 'negado',
-      tamanoPagina: 100,
-    });
-    if (esFallo(filtro)) throw new Error(filtro.error.detalle);
     const [accesos, deEquipos, ordenes] = await Promise.all([
-      this.eventos.consultar(filtro.valor),
+      this.negadosDeLaVentana(copropiedadId, desde, hasta),
       this.eventosDeEquipo.consultar({
         copropiedadId,
         desde,
@@ -42,12 +46,13 @@ export class FuenteDeLaColaPorPuertos implements FuenteDeLaCola {
         porRecepcion: true,
         soloEnVivo: true,
         tipos: [...TIPOS_DE_EQUIPO_QUE_DISPARAN, ...TIPOS_QUE_TERMINAN_LA_LLAMADA],
-        limite: TOPE_DE_LA_COLA,
+        limite: TOPE_DE_ACCESOS_EN_LA_VENTANA,
       }),
-      this.ordenes.ultimas(copropiedadId, TOPE_DE_LA_COLA),
+      // Lo que nombran las órdenes ya se atendió: tienen que alcanzar toda la ventana.
+      this.ordenes.ultimas(copropiedadId, TOPE_DE_ACCESOS_EN_LA_VENTANA),
     ]);
     return {
-      accesos: accesos.filas.map((a) => ({
+      accesos: accesos.map((a) => ({
         id: a.id,
         ocurridoEn: new Date(a.ocurridoEn),
         resultado: a.resultado,
@@ -76,5 +81,30 @@ export class FuenteDeLaColaPorPuertos implements FuenteDeLaCola {
         ),
       ),
     };
+  }
+
+  /** Todos los negados de la ventana, página a página, hasta el tope. */
+  private async negadosDeLaVentana(
+    copropiedadId: string,
+    desde: Date,
+    hasta: Date,
+  ): Promise<readonly EventoRegistrado[]> {
+    const filas: EventoRegistrado[] = [];
+    let cursor: string | null = null;
+    do {
+      const filtro = FiltroDeEventos.crear({
+        copropiedadId,
+        desde,
+        hasta,
+        resultado: 'negado',
+        tamanoPagina: PAGINA_DE_ACCESOS,
+        cursor,
+      });
+      if (esFallo(filtro)) throw new Error(filtro.error.detalle);
+      const pagina = await this.eventos.consultar(filtro.valor);
+      filas.push(...pagina.filas);
+      cursor = pagina.siguiente;
+    } while (cursor !== null && filas.length < TOPE_DE_ACCESOS_EN_LA_VENTANA);
+    return filas;
   }
 }
