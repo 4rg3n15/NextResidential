@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FiltroDeEventos } from '@ncr/domain-core';
-import type { EventoRegistrado, RepositorioEventos } from '../../eventos';
-import { RepositorioEventosDeEquipoEnMemoria } from '../../eventos/infraestructura/repositorios-en-memoria';
+import type {
+  EventoRegistrado,
+  RepositorioEventos,
+  RepositorioEventosDeEquipo,
+} from '../../eventos';
 import { BitacoraDeOrdenesEnMemoria } from './adaptadores-en-memoria';
 import { FuenteDeLaColaPorPuertos, TOPE_DE_ACCESOS_EN_LA_VENTANA } from './fuente-de-la-cola';
 
@@ -58,7 +61,8 @@ const paginado = (filas: readonly EventoRegistrado[]) => {
 const fuente = (repo: RepositorioEventos) =>
   new FuenteDeLaColaPorPuertos(
     repo,
-    new RepositorioEventosDeEquipoEnMemoria(),
+    // Sin eventos de equipo: aquí sólo se prueba la paginación de los accesos.
+    { consultar: async () => [] } as unknown as RepositorioEventosDeEquipo,
     new BitacoraDeOrdenesEnMemoria(),
   );
 
