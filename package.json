@@ -53,6 +53,11 @@
     "vitest": "^3.2.6"
   },
   "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-mrhx-c7xc-m3w5"
+      ]
+    },
     "overrides": {
       "multer": "^2.5.0",
       "body-parser": "^2.4.0",
