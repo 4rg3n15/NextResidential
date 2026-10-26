@@ -2842,24 +2842,6 @@
             }
           },
           {
-            "name": "desde",
-            "required": true,
-            "in": "query",
-            "description": "Inicio del rango, ISO-8601 con zona",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "hasta",
-            "required": true,
-            "in": "query",
-            "description": "Fin del rango, EXCLUIDO",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "viviendaId",
             "required": false,
             "in": "query",
@@ -2876,34 +2858,11 @@
             }
           },
           {
-            "name": "dispositivoId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "zonaId",
             "required": false,
             "in": "query",
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "name": "tipo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ingreso",
-                "salida",
-                "denegado",
-                "alerta",
-                "manual"
-              ]
             }
           },
           {
@@ -2935,6 +2894,95 @@
                 "PLACA_DESCONOCIDA",
                 "CONFIANZA_INSUFICIENTE",
                 "FALLO_TECNICO"
+              ]
+            }
+          },
+          {
+            "name": "placa",
+            "required": false,
+            "in": "query",
+            "description": "Placa, con o sin guiones ni espacios",
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "name": "operadorId",
+            "required": false,
+            "in": "query",
+            "description": "Quién abrió o negó a mano",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "metodo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "placa",
+                "facial",
+                "manual",
+                "remoto",
+                "tarjeta"
+              ]
+            }
+          },
+          {
+            "name": "identificacion",
+            "required": false,
+            "in": "query",
+            "description": "`conocida`: el evento identificó a una persona; `desconocida`: no",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "conocida",
+                "desconocida"
+              ]
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "Inicio del rango, ISO-8601 con zona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "Fin del rango, EXCLUIDO",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ingreso",
+                "salida",
+                "denegado",
+                "alerta",
+                "manual"
               ]
             }
           },
@@ -3050,24 +3098,6 @@
             }
           },
           {
-            "name": "desde",
-            "required": true,
-            "in": "query",
-            "description": "Inicio del rango, ISO-8601 con zona",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "hasta",
-            "required": true,
-            "in": "query",
-            "description": "Fin del rango, EXCLUIDO",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "viviendaId",
             "required": false,
             "in": "query",
@@ -3084,34 +3114,11 @@
             }
           },
           {
-            "name": "dispositivoId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "zonaId",
             "required": false,
             "in": "query",
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "name": "tipo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ingreso",
-                "salida",
-                "denegado",
-                "alerta",
-                "manual"
-              ]
             }
           },
           {
@@ -3143,6 +3150,95 @@
                 "PLACA_DESCONOCIDA",
                 "CONFIANZA_INSUFICIENTE",
                 "FALLO_TECNICO"
+              ]
+            }
+          },
+          {
+            "name": "placa",
+            "required": false,
+            "in": "query",
+            "description": "Placa, con o sin guiones ni espacios",
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "name": "operadorId",
+            "required": false,
+            "in": "query",
+            "description": "Quién abrió o negó a mano",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "metodo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "placa",
+                "facial",
+                "manual",
+                "remoto",
+                "tarjeta"
+              ]
+            }
+          },
+          {
+            "name": "identificacion",
+            "required": false,
+            "in": "query",
+            "description": "`conocida`: el evento identificó a una persona; `desconocida`: no",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "conocida",
+                "desconocida"
+              ]
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "Inicio del rango, ISO-8601 con zona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "Fin del rango, EXCLUIDO",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivoId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ingreso",
+                "salida",
+                "denegado",
+                "alerta",
+                "manual"
               ]
             }
           },
@@ -3292,6 +3388,110 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "viviendaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "personaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zonaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "permitido",
+                "negado"
+              ]
+            }
+          },
+          {
+            "name": "motivo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VIGENCIA_EXPIRADA",
+                "AFORO_SUPERADO",
+                "LISTA_NEGRA",
+                "ZONA_NO_AUTORIZADA",
+                "FUERA_DE_PATRON",
+                "FUERA_DE_HORARIO",
+                "SIN_CONSENTIMIENTO",
+                "PLACA_DESCONOCIDA",
+                "CONFIANZA_INSUFICIENTE",
+                "FALLO_TECNICO"
+              ]
+            }
+          },
+          {
+            "name": "placa",
+            "required": false,
+            "in": "query",
+            "description": "Placa, con o sin guiones ni espacios",
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          },
+          {
+            "name": "operadorId",
+            "required": false,
+            "in": "query",
+            "description": "Quién abrió o negó a mano",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "metodo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "placa",
+                "facial",
+                "manual",
+                "remoto",
+                "tarjeta"
+              ]
+            }
+          },
+          {
+            "name": "identificacion",
+            "required": false,
+            "in": "query",
+            "description": "`conocida`: el evento identificó a una persona; `desconocida`: no",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "conocida",
+                "desconocida"
+              ]
             }
           },
           {
@@ -13333,6 +13533,53 @@
             "type": "number",
             "nullable": true,
             "description": "Segundos que el reloj del equipo iba por delante (negativo: atrasado)"
+          },
+          "metodo": {
+            "type": "string",
+            "nullable": true,
+            "description": "placa, facial, tarjeta, manual, remoto"
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "personaId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nulo en un acceso: «Desconocido»"
+          },
+          "persona": {
+            "type": "string",
+            "nullable": true
+          },
+          "clasePersona": {
+            "type": "string",
+            "enum": [
+              "residente",
+              "visitante"
+            ],
+            "nullable": true
+          },
+          "viviendaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "vivienda": {
+            "type": "string",
+            "nullable": true
+          },
+          "operadorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quién abrió o negó a mano"
+          },
+          "operador": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -13347,7 +13594,17 @@
           "eventoId",
           "codigo",
           "horaDelEquipo",
-          "relojDesviadoSegundos"
+          "relojDesviadoSegundos",
+          "metodo",
+          "motivo",
+          "placa",
+          "personaId",
+          "persona",
+          "clasePersona",
+          "viviendaId",
+          "vivienda",
+          "operadorId",
+          "operador"
         ]
       },
       "EmergenciaDto": {
