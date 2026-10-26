@@ -58,7 +58,9 @@ const SONDAS = [
     fichero: 'apps/api/src/visitas/presentacion/visitas.controller.ts',
     // Sólo la ruta que GENERA: la lista y las viviendas siguen abiertas, así
     // el recorrido llega al envío y el fallo es el de H-SITIO-03, no otro.
-    antes: /@Roles\(\.\.\.CONSOLA\)(\s*@ApiOperation\(\{ summary: 'Genera la autorización)/,
+    // D-143 · tolera el salto de línea que prettier mete cuando el `summary`
+    // pasa de 100 columnas: la sonda busca el decorador, no su formato.
+    antes: /@Roles\(\.\.\.CONSOLA\)(\s*@ApiOperation\(\{\s*summary: 'Genera la autorización)/,
     despues: "@Roles('administrador', 'portero', 'operador_central')$1",
   },
   {
