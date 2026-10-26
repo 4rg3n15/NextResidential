@@ -17,7 +17,8 @@ import type { DisparadorDeAtencion } from '../../eventos';
  * atencion.ts`): la llamada, el rostro o la persona no autorizada, la placa no
  * autorizada, la lista negra y lo dudoso. Ni los permitidos ni el volcado
  * histórico de un equipo. Y sólo mientras está VIGENTE —`GUARDIA_VIGENCIA_EN_
- * COLA_S`, 5 minutos por omisión—: después sale de la cola y queda en Eventos.
+ * COLA_S`, una hora por omisión desde la decisión del cliente del 23/10—:
+ * después sale de la cola y queda en Eventos, que conserva TODO (RN-03).
  * Sale antes si alguien lo atendió (una orden manual que lo nombra) o, si es
  * una llamada, si el equipo dice que terminó.
  *
@@ -99,8 +100,12 @@ export interface EnAtencion {
 
 /** Más allá de esto, la espera deja de ser normal y se señala. */
 export const UMBRAL_DE_DEMORA_SEGUNDOS = 60;
-/** G1 (15-N) · cuánto sigue en la cola algo sin atender (`GUARDIA_VIGENCIA_EN_COLA_S`). */
-export const VIGENCIA_EN_COLA_POR_OMISION_S = 300;
+/**
+ * G1 (15-N) · cuánto sigue en la cola algo sin atender (`GUARDIA_VIGENCIA_EN_COLA_S`).
+ * D-144 · una hora por decisión del cliente (23/10), antes 5 minutos. Sólo
+ * cambia cuánto permanece en la cola; el escalamiento (RN-18, < 10 s) no.
+ */
+export const VIGENCIA_EN_COLA_POR_OMISION_S = 3600;
 
 const TITULO_POR_DISPARADOR: Readonly<Record<DisparadorDeAtencion, string>> = {
   llamada: 'Llamada en el videoportero',

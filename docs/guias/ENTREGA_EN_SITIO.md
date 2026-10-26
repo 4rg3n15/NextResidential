@@ -620,7 +620,7 @@ _De `VISITA-29-09.md` §0 y §4, y de `PROXIMA-VISITA-15N.md` §3 y §4._
   necesita a una persona y llega en vivo —la llamada, el rostro o la persona no
   autorizada, la placa no autorizada, la lista negra, lo dudoso— entra en la cola
   y, si el operador no atiende ya a otro, pasa solo a «Atención» con el video de
-  **ese** equipo. Sale de la cola pasados `GUARDIA_VIGENCIA_EN_COLA_S` (300 s por
+  **ese** equipo. Sale de la cola pasados `GUARDIA_VIGENCIA_EN_COLA_S` (3600 s —una hora— por
   omisión) y queda en Eventos. Qué pasa solo a «Atención» se elige en Configuración →
   «Avisos de la guardia y la portería» (por omisión, todo).
 - **Al terminar,** las alertas de las pruebas se archivan desde Eventos, una a una

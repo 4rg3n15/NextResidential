@@ -1,5 +1,5 @@
 import type { Reloj } from '@ncr/domain-core';
-import { VIGENCIA_EN_COLA_POR_OMISION_S, construirCola, resumenDeCola } from './cola-de-atencion';
+import { construirCola, resumenDeCola } from './cola-de-atencion';
 import type { EnAtencion, MaterialDeLaCola } from './cola-de-atencion';
 import { mezclarPreferencias } from './preferencias-de-atencion';
 import type {
@@ -39,7 +39,8 @@ export class ConsultarColaDeAtencion {
     private readonly fuente: FuenteDeLaCola,
     private readonly preferencias: RepositorioDePreferenciasDeAtencion,
     private readonly reloj: Reloj,
-    private readonly vigenciaSegundos: number = VIGENCIA_EN_COLA_POR_OMISION_S,
+    /** D-144 · `GUARDIA_VIGENCIA_EN_COLA_S`, sin valor por omisión aquí: lo fija la configuración. */
+    private readonly vigenciaSegundos: number,
   ) {}
 
   async ejecutar(copropiedadId: string): Promise<ColaConsultada> {
