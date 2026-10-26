@@ -24,6 +24,8 @@ import type { ContextoTenant } from '../../autenticacion';
 import { Aislamiento } from '../../multiempresa/aislamiento';
 import { ErrorApiDto } from '../../comun/respuestas';
 import { ConsultarLineaDeTiempo } from '../aplicacion/linea-de-tiempo';
+import { FiltrosDeAccesoDto } from './dtos';
+import { criteriosDeAcceso } from './criterios-de-acceso';
 import type { ElementoDeLineaDeTiempo } from '../aplicacion/linea-de-tiempo';
 
 /**
@@ -31,7 +33,7 @@ import type { ElementoDeLineaDeTiempo } from '../aplicacion/linea-de-tiempo';
  * eventos de equipo juntos, filtrables por equipo, tipo y fecha. Los mismos
  * roles que el historial de accesos (HU-32); el residente no.
  */
-export class ConsultaLineaDeTiempoDto {
+export class ConsultaLineaDeTiempoDto extends FiltrosDeAccesoDto {
   @ApiProperty({ description: 'Inicio del rango, ISO-8601 con zona' }) @IsISO8601() desde!: string;
   @ApiProperty({ description: 'Fin del rango, EXCLUIDO' }) @IsISO8601() hasta!: string;
 
@@ -92,6 +94,26 @@ export class ElementoDeLineaDeTiempoDto {
     description: 'Segundos que el reloj del equipo iba por delante (negativo: atrasado)',
   })
   relojDesviadoSegundos!: number | null;
+
+  /** D-145 · lo que cuenta un acceso; `null` en un evento de equipo. */
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'placa, facial, tarjeta, manual, remoto',
+  })
+  metodo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) placa!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Nulo en un acceso: «Desconocido»' })
+  personaId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) persona!: string | null;
+  @ApiProperty({ enum: ['residente', 'visitante'], nullable: true })
+  clasePersona!: 'residente' | 'visitante' | null;
+  @ApiProperty({ type: String, nullable: true }) viviendaId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) vivienda!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Quién abrió o negó a mano' })
+  operadorId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) operador!: string | null;
 }
 
 export class LineaDeTiempoDto {
@@ -127,6 +149,7 @@ export class LineaDeTiempoController {
       dispositivoId: dto.dispositivoId ?? null,
       tipo: dto.tipo ?? null,
       limite: dto.limite ?? 200,
+      ...criteriosDeAcceso(dto),
     });
     if (r.ok) return r.valor;
     throw new BadRequestException(r.error.detalle);

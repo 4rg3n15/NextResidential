@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+  METODOS_DE_ACCESO,
   MOTIVOS_ACCESO,
   SEVERIDADES,
   TAMANO_PAGINA_MAXIMO,
@@ -29,24 +30,15 @@ import {
  * tope de días: eso es del dominio, y duplicarlo crearía dos verdades que se
  * separan en la primera corrección que se haga solo en un sitio.
  */
-export class ConsultaEventosDto {
-  @ApiProperty({ description: 'Inicio del rango, ISO-8601 con zona' })
-  @IsISO8601()
-  desde!: string;
-
-  @ApiProperty({ description: 'Fin del rango, EXCLUIDO' })
-  @IsISO8601()
-  hasta!: string;
-
+/**
+ * D-145 · los filtros que sólo tiene un ACCESO, iguales en el historial, la
+ * exportación (HU-32) y la línea de tiempo: si viven en un solo sitio, la
+ * exportación no puede quedarse atrás del buscador.
+ */
+export class FiltrosDeAccesoDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() viviendaId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() personaId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(128) dispositivoId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() zonaId?: string;
-
-  @ApiPropertyOptional({ enum: TIPOS_DE_EVENTO })
-  @IsOptional()
-  @IsIn([...TIPOS_DE_EVENTO])
-  tipo?: (typeof TIPOS_DE_EVENTO)[number];
 
   @ApiPropertyOptional({ enum: ['permitido', 'negado'] })
   @IsOptional()
@@ -57,6 +49,48 @@ export class ConsultaEventosDto {
   @IsOptional()
   @IsIn([...MOTIVOS_ACCESO])
   motivo?: (typeof MOTIVOS_ACCESO)[number];
+
+  /** La normaliza `FiltroDeEventos` con `Placa`: `abc-123` encuentra `ABC123`. */
+  @ApiPropertyOptional({ maxLength: 16, description: 'Placa, con o sin guiones ni espacios' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  placa?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Quién abrió o negó a mano' })
+  @IsOptional()
+  @IsUUID()
+  operadorId?: string;
+
+  @ApiPropertyOptional({ enum: METODOS_DE_ACCESO })
+  @IsOptional()
+  @IsIn([...METODOS_DE_ACCESO])
+  metodo?: (typeof METODOS_DE_ACCESO)[number];
+
+  @ApiPropertyOptional({
+    enum: ['conocida', 'desconocida'],
+    description: '`conocida`: el evento identificó a una persona; `desconocida`: no',
+  })
+  @IsOptional()
+  @IsIn(['conocida', 'desconocida'])
+  identificacion?: 'conocida' | 'desconocida';
+}
+
+export class ConsultaEventosDto extends FiltrosDeAccesoDto {
+  @ApiProperty({ description: 'Inicio del rango, ISO-8601 con zona' })
+  @IsISO8601()
+  desde!: string;
+
+  @ApiProperty({ description: 'Fin del rango, EXCLUIDO' })
+  @IsISO8601()
+  hasta!: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(128) dispositivoId?: string;
+
+  @ApiPropertyOptional({ enum: TIPOS_DE_EVENTO })
+  @IsOptional()
+  @IsIn([...TIPOS_DE_EVENTO])
+  tipo?: (typeof TIPOS_DE_EVENTO)[number];
 
   @ApiPropertyOptional({ minimum: 1, maximum: TAMANO_PAGINA_MAXIMO })
   @IsOptional()

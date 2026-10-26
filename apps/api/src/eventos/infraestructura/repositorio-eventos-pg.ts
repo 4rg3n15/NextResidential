@@ -182,6 +182,15 @@ export class RepositorioEventosPg implements RepositorioEventos {
       ...opcional('tipo', filtro.tipo, parametros),
       ...opcional('resultado', filtro.resultado, parametros),
       ...opcional('motivo', filtro.motivo, parametros),
+      // D-145 · todo parametrizado (§2.7.4): la placa ya viene normalizada por
+      // `Placa`, el método se traduce al enumerado de la base aquí (A_BASE).
+      ...opcional('placa_detectada', filtro.placa, parametros),
+      ...opcional('operador_id', filtro.operadorId, parametros),
+      ...opcional('metodo', filtro.metodo === null ? null : A_BASE[filtro.metodo], parametros),
+      // Sin parámetro: dos literales fijos, elegidos por un enumerado cerrado.
+      ...(filtro.identificacion === null
+        ? []
+        : [filtro.identificacion === 'conocida' ? 'persona_id IS NOT NULL' : 'persona_id IS NULL']),
     ];
 
     if (cursor !== null) {

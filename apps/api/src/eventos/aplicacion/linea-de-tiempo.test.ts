@@ -1,3 +1,4 @@
+import { ResolutorDeNombresSinBase } from './nombres-de-eventos';
 import { describe, expect, it } from 'vitest';
 import { ConsultarLineaDeTiempo } from './linea-de-tiempo';
 import type { EventoRegistrado, RepositorioEventos } from './puertos';
@@ -63,7 +64,7 @@ const montar = async () => {
       creadoPor: 'actor',
     });
   }
-  return new ConsultarLineaDeTiempo(accesos, deEquipo);
+  return new ConsultarLineaDeTiempo(accesos, deEquipo, new ResolutorDeNombresSinBase());
 };
 
 const criterios = (tipo: string | null) => ({
@@ -124,6 +125,7 @@ describe('R2 (15-N) · con el reloj del equipo desviado, la hora que se enseña 
         porId: async () => null,
       },
       new RepositorioEventosDeEquipoEnMemoria(),
+      new ResolutorDeNombresSinBase(),
       tolerancia,
     ).ejecutar({
       copropiedadId: COP,
@@ -195,6 +197,7 @@ describe('R2 (15-N) · también en lo que emite el equipo en vivo; nunca en su h
         porId: async () => null,
       },
       deEquipo,
+      new ResolutorDeNombresSinBase(),
       30,
     ).ejecutar({
       copropiedadId: COP,

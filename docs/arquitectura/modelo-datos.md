@@ -1175,6 +1175,20 @@ CHECK ( tipo <> 'manual' OR (operador_id IS NOT NULL
 
 Sin columnas de baja lógica: un evento no se desactiva. Y sin `actualizado_en` ni `actualizado_por`: no hay actualización posible.
 
+**D-145 · migración 0059 · índices del buscador.** El buscador de la consola filtra por
+placa y por operador, y ninguno de los índices de la 0011 empezaba por esas columnas. Se
+añaden dos índices **parciales**, que solo indexan las filas que pueden coincidir:
+
+```
+eventos_por_placa_idx    (copropiedad_id, placa_detectada, ocurrido_en DESC) WHERE placa_detectada IS NOT NULL
+eventos_por_operador_idx (copropiedad_id, operador_id,     ocurrido_en DESC) WHERE operador_id IS NOT NULL
+```
+
+Al crearse sobre la tabla particionada, cada partición mensual los hereda. Son índices y
+nada más: ni columnas nuevas ni `UPDATE`. La persona, la vivienda y el operador se nombran
+**al consultar**, por lotes (`ResolutorDeNombresPg`), no copiando nombres en `eventos`.
+Prueba: `99o_indices_del_buscador_de_eventos.sql`; reversión `supabase/reversion/0059_revert.sql`.
+
 #### `evidencias` — tenant ✔
 
 | Columna                   | Tipo                      | Restricción                                                          | Justificación                                      |
