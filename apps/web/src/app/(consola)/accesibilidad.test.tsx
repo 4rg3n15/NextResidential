@@ -278,7 +278,11 @@ const PANTALLAS: readonly PantallaEnPrueba[] = [
     montar: () => <PantallaDeDispositivos copropiedadId={COP} />,
     senal: /Talanquera principal/,
   },
-  { nombre: 'eventos', montar: () => <PantallaDeEventos copropiedadId={COP} />, senal: /placa/ },
+  {
+    nombre: 'eventos',
+    montar: () => <PantallaDeEventos copropiedadId={COP} rol="administrador" />,
+    senal: /placa/,
+  },
   {
     nombre: 'informes',
     montar: () => <PantallaDeInformes copropiedadId={COP} />,
@@ -452,7 +456,7 @@ describe('los avisos se anuncian solos', () => {
     );
     render(
       <Envoltura>
-        <PantallaDeEventos copropiedadId={COP} />
+        <PantallaDeEventos copropiedadId={COP} rol="administrador" />
       </Envoltura>,
     );
     await waitFor(() => expect(screen.getByRole('alert')).toBeDefined());

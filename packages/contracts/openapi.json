@@ -13536,11 +13536,29 @@
           },
           "metodo": {
             "type": "string",
-            "nullable": true,
-            "description": "placa, facial, tarjeta, manual, remoto"
+            "enum": [
+              "placa",
+              "facial",
+              "manual",
+              "remoto",
+              "tarjeta"
+            ],
+            "nullable": true
           },
           "motivo": {
             "type": "string",
+            "enum": [
+              "VIGENCIA_EXPIRADA",
+              "AFORO_SUPERADO",
+              "LISTA_NEGRA",
+              "ZONA_NO_AUTORIZADA",
+              "FUERA_DE_PATRON",
+              "FUERA_DE_HORARIO",
+              "SIN_CONSENTIMIENTO",
+              "PLACA_DESCONOCIDA",
+              "CONFIANZA_INSUFICIENTE",
+              "FALLO_TECNICO"
+            ],
             "nullable": true
           },
           "placa": {

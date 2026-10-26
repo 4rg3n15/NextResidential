@@ -4020,9 +4020,10 @@ export interface components {
             horaDelEquipo: string | null;
             /** @description Segundos que el reloj del equipo iba por delante (negativo: atrasado) */
             relojDesviadoSegundos: number | null;
-            /** @description placa, facial, tarjeta, manual, remoto */
-            metodo: string | null;
-            motivo: string | null;
+            /** @enum {string|null} */
+            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta" | null;
+            /** @enum {string|null} */
+            motivo: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO" | null;
             placa: string | null;
             /** @description Nulo en un acceso: «Desconocido» */
             personaId: string | null;

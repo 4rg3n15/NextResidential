@@ -235,9 +235,11 @@ export class ConsultarLineaDeTiempo {
     });
     if (esFallo(filtro)) return filtro;
 
-    // D-145 · un filtro que sólo cumple un acceso deja fuera los de equipo.
+    // D-145 · un filtro que sólo cumple un acceso deja fuera los de equipo; y
+    // con un tipo de equipo elegido, ninguno de ésos puede cumplirlo.
+    const soloEquipo = c.tipo !== null && c.tipo !== 'acceso';
+    if (soloEquipo && filtro.valor.soloDeAccesos) return exito({ elementos: [] });
     const soloAccesos = c.tipo === 'acceso' || filtro.valor.soloDeAccesos;
-    const soloEquipo = c.tipo !== null && !soloAccesos;
     const [accesos, delEquipo] = await Promise.all([
       soloEquipo ? Promise.resolve([]) : this.accesos.consultar(filtro.valor).then((p) => p.filas),
       soloAccesos

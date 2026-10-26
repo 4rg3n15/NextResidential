@@ -409,6 +409,8 @@ export 'models/editar_vehiculo_dto_tipo.dart';
 export 'models/editar_vivienda_dto_estado_administrativo.dart';
 export 'models/elemento_de_linea_de_tiempo_dto_origen.dart';
 export 'models/elemento_de_linea_de_tiempo_dto_resultado.dart';
+export 'models/elemento_de_linea_de_tiempo_dto_metodo.dart';
+export 'models/elemento_de_linea_de_tiempo_dto_motivo.dart';
 export 'models/elemento_de_linea_de_tiempo_dto_clase_persona.dart';
 export 'models/en_atencion_dto_origen.dart';
 export 'models/en_atencion_dto_disparador.dart';

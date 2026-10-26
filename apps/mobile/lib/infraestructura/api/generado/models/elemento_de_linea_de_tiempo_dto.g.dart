@@ -29,8 +29,12 @@ ElementoDeLineaDeTiempoDto _$ElementoDeLineaDeTiempoDtoFromJson(
       ? null
       : DateTime.parse(json['horaDelEquipo'] as String),
   relojDesviadoSegundos: json['relojDesviadoSegundos'] as num?,
-  metodo: json['metodo'] as String?,
-  motivo: json['motivo'] as String?,
+  metodo: json['metodo'] == null
+      ? null
+      : ElementoDeLineaDeTiempoDtoMetodo.fromJson(json['metodo'] as String),
+  motivo: json['motivo'] == null
+      ? null
+      : ElementoDeLineaDeTiempoDtoMotivo.fromJson(json['motivo'] as String),
   placa: json['placa'] as String?,
   personaId: json['personaId'] as String?,
   persona: json['persona'] as String?,

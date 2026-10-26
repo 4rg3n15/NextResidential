@@ -16,6 +16,8 @@ import {
   ApiPropertyOptional,
   ApiTags,
 } from '@nestjs/swagger';
+import { METODOS_DE_ACCESO, MOTIVOS_ACCESO } from '@ncr/domain-core';
+import type { MetodoDeAcceso, MotivoAcceso } from '@ncr/domain-core';
 import { Type } from 'class-transformer';
 import { IsISO8601, IsInt, IsOptional, IsUUID, Matches, Max, Min } from 'class-validator';
 import { Roles } from '../../comun/decoradores';
@@ -96,13 +98,9 @@ export class ElementoDeLineaDeTiempoDto {
   relojDesviadoSegundos!: number | null;
 
   /** D-145 · lo que cuenta un acceso; `null` en un evento de equipo. */
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    description: 'placa, facial, tarjeta, manual, remoto',
-  })
-  metodo!: string | null;
-  @ApiProperty({ type: String, nullable: true }) motivo!: string | null;
+  @ApiProperty({ enum: METODOS_DE_ACCESO, nullable: true })
+  metodo!: MetodoDeAcceso | null;
+  @ApiProperty({ enum: MOTIVOS_ACCESO, nullable: true }) motivo!: MotivoAcceso | null;
   @ApiProperty({ type: String, nullable: true }) placa!: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Nulo en un acceso: «Desconocido»' })
   personaId!: string | null;

@@ -2,95 +2,103 @@
 
 import type { JSX } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import type { ElementoDeLineaDeTiempo, LineaDeTiempo } from '@ncr/contracts';
+import type { LineaDeTiempo, Rol } from '@ncr/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EncabezadoDePantalla } from '@/componentes/encabezado-pantalla';
 import { TablaDeDatos } from '@/componentes/tabla-datos';
-import type { Columna } from '@/componentes/tabla-datos';
 import { Boton } from '@/componentes/ui/boton';
-import { Distintivo } from '@/componentes/ui/distintivo';
-import type { TonoDeDistintivo } from '@/componentes/ui/distintivo';
 import { EstadoCargando, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
 import { useAlertasAbiertas, useNombresDeEquipos } from '@/lib/api/consultas';
-import { desvioEnPalabras, diaLocalHace, fechaYHora, rangoDeDias } from '@/lib/fechas';
-import { AlertasAbiertas } from './alertas-abiertas';
+import { fechaYHora } from '@/lib/fechas';
+import { horaEnZona } from '@/lib/hora-en-zona';
 import { abrirCanal } from '@/lib/sse/canal';
 import type { EstadoDelCanal } from '@/lib/sse/canal';
-import { ORIGEN, TIPOS_DE_LA_LINEA } from './tipos-de-evento';
-
-/** El color acompaña al texto, nunca lo sustituye (el distintivo lleva icono). */
-const tonoDe = (e: ElementoDeLineaDeTiempo): TonoDeDistintivo => {
-  if (!e.enVivo) return 'neutro';
-  if (e.origen === 'acceso') return e.resultado === 'permitido' ? 'exito' : 'peligro';
-  if (/forzada|sabotaje|coaccion|fuera_de_linea|la_camara_decidio|lista_negra/.test(e.tipo)) {
-    return 'peligro';
-  }
-  if (e.origen === 'plataforma') return 'marca';
-  return 'aviso';
-};
+import { AlertasAbiertas } from './alertas-abiertas';
+import { BarraDeFiltros } from './barra-de-filtros';
+import { columnasDeEventos } from './columnas';
+import type { FiltrosDeEventos } from './filtros';
+import {
+  SIN_FILTROS,
+  filtrosDeAcceso,
+  filtrosDeLaUrl,
+  rangoDeLaVista,
+  urlDeExportacion,
+  urlDeFiltros,
+} from './filtros';
+import { useOperadoresVistos } from './operadores-vistos';
+import { useVistaDelPortero } from './vista-del-portero';
 
 /**
- * Eventos y alertas · ETAPA 15-L (Bloque B).
+ * Eventos y alertas · ETAPA 15-L (Bloque B) · buscador y vistas D-145.
  *
- * **Una sola línea de tiempo.** Arriba, lo último que pasó en cualquier equipo:
- * el acceso que decidió el motor, la puerta que se abrió o se forzó, el botón
- * de salida, el timbre, la llamada, el sabotaje, el equipo que se cayó, la
- * apertura que ordenó un portero con lo que contestó el equipo, y lo que nadie
- * catalogó. Se refresca sola cuando el canal en vivo trae algo nuevo.
+ * **Una sola línea de tiempo**, filtrable por fecha y hora de Bogotá, tipo,
+ * equipo, vivienda, persona, zona, resultado, motivo, placa, operador, método
+ * e identificación. Los filtros viven en la URL: un enlace reproduce la
+ * búsqueda. Se refresca sola cuando el canal en vivo trae algo nuevo.
  *
- * **El banner de alertas críticas va arriba y no se puede descartar.** Una
- * alerta sin resolver que se cierra con una «x» deja de verse y sigue sin
- * resolverse; aquí desaparece cuando alguien la atiende (CA-18).
+ * **Se conservan todos los eventos** (RN-03, CA-23, ADR-05). Al portero se le
+ * limpia la VISTA: su día y, si pulsó «Limpiar», desde ese instante. La
+ * administración, la superadministración y la central lo ven todo, sin corte.
  *
- * **La exportación es de ACCESOS** (HU-32): es un fichero binario que el
- * navegador descarga con su nombre, no pasa por el cliente tipado.
+ * **El banner de alertas críticas va arriba y no se puede descartar** (CA-18).
+ * Ni el corte del portero ni «Limpiar» lo tocan: una alerta abierta sigue
+ * abierta hasta que alguien la atiende.
+ *
+ * **La exportación es de ACCESOS** (HU-32), con el mismo rango y filtros.
  */
 export const PantallaDeEventos = ({
   copropiedadId,
+  rol,
+  parametros = '',
 }: {
   readonly copropiedadId: string;
+  readonly rol: Rol;
+  /** La consulta de la URL con la que se abrió la página. */
+  readonly parametros?: string;
 }): JSX.Element => {
-  const [desde, setDesde] = useState(() => diaLocalHace(7));
-  const [hasta, setHasta] = useState(() => diaLocalHace(0));
-  const [tipo, setTipo] = useState('');
-  const [dispositivoId, setDispositivoId] = useState('');
+  const [filtros, setFiltros] = useState<FiltrosDeEventos>(() => filtrosDeLaUrl(parametros));
   const [enVivo, setEnVivo] = useState<EstadoDelCanal>('conectando');
+  const vista = useVistaDelPortero(copropiedadId, rol);
   const clientes = useQueryClient();
 
-  /**
-   * El fin es EXCLUSIVO en el dominio: se pide el día siguiente a `hasta`.
-   * Otros fallos (15-M) · con un campo vacío o al revés, se siguen enseñando
-   * los últimos 7 días y se dice por qué, en vez de tumbar la página.
-   */
-  const rangoPedido = useMemo(() => rangoDeDias(desde, hasta), [desde, hasta]);
-  const rango = useMemo(
-    () => rangoPedido ?? rangoDeDias(diaLocalHace(7), diaLocalHace(0)) ?? { desde: '', hasta: '' },
-    [rangoPedido],
-  );
+  // Los filtros, a la URL: sin recargar y sin apilar una entrada por tecla.
+  useEffect(() => {
+    window.history.replaceState(null, '', `${window.location.pathname}${urlDeFiltros(filtros)}`);
+  }, [filtros]);
 
-  const clave = ['linea-de-tiempo', copropiedadId, rango.desde, rango.hasta, tipo, dispositivoId];
+  const rango = rangoDeLaVista(filtros, vista, vista.ahora);
+  const desde = rango.desde.toISOString();
+  const hasta = rango.hasta.toISOString();
+  const deAcceso = filtrosDeAcceso(filtros);
+  const { tipo, dispositivoId } = filtros;
+
   const consulta = useQuery<LineaDeTiempo>({
-    queryKey: clave,
+    queryKey: ['linea-de-tiempo', copropiedadId, desde, hasta, tipo, dispositivoId, deAcceso],
+    // Al cambiar un filtro se conserva lo anterior hasta que llegue lo nuevo: si
+    // no, la tabla vuelve a «cargando», desmonta la barra de filtros y quien
+    // escribía una placa pierde el foco a media palabra.
+    placeholderData: (previa) => previa,
     queryFn: async () =>
       desenvolver(
         await cliente.GET('/copropiedades/{id}/eventos/linea-de-tiempo', {
           params: {
             path: { id: copropiedadId },
             query: {
-              desde: rango.desde,
-              hasta: rango.hasta,
+              desde,
+              hasta,
               limite: 200,
               ...(tipo === '' ? {} : { tipo }),
               ...(dispositivoId === '' ? {} : { dispositivoId }),
+              ...deAcceso,
             },
           },
         }),
       ),
   });
 
-  // B2 · el canal en vivo que ya usa la consola: cualquier acceso o evento de
-  // equipo nuevo vuelve a pedir la línea (con sus filtros).
+  // B2 · el canal en vivo: cualquier acceso o evento de equipo nuevo vuelve a
+  // pedir la línea (con sus filtros).
   useEffect(() => {
     if (typeof EventSource === 'undefined') return undefined;
     const refrescar = (): void =>
@@ -107,33 +115,28 @@ export const PantallaDeEventos = ({
     });
   }, [clientes, copropiedadId]);
 
-  // DT-15L-02 · sólo los nombres: portería y central los necesitan para saber
-  // qué equipo emitió cada evento, y la lista completa es de administración.
+  // DT-15L-02 · sólo los nombres de los equipos: la lista completa es de administración.
   const equipos = useNombresDeEquipos(copropiedadId);
-  const nombres = useMemo(
-    () => new Map((equipos.data ?? []).map((e) => [e.id, e.nombre] as const)),
+  const listaDeEquipos = useMemo(
+    () => (equipos.data ?? []).map((e) => ({ id: e.id, nombre: e.nombre })),
     [equipos.data],
   );
+  const nombres = useMemo(
+    () => new Map(listaDeEquipos.map((e) => [e.id, e.nombre] as const)),
+    [listaDeEquipos],
+  );
   const nombreDe = (id: string): string => nombres.get(id) ?? 'Equipo sin nombre';
+  const operadores = useOperadoresVistos(consulta.data?.elementos);
 
   const alertas = useAlertasAbiertas(copropiedadId);
   const criticas = (alertas.data ?? []).filter(
     (a) => a.severidad === 'critica' || a.severidad === 'alta',
   );
 
-  const exportar = (formato: 'csv' | 'excel' | 'pdf'): void => {
-    const parametros = new URLSearchParams({
-      desde: rango.desde,
-      hasta: rango.hasta,
-      formato,
-      ...(dispositivoId === '' ? {} : { dispositivoId }),
-    });
-    // Navegación directa y no `fetch`: la descarga la gestiona el navegador con
-    // la cabecera `Content-Disposition` que envía la API.
-    window.location.assign(
-      `/api/ncr/copropiedades/${copropiedadId}/eventos/exportacion?${parametros.toString()}`,
-    );
-  };
+  // Navegación directa y no `fetch`: la descarga la gestiona el navegador con
+  // la cabecera `Content-Disposition` que envía la API.
+  const exportar = (formato: 'csv' | 'excel' | 'pdf'): void =>
+    window.location.assign(urlDeExportacion(copropiedadId, rango, filtros, formato));
 
   if (consulta.isError) {
     const e = consulta.error;
@@ -143,59 +146,6 @@ export const PantallaDeEventos = ({
       () => void consulta.refetch(),
     );
   }
-
-  const columnas: readonly Columna<ElementoDeLineaDeTiempo>[] = [
-    {
-      clave: 'momento',
-      titulo: 'Fecha y hora',
-      texto: (e) => e.ocurridoEn,
-      celda: (e) => (
-        <span className="tabular-nums text-secundario">
-          {new Date(e.ocurridoEn).toLocaleString('es-CO', {
-            dateStyle: 'short',
-            timeStyle: 'medium',
-          })}
-          {/* R2 (15-N) · con el reloj del equipo desviado, ésta es la hora de
-              RECEPCIÓN; la del equipo se dice, marcada. */}
-          {e.relojDesviadoSegundos === null ? null : (
-            <span
-              className="mt-0.5 block text-distintivo text-aviso-texto"
-              title={
-                e.horaDelEquipo === null
-                  ? undefined
-                  : `El equipo dijo ${new Date(e.horaDelEquipo).toLocaleString('es-CO')}`
-              }
-            >
-              Hora de recepción · reloj del equipo {desvioEnPalabras(e.relojDesviadoSegundos)}
-            </span>
-          )}
-        </span>
-      ),
-    },
-    {
-      clave: 'que',
-      titulo: 'Qué pasó',
-      texto: (e) => e.titulo,
-      celda: (e) => <Distintivo tono={tonoDe(e)}>{e.titulo}</Distintivo>,
-    },
-    {
-      clave: 'equipo',
-      titulo: 'Equipo',
-      texto: (e) => nombreDe(e.dispositivoId),
-      celda: (e) => <span className="text-secundario text-texto">{nombreDe(e.dispositivoId)}</span>,
-    },
-    {
-      clave: 'origen',
-      titulo: 'Origen',
-      texto: (e) => ORIGEN[e.origen],
-      celda: (e) => (
-        <span className="text-secundario text-texto-apagado">
-          {ORIGEN[e.origen]}
-          {e.enVivo ? '' : ' · histórico del equipo'}
-        </span>
-      ),
-    },
-  ];
 
   return (
     <>
@@ -211,6 +161,11 @@ export const PantallaDeEventos = ({
                   ? 'Sin conexión en vivo'
                   : 'Conectando…'}
             </span>
+            {vista.delPortero ? (
+              <Boton variante="secundario" onClick={vista.limpiar}>
+                Limpiar
+              </Boton>
+            ) : null}
             <Boton variante="secundario" onClick={() => exportar('csv')}>
               Accesos en CSV
             </Boton>
@@ -223,6 +178,13 @@ export const PantallaDeEventos = ({
           </>
         }
       />
+
+      {vista.delPortero ? (
+        <p role="note" className="mb-3 text-secundario text-texto-apagado">
+          Hoy, desde las {horaEnZona(rango.desde)}. Sólo limpia esta vista. El historial completo lo
+          conserva la administración.
+        </p>
+      ) : null}
 
       {criticas.length > 0 ? (
         <div
@@ -245,84 +207,42 @@ export const PantallaDeEventos = ({
       ) : null}
 
       {/* E5 / C7 (15-M) · la cola entera, filtrable, con archivo lógico y motivo. */}
-      <AlertasAbiertas
-        copropiedadId={copropiedadId}
-        nombreDe={nombreDe}
-        equipos={(equipos.data ?? []).map((e) => ({ id: e.id, nombre: e.nombre }))}
-      />
+      <AlertasAbiertas copropiedadId={copropiedadId} nombreDe={nombreDe} equipos={listaDeEquipos} />
 
       {consulta.isLoading ? <EstadoCargando etiqueta="Cargando eventos" /> : null}
 
       <TablaDeDatos
         titulo="Línea de tiempo"
-        columnas={columnas}
+        columnas={columnasDeEventos(nombreDe)}
         filas={consulta.data?.elementos ?? []}
         claveDeFila={(e) => `${e.origen}-${e.id}`}
         cargando={consulta.isLoading}
         porPagina={25}
         filtros={
-          <>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Desde</span>
-              <input
-                type="date"
-                value={desde}
-                onChange={(e) => setDesde(e.target.value)}
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Hasta</span>
-              <input
-                type="date"
-                value={hasta}
-                onChange={(e) => setHasta(e.target.value)}
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              />
-            </label>
-            {rangoPedido === null ? (
-              <span role="status" className="text-secundario text-aviso-texto">
-                Fechas incompletas o al revés: se muestran los últimos 7 días.
-              </span>
-            ) : null}
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Tipo</span>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              >
-                <option value="">Todos</option>
-                {TIPOS_DE_LA_LINEA.map((t) => (
-                  <option key={t.valor} value={t.valor}>
-                    {t.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">Equipo</span>
-              <select
-                value={dispositivoId}
-                onChange={(e) => setDispositivoId(e.target.value)}
-                aria-label="Filtrar por equipo"
-                className="rounded-campo border border-borde bg-campo px-2 py-1.5 text-cuerpo"
-              >
-                <option value="">Todos</option>
-                {(equipos.data ?? []).map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
+          <BarraDeFiltros
+            copropiedadId={copropiedadId}
+            filtros={filtros}
+            cambiar={(parcial) => setFiltros((f) => ({ ...f, ...parcial }))}
+            borrar={() => setFiltros(SIN_FILTROS)}
+            delPortero={vista.delPortero}
+            rangoAjustado={rango.ajustado}
+            equipos={listaDeEquipos}
+            operadores={operadores}
+          />
         }
-        vacio={{
-          titulo: 'Sin eventos en el rango',
-          descripcion:
-            'Ningún equipo reportó nada con estos filtros. Amplía el rango de fechas o quita el filtro de tipo o de equipo.',
-        }}
+        vacio={
+          vista.delPortero
+            ? {
+                titulo: 'Nada todavía',
+                descripcion:
+                  'No ha pasado nada desde el inicio del día o desde que limpió la vista. Lo nuevo aparece aquí solo.',
+              }
+            : {
+                titulo: 'Sin eventos en el rango',
+                descripcion:
+                  'Nada coincide con estos filtros. Amplíe el rango de fechas o pulse «Borrar filtros».',
+              }
+        }
       />
     </>
   );

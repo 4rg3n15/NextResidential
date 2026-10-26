@@ -188,3 +188,20 @@ describe('D-145 · la exportación y el listado leen los mismos filtros', () => 
     });
   });
 });
+
+describe('D-145 · un tipo de equipo con un filtro de acceso', () => {
+  it('no hay nada que cumpla los dos: vacío, sin consultar nada', async () => {
+    const m = await montar([fila(1)]);
+    const r = await m.caso.ejecutar(criterios({ tipo: 'puerta_forzada', placa: 'ABC123' }));
+    if (!r.ok) throw new Error(r.error.detalle);
+    expect(r.valor.elementos).toEqual([]);
+    expect(m.consultar).not.toHaveBeenCalled();
+  });
+
+  it('el tipo de equipo solo sigue trayendo sólo ese tipo', async () => {
+    const m = await montar([fila(1)]);
+    const r = await m.caso.ejecutar(criterios({ tipo: 'puerta_forzada' }));
+    if (!r.ok) throw new Error(r.error.detalle);
+    expect(r.valor.elementos.map((e) => e.tipo)).toEqual(['puerta_forzada']);
+  });
+});

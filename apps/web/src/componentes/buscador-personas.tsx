@@ -65,6 +65,8 @@ export interface PropiedadesDeBuscadorDePersonas {
   readonly etiqueta?: string;
   readonly ayuda?: string;
   readonly error?: string | undefined;
+  /** D-145 · `false` en un FILTRO: buscar a alguien no es registrarlo. */
+  readonly permitirAlta?: boolean;
 }
 
 export const BuscadorDePersonas = ({
@@ -74,6 +76,7 @@ export const BuscadorDePersonas = ({
   etiqueta = 'Persona que visita',
   ayuda = 'Búscala por nombre o documento. Si no aparece, se registra aquí mismo.',
   error,
+  permitirAlta = true,
 }: PropiedadesDeBuscadorDePersonas): JSX.Element => {
   const id = useId();
   const [texto, setTexto] = useState('');
@@ -172,9 +175,11 @@ export const BuscadorDePersonas = ({
             <span className="block truncate text-cuerpo font-medium text-texto">
               {elegida.nombreCompleto}
             </span>
-            <span className="block truncate text-secundario text-texto-apagado">
-              doc. {elegida.documento}
-            </span>
+            {elegida.documento === '' ? null : (
+              <span className="block truncate text-secundario text-texto-apagado">
+                doc. {elegida.documento}
+              </span>
+            )}
           </span>
           <Boton
             variante="fantasma"
@@ -355,16 +360,18 @@ export const BuscadorDePersonas = ({
             ) : null}
             {/* El alta va SIEMPRE al final, también cuando hay resultados: quizá
                 el visitante es un homónimo del que sí está. */}
-            <li className="border-t border-borde">
-              <button
-                type="button"
-                onClick={abrirAlta}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-secundario text-marca-texto transition-colors duration-100 ease-salida hover:bg-lienzo motion-reduce:transition-none"
-              >
-                <UserPlus aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
-                Registrar a «{texto.trim()}» como persona nueva
-              </button>
-            </li>
+            {permitirAlta ? (
+              <li className="border-t border-borde">
+                <button
+                  type="button"
+                  onClick={abrirAlta}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-secundario text-marca-texto transition-colors duration-100 ease-salida hover:bg-lienzo motion-reduce:transition-none"
+                >
+                  <UserPlus aria-hidden="true" className="h-4 w-4" strokeWidth={1.75} />
+                  Registrar a «{texto.trim()}» como persona nueva
+                </button>
+              </li>
+            ) : null}
           </ul>
         </div>
       ) : null}

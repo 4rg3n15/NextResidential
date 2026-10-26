@@ -6,6 +6,8 @@ import 'package:json_annotation/json_annotation.dart';
 
 import 'codigo_del_equipo_dto.dart';
 import 'elemento_de_linea_de_tiempo_dto_clase_persona.dart';
+import 'elemento_de_linea_de_tiempo_dto_metodo.dart';
+import 'elemento_de_linea_de_tiempo_dto_motivo.dart';
 import 'elemento_de_linea_de_tiempo_dto_origen.dart';
 import 'elemento_de_linea_de_tiempo_dto_resultado.dart';
 
@@ -62,10 +64,8 @@ class ElementoDeLineaDeTiempoDto {
 
   /// Segundos que el reloj del equipo iba por delante (negativo: atrasado)
   final num? relojDesviadoSegundos;
-
-  /// placa, facial, tarjeta, manual, remoto
-  final String? metodo;
-  final String? motivo;
+  final ElementoDeLineaDeTiempoDtoMetodo? metodo;
+  final ElementoDeLineaDeTiempoDtoMotivo? motivo;
   final String? placa;
 
   /// Nulo en un acceso: «Desconocido»

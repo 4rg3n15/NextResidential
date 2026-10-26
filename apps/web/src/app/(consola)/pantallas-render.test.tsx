@@ -483,11 +483,11 @@ describe('eventos', () => {
         return base(entrada);
       }),
     );
-    montar(<PantallaDeEventos copropiedadId={COP} />);
+    montar(<PantallaDeEventos copropiedadId={COP} rol="administrador" />);
     await waitFor(() => expect(screen.getByText(/1 alerta sin resolver/)).toBeDefined());
     // 15-L · una sola línea: el acceso con su motivo EN ESPAÑOL (no el código
     // del dominio), el evento de equipo, y el equipo por su NOMBRE.
-    await waitFor(() => expect(screen.getByText(/persona o placa en lista negra/)).toBeDefined());
+    await waitFor(() => expect(screen.getByText(/persona o placa en lista negra/i)).toBeDefined());
     expect(within(screen.getByRole('table')).getByText('Puerta forzada')).toBeDefined();
     await waitFor(() =>
       expect(within(screen.getByRole('table')).getAllByText('Talanquera principal')).toHaveLength(
