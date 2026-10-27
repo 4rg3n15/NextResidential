@@ -3,8 +3,10 @@
 --
 -- Como `authenticated`, en una transacción que se DESHACE:
 --  · positiva: el servicio de Mira ve a su residente;
---  · negativas: no ve al administrador de El Roble, ni al superadministrador
---    (copropiedad NULL), ni puede escribir en `usuarios`.
+--  · negativas: no ve al administrador de El Roble, ni a otro usuario sin
+--    copropiedad que no sea superadministrador, ni puede escribir en `usuarios`.
+--    (D-145, 0060: desde el 26/10 SÍ ve a los superadministradores, para
+--    nombrarlos en los eventos que abren a mano. Lo prueba 99p.)
 -- =============================================================================
 
 \set ON_ERROR_STOP on
@@ -22,9 +24,12 @@ BEGIN
   IF n <> 0 THEN RAISE EXCEPTION '99k: el servicio de Mira ve al administrador de El Roble'; END IF;
 
   -- El propio actor de servicio (copropiedad NULL) se ve por `usuarios_lectura`
-  -- (`id = app.usuario_id()`), no por la 0054; ningún OTRO sin copropiedad.
-  SELECT count(*) INTO n FROM public.usuarios
-   WHERE copropiedad_id IS NULL AND id <> app.usuario_id();
+  -- (`id = app.usuario_id()`), no por la 0054; ningún OTRO sin copropiedad,
+  -- salvo los superadministradores (0060).
+  SELECT count(*) INTO n FROM public.usuarios u
+   WHERE u.copropiedad_id IS NULL AND u.id <> app.usuario_id()
+     AND NOT EXISTS (SELECT 1 FROM public.roles_usuario r
+                      WHERE r.usuario_id = u.id AND r.rol = 'superadministrador');
   IF n <> 0 THEN RAISE EXCEPTION '99k: el servicio ve usuarios sin copropiedad (%)', n; END IF;
 
   UPDATE public.usuarios SET actualizado_en = now()

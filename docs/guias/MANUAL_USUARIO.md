@@ -386,6 +386,25 @@ quién, dónde, cuándo, con qué resultado y **con qué versión de reglas se
 decidió**. Los eventos **no se pueden modificar ni borrar** por nadie, ni
 siquiera desde la base de datos (RN-03).
 
+**El buscador de «Eventos y alertas»** (D-145). Filtre por fecha **y hora**
+—siempre en hora de Bogotá, mire desde donde mire—, tipo, equipo, vivienda,
+persona (residente o visitante, buscada por nombre o documento; vivienda y
+persona sólo para la administración, que es quien lee el padrón), zona,
+resultado, motivo, **placa**, **operador**, **método** (placa, rostro,
+tarjeta, a mano, remoto) e **identificación** (conocida o desconocida). La
+placa se escribe como venga: `abc-123` encuentra `ABC123`; a medio escribir no
+se busca y se dice. Los filtros quedan en la dirección de la página: copiarla
+comparte la búsqueda. «Borrar filtros» vuelve a los últimos 7 días sin filtro.
+Cada fila dice cuándo, qué tipo, con qué resultado y motivo, cómo se
+identificó, **quién** —con su nombre y si es residente o visitante, o
+«Desconocido» si nadie lo identificó—, la vivienda, la placa, el equipo y, si
+fue a mano, el operador. «Accesos en CSV», «Excel» y «PDF» exportan **lo mismo
+que se ve**: el mismo rango y los mismos filtros.
+
+**La administración lo conserva todo.** La administración, la
+superadministración y la central ven el historial completo: no tienen botón
+«Limpiar» ni corte diario. El del portero (§4) es sólo una vista.
+
 Cuatro informes, exportables: accesos por periodo, visitantes frecuentes, uso de
 zonas y auditoría de sistema. **Cada informe dice lo que NO puede afirmar**: si
 un dato no se distingue, sale escrito junto al resultado en vez de dejar que
@@ -436,6 +455,19 @@ videoportero, use **Guardia virtual** (§5). «Última orden: …» dice lo que
   reporta la salida, el visitante sigue contando hasta que vence su visita
   (P-41).
 
+### Su vista de «Eventos y alertas»
+
+Cada día empieza **vacía**: usted ve lo que pasó **hoy**, desde las 00:00 de
+Bogotá, y a medianoche se limpia sola. Si quiere empezar de cero a mitad de
+turno, pulse **«Limpiar»**: deja de ver lo anterior a ese instante. Junto al
+botón se lee: «Sólo limpia esta vista. El historial completo lo conserva la
+administración». Es literal: **ningún evento se borra** (RN-03); la
+administración lo sigue viendo todo. «Limpiar» se recuerda en ese navegador
+hasta el final del día; las **alertas abiertas no se limpian**: siguen ahí hasta
+que alguien las atiende. Los demás filtros del buscador (§3.5) los tiene
+todos menos las fechas, la vivienda y la persona: esos dos salen del padrón,
+que es de la administración.
+
 En Portería **no hay audio**: hablar con el visitante por el videoportero se
 hace desde Guardia virtual.
 
@@ -461,7 +493,10 @@ superadministrador— y la administración; lo que sigue vale igual para ellos.
    en segundos; lo que pasa del umbral sale en rojo. Si usted no atiende a
    nadie, lo primero de la cola pasa solo a **«Atención»** y el vídeo de su
    equipo se abre sin clic. Si ya atiende a alguien, el nuevo espera en la cola
-   y no le quita la pantalla.
+   y no le quita la pantalla. **Cada evento sale de la cola una hora después de
+   ocurrido** (D-144; `GUARDIA_VIGENCIA_EN_COLA_S`, por omisión 3600 s): la
+   cola es para atender lo que está pasando, no un historial —ése está en
+   «Eventos y alertas»—. El escalamiento de alertas no cambia.
 2. «Atención» dice qué pasa, la vivienda, cuánto lleva esperando, la placa
    leída si la hay y la evidencia. Debajo, **«Equipos en vivo»** muestra el
    vídeo del equipo que se atiende; puede mirar otro en «Equipo» sin perder la

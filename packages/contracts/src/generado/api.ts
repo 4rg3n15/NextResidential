@@ -4020,6 +4020,21 @@ export interface components {
             horaDelEquipo: string | null;
             /** @description Segundos que el reloj del equipo iba por delante (negativo: atrasado) */
             relojDesviadoSegundos: number | null;
+            /** @enum {string|null} */
+            metodo: "placa" | "facial" | "manual" | "remoto" | "tarjeta" | null;
+            /** @enum {string|null} */
+            motivo: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO" | null;
+            placa: string | null;
+            /** @description Nulo en un acceso: «Desconocido» */
+            personaId: string | null;
+            persona: string | null;
+            /** @enum {string|null} */
+            clasePersona: "residente" | "visitante" | null;
+            viviendaId: string | null;
+            vivienda: string | null;
+            /** @description Quién abrió o negó a mano */
+            operadorId: string | null;
+            operador: string | null;
         };
         EmergenciaDto: {
             /** @description Qué ocurre. Obligatorio. */
@@ -7717,17 +7732,24 @@ export interface operations {
     EventosController_historial: {
         parameters: {
             query: {
+                viviendaId?: string;
+                personaId?: string;
+                zonaId?: string;
+                resultado?: "permitido" | "negado";
+                motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
+                /** @description Placa, con o sin guiones ni espacios */
+                placa?: string;
+                /** @description Quién abrió o negó a mano */
+                operadorId?: string;
+                metodo?: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+                /** @description `conocida`: el evento identificó a una persona; `desconocida`: no */
+                identificacion?: "conocida" | "desconocida";
                 /** @description Inicio del rango, ISO-8601 con zona */
                 desde: string;
                 /** @description Fin del rango, EXCLUIDO */
                 hasta: string;
-                viviendaId?: string;
-                personaId?: string;
                 dispositivoId?: string;
-                zonaId?: string;
                 tipo?: "ingreso" | "salida" | "denegado" | "alerta" | "manual";
-                resultado?: "permitido" | "negado";
-                motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
                 tamanoPagina?: number;
                 /** @description Cursor opaco devuelto por la página anterior */
                 cursor?: string;
@@ -7792,17 +7814,24 @@ export interface operations {
     EventosController_exportacion: {
         parameters: {
             query: {
+                viviendaId?: string;
+                personaId?: string;
+                zonaId?: string;
+                resultado?: "permitido" | "negado";
+                motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
+                /** @description Placa, con o sin guiones ni espacios */
+                placa?: string;
+                /** @description Quién abrió o negó a mano */
+                operadorId?: string;
+                metodo?: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+                /** @description `conocida`: el evento identificó a una persona; `desconocida`: no */
+                identificacion?: "conocida" | "desconocida";
                 /** @description Inicio del rango, ISO-8601 con zona */
                 desde: string;
                 /** @description Fin del rango, EXCLUIDO */
                 hasta: string;
-                viviendaId?: string;
-                personaId?: string;
                 dispositivoId?: string;
-                zonaId?: string;
                 tipo?: "ingreso" | "salida" | "denegado" | "alerta" | "manual";
-                resultado?: "permitido" | "negado";
-                motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
                 tamanoPagina?: number;
                 /** @description Cursor opaco devuelto por la página anterior */
                 cursor?: string;
@@ -7872,6 +7901,18 @@ export interface operations {
     LineaDeTiempoController_lineaDeTiempo: {
         parameters: {
             query: {
+                viviendaId?: string;
+                personaId?: string;
+                zonaId?: string;
+                resultado?: "permitido" | "negado";
+                motivo?: "VIGENCIA_EXPIRADA" | "AFORO_SUPERADO" | "LISTA_NEGRA" | "ZONA_NO_AUTORIZADA" | "FUERA_DE_PATRON" | "FUERA_DE_HORARIO" | "SIN_CONSENTIMIENTO" | "PLACA_DESCONOCIDA" | "CONFIANZA_INSUFICIENTE" | "FALLO_TECNICO";
+                /** @description Placa, con o sin guiones ni espacios */
+                placa?: string;
+                /** @description Quién abrió o negó a mano */
+                operadorId?: string;
+                metodo?: "placa" | "facial" | "manual" | "remoto" | "tarjeta";
+                /** @description `conocida`: el evento identificó a una persona; `desconocida`: no */
+                identificacion?: "conocida" | "desconocida";
                 /** @description Inicio del rango, ISO-8601 con zona */
                 desde: string;
                 /** @description Fin del rango, EXCLUIDO */

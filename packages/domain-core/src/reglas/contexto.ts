@@ -1,7 +1,9 @@
 import type { Autorizacion } from '../autorizaciones/autorizacion';
 import type { VersionDeReglas } from '../autorizaciones/version-de-reglas';
 
-export type MetodoDeAcceso = 'placa' | 'facial' | 'manual' | 'remoto' | 'tarjeta';
+/** D-145 · la lista, además del tipo: el buscador de eventos la valida contra ella. */
+export const METODOS_DE_ACCESO = ['placa', 'facial', 'manual', 'remoto', 'tarjeta'] as const;
+export type MetodoDeAcceso = (typeof METODOS_DE_ACCESO)[number];
 
 export interface ZonaSolicitada {
   readonly id: string;

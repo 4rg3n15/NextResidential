@@ -80,6 +80,11 @@ export const filtrarYPaginar = (
     (filtro.tipo === null || f.tipo === filtro.tipo) &&
     (filtro.resultado === null || f.resultado === filtro.resultado) &&
     (filtro.motivo === null || f.motivo === filtro.motivo) &&
+    (filtro.placa === null || f.placaDetectada === filtro.placa) &&
+    (filtro.operadorId === null || f.operadorId === filtro.operadorId) &&
+    (filtro.metodo === null || f.metodo === filtro.metodo) &&
+    (filtro.identificacion === null ||
+      (filtro.identificacion === 'conocida') === (f.personaId !== null)) &&
     (cursor === null || anteriorA(f, cursor));
 
   const ordenadas = filas

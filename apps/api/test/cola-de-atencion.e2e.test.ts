@@ -76,7 +76,7 @@ describe('G1 · qué llega a la cola desde un equipo', () => {
   it('sin nada en vivo, la cola está vacía y trae la vigencia y las preferencias por omisión', async () => {
     const r = await cola();
     expect(r.body.cola).toEqual([]);
-    expect(r.body.vigenciaSegundos).toBe(300);
+    expect(r.body.vigenciaSegundos).toBe(3600);
     expect(r.body.preferencias.llamada).toEqual({ abrir: true, sonar: true });
   });
 

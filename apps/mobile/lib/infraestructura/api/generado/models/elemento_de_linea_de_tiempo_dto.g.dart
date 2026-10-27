@@ -29,6 +29,24 @@ ElementoDeLineaDeTiempoDto _$ElementoDeLineaDeTiempoDtoFromJson(
       ? null
       : DateTime.parse(json['horaDelEquipo'] as String),
   relojDesviadoSegundos: json['relojDesviadoSegundos'] as num?,
+  metodo: json['metodo'] == null
+      ? null
+      : ElementoDeLineaDeTiempoDtoMetodo.fromJson(json['metodo'] as String),
+  motivo: json['motivo'] == null
+      ? null
+      : ElementoDeLineaDeTiempoDtoMotivo.fromJson(json['motivo'] as String),
+  placa: json['placa'] as String?,
+  personaId: json['personaId'] as String?,
+  persona: json['persona'] as String?,
+  clasePersona: json['clasePersona'] == null
+      ? null
+      : ElementoDeLineaDeTiempoDtoClasePersona.fromJson(
+          json['clasePersona'] as String,
+        ),
+  viviendaId: json['viviendaId'] as String?,
+  vivienda: json['vivienda'] as String?,
+  operadorId: json['operadorId'] as String?,
+  operador: json['operador'] as String?,
 );
 
 Map<String, dynamic> _$ElementoDeLineaDeTiempoDtoToJson(
@@ -46,4 +64,14 @@ Map<String, dynamic> _$ElementoDeLineaDeTiempoDtoToJson(
   'codigo': instance.codigo,
   'horaDelEquipo': instance.horaDelEquipo?.toIso8601String(),
   'relojDesviadoSegundos': instance.relojDesviadoSegundos,
+  'metodo': instance.metodo,
+  'motivo': instance.motivo,
+  'placa': instance.placa,
+  'personaId': instance.personaId,
+  'persona': instance.persona,
+  'clasePersona': instance.clasePersona,
+  'viviendaId': instance.viviendaId,
+  'vivienda': instance.vivienda,
+  'operadorId': instance.operadorId,
+  'operador': instance.operador,
 };

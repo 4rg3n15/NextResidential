@@ -152,3 +152,39 @@ describe('BuscadorDePersonas', () => {
     expect(aviso.textContent).toMatch(/ya estaba registrado como «Ana Pérez»/);
   });
 });
+
+describe('D-145 · como filtro, buscar no es registrar', () => {
+  it('con `permitirAlta={false}` encuentra, pero no ofrece el alta', async () => {
+    render(
+      <Montado>
+        <BuscadorDePersonas
+          copropiedadId={COP}
+          elegida={null}
+          alElegir={() => undefined}
+          etiqueta="Persona"
+          permitirAlta={false}
+        />
+      </Montado>,
+    );
+    const campo = screen.getByRole('combobox', { name: /Persona/ });
+    fireEvent.focus(campo);
+    fireEvent.change(campo, { target: { value: 'Ana' } });
+    expect(await screen.findByRole('option', { name: /Ana Pérez/ })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Registrar a/ })).toBeNull();
+  });
+
+  it('una persona elegida sin documento (vino en un enlace) no pinta «doc.» vacío', () => {
+    render(
+      <Montado>
+        <BuscadorDePersonas
+          copropiedadId={COP}
+          elegida={{ id: PERSONA.id, nombreCompleto: 'Persona del enlace', documento: '' }}
+          alElegir={() => undefined}
+          etiqueta="Persona"
+        />
+      </Montado>,
+    );
+    expect(screen.getByText('Persona del enlace')).toBeDefined();
+    expect(screen.queryByText(/doc\./)).toBeNull();
+  });
+});

@@ -110,3 +110,52 @@ describe('FiltroDeEventos · validación', () => {
     }).toThrow();
   });
 });
+
+describe('D-145 · el buscador de eventos: placa, operador, método e identificación', () => {
+  it('la placa se normaliza con el objeto de valor: guiones, espacios y minúsculas', () => {
+    expect(abrir(FiltroDeEventos.crear(criterios({ placa: 'abc-123' }))).placa).toBe('ABC123');
+    expect(abrir(FiltroDeEventos.crear(criterios({ placa: ' ab c 123 ' }))).placa).toBe('ABC123');
+  });
+
+  it('una placa en blanco no filtra; una que no es placa es un error con motivo', () => {
+    expect(abrir(FiltroDeEventos.crear(criterios({ placa: '   ' }))).placa).toBeNull();
+    expect(error(FiltroDeEventos.crear(criterios({ placa: 'AB' }))).regla).toBe('RN-04');
+    expect(error(FiltroDeEventos.crear(criterios({ placa: 'ABC#123' }))).codigo).toBe(
+      'DATO_INVALIDO',
+    );
+  });
+
+  it('operador, método e identificación viajan tal cual', () => {
+    const f = abrir(
+      FiltroDeEventos.crear(
+        criterios({ operadorId: 'u-1', metodo: 'facial', identificacion: 'desconocida' }),
+      ),
+    );
+    expect([f.operadorId, f.metodo, f.identificacion]).toEqual(['u-1', 'facial', 'desconocida']);
+    expect(Object.isFrozen(f)).toBe(true);
+  });
+
+  it('soloDeAccesos: cualquier filtro que sólo tiene un acceso lo activa; equipo y tipo no', () => {
+    expect(abrir(FiltroDeEventos.crear(criterios())).soloDeAccesos).toBe(false);
+    expect(
+      abrir(FiltroDeEventos.crear(criterios({ dispositivoId: 'd', tipo: 'denegado' })))
+        .soloDeAccesos,
+    ).toBe(false);
+    for (const extra of [
+      { viviendaId: 'v' },
+      { personaId: 'p' },
+      { zonaId: 'z' },
+      { resultado: 'negado' as const },
+      { motivo: 'LISTA_NEGRA' as const },
+      { placa: 'ABC123' },
+      { operadorId: 'u' },
+      { metodo: 'placa' as const },
+      { identificacion: 'conocida' as const },
+    ]) {
+      expect(
+        abrir(FiltroDeEventos.crear(criterios(extra))).soloDeAccesos,
+        JSON.stringify(extra),
+      ).toBe(true);
+    }
+  });
+});

@@ -1,7 +1,8 @@
 import { FiltroDeEventos, esFallo, exito } from '@ncr/domain-core';
-import type { ErrorDominio, MotivoAcceso, Resultado } from '@ncr/domain-core';
+import type { CriteriosDeEventos, ErrorDominio, MotivoAcceso, Resultado } from '@ncr/domain-core';
 import type { EventoRegistrado, RepositorioEventos } from './puertos';
 import type { EventoDeEquipoGuardado, RepositorioEventosDeEquipo } from './eventos-de-equipo';
+import type { ClaseDePersona, NombresDeEventos, ResolutorDeNombres } from './nombres-de-eventos';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -11,6 +12,12 @@ import type { EventoDeEquipoGuardado, RepositorioEventosDeEquipo } from './event
  * (`eventos`, lo que decidió el motor) y los EVENTOS DE EQUIPO (todo lo demás
  * que el equipo emitió y lo que la plataforma le hizo). Filtros: equipo, tipo
  * y fecha. `tipo = acceso` deja sólo los accesos; un tipo de equipo, sólo ese.
+ *
+ * D-145 · y los del buscador, que sólo tiene un ACCESO —vivienda, persona,
+ * zona, resultado, motivo, placa, operador, método, identificación—: con
+ * cualquiera de ellos los eventos de equipo no pueden cumplirlo y se dejan
+ * fuera. Cada acceso sale con su método, motivo, placa y los NOMBRES de la
+ * persona (y si es residente o visitante), la vivienda y el operador.
  *
  * El título va en español y sin jerga (Bloque I): el motivo de una negación
  * se traduce aquí, no en cada pantalla.
@@ -36,9 +43,35 @@ export interface ElementoDeLineaDeTiempo {
    */
   readonly horaDelEquipo: string | null;
   readonly relojDesviadoSegundos: number | null;
+  /** D-145 · lo que cuenta un ACCESO; en un evento de equipo, `null`. */
+  readonly metodo: string | null;
+  readonly motivo: MotivoAcceso | null;
+  readonly placa: string | null;
+  /** `null` en un acceso: nadie identificado («Desconocido»). */
+  readonly personaId: string | null;
+  readonly persona: string | null;
+  readonly clasePersona: ClaseDePersona | null;
+  readonly viviendaId: string | null;
+  readonly vivienda: string | null;
+  /** Quién abrió o negó a mano; `null` si lo decidió el motor. */
+  readonly operadorId: string | null;
+  readonly operador: string | null;
 }
 
-export interface CriteriosDeLineaDeTiempo {
+type FiltrosDeAcceso = Pick<
+  CriteriosDeEventos,
+  | 'viviendaId'
+  | 'personaId'
+  | 'zonaId'
+  | 'resultado'
+  | 'motivo'
+  | 'placa'
+  | 'operadorId'
+  | 'metodo'
+  | 'identificacion'
+>;
+
+export interface CriteriosDeLineaDeTiempo extends FiltrosDeAcceso {
   readonly copropiedadId: string;
   readonly desde: Date;
   readonly hasta: Date;
@@ -46,6 +79,20 @@ export interface CriteriosDeLineaDeTiempo {
   readonly tipo: string | null;
   readonly limite: number;
 }
+
+/** Lo que un evento de equipo no tiene: todo `null`. */
+const SIN_DATOS_DE_ACCESO = {
+  metodo: null,
+  motivo: null,
+  placa: null,
+  personaId: null,
+  persona: null,
+  clasePersona: null,
+  viviendaId: null,
+  vivienda: null,
+  operadorId: null,
+  operador: null,
+} as const;
 
 const MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   VIGENCIA_EXPIRADA: 'autorización fuera de vigencia',
@@ -96,7 +143,11 @@ const horaMostrada = (
   };
 };
 
-const deAcceso = (e: EventoRegistrado, toleranciaS?: number): ElementoDeLineaDeTiempo => {
+const deAcceso = (
+  e: EventoRegistrado,
+  nombres: NombresDeEventos,
+  toleranciaS?: number,
+): ElementoDeLineaDeTiempo => {
   const como = METODO[e.metodo] ?? e.metodo;
   const placa = e.placaDetectada === null ? '' : ` ${e.placaDetectada}`;
   const titulo =
@@ -114,6 +165,16 @@ const deAcceso = (e: EventoRegistrado, toleranciaS?: number): ElementoDeLineaDeT
     enVivo: true,
     eventoId: e.id,
     codigo: null,
+    metodo: e.metodo,
+    motivo: e.motivo,
+    placa: e.placaDetectada,
+    personaId: e.personaId,
+    persona: e.personaId === null ? null : (nombres.personas.get(e.personaId)?.nombre ?? null),
+    clasePersona: e.personaId === null ? null : (nombres.personas.get(e.personaId)?.clase ?? null),
+    viviendaId: e.viviendaId,
+    vivienda: e.viviendaId === null ? null : (nombres.viviendas.get(e.viviendaId) ?? null),
+    operadorId: e.operadorId,
+    operador: e.operadorId === null ? null : (nombres.operadores.get(e.operadorId) ?? null),
   };
 };
 
@@ -131,12 +192,20 @@ const deEquipo = (e: EventoDeEquipoGuardado, toleranciaS?: number): ElementoDeLi
     e.codigoMayor === null || e.codigoMenor === null
       ? null
       : { mayor: e.codigoMayor, menor: e.codigoMenor },
+  ...SIN_DATOS_DE_ACCESO,
 });
+
+/** Sin nulos ni repetidos: un lote por clase, cada id una vez. */
+const sinNulos = (ids: readonly (string | null)[]): string[] => [
+  ...new Set(ids.filter((x): x is string => x !== null)),
+];
 
 export class ConsultarLineaDeTiempo {
   constructor(
     private readonly accesos: RepositorioEventos,
     private readonly deEquipo: RepositorioEventosDeEquipo,
+    /** D-145 · nombres de persona, vivienda y operador, por lotes. */
+    private readonly nombres: ResolutorDeNombres,
     /** R2 (15-N) · `EQUIPOS_DESVIO_DE_RELOJ_S`. Sin él, la hora es la del equipo, como antes. */
     private readonly toleranciaDeRelojS?: number,
   ) {}
@@ -150,20 +219,27 @@ export class ConsultarLineaDeTiempo {
       copropiedadId: c.copropiedadId,
       desde: c.desde,
       hasta: c.hasta,
-      viviendaId: null,
-      personaId: null,
+      viviendaId: c.viviendaId ?? null,
+      personaId: c.personaId ?? null,
       dispositivoId: c.dispositivoId,
-      zonaId: null,
+      zonaId: c.zonaId ?? null,
       tipo: null,
-      resultado: null,
-      motivo: null,
+      resultado: c.resultado ?? null,
+      motivo: c.motivo ?? null,
+      placa: c.placa ?? null,
+      operadorId: c.operadorId ?? null,
+      metodo: c.metodo ?? null,
+      identificacion: c.identificacion ?? null,
       tamanoPagina: c.limite,
       cursor: null,
     });
     if (esFallo(filtro)) return filtro;
 
-    const soloAccesos = c.tipo === 'acceso';
-    const soloEquipo = c.tipo !== null && !soloAccesos;
+    // D-145 · un filtro que sólo cumple un acceso deja fuera los de equipo; y
+    // con un tipo de equipo elegido, ninguno de ésos puede cumplirlo.
+    const soloEquipo = c.tipo !== null && c.tipo !== 'acceso';
+    if (soloEquipo && filtro.valor.soloDeAccesos) return exito({ elementos: [] });
+    const soloAccesos = c.tipo === 'acceso' || filtro.valor.soloDeAccesos;
     const [accesos, delEquipo] = await Promise.all([
       soloEquipo ? Promise.resolve([]) : this.accesos.consultar(filtro.valor).then((p) => p.filas),
       soloAccesos
@@ -178,8 +254,13 @@ export class ConsultarLineaDeTiempo {
           }),
     ]);
     const tolerancia = this.toleranciaDeRelojS;
+    const nombres = await this.nombres.resolver(c.copropiedadId, {
+      personas: sinNulos(accesos.map((a) => a.personaId)),
+      viviendas: sinNulos(accesos.map((a) => a.viviendaId)),
+      operadores: sinNulos(accesos.map((a) => a.operadorId)),
+    });
     const elementos = [
-      ...accesos.map((a) => deAcceso(a, tolerancia)),
+      ...accesos.map((a) => deAcceso(a, nombres, tolerancia)),
       ...delEquipo.map((e) => deEquipo(e, tolerancia)),
     ]
       .sort((a, b) => b.ocurridoEn.localeCompare(a.ocurridoEn))

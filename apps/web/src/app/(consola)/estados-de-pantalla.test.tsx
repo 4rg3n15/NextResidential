@@ -67,7 +67,10 @@ const PANTALLAS: readonly {
   },
   { nombre: 'zonas comunes', montar: () => <PantallaDeZonas copropiedadId={COP} /> },
   { nombre: 'dispositivos', montar: () => <PantallaDeDispositivos copropiedadId={COP} /> },
-  { nombre: 'eventos', montar: () => <PantallaDeEventos copropiedadId={COP} /> },
+  {
+    nombre: 'eventos',
+    montar: () => <PantallaDeEventos copropiedadId={COP} rol="administrador" />,
+  },
   { nombre: 'informes', montar: () => <PantallaDeInformes copropiedadId={COP} />, pedir: true },
   // Bloque 7: la configuración dejó de ser una pantalla de lectura, así que
   // entra en la misma batería. Un formulario que falla en blanco es peor que

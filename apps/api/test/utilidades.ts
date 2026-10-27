@@ -133,7 +133,7 @@ export const configuracionDePrueba: Configuracion = {
   // pasa por él, y sin ellos la ventana de alertas valía NaN (ver
   // `configuracion-de-prueba.test.ts`).
   ALERTAS_VENTANA_DEDUP_S: 600,
-  GUARDIA_VIGENCIA_EN_COLA_S: 300,
+  GUARDIA_VIGENCIA_EN_COLA_S: 3600,
   GUARDIA_AUDIO_TRANSPORTE: 'websocket',
   EQUIPOS_DESVIO_DE_RELOJ_S: 30,
   ROSTRO_RESIDENTE_RETENCION_DIAS: 365,

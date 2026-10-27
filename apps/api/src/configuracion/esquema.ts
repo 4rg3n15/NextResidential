@@ -354,9 +354,12 @@ export const esquemaConfiguracion = z.object({
   ALERTAS_VENTANA_DEDUP_S: z.coerce.number().int().min(0).max(86_400).default(600),
   /**
    * G1 (15-N) · cuánto sigue en la cola de atención algo que nadie atendió.
-   * Después sale de la cola y queda en Eventos. 5 minutos por omisión (P-22).
+   * Después sale de la cola y queda en Eventos. D-144 · una hora por omisión
+   * (decisión del cliente, 23/10; antes 5 minutos), entre 1 minuto y 24 horas.
+   * Debe coincidir con `VIGENCIA_EN_COLA_POR_OMISION_S` (lo comprueba
+   * `esquema.test.ts`).
    */
-  GUARDIA_VIGENCIA_EN_COLA_S: z.coerce.number().int().min(30).max(3600).default(300),
+  GUARDIA_VIGENCIA_EN_COLA_S: z.coerce.number().int().min(60).max(86_400).default(3600),
   /**
    * 15-P · por dónde viaja el audio de la guardia (ADR-01, enmienda 15-P).
    *  · `websocket` (por omisión desde la medida de la 15-P): un canal ordenado

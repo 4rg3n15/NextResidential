@@ -31,6 +31,7 @@ import {
 import type { EventoRegistrado, PaginaDeEventos } from '../aplicacion/puertos';
 import { CanalEnProceso } from '../infraestructura/canal-en-proceso';
 import { ConsultaEventosDto, ExportacionEventosDto } from './dtos';
+import { criteriosDeAcceso } from './criterios-de-acceso';
 import { PaginaDeEventosDto, UrlDeEvidenciaDto } from './respuestas';
 import { ErrorApiDto } from '../../comun/respuestas';
 import { aCsv, aExcel, aPdf } from './formatos';
@@ -178,13 +179,9 @@ const criteriosDe = (
   copropiedadId,
   desde: new Date(dto.desde),
   hasta: new Date(dto.hasta),
-  viviendaId: dto.viviendaId ?? null,
-  personaId: dto.personaId ?? null,
   dispositivoId: dto.dispositivoId ?? null,
-  zonaId: dto.zonaId ?? null,
   tipo: dto.tipo ?? null,
-  resultado: dto.resultado ?? null,
-  motivo: dto.motivo ?? null,
+  ...criteriosDeAcceso(dto),
   ...(dto.tamanoPagina === undefined ? {} : { tamanoPagina: dto.tamanoPagina }),
   cursor: dto.cursor ?? null,
 });

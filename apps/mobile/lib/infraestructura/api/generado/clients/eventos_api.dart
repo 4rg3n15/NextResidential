@@ -9,7 +9,9 @@ import 'package:retrofit/retrofit.dart';
 
 import '../models/billete_del_flujo_dto.dart';
 import '../models/formato.dart';
+import '../models/identificacion.dart';
 import '../models/linea_de_tiempo_dto.dart';
+import '../models/metodo.dart';
 import '../models/motivo.dart';
 import '../models/pagina_de_eventos_dto.dart';
 import '../models/resultado.dart';
@@ -24,6 +26,12 @@ abstract class EventosApi {
 
   /// Historial filtrado y paginado por cursor (HU-32).
   ///
+  /// [placa] - Placa, con o sin guiones ni espacios.
+  ///
+  /// [operadorId] - Quién abrió o negó a mano.
+  ///
+  /// [identificacion] - `conocida`: el evento identificó a una persona; `desconocida`: no.
+  ///
   /// [desde] - Inicio del rango, ISO-8601 con zona.
   ///
   /// [hasta] - Fin del rango, EXCLUIDO.
@@ -36,11 +44,15 @@ abstract class EventosApi {
     @Query('hasta') required String hasta,
     @Query('viviendaId') String? viviendaId,
     @Query('personaId') String? personaId,
-    @Query('dispositivoId') String? dispositivoId,
     @Query('zonaId') String? zonaId,
-    @Query('tipo') Tipo2? tipo,
     @Query('resultado') Resultado? resultado,
     @Query('motivo') Motivo? motivo,
+    @Query('placa') String? placa,
+    @Query('operadorId') String? operadorId,
+    @Query('metodo') Metodo? metodo,
+    @Query('identificacion') Identificacion? identificacion,
+    @Query('dispositivoId') String? dispositivoId,
+    @Query('tipo') Tipo2? tipo,
     @Query('tamanoPagina') num? tamanoPagina,
     @Query('cursor') String? cursor,
   });
@@ -52,6 +64,12 @@ abstract class EventosApi {
   });
 
   /// Exporta el historial en CSV, Excel o PDF (HU-32).
+  ///
+  /// [placa] - Placa, con o sin guiones ni espacios.
+  ///
+  /// [operadorId] - Quién abrió o negó a mano.
+  ///
+  /// [identificacion] - `conocida`: el evento identificó a una persona; `desconocida`: no.
   ///
   /// [desde] - Inicio del rango, ISO-8601 con zona.
   ///
@@ -67,11 +85,15 @@ abstract class EventosApi {
     @Query('formato') required Formato formato,
     @Query('viviendaId') String? viviendaId,
     @Query('personaId') String? personaId,
-    @Query('dispositivoId') String? dispositivoId,
     @Query('zonaId') String? zonaId,
-    @Query('tipo') Tipo2? tipo,
     @Query('resultado') Resultado? resultado,
     @Query('motivo') Motivo? motivo,
+    @Query('placa') String? placa,
+    @Query('operadorId') String? operadorId,
+    @Query('metodo') Metodo? metodo,
+    @Query('identificacion') Identificacion? identificacion,
+    @Query('dispositivoId') String? dispositivoId,
+    @Query('tipo') Tipo2? tipo,
     @Query('tamanoPagina') num? tamanoPagina,
     @Query('cursor') String? cursor,
   });
@@ -85,6 +107,12 @@ abstract class EventosApi {
 
   /// Accesos y eventos de equipo en una sola línea de tiempo, con filtros (Bloque B).
   ///
+  /// [placa] - Placa, con o sin guiones ni espacios.
+  ///
+  /// [operadorId] - Quién abrió o negó a mano.
+  ///
+  /// [identificacion] - `conocida`: el evento identificó a una persona; `desconocida`: no.
+  ///
   /// [desde] - Inicio del rango, ISO-8601 con zona.
   ///
   /// [hasta] - Fin del rango, EXCLUIDO.
@@ -95,6 +123,15 @@ abstract class EventosApi {
     @Path('id') required String id,
     @Query('desde') required String desde,
     @Query('hasta') required String hasta,
+    @Query('viviendaId') String? viviendaId,
+    @Query('personaId') String? personaId,
+    @Query('zonaId') String? zonaId,
+    @Query('resultado') Resultado? resultado,
+    @Query('motivo') Motivo? motivo,
+    @Query('placa') String? placa,
+    @Query('operadorId') String? operadorId,
+    @Query('metodo') Metodo? metodo,
+    @Query('identificacion') Identificacion? identificacion,
     @Query('dispositivoId') String? dispositivoId,
     @Query('tipo') String? tipo,
     @Query('limite') num? limite,

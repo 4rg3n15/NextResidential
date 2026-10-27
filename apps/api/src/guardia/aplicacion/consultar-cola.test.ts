@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ConsultarColaDeAtencion, MARGEN_DE_RELOJ_MS } from './consultar-cola';
 import type { FuenteDeLaCola } from './consultar-cola';
+import { VIGENCIA_EN_COLA_POR_OMISION_S } from './cola-de-atencion';
 import type { MaterialDeLaCola } from './cola-de-atencion';
 import type { RepositorioDePreferenciasDeAtencion } from './preferencias-de-atencion';
 
@@ -20,7 +21,7 @@ const montar = (material: MaterialDeLaCola, guardadas: unknown = null) => {
   };
   return {
     pedidos,
-    caso: (vigencia?: number) =>
+    caso: (vigencia = VIGENCIA_EN_COLA_POR_OMISION_S) =>
       new ConsultarColaDeAtencion(fuente, preferencias, { ahora: () => AHORA }, vigencia),
   };
 };

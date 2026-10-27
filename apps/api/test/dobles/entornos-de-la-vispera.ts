@@ -31,7 +31,7 @@ export const repositorio = (api: string | null, consola: Readonly<Record<string,
 
 export const API_COMPLETA = [
   'GUARDIA_AUDIO_TRANSPORTE=websocket',
-  'GUARDIA_VIGENCIA_EN_COLA_S=300',
+  'GUARDIA_VIGENCIA_EN_COLA_S=3600',
   'EVENTOS_HISTORICOS_LOTE=500',
   'EVENTOS_HISTORICOS_POR_SEGUNDO=500',
   'PGBOSS_POOL_MAX=2',

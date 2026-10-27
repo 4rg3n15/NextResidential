@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConsultarLineaDeTiempo } from './aplicacion/linea-de-tiempo';
+import { ResolutorDeNombresSinBase } from './aplicacion/nombres-de-eventos';
+import { ResolutorDeNombresPg } from './infraestructura/resolutor-de-nombres-pg';
 import { LineaDeTiempoController } from './presentacion/linea-de-tiempo.controller';
 import {
   REGISTRO_DE_EVENTOS_DE_EQUIPO,
@@ -408,12 +410,22 @@ export class EventosModule {
         },
         {
           provide: ConsultarLineaDeTiempo,
-          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO, CONFIGURACION],
+          inject: [REPOSITORIO_EVENTOS, REPOSITORIO_EVENTOS_DE_EQUIPO, CONFIGURACION, Pool],
           useFactory: (
             repo: RepositorioEventos,
             deEquipo: RepositorioEventosDeEquipo,
             config: Configuracion,
-          ) => new ConsultarLineaDeTiempo(repo, deEquipo, config.EQUIPOS_DESVIO_DE_RELOJ_S),
+            pool: Pool,
+          ) =>
+            new ConsultarLineaDeTiempo(
+              repo,
+              deEquipo,
+              // D-145 · con el mismo interruptor que el histórico de accesos.
+              config.PERSISTENCIA_DE_EVENTOS === 'postgres'
+                ? new ResolutorDeNombresPg(pool)
+                : new ResolutorDeNombresSinBase(),
+              config.EQUIPOS_DESVIO_DE_RELOJ_S,
+            ),
         },
         {
           provide: ExportarEventos,

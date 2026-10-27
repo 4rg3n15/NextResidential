@@ -1175,6 +1175,37 @@ CHECK ( tipo <> 'manual' OR (operador_id IS NOT NULL
 
 Sin columnas de baja lógica: un evento no se desactiva. Y sin `actualizado_en` ni `actualizado_por`: no hay actualización posible.
 
+**D-145 · migración 0059 · índices del buscador.** El buscador de la consola filtra por
+placa y por operador, y ninguno de los índices de la 0011 empezaba por esas columnas. Se
+añaden dos índices **parciales**, que solo indexan las filas que pueden coincidir:
+
+```
+eventos_por_placa_idx    (copropiedad_id, placa_detectada, ocurrido_en DESC) WHERE placa_detectada IS NOT NULL
+eventos_por_operador_idx (copropiedad_id, operador_id,     ocurrido_en DESC) WHERE operador_id IS NOT NULL
+```
+
+Al crearse sobre la tabla particionada, cada partición mensual los hereda. Son índices y
+nada más: ni columnas nuevas ni `UPDATE`. La persona, la vivienda y el operador se nombran
+**al consultar**, por lotes (`ResolutorDeNombresPg`), no copiando nombres en `eventos`.
+Prueba: `99o_indices_del_buscador_de_eventos.sql`; reversión `supabase/reversion/0059_revert.sql`.
+
+**D-145 · migración 0060 · el servicio nombra a quien actuó en su copropiedad.** La 0054
+sólo dejaba al servicio de X leer los usuarios cuya copropiedad es X. Con eso quedaban sin
+nombre, en el historial, el **operador de central** que atiende X por una asignación en
+`roles_usuario` y el **superadministrador** (sin copropiedad). Por decisión del cliente
+(26/10) se amplía la lectura del SERVICIO y de nadie más:
+
+- `roles_usuario_lectura_servicio`: lee los roles de X y los de superadministrador. Hace
+  falta porque, con `FORCE`, la RLS de `roles_usuario` se aplica también dentro de la
+  política de `usuarios` (0018).
+- `usuarios_lectura_servicio_por_rol`: lee a quien tiene o **tuvo** un rol en X (un evento
+  antiguo conserva su autor aunque el turno haya terminado) y a los superadministradores.
+
+Las dos exigen `app.rol() = 'servicio'`, así que los demás roles no ganan nada. El servicio
+de X sigue sin ver a un usuario de otra copropiedad sin rol en X, ni a los actores de sistema
+sin copropiedad. Sólo lectura. Prueba: `99p_servicio_lee_operadores.sql`, que falla con la
+0060 revertida; `99k` se ajustó a la decisión. Reversión: `supabase/reversion/0060_revert.sql`.
+
 #### `evidencias` — tenant ✔
 
 | Columna                   | Tipo                      | Restricción                                                          | Justificación                                      |
