@@ -14,9 +14,10 @@ import type { Rol } from '@ncr/contracts';
  * consulta. Si el navegador no deja guardar (modo privado, almacenamiento
  * bloqueado), la vista sigue limpia mientras dure la página, y nada falla.
  *
- * PENDIENTE DE DEFINICIÓN (P-42) · que la API niegue al portero el historial anterior
- * a su día. Hoy el corte es de la interfaz: la API le sigue respondiendo el
- * rango que pida (la autorización por rol de `/eventos` no cambia en este PR).
+ * D-146 · decisión del cliente (27/10): el corte es SÓLO de la vista del día.
+ * El portero puede consultar, buscar y filtrar días anteriores como la
+ * administración; en cuanto toca las fechas o un filtro, este corte no aplica
+ * (`rangoDeLaVista`). P-42 queda resuelta: la API no restringe por fecha.
  */
 export const ROLES_CON_VISTA_LIMPIABLE: readonly Rol[] = ['portero'];
 
