@@ -1688,7 +1688,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Autorizo a un visitante con su foto y la casilla (F1, F4) */
+        /** Autorizo a un visitante con su placa o su foto y la casilla (F1, F4, D-143) */
         post: operations["MisVisitasController_crear"];
         delete?: never;
         options?: never;
@@ -1722,7 +1722,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Vuelvo a autorizar a un visitante anterior con su foto (F6) */
+        /** Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143) */
         post: operations["MisVisitasController_repetir"];
         delete?: never;
         options?: never;
@@ -2520,7 +2520,7 @@ export interface paths {
         /** Visitas: las del día en portería; con filtros en administración */
         get: operations["VisitasController_lista"];
         put?: never;
-        /** Genera la autorización de un visitante con su foto (F1, F2, F3, F4) */
+        /** Genera la autorización de un visitante con su placa o su foto (F1–F4, D-143) */
         post: operations["VisitasController_crear"];
         delete?: never;
         options?: never;
@@ -4531,15 +4531,15 @@ export interface components {
             duracionMinutos: number;
             placa?: string | null;
             observaciones?: string | null;
-            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
-            casillaMarcada: boolean;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora. */
+            casillaMarcada?: boolean;
             nombre: string;
             /** @enum {string} */
             tipoDocumento: "cedula" | "cedula_extranjeria" | "pasaporte" | "otro";
             documento: string;
             /** Format: uuid */
             viviendaId: string;
-            foto: components["schemas"]["FotoDeVisitaDto"];
+            foto?: components["schemas"]["FotoDeVisitaDto"];
         };
         GrupoProyectadoDto: {
             agrupacion: string | null;
@@ -4905,11 +4905,11 @@ export interface components {
             duracionMinutos: number;
             placa?: string | null;
             observaciones?: string | null;
-            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria. */
-            casillaMarcada: boolean;
+            /** @description La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora. */
+            casillaMarcada?: boolean;
             nombre: string;
             documento: string;
-            foto: components["schemas"]["FotoDeVisitaDto"];
+            foto?: components["schemas"]["FotoDeVisitaDto"];
             /** @description La reusa cada reintento sin conexión */
             claveDeIdempotencia: string;
         };
@@ -5489,7 +5489,7 @@ export interface components {
             /** Format: date-time */
             inicio: string;
             duracionMinutos: number;
-            casillaMarcada: boolean;
+            casillaMarcada?: boolean;
             claveDeIdempotencia: string;
         };
         ReservaDelDiaDto: {

@@ -10,16 +10,18 @@ GenerarVisitaDto _$GenerarVisitaDtoFromJson(Map<String, dynamic> json) =>
     GenerarVisitaDto(
       inicio: DateTime.parse(json['inicio'] as String),
       duracionMinutos: json['duracionMinutos'] as num,
-      casillaMarcada: json['casillaMarcada'] as bool,
       nombre: json['nombre'] as String,
       tipoDocumento: GenerarVisitaDtoTipoDocumento.fromJson(
         json['tipoDocumento'] as String,
       ),
       documento: json['documento'] as String,
       viviendaId: json['viviendaId'] as String,
-      foto: FotoDeVisitaDto.fromJson(json['foto'] as Map<String, dynamic>),
       placa: json['placa'] as String?,
       observaciones: json['observaciones'] as String?,
+      casillaMarcada: json['casillaMarcada'] as bool?,
+      foto: json['foto'] == null
+          ? null
+          : FotoDeVisitaDto.fromJson(json['foto'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$GenerarVisitaDtoToJson(GenerarVisitaDto instance) =>

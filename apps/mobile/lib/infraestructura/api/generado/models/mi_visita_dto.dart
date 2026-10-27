@@ -13,13 +13,13 @@ class MiVisitaDto {
   const MiVisitaDto({
     required this.inicio,
     required this.duracionMinutos,
-    required this.casillaMarcada,
     required this.nombre,
     required this.documento,
-    required this.foto,
     required this.claveDeIdempotencia,
     this.placa,
     this.observaciones,
+    this.casillaMarcada,
+    this.foto,
   });
   
   factory MiVisitaDto.fromJson(Map<String, Object?> json) => _$MiVisitaDtoFromJson(json);
@@ -30,11 +30,11 @@ class MiVisitaDto {
   final String? placa;
   final String? observaciones;
 
-  /// La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria.
-  final bool casillaMarcada;
+  /// La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora.
+  final bool? casillaMarcada;
   final String nombre;
   final String documento;
-  final FotoDeVisitaDto foto;
+  final FotoDeVisitaDto? foto;
 
   /// La reusa cada reintento sin conexión
   final String claveDeIdempotencia;

@@ -15,7 +15,7 @@ export {
   textoDeLaCasilla,
 } from './aplicacion/rostro-de-visita';
 export type { FotoDeVisita, RostroRegistrado } from './aplicacion/rostro-de-visita';
-export { hastaDe, revisarForma } from './aplicacion/generar-visita';
+export { MENSAJE_PLACA_O_FOTO, hastaDe, revisarForma } from './aplicacion/generar-visita';
 export { confirmacionDePlaca, momentoCorto } from './aplicacion/confirmacion-de-placa';
 export type { VisitanteReciente } from './aplicacion/puertos';
 export { RUTAS_CON_FOTO_DE_VISITA } from './presentacion/limites';

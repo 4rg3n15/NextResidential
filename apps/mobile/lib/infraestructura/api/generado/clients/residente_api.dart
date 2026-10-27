@@ -293,7 +293,7 @@ abstract class ResidenteApi {
     @Body() required AltaDeMiViviendaDto body,
   });
 
-  /// Autorizo a un visitante con su foto y la casilla (F1, F4)
+  /// Autorizo a un visitante con su placa o su foto y la casilla (F1, F4, D-143)
   @POST('/copropiedades/{id}/mi/visitas')
   Future<MiVisitaGeneradaDto> misVisitasControllerCrear({
     @Path('id') required String id,
@@ -306,7 +306,7 @@ abstract class ResidenteApi {
     @Path('id') required String id,
   });
 
-  /// Vuelvo a autorizar a un visitante anterior con su foto (F6)
+  /// Vuelvo a autorizar a un visitante anterior con su foto o su placa (F6, D-143)
   @POST('/copropiedades/{id}/mi/visitas/{autorizacionId}/repeticion')
   Future<MiVisitaGeneradaDto> misVisitasControllerRepetir({
     @Path('id') required String id,

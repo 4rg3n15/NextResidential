@@ -402,6 +402,91 @@ describe('F1 · generar autorización desde la consola', () => {
   });
 });
 
+/**
+ * D-143 · decisión del cliente (23/10): placa o foto, al menos una. Sin foto
+ * la visita vale por placa: ni foto guardada, ni casilla, ni plantilla, ni
+ * consentimiento. Se comprueba en la BASE, no en la respuesta.
+ */
+describe('D-143 · visita con placa y sin foto', () => {
+  const placa = `V${CORRIDA}`;
+  const sinFoto = { foto: undefined, casillaMarcada: undefined };
+
+  it('consola · sin foto ni casilla, con placa: vigente y sin nada biométrico', async () => {
+    if (omitida()) return;
+    const r = await con(portero).post(
+      `/copropiedades/${COP_A}/visitas`,
+      visita(9, { ...sinFoto, placa }),
+    );
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ generada: true, equipos: 0, porEquipo: [] });
+    const id = r.body.autorizacionId as string;
+    const a = await fila<{
+      estado: string;
+      placa: string | null;
+      por: string | null;
+      foto: string | null;
+    }>(
+      `SELECT estado::text, placa, consentimiento_declarado_por AS por, evidencia_foto_id AS foto
+         FROM public.autorizaciones WHERE id = $1`,
+      [id],
+    );
+    expect(a).toMatchObject({ estado: 'activa', placa, por: null, foto: null });
+    const plantillas = await fila<{ n: string }>(
+      'SELECT count(*) AS n FROM public.plantillas_biometricas WHERE autorizacion_id = $1',
+      [id],
+    );
+    expect(Number(plantillas?.n)).toBe(0);
+  });
+
+  it('consola · sin placa ni foto: 422 con el motivo, y no se crea nada', async () => {
+    if (omitida()) return;
+    const r = await con(portero).post(`/copropiedades/${COP_A}/visitas`, visita(10, sinFoto));
+    expect(r.status).toBe(422);
+    expect(JSON.stringify(r.body)).toMatch(/Indique la placa del vehículo o la foto del visitante/);
+    expect(await cuantas(10)).toBe(0);
+  });
+
+  it('app · el residente también: con placa y sin foto, creada y sin plantilla', async () => {
+    if (omitida()) return;
+    const r = await con(residente).post(
+      `/copropiedades/${COP_A}/mi/visitas`,
+      // Otro nombre: F5/F7 cuenta los «Visitante <corrida>» de cada vivienda.
+      visitaDeLaApp(11, { ...sinFoto, placa: `W${CORRIDA}`, nombre: `Con placa ${CORRIDA}` }),
+    );
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ creada: true, repetida: false, equipos: 0 });
+    const plantillas = await fila<{ n: string }>(
+      'SELECT count(*) AS n FROM public.plantillas_biometricas WHERE autorizacion_id = $1',
+      [r.body.id as string],
+    );
+    expect(Number(plantillas?.n)).toBe(0);
+  });
+
+  it('app · y se vuelve a autorizar por la placa, sin casilla ni foto', async () => {
+    if (omitida()) return;
+    const ultimas = await con(residente).get(`/copropiedades/${COP_A}/mi/visitas/ultimas`);
+    const anterior = (
+      ultimas.body as { autorizacionId: string; visitante: string; tieneFoto: boolean }[]
+    ).find((v) => v.visitante === `Con placa ${CORRIDA}`);
+    expect(anterior?.tieneFoto).toBe(false);
+    const r = await con(residente).post(
+      `/copropiedades/${COP_A}/mi/visitas/${anterior?.autorizacionId ?? ''}/repeticion`,
+      {
+        inicio: new Date(Date.now() + 86_400_000).toISOString(),
+        duracionMinutos: 60,
+        claveDeIdempotencia: `repite-placa-${CORRIDA}-${randomUUID()}`,
+      },
+    );
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({ creada: true });
+    const nueva = await fila<{ placa: string | null; foto: string | null }>(
+      'SELECT placa, evidencia_foto_id AS foto FROM public.autorizaciones WHERE id = $1',
+      [r.body.id as string],
+    );
+    expect(nueva).toEqual({ placa: `W${CORRIDA}`, foto: null });
+  });
+});
+
 describe('F5 y F7 · la lista', () => {
   let manana = '';
 

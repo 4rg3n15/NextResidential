@@ -10,8 +10,8 @@ RepetirVisitaDto _$RepetirVisitaDtoFromJson(Map<String, dynamic> json) =>
     RepetirVisitaDto(
       inicio: DateTime.parse(json['inicio'] as String),
       duracionMinutos: json['duracionMinutos'] as num,
-      casillaMarcada: json['casillaMarcada'] as bool,
       claveDeIdempotencia: json['claveDeIdempotencia'] as String,
+      casillaMarcada: json['casillaMarcada'] as bool?,
     );
 
 Map<String, dynamic> _$RepetirVisitaDtoToJson(RepetirVisitaDto instance) =>

@@ -104,6 +104,9 @@ const rellenar = async (): Promise<void> => {
 describe('Generar autorización (F1, F4)', () => {
   it('la casilla nombra al visitante con el nombre del formulario (ADR-032)', async () => {
     montar();
+    // D-143 · la casilla es el consentimiento de la FOTO: sin foto no aparece.
+    expect(screen.queryByLabelText(/Declaro que/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Tomar foto' }));
     // Sin nombre todavía: «el visitante», nunca el marcador.
     expect(
       await screen.findByLabelText(
@@ -123,10 +126,11 @@ describe('Generar autorización (F1, F4)', () => {
     expect(screen.queryByText(/\{visitante\}/)).toBeNull();
   });
 
-  it('sin foto no se envía, y sin la casilla tampoco', async () => {
+  it('sin placa ni foto no se envía y se avisa; con foto, sin la casilla tampoco', async () => {
     montar();
     await rellenar();
     expect(enviar().disabled).toBe(true);
+    expect(screen.getByRole('note').textContent).toMatch(/placa del vehículo, la foto/);
     fireEvent.click(screen.getByRole('button', { name: 'Tomar foto' }));
     expect(enviar().disabled, 'sin la casilla marcada no se envía').toBe(true);
     fireEvent.click(screen.getByLabelText(/Declaro que Ana Pérez me autorizó a usar su foto/));
@@ -159,6 +163,33 @@ describe('Generar autorización (F1, F4)', () => {
       await screen.findByText(/Foto enviada a 2 de 3 equipos; 1 no la aceptaron/),
     ).toBeTruthy();
     expect(screen.getByText(/Videoportero: no respondió/)).toBeTruthy();
+  });
+
+  it('D-143 · con placa y sin foto se envía sin foto ni casilla, y se dice que entra por placa', async () => {
+    respuesta = {
+      generada: true,
+      autorizacionId: 'a0000000-0000-4000-8000-000000000010',
+      motivosDeFoto: [],
+      equipos: 0,
+      sincronizadas: 0,
+      fallidas: 0,
+      porEquipo: [],
+      avisoDeSincronizacion: null,
+      confirmacionDePlaca: 'Placa ABC123 registrada para la visita de Ana Pérez',
+    };
+    montar();
+    await rellenar();
+    fireEvent.change(screen.getByLabelText(/Placa del vehículo/), { target: { value: 'abc123' } });
+    expect(screen.queryByLabelText(/Declaro que/)).toBeNull();
+    expect(enviar().disabled).toBe(false);
+    fireEvent.click(enviar());
+    await waitFor(() => expect(enviados.length).toBe(1));
+    const cuerpo = (await enviados[0]!.clone().json()) as Record<string, unknown>;
+    expect(cuerpo['placa']).toBe('ABC123');
+    expect(cuerpo).not.toHaveProperty('foto');
+    expect(cuerpo).not.toHaveProperty('casillaMarcada');
+    expect(await screen.findByText(/Sin foto: el visitante entra por la placa/)).toBeTruthy();
+    expect(screen.queryByText(/Foto enviada a/)).toBeNull();
   });
 
   it('una foto que el servidor rechaza se dice con palabras, sin códigos', async () => {

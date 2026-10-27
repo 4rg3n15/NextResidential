@@ -847,25 +847,30 @@ acto.
    sistema la reconoce por su documento.
 2. **Cuándo**: fecha, hora de llegada y **duración**. Fuera de esa ventana no
    entra.
-3. **Foto frontal** del visitante, de frente y con buena luz. En la app,
-   **«Tomar foto»** con la cámara o **«Elegir de la galería»** si el visitante
-   se la envió; la de la galería se envía sin sus datos ocultos (ubicación,
-   teléfono, fecha). En la consola, el campo **«Foto frontal del visitante»**
-   (JPEG o PNG; en el teléfono ofrece la cámara). Las dos revisan la foto antes
-   de enviarla y dicen si sirve; si el navegador no sabe contar rostros, la
-   consola le pide confirmar que se ve uno solo, de frente y bien encuadrado.
-4. La casilla **«Declaro que <nombre del visitante> me autorizó a usar su foto
-   para su ingreso al conjunto»**, con el nombre que usted escribió. Sin ella
-   no se envía.
-5. **Placa** si llega en vehículo, y **observaciones** para el portero
-   (opcionales).
+3. **Placa o foto: al menos una de las dos**, y usted elige (D-143). El
+   formulario lo recuerda debajo de la placa hasta que haya una.
+   - **Placa del vehículo**, si llega en carro: la cámara de placas le da paso
+     dentro de la ventana de la visita. Con la placa basta; no hace falta foto.
+   - **Foto frontal** del visitante, de frente y con buena luz, si va a entrar
+     por reconocimiento facial. En la consola, el campo **«Foto frontal del
+     visitante (opcional si hay placa)»** (JPEG o PNG; en el teléfono ofrece la
+     cámara). La consola revisa la foto antes de enviarla y dice si sirve; si el
+     navegador no sabe contar rostros, le pide confirmar que se ve uno solo, de
+     frente y bien encuadrado. La app nativa, suspendida, sigue pidiendo foto.
+4. **Sólo si puso foto**, la casilla **«Declaro que <nombre del visitante> me
+   autorizó a usar su foto para su ingreso al conjunto»**, con el nombre que
+   usted escribió. Con foto y sin ella no se envía; sin foto no aparece, porque
+   no hay dato biométrico que autorizar.
+5. **Observaciones** para el portero (opcionales).
 
 En la consola se envía con **«Registrar visita»**; mientras falte algo, el
 formulario dice qué («Falta: …»).
 
 **Últimos visitantes → Volver a autorizar**: para alguien que ya vino, se
-copian sus datos y su foto y sólo se le pide fecha, hora, duración y la casilla.
-Sin foto guardada no se puede: se registra como visitante nuevo.
+copian sus datos, su placa y su foto y sólo se le pide fecha, hora, duración y
+la casilla. Si vino sólo con placa, se vuelve a autorizar por la placa y no hay
+casilla que marcar. Sin foto ni placa guardadas no se puede: se registra como
+visitante nuevo.
 
 Debería llevarle **menos de un minuto** (KPI-10).
 

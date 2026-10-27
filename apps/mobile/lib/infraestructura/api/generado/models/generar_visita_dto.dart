@@ -14,14 +14,14 @@ class GenerarVisitaDto {
   const GenerarVisitaDto({
     required this.inicio,
     required this.duracionMinutos,
-    required this.casillaMarcada,
     required this.nombre,
     required this.tipoDocumento,
     required this.documento,
     required this.viviendaId,
-    required this.foto,
     this.placa,
     this.observaciones,
+    this.casillaMarcada,
+    this.foto,
   });
   
   factory GenerarVisitaDto.fromJson(Map<String, Object?> json) => _$GenerarVisitaDtoFromJson(json);
@@ -32,13 +32,13 @@ class GenerarVisitaDto {
   final String? placa;
   final String? observaciones;
 
-  /// La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria.
-  final bool casillaMarcada;
+  /// La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria si se envía foto; sin foto se ignora.
+  final bool? casillaMarcada;
   final String nombre;
   final GenerarVisitaDtoTipoDocumento tipoDocumento;
   final String documento;
   final String viviendaId;
-  final FotoDeVisitaDto foto;
+  final FotoDeVisitaDto? foto;
 
   Map<String, Object?> toJson() => _$GenerarVisitaDtoToJson(this);
 }

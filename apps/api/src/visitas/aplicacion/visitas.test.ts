@@ -123,12 +123,14 @@ const ROSTRO: RostroRegistrado = {
 };
 
 describe('revisarForma y revisarFoto · antes de crear nada', () => {
-  it('sin la casilla, o con una duración fuera de 15 min – 24 h, no hay visita', () => {
-    expect(esFallo(revisarForma(false, 60))).toBe(true);
-    expect(esFallo(revisarForma(true, 14))).toBe(true);
-    expect(esFallo(revisarForma(true, 24 * 60 + 1))).toBe(true);
-    expect(esFallo(revisarForma(true, 30.5))).toBe(true);
-    expect(esFallo(revisarForma(true, 15))).toBe(false);
+  it('con foto y sin la casilla, o con una duración fuera de 15 min – 24 h, no hay visita', () => {
+    const conFoto = (casillaMarcada: boolean, duracionMinutos: number) =>
+      revisarForma({ casillaMarcada, duracionMinutos, placa: null, conFoto: true });
+    expect(esFallo(conFoto(false, 60))).toBe(true);
+    expect(esFallo(conFoto(true, 14))).toBe(true);
+    expect(esFallo(conFoto(true, 24 * 60 + 1))).toBe(true);
+    expect(esFallo(conFoto(true, 30.5))).toBe(true);
+    expect(esFallo(conFoto(true, 15))).toBe(false);
   });
 
   it('la foto se comprueba por su tipo real, su tamaño y su calidad', () => {

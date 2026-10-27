@@ -117,7 +117,9 @@ export class VisitasController {
   @MideKpi('KPI-09')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Roles(...CONSOLA)
-  @ApiOperation({ summary: 'Genera la autorización de un visitante con su foto (F1, F2, F3, F4)' })
+  @ApiOperation({
+    summary: 'Genera la autorización de un visitante con su placa o su foto (F1–F4, D-143)',
+  })
   @ApiOkResponse({ type: VisitaGeneradaDto })
   async crear(
     @Contexto() ctx: ContextoTenant,
@@ -137,8 +139,8 @@ export class VisitasController {
         duracionMinutos: dto.duracionMinutos,
         placa: dto.placa ?? null,
         observaciones: dto.observaciones ?? null,
-        foto: dto.foto,
-        casillaMarcada: dto.casillaMarcada,
+        foto: dto.foto ?? null,
+        casillaMarcada: dto.casillaMarcada ?? false,
       }),
     );
     return aGenerada(r);

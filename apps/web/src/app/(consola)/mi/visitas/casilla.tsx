@@ -49,9 +49,14 @@ export const CasillaDeLaFoto = ({
   </label>
 );
 
-/** Lo que el servidor contestó al registrar: 200 con motivo, o creada con su sincronización. */
+/**
+ * Lo que el servidor contestó al registrar: 200 con motivo, o creada con su
+ * sincronización. `conFoto` en falso (D-143): no hay equipos de qué hablar, la
+ * visita vale por placa.
+ */
 export const desenlaceDe = (
   r: MiVisitaGenerada,
+  conFoto = true,
 ): { readonly error?: string; readonly exito?: string } => {
   if (!r.creada) {
     if (r.motivosDeFoto.length > 0) {
@@ -64,6 +69,12 @@ export const desenlaceDe = (
     return {
       exito:
         'Esta visita ya estaba registrada: se había enviado antes y el conjunto la conservó. No se creó una segunda.',
+    };
+  }
+  if (!conFoto) {
+    return {
+      exito:
+        'Visita autorizada. La portería ya puede verla. Sin foto: entra por la placa, no por reconocimiento facial.',
     };
   }
   const equipos =

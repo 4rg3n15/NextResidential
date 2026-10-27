@@ -37,16 +37,19 @@ const Reciente = ({
           .filter((x): x is string => x !== null)
           .join(' · ')}
       </p>
+      {/* D-143 · sin foto se repite por la placa; sin ninguna de las dos, no. */}
       {!v.tieneFoto ? (
         <p className="text-secundario text-texto-apagado">
-          No hay una foto guardada: regístralo como visitante nuevo.
+          {v.placa === null
+            ? 'No hay foto ni placa guardadas: regístralo como visitante nuevo.'
+            : 'Sin foto guardada: se vuelve a autorizar por su placa.'}
         </p>
       ) : null}
       <div className="flex justify-end">
         <Boton
           variante="secundario"
           tamano="sm"
-          disabled={!v.tieneFoto}
+          disabled={!v.tieneFoto && v.placa === null}
           onClick={() => alVolver(v)}
         >
           Volver a autorizar

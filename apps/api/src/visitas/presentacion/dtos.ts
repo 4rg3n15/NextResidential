@@ -102,13 +102,19 @@ class FormaDeVisitaDto {
   @MaxLength(1000)
   observaciones?: string | null;
 
-  @ApiProperty({
+  /** D-143 · sólo con foto (RN-10); lo exige `revisarForma`, no el DTO. */
+  @ApiPropertyOptional({
     description:
-      'La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria.',
+      'La casilla «El visitante autorizó el uso de su foto para el ingreso». Obligatoria ' +
+      'si se envía foto; sin foto se ignora.',
   })
+  @IsOptional()
   @IsBoolean()
-  casillaMarcada!: boolean;
+  casillaMarcada?: boolean;
 }
+
+/** D-143 · placa o foto lo exige `revisarForma` (§2.7.3). Sin `description`: daría un `allOf`. */
+const FOTO_OPCIONAL = { type: FotoDeVisitaDto } as const;
 
 export class GenerarVisitaDto extends FormaDeVisitaDto {
   @ApiProperty({ minLength: 3, maxLength: 120 })
@@ -131,10 +137,11 @@ export class GenerarVisitaDto extends FormaDeVisitaDto {
   @IsUUID()
   viviendaId!: string;
 
-  @ApiProperty({ type: FotoDeVisitaDto })
+  @ApiPropertyOptional(FOTO_OPCIONAL)
+  @IsOptional()
   @ValidateNested()
   @Type(() => FotoDeVisitaDto)
-  foto!: FotoDeVisitaDto;
+  foto?: FotoDeVisitaDto;
 }
 
 /** F1 en la app: la vivienda sale del vínculo del residente, nunca del cuerpo. */
@@ -151,10 +158,11 @@ export class MiVisitaDto extends FormaDeVisitaDto {
   @MaxLength(32)
   documento!: string;
 
-  @ApiProperty({ type: FotoDeVisitaDto })
+  @ApiPropertyOptional(FOTO_OPCIONAL)
+  @IsOptional()
   @ValidateNested()
   @Type(() => FotoDeVisitaDto)
-  foto!: FotoDeVisitaDto;
+  foto?: FotoDeVisitaDto;
 
   @ApiProperty({
     minLength: 8,
@@ -179,9 +187,11 @@ export class RepetirVisitaDto {
   @Max(DURACION_MAXIMA_MINUTOS, { message: 'La visita no puede durar más de 24 horas' })
   duracionMinutos!: number;
 
-  @ApiProperty()
+  /** D-143 · sólo si la visita anterior tenía foto: una de sólo placa no la pide. */
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean()
-  casillaMarcada!: boolean;
+  casillaMarcada?: boolean;
 
   @ApiProperty({ minLength: 8, maxLength: 128 })
   @IsString()

@@ -11,6 +11,9 @@
  *
  * Ya no hay enlace para el visitante ni espera: la casilla es la constancia
  * (ADR-032) y la visita nace vigente (F2).
+ *
+ * D-143 · la foto es opcional: placa o foto, al menos una. Sin foto la visita
+ * vale por placa y la segunda mitad no se ejecuta.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 import { errorDominio, esFallo, exito, fallo } from '@ncr/domain-core';
@@ -43,7 +46,8 @@ export interface EntradaDeMiVisita {
   readonly duracionMinutos: number;
   readonly placa: string | null;
   readonly observaciones: string | null;
-  readonly foto: FotoDeVisita;
+  /** D-143 · opcional: placa o foto, al menos una (`revisarForma`). */
+  readonly foto: FotoDeVisita | null;
   readonly casillaMarcada: boolean;
   readonly claveDeIdempotencia: string;
 }
@@ -72,11 +76,18 @@ export class GenerarMiVisita {
     copropiedadId: string,
     entrada: EntradaDeMiVisita,
   ): Promise<Resultado<ResultadoDeMiVisita, ErrorDominio>> {
-    const forma = revisarForma(entrada.casillaMarcada, entrada.duracionMinutos);
+    const forma = revisarForma({
+      casillaMarcada: entrada.casillaMarcada,
+      duracionMinutos: entrada.duracionMinutos,
+      placa: entrada.placa,
+      conFoto: entrada.foto !== null,
+    });
     if (esFallo(forma)) return forma;
-    const foto = revisarFoto(entrada.foto);
-    if (esFallo(foto)) return foto;
-    if (!foto.valor.aceptada) return exito({ creada: false, motivosDeFoto: foto.valor.motivos });
+    if (entrada.foto !== null) {
+      const foto = revisarFoto(entrada.foto);
+      if (esFallo(foto)) return foto;
+      if (!foto.valor.aceptada) return exito({ creada: false, motivosDeFoto: foto.valor.motivos });
+    }
 
     const ambito = await this.resolver.ejecutar(ctx, copropiedadId);
     if (esFallo(ambito)) return ambito;
@@ -101,6 +112,12 @@ export class GenerarMiVisita {
     // Un reintento sin conexión de una visita que ya llegó: la foto ya viajó
     // con el primer intento y no se duplica (RN-17).
     if (repetida) return exito({ creada: true, id, repetida: true });
+    // D-143 · sin foto la visita vale por placa: ni plantilla, ni
+    // consentimiento, ni equipos.
+    if (entrada.foto === null) {
+      await this.aviso.nueva(copropiedadId, id);
+      return exito({ creada: true, id, repetida: false });
+    }
 
     const titular = await this.autorizaciones.titularDeLaAutorizacion(ambito.valor.ambito, id);
     if (titular === null) {
@@ -152,6 +169,9 @@ export interface EntradaDeRepeticion {
  * F6 · «Volver a autorizar»: copia nombre, documento, placa y la FOTO de una
  * visita anterior de SU vivienda, y sólo pide cuándo y cuánto. La casilla se
  * vuelve a marcar: cada autorización lleva su propia constancia (ADR-032).
+ *
+ * D-143 · una visita que vino sólo con placa también se repite: sin foto, con
+ * su placa y sin casilla, por la misma regla de `revisarForma`.
  */
 export class VolverAAutorizar {
   constructor(
@@ -173,12 +193,13 @@ export class VolverAAutorizar {
       entrada.autorizacionId,
     );
     if (esFallo(anterior)) return anterior;
-    const { foto, calidad } = anterior.valor;
-    if (foto === null || calidad === null) {
+    const { foto, calidad, placa } = anterior.valor;
+    const conFoto = foto !== null && calidad !== null;
+    if (!conFoto && placa === null) {
       return fallo(
         errorDominio(
           'DATO_INVALIDO',
-          'Esa visita no tiene una foto que se pueda reutilizar: genere una nueva',
+          'Esa visita no tiene foto ni placa que se puedan reutilizar: genere una nueva',
         ),
       );
     }
@@ -187,9 +208,9 @@ export class VolverAAutorizar {
       documento: anterior.valor.documento,
       inicio: entrada.inicio,
       duracionMinutos: entrada.duracionMinutos,
-      placa: anterior.valor.placa,
+      placa,
       observaciones: null,
-      foto: { ...foto, calidadPrevia: calidad },
+      foto: conFoto ? { ...foto, calidadPrevia: calidad } : null,
       casillaMarcada: entrada.casillaMarcada,
       claveDeIdempotencia: entrada.claveDeIdempotencia,
     });

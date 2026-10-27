@@ -19,8 +19,9 @@ export interface EntradaDeVisita {
   readonly duracionMinutos: number;
   readonly placa: string | null;
   readonly observaciones: string | null;
-  readonly foto: FotoDeVisita;
-  /** F4 · la casilla. Sin ella no se genera nada. */
+  /** D-143 · opcional: la visita puede llegar en carro sin registrar rostro. */
+  readonly foto: FotoDeVisita | null;
+  /** F4 · la casilla. Sólo se exige si viene foto (RN-10). */
   readonly casillaMarcada: boolean;
 }
 
@@ -30,18 +31,47 @@ export type ResultadoDeVisita =
       readonly autorizacionId: string;
       /** C9 (15-M) · la frase de la placa, o `null` si la visita no lleva. */
       readonly confirmacionDePlaca: string | null;
-    } & RostroRegistrado)
+    } & Partial<RostroRegistrado>)
   | { readonly generada: false; readonly motivosDeFoto: readonly MotivoRechazoCaptura[] };
 
 export const hastaDe = (inicio: Date, duracionMinutos: number): Date =>
   new Date(inicio.getTime() + duracionMinutos * 60_000);
 
-/** La forma común a la consola y a la app: casilla y duración. */
-export const revisarForma = (
-  casillaMarcada: boolean,
-  duracionMinutos: number,
-): Resultado<true, ErrorDominio> => {
-  if (!casillaMarcada) {
+/**
+ * D-143 · decisión del cliente (pruebas en sitio, 23/10): una visita puede
+ * llegar en carro sin registrar rostro. Es obligatorio AL MENOS UNO de los
+ * dos, placa o foto, y quien la genera elige.
+ */
+export const MENSAJE_PLACA_O_FOTO = 'Indique la placa del vehículo o la foto del visitante';
+
+/** Una placa en blanco es «sin placa», igual que en `CrearAutorizacion`. */
+const tienePlaca = (placa: string | null): boolean => placa !== null && placa.trim() !== '';
+
+export interface FormaDeVisita {
+  readonly casillaMarcada: boolean;
+  readonly duracionMinutos: number;
+  readonly placa: string | null;
+  readonly conFoto: boolean;
+}
+
+/**
+ * La forma común a la consola y a la app: placa o foto, casilla y duración.
+ *
+ * Es la regla, no la forma del cuerpo: el DTO sólo dice que los dos campos son
+ * opcionales, y es aquí donde se exige uno (§2.7.3). La casilla es el
+ * consentimiento del dato BIOMÉTRICO (RN-10): sin foto no hay nada que
+ * consentir, así que ni se pide ni se guarda constancia.
+ */
+export const revisarForma = ({
+  casillaMarcada,
+  duracionMinutos,
+  placa,
+  conFoto,
+}: FormaDeVisita): Resultado<true, ErrorDominio> => {
+  if (!conFoto && !tienePlaca(placa)) {
+    return fallo(errorDominio('DATO_INVALIDO', MENSAJE_PLACA_O_FOTO));
+  }
+  if (conFoto && !casillaMarcada) {
     return fallo(
       errorDominio(
         'DATO_INVALIDO',
@@ -72,11 +102,12 @@ export const revisarForma = (
  * `GenerarVisita` — F1 y F2 (15-L), desde la consola: todos los roles.
  *
  * El orden es la regla:
- *   1. forma: casilla marcada, duración acotada, foto válida y con calidad —
- *      antes de crear NADA—;
+ *   1. forma: placa o foto, casilla si hay foto, duración acotada, foto válida
+ *      y con calidad —antes de crear NADA—;
  *   2. la persona por su documento;
  *   3. la autorización, que nace VIGENTE (autoaprobación, ADR-027);
- *   4. la foto, la plantilla y los equipos;
+ *   4. si hay foto, la foto, la plantilla y los equipos; sin foto (D-143) la
+ *      autorización vale por placa y no se toca nada biométrico;
  *   5. el aviso en vivo a portería y superadministración.
  *
  * Si el paso 4 falla después de crear la autorización —un almacén caído—, la
@@ -101,11 +132,20 @@ export class GenerarVisita {
     if (copropiedadId === null) {
       return fallo(errorDominio('OPERACION_NO_PERMITIDA', 'Sin copropiedad', 'RN-15'));
     }
-    const forma = revisarForma(entrada.casillaMarcada, entrada.duracionMinutos);
+    const forma = revisarForma({
+      casillaMarcada: entrada.casillaMarcada,
+      duracionMinutos: entrada.duracionMinutos,
+      placa: entrada.placa,
+      conFoto: entrada.foto !== null,
+    });
     if (esFallo(forma)) return forma;
-    const foto = revisarFoto(entrada.foto);
-    if (esFallo(foto)) return foto;
-    if (!foto.valor.aceptada) return exito({ generada: false, motivosDeFoto: foto.valor.motivos });
+    if (entrada.foto !== null) {
+      const foto = revisarFoto(entrada.foto);
+      if (esFallo(foto)) return foto;
+      if (!foto.valor.aceptada) {
+        return exito({ generada: false, motivosDeFoto: foto.valor.motivos });
+      }
+    }
 
     const personaId = await this.personas.resolver(copropiedadId, entrada.visitante, ctx.usuarioId);
     const hasta = hastaDe(entrada.inicio, entrada.duracionMinutos);
@@ -120,12 +160,15 @@ export class GenerarVisita {
     if (esFallo(creada)) return creada;
     const autorizacionId = creada.valor.id;
 
-    const rostro = await this.registrarOAnular(ctx, {
-      autorizacionId,
-      titularId: personaId,
-      hasta,
-      foto: entrada.foto,
-    });
+    const rostro =
+      entrada.foto === null
+        ? exito({})
+        : await this.registrarOAnular(ctx, {
+            autorizacionId,
+            titularId: personaId,
+            hasta,
+            foto: entrada.foto,
+          });
     if (esFallo(rostro)) return rostro;
 
     await this.aviso.nueva(copropiedadId, autorizacionId);

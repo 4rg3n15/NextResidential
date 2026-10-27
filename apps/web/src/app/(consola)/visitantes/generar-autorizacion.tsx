@@ -7,6 +7,7 @@ import type { VisitaGenerada } from '@ncr/contracts';
 import { DialogoDeFormulario } from '@/componentes/dialogo-formulario';
 import { CapturaDeFoto } from '@/componentes/captura-de-foto';
 import type { FotoLista } from '@/componentes/captura-de-foto';
+import { AvisoPlacaOFoto, fotoYCasilla, hayPlacaOFoto } from '@/componentes/placa-o-foto';
 import { Campo } from '@/componentes/ui/campo';
 import { Ayuda } from '@/componentes/ui/ayuda';
 import { ErrorDeApi, cliente, desenvolver } from '@/lib/api/cliente';
@@ -17,6 +18,7 @@ import {
   useTextoDeLaCasilla,
   useViviendasDeVisitas,
 } from '@/lib/api/visitas';
+import { ResultadoDeVisita } from './resultado-de-visita';
 
 const TIPOS = [
   { valor: 'cedula', etiqueta: 'Cédula de ciudadanía' },
@@ -49,9 +51,10 @@ export const MOTIVOS_DE_FOTO: Readonly<Record<string, string>> = {
  * F1 (15-L) · «GENERAR AUTORIZACIÓN», igual para todos los roles de la consola.
  *
  * Pide lo que pide la app del residente: nombre y documento, fecha y hora,
- * duración, la vivienda, la foto frontal y la casilla. La visita nace vigente
- * (F2) y la foto sale a todos los equipos con rostros (F3): al terminar se dice
- * cuántos la aceptaron y cuáles no.
+ * duración, la vivienda y la placa o la foto frontal —al menos una, D-143—,
+ * con la casilla si hay foto. La visita nace vigente (F2) y la foto, si la hay,
+ * sale a todos los equipos con rostros (F3): al terminar se dice cuántos la
+ * aceptaron y cuáles no.
  */
 export const GenerarAutorizacion = ({
   copropiedadId,
@@ -77,7 +80,10 @@ export const GenerarAutorizacion = ({
   const [casillaMarcada, setCasilla] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [resultado, setResultado] = useState<VisitaGenerada | null>(null);
+  const [resultado, setResultado] = useState<{
+    readonly visita: VisitaGenerada;
+    readonly conFoto: boolean;
+  } | null>(null);
   /** La captura se vuelve a montar para vaciarla al generar otra. */
   const [ronda, setRonda] = useState(0);
 
@@ -87,8 +93,8 @@ export const GenerarAutorizacion = ({
     viviendaId !== '' &&
     fecha !== '' &&
     hora !== '' &&
-    foto !== null &&
-    casillaMarcada;
+    hayPlacaOFoto(placa, foto) &&
+    (foto === null || casillaMarcada);
 
   const limpiar = (): void => {
     reponer();
@@ -109,7 +115,7 @@ export const GenerarAutorizacion = ({
   };
 
   const generar = async (): Promise<void> => {
-    if (!completo || foto === null) return;
+    if (!completo) return;
     setEnviando(true);
     setError(undefined);
     try {
@@ -124,8 +130,7 @@ export const GenerarAutorizacion = ({
             inicio: new Date(`${fecha}T${hora}:00`).toISOString(),
             duracionMinutos: duracion,
             placa: placa.trim() === '' ? null : placa.trim(),
-            foto,
-            casillaMarcada,
+            ...fotoYCasilla(foto, casillaMarcada),
           },
         }),
       );
@@ -134,7 +139,7 @@ export const GenerarAutorizacion = ({
         setError(`La foto no sirve: ${porque}. Tome otra.`);
         return;
       }
-      setResultado(r);
+      setResultado({ visita: r, conFoto: foto !== null });
       limpiar();
       await consultas.invalidateQueries({ queryKey: clavesDeVisitas.raiz(copropiedadId) });
     } catch (fallo) {
@@ -157,29 +162,7 @@ export const GenerarAutorizacion = ({
       alCancelar={cerrar}
     >
       {resultado !== null ? (
-        <div role="status" className="space-y-1 rounded-md border border-borde p-3 text-secundario">
-          <p className="font-medium text-texto">Autorización generada.</p>
-          {/* C9 (15-M) · la placa, confirmada con nombre y las dos fechas, tal como la escribe la API. */}
-          {resultado.confirmacionDePlaca !== null ? (
-            <p role="status" className="font-medium text-exito-texto">
-              {resultado.confirmacionDePlaca}
-            </p>
-          ) : null}
-          <p>
-            Foto enviada a {String(resultado.sincronizadas)} de {String(resultado.equipos)} equipos
-            {resultado.fallidas > 0 ? `; ${String(resultado.fallidas)} no la aceptaron` : ''}.
-          </p>
-          {resultado.porEquipo
-            .filter((e) => !e.sincronizada)
-            .map((e) => (
-              <p key={e.dispositivoId} className="text-aviso-texto">
-                {e.nombre}: {e.detalle}
-              </p>
-            ))}
-          {resultado.avisoDeSincronizacion !== null ? (
-            <p className="text-aviso-texto">{resultado.avisoDeSincronizacion}</p>
-          ) : null}
-        </div>
+        <ResultadoDeVisita visita={resultado.visita} conFoto={resultado.conFoto} />
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -265,33 +248,43 @@ export const GenerarAutorizacion = ({
           </select>
         </label>
         <Campo
-          etiqueta="Placa (opcional)"
+          etiqueta="Placa del vehículo"
           name="placa"
           value={placa}
           onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-          ayuda="Sólo si entra en vehículo."
+          ayuda="Si entra en vehículo: con la placa, la cámara le da paso en el horario de la visita."
         />
         <div className="sm:col-span-2">
-          <CapturaDeFoto key={ronda} alCambiar={setFoto} />
+          <AvisoPlacaOFoto cumplido={hayPlacaOFoto(placa, foto)} />
         </div>
-        <label className="flex items-start gap-2 sm:col-span-2">
-          <input
-            type="checkbox"
-            name="casilla"
-            checked={casillaMarcada}
-            onChange={(e) => setCasilla(e.target.checked)}
-            // Sin el texto publicado por el servidor no hay nada que declarar:
-            // la versión que queda escrita es la de ESE texto (ADR-032).
-            disabled={casilla.data === undefined}
-            required
+        <div className="sm:col-span-2">
+          <CapturaDeFoto
+            key={ronda}
+            alCambiar={setFoto}
+            etiqueta="Foto frontal del visitante (opcional si hay placa)"
           />
-          <span className="text-secundario text-texto">
-            {casilla.data === undefined
-              ? 'Cargando el texto de la declaración…'
-              : textoDeLaCasilla(casilla.data, nombre)}
-            <Ayuda texto="Queda guardado quién marcó la casilla y cuándo. La foto se borra de los equipos al terminar la visita o si se rechaza." />
-          </span>
-        </label>
+        </div>
+        {/* La casilla es el consentimiento de la FOTO (RN-10): sin foto, no se pide. */}
+        {foto !== null ? (
+          <label className="flex items-start gap-2 sm:col-span-2">
+            <input
+              type="checkbox"
+              name="casilla"
+              checked={casillaMarcada}
+              onChange={(e) => setCasilla(e.target.checked)}
+              // Sin el texto publicado por el servidor no hay nada que declarar:
+              // la versión que queda escrita es la de ESE texto (ADR-032).
+              disabled={casilla.data === undefined}
+              required
+            />
+            <span className="text-secundario text-texto">
+              {casilla.data === undefined
+                ? 'Cargando el texto de la declaración…'
+                : textoDeLaCasilla(casilla.data, nombre)}
+              <Ayuda texto="Queda guardado quién marcó la casilla y cuándo. La foto se borra de los equipos al terminar la visita o si se rechaza." />
+            </span>
+          </label>
+        ) : null}
       </div>
     </DialogoDeFormulario>
   );

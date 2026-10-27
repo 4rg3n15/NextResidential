@@ -9,13 +9,15 @@ part of 'mi_visita_dto.dart';
 MiVisitaDto _$MiVisitaDtoFromJson(Map<String, dynamic> json) => MiVisitaDto(
   inicio: DateTime.parse(json['inicio'] as String),
   duracionMinutos: json['duracionMinutos'] as num,
-  casillaMarcada: json['casillaMarcada'] as bool,
   nombre: json['nombre'] as String,
   documento: json['documento'] as String,
-  foto: FotoDeVisitaDto.fromJson(json['foto'] as Map<String, dynamic>),
   claveDeIdempotencia: json['claveDeIdempotencia'] as String,
   placa: json['placa'] as String?,
   observaciones: json['observaciones'] as String?,
+  casillaMarcada: json['casillaMarcada'] as bool?,
+  foto: json['foto'] == null
+      ? null
+      : FotoDeVisitaDto.fromJson(json['foto'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$MiVisitaDtoToJson(MiVisitaDto instance) =>

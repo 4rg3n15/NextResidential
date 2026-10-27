@@ -34,7 +34,7 @@ abstract class VisitasApi {
     @Query('texto') String? texto,
   });
 
-  /// Genera la autorización de un visitante con su foto (F1, F2, F3, F4)
+  /// Genera la autorización de un visitante con su placa o su foto (F1–F4, D-143)
   @POST('/copropiedades/{id}/visitas')
   Future<VisitaGeneradaDto> visitasControllerCrear({
     @Path('id') required String id,
