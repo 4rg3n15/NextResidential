@@ -306,7 +306,7 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
     expect(error).toContain('RN-11');
   });
 
-  it('con un planificador sano, programa los TRES trabajos', async () => {
+  it('con un planificador sano, programa los TRES trabajos y el respaldo diario (D-147)', async () => {
     const { bitacora } = bitacoraDePrueba();
     const programados: string[] = [];
     const sano: Planificador = {
@@ -321,6 +321,7 @@ describe('CicloDelPlanificador · el arranque de la API no depende de la cola', 
       'ncr.vigilar-latidos',
       'ncr.reiniciar-aforos',
       'ncr.barrer-plantillas',
+      'ncr.respaldar-eventos-del-dia',
     ]);
   });
 

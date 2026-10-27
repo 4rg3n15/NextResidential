@@ -9,7 +9,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Pool } from 'pg';
 import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora } from '@ncr/domain-core';
-import { VigilarLatidos } from '../eventos';
+import { RespaldarEventos, VigilarLatidos } from '../eventos';
 import { ReiniciarAforosVencidos } from '../zonas';
 import { BarrerPlantillasVencidas, EnviarPlantillasAEquipo } from '../biometria';
 import { REENVIO_DE_PLANTILLAS_A_EQUIPO } from '../equipos';
@@ -22,6 +22,7 @@ import type {
   TrabajoProgramado,
 } from './aplicacion/puertos';
 import { HORARIOS, trabajoPorCopropiedad } from './aplicacion/trabajos';
+import { trabajoDeRespaldoDiario } from './aplicacion/trabajo-de-respaldo';
 import { PlanificadorPgBoss } from './infraestructura/planificador-pgboss';
 import { PlanificadorInerte } from './infraestructura/planificador-inerte';
 import { CatalogoDeCopropiedadesPg } from './infraestructura/catalogo-copropiedades-pg';
@@ -100,6 +101,15 @@ export class CicloDelPlanificador implements OnApplicationBootstrap, BeforeAppli
     )) {
       this.planificador.programar(trabajo);
     }
+    // D-147 · el respaldo diario de los eventos, a las 00:15 de Bogotá.
+    this.planificador.programar(
+      trabajoDeRespaldoDiario(
+        this.referencia.get(RespaldarEventos, { strict: false }),
+        ACTOR_DEL_PLANIFICADOR,
+        this.catalogo,
+        this.bitacora,
+      ),
+    );
 
     /**
      * ═══════════════════════════════════════════════════════════════════════

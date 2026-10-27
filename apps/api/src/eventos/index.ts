@@ -6,6 +6,10 @@
  * proceso: qué adaptador se cablea es decisión de la raíz de composición.
  */
 export { EventosModule } from './eventos.module';
+/** D-147 · el respaldo diario: el planificador lo invoca a las 00:15 de Bogotá. */
+export { RespaldoDeEventosModule, respaldoEnBase } from './respaldo.module';
+export { RespaldarEventos } from './aplicacion/respaldo/respaldar-eventos';
+export type { ParteDelRespaldo } from './aplicacion/respaldo/respaldar-eventos';
 export { RegistrarAcceso } from './aplicacion/registrar-acceso';
 /** E5 (15-M) · alertas por EQUIPO, deduplicadas: las abre el ingestor por este puerto. */
 export { ALERTAS_DE_EQUIPO } from './aplicacion/deduplicacion-de-alertas';

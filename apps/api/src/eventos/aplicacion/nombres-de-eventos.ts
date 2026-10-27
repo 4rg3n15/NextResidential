@@ -22,12 +22,16 @@ export interface NombresDeEventos {
   readonly personas: ReadonlyMap<string, PersonaDelEvento>;
   readonly viviendas: ReadonlyMap<string, string>;
   readonly operadores: ReadonlyMap<string, string>;
+  /** D-147 · el nombre del equipo, para el respaldo diario. */
+  readonly dispositivos: ReadonlyMap<string, string>;
 }
 
 export interface IdsPorResolver {
   readonly personas: readonly string[];
   readonly viviendas: readonly string[];
   readonly operadores: readonly string[];
+  /** D-147 · opcional: la línea de tiempo los nombra en la consola. */
+  readonly dispositivos?: readonly string[];
 }
 
 export interface ResolutorDeNombres {
@@ -39,6 +43,7 @@ export const SIN_NOMBRES: NombresDeEventos = {
   personas: new Map(),
   viviendas: new Map(),
   operadores: new Map(),
+  dispositivos: new Map(),
 };
 
 /** Sin base (PERSISTENCIA_DE_EVENTOS en memoria): no hay padrón que leer. */

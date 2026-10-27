@@ -40,17 +40,23 @@
  *       sobra y se quita sin que nada se rompa.
  *   3 · quitar la acotación sin quitarla de aquí también pone el paso en rojo.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * Y LAS DE npm QUE SE ACOTAN A PROPÓSITO · D-147
+ *
+ * Todo `package.json` del repositorio fija versiones exactas, pero una
+ * dependencia NUEVA que toca algo delicado —credenciales, red hacia fuera— se
+ * declara además aquí, con su motivo y su versión: `nodemailer` lleva la clave
+ * SMTP y los ficheros de eventos. El control exige que la versión del manifiesto
+ * sea EXACTAMENTE la declarada (sin `^` ni `~`) y que ningún otro manifiesto la
+ * traiga sin pasar por aquí. Subirla es un cambio consciente en dos sitios.
+ *
  *   node scripts/lib/dependencias-acotadas.mjs
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const PUBSPEC = 'apps/mobile/pubspec.yaml';
 const LOCK = 'apps/mobile/pubspec.lock';
-
-if (!existsSync(PUBSPEC)) {
-  console.log('dependencias: no hay app móvil que acotar');
-  process.exit(0);
-}
 
 /** paquete → { version, motivo, prohibe } */
 const PERMITIDAS = new Map([
@@ -68,8 +74,25 @@ const PERMITIDAS = new Map([
   ],
 ]);
 
+/** paquete npm → { manifiesto, version, motivo } */
+const NPM_ACOTADAS = new Map([
+  [
+    'nodemailer',
+    {
+      manifiesto: 'apps/api/package.json',
+      version: '10.1.0',
+      motivo:
+        'D-147 · el correo del respaldo diario. Maneja la clave SMTP y envía el ' +
+        'fichero de eventos: cero dependencias propias, tipos incluidos, y la ' +
+        'versión con más de dos semanas publicada al adoptarla (10/10/2026). ' +
+        'Subirla es leer su registro de cambios, no un `pnpm update`',
+    },
+  ],
+]);
+
 const problemas = [];
-const pubspec = readFileSync(PUBSPEC, 'utf8');
+const hayMovil = existsSync(PUBSPEC);
+const pubspec = hayMovil ? readFileSync(PUBSPEC, 'utf8') : '';
 const lock = existsSync(LOCK) ? readFileSync(LOCK, 'utf8') : '';
 
 // Las acotaciones declaradas en el pubspec, leídas del bloque, no de una lista.
@@ -102,7 +125,7 @@ for (const [paquete, version] of declaradas) {
   }
 }
 
-for (const [paquete, { version, prohibe, motivo }] of PERMITIDAS) {
+for (const [paquete, { version, prohibe, motivo }] of hayMovil ? PERMITIDAS : []) {
   if (!declaradas.has(paquete)) {
     problemas.push(
       `falta la acotación \`${paquete}: ${version}\` en ${PUBSPEC}. Motivo por el ` +
@@ -119,14 +142,59 @@ for (const [paquete, { version, prohibe, motivo }] of PERMITIDAS) {
   }
 }
 
+// npm · los manifiestos de las apps y los paquetes del espacio de trabajo.
+const manifiestos = ['package.json'];
+for (const raiz of ['apps', 'packages']) {
+  if (!existsSync(raiz)) continue;
+  for (const d of readdirSync(raiz, { withFileTypes: true })) {
+    const m = join(raiz, d.name, 'package.json');
+    if (d.isDirectory() && existsSync(m)) manifiestos.push(m);
+  }
+}
+const versionEn = (manifiesto, paquete) => {
+  if (!existsSync(manifiesto)) return undefined;
+  const j = JSON.parse(readFileSync(manifiesto, 'utf8'));
+  for (const campo of [
+    'dependencies',
+    'devDependencies',
+    'optionalDependencies',
+    'peerDependencies',
+  ]) {
+    const v = j[campo]?.[paquete];
+    if (v !== undefined) return v;
+  }
+  return undefined;
+};
+for (const [paquete, { manifiesto, version, motivo }] of NPM_ACOTADAS) {
+  for (const m of manifiestos) {
+    const v = versionEn(m, paquete);
+    if (v === undefined) continue;
+    if (m !== manifiesto) {
+      problemas.push(
+        `\`${paquete}\` aparece en ${m} y sólo está acotado en ${manifiesto}. Motivo: ${motivo}`,
+      );
+    } else if (v !== version) {
+      problemas.push(
+        `\`${paquete}\` está como «${v}» en ${m} y aquí se acota a «${version}» exacta ` +
+          '(sin ^ ni ~). Motivo: ' +
+          motivo,
+      );
+    }
+  }
+}
+const npmAcotadas = [...NPM_ACOTADAS.keys()].filter((p) =>
+  manifiestos.some((m) => versionEn(m, p) !== undefined),
+);
+
 if (problemas.length > 0) {
   console.error(`FALLO ${problemas.length} problema(s) con las dependencias acotadas:`);
   for (const p of problemas) console.error(`  ✗ ${p}`);
   process.exit(1);
 }
 
-const cuantas = PERMITIDAS.size;
+const cuantas = hayMovil ? PERMITIDAS.size : 0;
 console.log(
-  `dependencias: ${cuantas} acotación(es) con motivo escrito · ` +
-    `objective_c fuera del grafo (lo arrastraba el plugin de Windows)`,
+  `dependencias: ${cuantas} acotación(es) de Dart con motivo escrito · ` +
+    (hayMovil ? 'objective_c fuera del grafo (lo arrastraba el plugin de Windows) · ' : '') +
+    `${npmAcotadas.length} de npm a versión exacta con motivo (${npmAcotadas.join(', ') || 'ninguna'})`,
 );

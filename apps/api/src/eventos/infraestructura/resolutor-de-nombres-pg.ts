@@ -42,11 +42,20 @@ SELECT u.id, u.nombre
                     WHERE r.usuario_id = u.id
                       AND (r.copropiedad_id = $1 OR r.rol = 'superadministrador')))`;
 
+const DISPOSITIVOS = `
+SELECT d.id, d.nombre
+  FROM public.dispositivos d
+ WHERE d.copropiedad_id = $1 AND d.id = ANY($2::uuid[])`;
+
 export class ResolutorDeNombresPg implements ResolutorDeNombres {
   constructor(private readonly pool: Pool) {}
 
   async resolver(copropiedadId: string, ids: IdsPorResolver): Promise<NombresDeEventos> {
-    if (ids.personas.length + ids.viviendas.length + ids.operadores.length === 0) {
+    const dispositivos = ids.dispositivos ?? [];
+    if (
+      ids.personas.length + ids.viviendas.length + ids.operadores.length + dispositivos.length ===
+      0
+    ) {
       return SIN_NOMBRES;
     }
     return conCliente(this.pool, async (cliente) => {
@@ -68,6 +77,7 @@ export class ResolutorDeNombresPg implements ResolutorDeNombres {
           OPERADORES,
           ids.operadores,
         );
+        const equipos = await consultar<{ id: string; nombre: string }>(DISPOSITIVOS, dispositivos);
         await cliente.query('COMMIT');
         return {
           personas: new Map<string, PersonaDelEvento>(
@@ -78,6 +88,7 @@ export class ResolutorDeNombresPg implements ResolutorDeNombres {
           ),
           viviendas: new Map(viviendas.map((v) => [v.id, v.nombre])),
           operadores: new Map(operadores.map((o) => [o.id, o.nombre])),
+          dispositivos: new Map(equipos.map((e) => [e.id, e.nombre])),
         };
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => undefined);

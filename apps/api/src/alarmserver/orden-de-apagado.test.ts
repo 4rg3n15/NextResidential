@@ -6,7 +6,7 @@ import { BITACORA } from '@ncr/domain-core';
 import type { Bitacora, Reloj } from '@ncr/domain-core';
 import type { EscuchaActiva } from '@ncr/providers';
 import { CierreDelPool } from '../persistencia/pool.module';
-import { VigilarLatidos } from '../eventos';
+import { RespaldarEventos, VigilarLatidos } from '../eventos';
 import { ReiniciarAforosVencidos } from '../zonas';
 import { BarrerPlantillasVencidas } from '../biometria';
 import { CATALOGO_DE_COPROPIEDADES, CicloDelPlanificador, PLANIFICADOR } from '../planificacion';
@@ -102,6 +102,7 @@ const montarYApagar = async () => {
       { provide: VigilarLatidos, useValue: {} },
       { provide: ReiniciarAforosVencidos, useValue: {} },
       { provide: BarrerPlantillasVencidas, useValue: {} },
+      { provide: RespaldarEventos, useValue: {} }, // D-147
       {
         provide: CicloDelPlanificador,
         inject: [PLANIFICADOR, CATALOGO_DE_COPROPIEDADES, BITACORA, ModuleRef],

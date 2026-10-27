@@ -2193,6 +2193,22 @@ try {
         : mal(`una acotación a ciegas NO se detecta (codigo ${r.codigo})`);
     }
 
+    // (d2) D-147 · una dependencia de npm acotada que vuelve a ser un rango.
+    {
+      const api = join(arbol13, 'npm-con-rango', 'apps', 'api');
+      mkdirSync(api, { recursive: true });
+      writeFileSync(
+        join(api, 'package.json'),
+        JSON.stringify({ dependencies: { nodemailer: '^10.1.0' } }),
+      );
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: join(arbol13, 'npm-con-rango'),
+      });
+      r.codigo !== 0 && /nodemailer.*\^10\.1\.0/.test(r.salida)
+        ? ok('dependencias-acotadas: una dependencia de npm acotada con RANGO se detecta')
+        : mal(`nodemailer con rango NO se detecta (codigo ${r.codigo})`);
+    }
+
     // (e) verificar-escritura · una ruta que NO se puede usar.
     {
       /**

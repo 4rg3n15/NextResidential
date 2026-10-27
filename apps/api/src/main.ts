@@ -49,8 +49,8 @@ import { MOTIVO_SIN_METADATOS, emiteMetadatosDeTipos } from './arranque/metadato
 import { ErrorDeConfiguracion, cargarConfiguracion } from './configuracion/esquema';
 import { BitacoraEstructurada } from './comun/bitacora/bitacora-estructurada';
 import { AdaptadorDeBitacoraNest } from './comun/bitacora/adaptador-nest';
-import { BITACORA } from '@ncr/domain-core';
-import type { Bitacora } from '@ncr/domain-core';
+import { BITACORA, CORREO_SALIENTE } from '@ncr/domain-core';
+import type { Bitacora, CorreoSaliente } from '@ncr/domain-core';
 import { ProveedorDeJwks } from './autenticacion';
 import { comprobarRecursosExternos } from './arranque/recursos-externos';
 import { SONDA_POSTGRES, recursoBaseDeDatos } from './arranque/sonda-postgres';
@@ -63,6 +63,11 @@ import {
   recursoJwks,
   recursoRecuperacionDeContrasena,
 } from './arranque/recursos';
+import {
+  recursoBucketDeRespaldos,
+  recursoCorreoDelRespaldo,
+} from './arranque/recursos-del-respaldo';
+import { respaldoEnBase } from './eventos';
 
 async function arrancar(): Promise<void> {
   // H-SITIO-06 (anexo 15-K) · antes que nada: sin metadatos de tipos el
@@ -121,6 +126,13 @@ async function arrancar(): Promise<void> {
         urlDeRedireccion: config.RECUPERACION_URL_REDIRECCION,
         origenesPermitidos: config.origenesPermitidos,
       }),
+      // D-147 · el respaldo diario: su bucket y su correo.
+      recursoBucketDeRespaldos({
+        supabaseUrl: config.SUPABASE_URL,
+        llaveSecreta: config.SUPABASE_SECRET_KEY,
+        enBase: respaldoEnBase(config),
+      }),
+      recursoCorreoDelRespaldo(app.get<CorreoSaliente>(CORREO_SALIENTE, { strict: false })),
     ],
     bitacora,
   );

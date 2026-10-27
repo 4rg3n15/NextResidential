@@ -133,6 +133,16 @@ export const ventanaDelDia = (ahora: Date, zonaHoraria: string): VentanaDelDia =
   return { desde, hasta, zonaHoraria };
 };
 
+/**
+ * D-147 · la fecha local (`AAAA-MM-DD`) de un instante en la zona: el día de
+ * la copropiedad que contiene ese instante, no el de UTC.
+ */
+export const fechaLocal = (instante: Date, zonaHoraria: string): string => {
+  const p = partesLocales(instante, zonaHoraria);
+  const dos = (n: number): string => String(n).padStart(2, '0');
+  return `${String(p.anio)}-${dos(p.mes)}-${dos(p.dia)}`;
+};
+
 /** Hora local (0–23) del instante, para agrupar el histograma de accesos. */
 export const horaLocal = (instante: Date, zonaHoraria: string): number =>
   partesLocales(instante, zonaHoraria).hora;
