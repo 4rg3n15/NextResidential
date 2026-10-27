@@ -22,6 +22,9 @@ import { URL_BASE, exigirBase } from './base-exigida';
  *  · los destinatarios son superadministradores activos con correo entregable;
  *  · ningún fichero del respaldo escribe en `eventos` (RN-03).
  *
+ * Todo pasa por un pool en `authenticated` (sin BYPASSRLS): la RLS forzada y el
+ * REVOKE se ejercen de verdad, no los salta el superusuario de la base local.
+ *
  * Las filas son append-only y se quedan en la base local: cada corrida usa un
  * día al azar de otro siglo para no chocar con la anterior.
  */
@@ -39,7 +42,10 @@ let disponible = false;
 beforeAll(async () => {
   if (!URL_BASE) return;
   try {
+    // Sin `BYPASSRLS`: la conexión de pruebas es superusuario y se saltaría la RLS
+    // forzada; cada cliente pasa a `authenticated`, como en claims-de-servicio-pg.
     pool = new Pool({ connectionString: URL_BASE, max: 4 });
+    pool.on('connect', (c) => void c.query('SET ROLE authenticated'));
     const { rows } = await pool.query<{ existe: boolean }>(
       "SELECT to_regclass('public.respaldos_de_eventos') IS NOT NULL AS existe",
     );

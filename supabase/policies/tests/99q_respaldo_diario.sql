@@ -77,7 +77,7 @@ BEGIN
 
   -- UPDATE y DELETE: denegados en las dos tablas.
   BEGIN
-    UPDATE public.respaldos_de_eventos SET numero_de_eventos = 0 WHERE id = v_respaldo;
+    UPDATE public.respaldos_de_eventos SET creado_en = now() WHERE id = v_respaldo;
     RAISE EXCEPTION '99q: el servicio pudo hacer UPDATE en respaldos_de_eventos';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
@@ -87,7 +87,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
-    UPDATE public.envios_de_respaldo SET resultado = 'enviado' WHERE respaldo_id = v_respaldo;
+    UPDATE public.envios_de_respaldo SET intentado_en = now() WHERE respaldo_id = v_respaldo;
     RAISE EXCEPTION '99q: el servicio pudo hacer UPDATE en envios_de_respaldo';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
