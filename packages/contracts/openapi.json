@@ -8538,6 +8538,128 @@
         ]
       }
     },
+    "/copropiedades/{id}/respaldos": {
+      "get": {
+        "operationId": "RespaldosController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RespaldoDiarioDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Respaldos diarios de los eventos, del más reciente al más antiguo",
+        "tags": [
+          "informes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/respaldos/ejecucion": {
+      "post": {
+        "operationId": "RespaldosController_ejecutar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParteDelRespaldoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ejecuta el respaldo de esta copropiedad a mano (idempotente; superadministración)",
+        "tags": [
+          "informes"
+        ]
+      }
+    },
+    "/copropiedades/{id}/respaldos/{fecha}/descarga": {
+      "get": {
+        "operationId": "RespaldosController_descargar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fecha",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescargaDeRespaldoDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ese día no tiene respaldo en esta copropiedad"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "URL firmada de vida corta para descargar el respaldo de un día",
+        "tags": [
+          "informes"
+        ]
+      }
+    },
     "/copropiedades/{id}/tablero/accesos-por-hora": {
       "get": {
         "operationId": "TableroController_leerAccesosPorHora",
@@ -13061,6 +13183,22 @@
           "codigo"
         ]
       },
+      "DescargaDeRespaldoDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL firmada del bucket privado (RN-21)"
+          },
+          "segundosDeVida": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "url",
+          "segundosDeVida"
+        ]
+      },
       "DetalleDeErrorDto": {
         "type": "object",
         "properties": {
@@ -17419,6 +17557,33 @@
           "viviendas"
         ]
       },
+      "ParteDelRespaldoDto": {
+        "type": "object",
+        "properties": {
+          "generados": {
+            "type": "number"
+          },
+          "fallidosAlGenerar": {
+            "type": "number"
+          },
+          "enviados": {
+            "type": "number"
+          },
+          "fallidosAlEnviar": {
+            "type": "number"
+          },
+          "sinConfigurar": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "generados",
+          "fallidosAlGenerar",
+          "enviados",
+          "fallidosAlEnviar",
+          "sinConfigurar"
+        ]
+      },
       "PatronDeAutorizacionDto": {
         "type": "object",
         "properties": {
@@ -18555,6 +18720,65 @@
           "desde",
           "hasta",
           "personas"
+        ]
+      },
+      "RespaldoDiarioDto": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "description": "Día de la copropiedad, AAAA-MM-DD (hora de Bogotá)"
+          },
+          "numeroDeEventos": {
+            "type": "number"
+          },
+          "permitidos": {
+            "type": "number"
+          },
+          "negados": {
+            "type": "number"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Huella SHA-256 del fichero, en hexadecimal"
+          },
+          "tamanoBytes": {
+            "type": "number"
+          },
+          "generadoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estadoDelEnvio": {
+            "type": "string",
+            "enum": [
+              "enviado",
+              "error",
+              "sin_configurar",
+              "pendiente"
+            ]
+          },
+          "enviadosA": {
+            "type": "number",
+            "description": "Superadministradores a los que llegó"
+          },
+          "ultimoError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Último fallo, sin direcciones"
+          }
+        },
+        "required": [
+          "fecha",
+          "numeroDeEventos",
+          "permitidos",
+          "negados",
+          "sha256",
+          "tamanoBytes",
+          "generadoEn",
+          "estadoDelEnvio",
+          "enviadosA",
+          "ultimoError"
         ]
       },
       "RestablecimientoDeContrasenaDto": {

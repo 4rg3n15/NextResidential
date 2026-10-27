@@ -2355,6 +2355,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/copropiedades/{id}/respaldos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Respaldos diarios de los eventos, del más reciente al más antiguo */
+        get: operations["RespaldosController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/respaldos/ejecucion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ejecuta el respaldo de esta copropiedad a mano (idempotente; superadministración) */
+        post: operations["RespaldosController_ejecutar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/copropiedades/{id}/respaldos/{fecha}/descarga": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** URL firmada de vida corta para descargar el respaldo de un día */
+        get: operations["RespaldosController_descargar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/copropiedades/{id}/tablero/accesos-por-hora": {
         parameters: {
             query?: never;
@@ -3877,6 +3928,11 @@ export interface components {
              */
             codigo: string;
         };
+        DescargaDeRespaldoDto: {
+            /** @description URL firmada del bucket privado (RN-21) */
+            url: string;
+            segundosDeVida: number;
+        };
         DetalleDeErrorDto: {
             /** @description Un mensaje, o el arreglo que devuelve el ValidationPipe con un renglón por campo rechazado. La consola muestra el arreglo campo a campo; una cadena, tal cual. */
             message: string | string[];
@@ -5169,6 +5225,13 @@ export interface components {
             totales: components["schemas"]["TotalesDeViviendasDto"];
             viviendas: components["schemas"]["ViviendaDto"][];
         };
+        ParteDelRespaldoDto: {
+            generados: number;
+            fallidosAlGenerar: number;
+            enviados: number;
+            fallidosAlEnviar: number;
+            sinConfigurar: number;
+        };
         PatronDeAutorizacionDto: {
             /** @description Días de la semana, 0..6 con domingo = 0 (el vocabulario del dominio). */
             dias: number[];
@@ -5516,6 +5579,24 @@ export interface components {
             /** Format: date-time */
             hasta: string;
             personas: number;
+        };
+        RespaldoDiarioDto: {
+            /** @description Día de la copropiedad, AAAA-MM-DD (hora de Bogotá) */
+            fecha: string;
+            numeroDeEventos: number;
+            permitidos: number;
+            negados: number;
+            /** @description Huella SHA-256 del fichero, en hexadecimal */
+            sha256: string;
+            tamanoBytes: number;
+            /** Format: date-time */
+            generadoEn: string;
+            /** @enum {string} */
+            estadoDelEnvio: "enviado" | "error" | "sin_configurar" | "pendiente";
+            /** @description Superadministradores a los que llegó */
+            enviadosA: number;
+            /** @description Último fallo, sin direcciones */
+            ultimoError: string | null;
         };
         RestablecimientoDeContrasenaDto: {
             /**
@@ -10639,6 +10720,77 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ViviendaSinTitularDto"][];
                 };
+            };
+        };
+    };
+    RespaldosController_listar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespaldoDiarioDto"][];
+                };
+            };
+        };
+    };
+    RespaldosController_ejecutar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParteDelRespaldoDto"];
+                };
+            };
+        };
+    };
+    RespaldosController_descargar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                fecha: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescargaDeRespaldoDto"];
+                };
+            };
+            /** @description Ese día no tiene respaldo en esta copropiedad */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

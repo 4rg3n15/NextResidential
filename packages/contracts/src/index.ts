@@ -104,6 +104,10 @@ export type FilaDeInforme = Esquemas['FilaDeInformeDto'];
 export type PuntoDeFrecuencia = Esquemas['PuntoDeFrecuenciaDto'];
 /** Los cuatro tipos del mockup, tomados del contrato y no reescritos a mano. */
 export type TipoDeInforme = Informe['tipo'];
+/** D-147 · los respaldos diarios de los eventos, en Informes. */
+export type RespaldoDiario = Esquemas['RespaldoDiarioDto'];
+export type EstadoDelEnvioDelRespaldo = RespaldoDiario['estadoDelEnvio'];
+export type DescargaDeRespaldo = Esquemas['DescargaDeRespaldoDto'];
 export type EstadoDeRegistro = Vivienda['estado'];
 export type ResultadoDeCarga = Esquemas['ResultadoDeCargaDto'];
 
