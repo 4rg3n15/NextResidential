@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { CorreoSinConfigurar } from '../eventos/infraestructura/respaldo-en-memoria';
 import { recursoBucketDeRespaldos, recursoCorreoDelRespaldo } from './recursos-del-respaldo';
 
 /**
@@ -11,7 +10,11 @@ const respuesta = (status: number, cuerpo: unknown = {}): Response =>
 
 describe('recursos del respaldo diario', () => {
   it('correo sin configurar: no crítico y SIN CONFIGURAR, nunca ok', async () => {
-    const r = recursoCorreoDelRespaldo(new CorreoSinConfigurar());
+    // Un doble del PUERTO, no el adaptador de eventos: arranque no entra en otro módulo por dentro (§2.2).
+    const r = recursoCorreoDelRespaldo({
+      configurado: false,
+      enviar: async () => ({ estado: 'sin-configurar' }),
+    });
     expect(r.critico).toBe(false);
     expect((await r.comprobar()).estado).toBe('sin-configurar');
   });

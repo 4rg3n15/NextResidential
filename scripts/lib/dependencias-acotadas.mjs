@@ -192,9 +192,9 @@ if (problemas.length > 0) {
   process.exit(1);
 }
 
-const cuantas = hayMovil ? PERMITIDAS.size : 0;
+const cuantas = PERMITIDAS.size;
 console.log(
-  `dependencias: ${cuantas} acotación(es) de Dart con motivo escrito · ` +
-    (hayMovil ? 'objective_c fuera del grafo (lo arrastraba el plugin de Windows) · ' : '') +
-    `${npmAcotadas.length} de npm a versión exacta con motivo (${npmAcotadas.join(', ') || 'ninguna'})`,
+  `dependencias: ${cuantas} acotación(es) con motivo escrito · ` +
+    `objective_c fuera del grafo (lo arrastraba el plugin de Windows) · ` +
+    `${npmAcotadas.length} de npm a versión exacta con motivo (${npmAcotadas.join(', ')})`,
 );
