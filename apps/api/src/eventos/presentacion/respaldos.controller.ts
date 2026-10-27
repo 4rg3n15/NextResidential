@@ -117,7 +117,8 @@ export class RespaldosController {
   @Post('ejecucion')
   @HttpCode(200)
   @Roles('superadministrador')
-  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  // 10/min, como las rutas sensibles de sitio: idempotente y sólo del superadministrador.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Ejecuta el respaldo de esta copropiedad a mano (idempotente; superadministración)',
   })

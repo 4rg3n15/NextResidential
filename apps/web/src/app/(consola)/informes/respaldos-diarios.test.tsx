@@ -44,7 +44,21 @@ const servidor = (lista: unknown[]) =>
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Monta la sección y la despliega: hasta entonces no pide nada. */
+const abrir = (): void => {
+  render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+  fireEvent.click(screen.getByRole('button', { name: 'Ver respaldos diarios' }));
+};
+
 describe('Respaldos diarios (D-147)', () => {
+  it('cerrada no pide nada: Informes no consulta hasta que se le pide', () => {
+    const espia = servidor([]);
+    vi.stubGlobal('fetch', espia);
+    render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+    expect(screen.getByRole('button', { name: 'Ver respaldos diarios' })).toBeTruthy();
+    expect(espia).not.toHaveBeenCalled();
+  });
+
   it('lista cada día con sus eventos y el estado del envío', async () => {
     vi.stubGlobal(
       'fetch',
@@ -54,7 +68,7 @@ describe('Respaldos diarios (D-147)', () => {
         RESPALDO('2026-10-25', 'sin_configurar'),
       ]),
     );
-    render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+    abrir();
     await waitFor(() => expect(screen.getByText('2026-10-27')).toBeTruthy());
     expect(screen.getByText('Enviado')).toBeTruthy();
     expect(screen.getByText('Falló · se reintenta')).toBeTruthy();
@@ -65,7 +79,7 @@ describe('Respaldos diarios (D-147)', () => {
 
   it('sin respaldos, lo dice y recuerda que el histórico sigue en «Eventos»', async () => {
     vi.stubGlobal('fetch', servidor([]));
-    render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+    abrir();
     await waitFor(() => expect(screen.getByText('Aún no hay respaldos')).toBeTruthy());
     expect(screen.getByText(/El histórico completo sigue en «Eventos»/)).toBeTruthy();
   });
@@ -75,7 +89,7 @@ describe('Respaldos diarios (D-147)', () => {
     vi.stubGlobal('fetch', espia);
     const asignar = vi.fn();
     vi.stubGlobal('location', { ...window.location, assign: asignar });
-    render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+    abrir();
     const boton = await screen.findByRole('button', {
       name: 'Descargar el respaldo del 2026-10-27',
     });
@@ -99,7 +113,7 @@ describe('Respaldos diarios (D-147)', () => {
       'fetch',
       vi.fn(async () => respuesta({ estado: 403, mensaje: 'no' }, 403)),
     );
-    render(<RespaldosDiarios copropiedadId={COP} />, { wrapper: Envoltura });
+    abrir();
     await waitFor(() => expect(screen.getByText('Sin permiso')).toBeTruthy());
   });
 });

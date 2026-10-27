@@ -36,7 +36,8 @@ export const RespaldosDiarios = ({
 }: {
   readonly copropiedadId: string;
 }): JSX.Element => {
-  const consulta = useRespaldosDiarios(copropiedadId);
+  const [abierta, setAbierta] = useState(false);
+  const consulta = useRespaldosDiarios(copropiedadId, abierta);
   const [descargando, setDescargando] = useState<string | null>(null);
   const [fallo, setFallo] = useState<string | null>(null);
 
@@ -107,37 +108,57 @@ export const RespaldosDiarios = ({
     },
   ];
 
-  if (consulta.isError) {
-    return estadoSegunCodigo(
-      consulta.error instanceof ErrorDeApi ? consulta.error : 0,
-      consulta.error instanceof Error ? consulta.error.message : 'Error inesperado',
-      () => void consulta.refetch(),
-    );
-  }
-
   return (
     <section aria-labelledby="titulo-respaldos" className="mt-6">
-      <h2 id="titulo-respaldos" className="sr-only">
-        Respaldos diarios
-      </h2>
-      {fallo === null ? null : (
-        <p role="alert" className="mb-2 text-secundario text-peligro-texto">
-          {fallo}
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <h2 id="titulo-respaldos" className="text-cuerpo font-semibold text-texto">
+          Respaldos diarios
+        </h2>
+        <Boton
+          variante="secundario"
+          tamano="sm"
+          aria-expanded={abierta}
+          aria-controls="lista-de-respaldos"
+          onClick={() => setAbierta((a) => !a)}
+        >
+          {abierta ? 'Ocultar' : 'Ver respaldos diarios'}
+        </Boton>
+      </div>
+      {!abierta ? (
+        <p className="text-secundario text-texto-apagado">
+          Cada día a las 00:15 (hora de Bogotá) se guarda el Excel de los eventos del día anterior y
+          se envía a la superadministración.
         </p>
+      ) : (
+        <div id="lista-de-respaldos">
+          {fallo === null ? null : (
+            <p role="alert" className="mb-2 text-secundario text-peligro-texto">
+              {fallo}
+            </p>
+          )}
+          {consulta.isError ? (
+            estadoSegunCodigo(
+              consulta.error instanceof ErrorDeApi ? consulta.error : 0,
+              consulta.error instanceof Error ? consulta.error.message : 'Error inesperado',
+              () => void consulta.refetch(),
+            )
+          ) : (
+            <TablaDeDatos
+              titulo="Respaldos diarios"
+              columnas={columnas}
+              filas={consulta.data ?? []}
+              cargando={consulta.isLoading}
+              claveDeFila={(r) => r.fecha}
+              porPagina={10}
+              vacio={{
+                titulo: 'Aún no hay respaldos',
+                descripcion:
+                  'Cada día a las 00:15 (hora de Bogotá) se guarda el Excel de los eventos del día anterior y se envía a la superadministración. El histórico completo sigue en «Eventos».',
+              }}
+            />
+          )}
+        </div>
       )}
-      <TablaDeDatos
-        titulo="Respaldos diarios"
-        columnas={columnas}
-        filas={consulta.data ?? []}
-        cargando={consulta.isLoading}
-        claveDeFila={(r) => r.fecha}
-        porPagina={10}
-        vacio={{
-          titulo: 'Aún no hay respaldos',
-          descripcion:
-            'Cada día a las 00:15 (hora de Bogotá) se guarda el Excel de los eventos del día anterior y se envía a la superadministración. El histórico completo sigue en «Eventos».',
-        }}
-      />
     </section>
   );
 };

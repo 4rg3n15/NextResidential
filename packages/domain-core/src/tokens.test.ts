@@ -8,8 +8,10 @@ describe('tokens de inyección', () => {
   ][];
 
   it('declara un token por cada puerto del contrato §2.2', () => {
-    // 8 de soporte + 9 de repositorio (los nueve agregados) + 4 de proveedor.
-    expect(todos).toHaveLength(21);
+    // 9 de soporte + 9 de repositorio (los nueve agregados) + 4 de proveedor.
+    // D-147 · el noveno de soporte es `CORREO_SALIENTE`: `Notificador` no admite
+    // adjuntos y el respaldo diario envía un fichero (§2.3, ISP).
+    expect(todos).toHaveLength(22);
   });
 
   it('ningún token colisiona con otro', () => {

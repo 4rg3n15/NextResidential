@@ -1010,7 +1010,7 @@ cinco o ninguna**:
 1. Con las cinco `CORREO_*` declaradas, reinicie la API y compruebe en el
    arranque: `correo del respaldo diario (SMTP con TLS): ok`.
 2. Como superadministrador, ejecute el respaldo a mano:
-   `POST /copropiedades/<id>/respaldos/ejecucion` (límite: 3 por minuto). Es
+   `POST /copropiedades/<id>/respaldos/ejecucion` (límite: 10 por minuto). Es
    idempotente: no regenera ni reenvía lo ya hecho.
 3. Reciba el correo «Eventos del <ayer> · <copropiedad>» y anote la huella.
 4. En la consola, **Informes → Respaldos diarios → Descargar** el mismo día y
