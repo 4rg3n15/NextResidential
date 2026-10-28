@@ -52,8 +52,6 @@ export interface PropiedadesDeBarra {
   readonly filtros: FiltrosDeEventos;
   readonly cambiar: (parcial: Partial<FiltrosDeEventos>) => void;
   readonly borrar: () => void;
-  /** Al portero no se le ofrecen fechas: ve su día (D-145). */
-  readonly delPortero: boolean;
   /**
    * Vivienda y persona salen del padrón, que sólo lee la administración
    * (`padron/viviendas` y `padron/personas`): al portero y a la central se les
@@ -70,7 +68,6 @@ export const BarraDeFiltros = ({
   filtros: f,
   cambiar,
   borrar,
-  delPortero,
   conPadron,
   rangoAjustado,
   equipos,
@@ -91,26 +88,23 @@ export const BarraDeFiltros = ({
 
   return (
     <>
-      {delPortero ? null : (
-        <>
-          {(['desde', 'hasta'] as const).map((k) => (
-            <label key={k} className="flex items-center gap-2 text-secundario">
-              <span className="text-texto-apagado">{k === 'desde' ? 'Desde' : 'Hasta'}</span>
-              <input
-                type="datetime-local"
-                value={f[k]}
-                onChange={(e) => cambiar({ [k]: e.target.value })}
-                className={CLASE_CAMPO}
-              />
-            </label>
-          ))}
-          {rangoAjustado ? (
-            <span role="status" className="text-secundario text-aviso-texto">
-              Fechas incompletas o al revés: se muestran los últimos 7 días.
-            </span>
-          ) : null}
-        </>
-      )}
+      {/* D-146 · fechas para todos: el portero también busca días anteriores. */}
+      {(['desde', 'hasta'] as const).map((k) => (
+        <label key={k} className="flex items-center gap-2 text-secundario">
+          <span className="text-texto-apagado">{k === 'desde' ? 'Desde' : 'Hasta'}</span>
+          <input
+            type="datetime-local"
+            value={f[k]}
+            onChange={(e) => cambiar({ [k]: e.target.value })}
+            className={CLASE_CAMPO}
+          />
+        </label>
+      ))}
+      {rangoAjustado ? (
+        <span role="status" className="text-secundario text-aviso-texto">
+          Fechas incompletas o al revés: se muestran los últimos 7 días.
+        </span>
+      ) : null}
       <Seleccion etiqueta="Tipo" valor={f.tipo} alCambiar={(tipo) => cambiar({ tipo })}>
         {TIPOS_DE_LA_LINEA.map((t) => (
           <option key={t.valor} value={t.valor}>

@@ -41,8 +41,11 @@ const ROLES_CON_PADRON: readonly Rol[] = ['administrador', 'superadministrador']
  * búsqueda. Se refresca sola cuando el canal en vivo trae algo nuevo.
  *
  * **Se conservan todos los eventos** (RN-03, CA-23, ADR-05). Al portero se le
- * limpia la VISTA: su día y, si pulsó «Limpiar», desde ese instante. La
- * administración, la superadministración y la central lo ven todo, sin corte.
+ * limpia la vista DEL DÍA: sin filtros ve su día y, si pulsó «Limpiar», desde
+ * ese instante. En cuanto toca las fechas o un filtro, busca como la
+ * administración, también días anteriores (D-146); «Borrar filtros» lo
+ * devuelve a su día. La administración, la superadministración y la central
+ * lo ven todo, sin corte.
  *
  * **El banner de alertas críticas va arriba y no se puede descartar** (CA-18).
  * Ni el corte del portero ni «Limpiar» lo tocan: una alerta abierta sigue
@@ -107,13 +110,14 @@ export const PantallaDeEventos = ({
       ),
   });
 
-  // El corte del portero, también en lo que se ENSEÑA: lo que se conserva de
-  // la consulta anterior mientras llega la nueva (o de la caché) no puede
-  // saltarse su «Limpiar». Las horas son ISO en UTC: se comparan como texto.
+  // El corte de la vista del día del portero, también en lo que se ENSEÑA: lo
+  // que se conserva de la consulta anterior mientras llega la nueva (o de la
+  // caché) no puede saltarse su «Limpiar». Una búsqueda no se recorta (D-146).
+  // Las horas son ISO en UTC: se comparan como texto.
   const recibidas = consulta.data?.elementos ?? [];
   const filas = !vista.lista
     ? []
-    : vista.delPortero
+    : rango.delDia
       ? recibidas.filter((e) => e.ocurridoEn >= desde && e.ocurridoEn < hasta)
       : recibidas;
 
@@ -181,7 +185,7 @@ export const PantallaDeEventos = ({
                   ? 'Sin conexión en vivo'
                   : 'Conectando…'}
             </span>
-            {vista.delPortero ? (
+            {rango.delDia ? (
               <Boton variante="secundario" onClick={vista.limpiar}>
                 Limpiar
               </Boton>
@@ -199,10 +203,10 @@ export const PantallaDeEventos = ({
         }
       />
 
-      {vista.delPortero ? (
+      {rango.delDia ? (
         <p role="note" className="mb-3 text-secundario text-texto-apagado">
-          Hoy, desde las {horaEnZona(rango.desde)}. Sólo limpia esta vista. El historial completo lo
-          conserva la administración.
+          Hoy, desde las {horaEnZona(rango.desde)}. Limpia sólo la vista de hoy. Para ver días
+          anteriores, use las fechas y los filtros.
         </p>
       ) : null}
 
@@ -244,7 +248,6 @@ export const PantallaDeEventos = ({
             filtros={filtros}
             cambiar={(parcial) => setFiltros((f) => ({ ...f, ...parcial }))}
             borrar={() => setFiltros(SIN_FILTROS)}
-            delPortero={vista.delPortero}
             conPadron={conPadron}
             rangoAjustado={rango.ajustado}
             equipos={listaDeEquipos}
@@ -252,7 +255,7 @@ export const PantallaDeEventos = ({
           />
         }
         vacio={
-          vista.delPortero
+          rango.delDia
             ? {
                 titulo: 'Nada todavía',
                 descripcion:

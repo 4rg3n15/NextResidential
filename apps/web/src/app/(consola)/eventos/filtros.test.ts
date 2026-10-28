@@ -45,10 +45,38 @@ describe('D-145 · la hora de Bogotá, no la del navegador', () => {
 });
 
 describe('D-145 · el rango que ve cada rol', () => {
-  it('el portero ve sólo su día de Bogotá, aunque pida otras fechas', () => {
-    const f = { ...SIN_FILTROS, desde: '2026-01-01T00:00', hasta: '2026-12-31T23:59' };
-    const r = rangoDeLaVista(f, { delPortero: true, limpiadoEn: null }, AHORA);
+  it('el portero sin filtros ve su día de Bogotá: la vista del día', () => {
+    const r = rangoDeLaVista(SIN_FILTROS, { delPortero: true, limpiadoEn: null }, AHORA);
     expect([r.desde.toISOString(), r.hasta.toISOString()]).toEqual([INICIO_25, INICIO_26]);
+    expect(r.delDia).toBe(true);
+  });
+
+  it('D-146 · el portero que pone fechas ve el rango que pidió, días anteriores incluidos', () => {
+    const f = { ...SIN_FILTROS, desde: '2026-10-22T00:00' };
+    const r = rangoDeLaVista(f, { delPortero: true, limpiadoEn: null }, AHORA);
+    expect([r.desde.toISOString(), r.hasta.toISOString()]).toEqual([
+      '2026-10-22T05:00:00.000Z',
+      INICIO_26,
+    ]);
+    expect(r.delDia).toBe(false);
+  });
+
+  it('D-146 · «Limpiar» no recorta una búsqueda, tampoco una sin fechas', () => {
+    const limpio = new Date('2026-10-26T03:00:00.000Z');
+    const conFechas = rangoDeLaVista(
+      { ...SIN_FILTROS, desde: '2026-10-25T06:00' },
+      { delPortero: true, limpiadoEn: limpio },
+      AHORA,
+    );
+    expect(conFechas.desde.toISOString()).toBe('2026-10-25T11:00:00.000Z');
+    // Sólo con un filtro, sin fechas: lo mismo que la administración, 7 días.
+    const soloPlaca = rangoDeLaVista(
+      { ...SIN_FILTROS, placa: 'ABC123' },
+      { delPortero: true, limpiadoEn: limpio },
+      AHORA,
+    );
+    expect(soloPlaca.desde.toISOString()).toBe('2026-10-18T05:00:00.000Z');
+    expect(soloPlaca.delDia).toBe(false);
   });
 
   it('tras «Limpiar», desde ese instante; un «Limpiar» de ayer ya no cuenta', () => {
