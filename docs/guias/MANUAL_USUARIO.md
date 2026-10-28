@@ -403,7 +403,8 @@ que se ve**: el mismo rango y los mismos filtros.
 
 **La administración lo conserva todo.** La administración, la
 superadministración y la central ven el historial completo: no tienen botón
-«Limpiar» ni corte diario. El del portero (§4) es sólo una vista.
+«Limpiar» ni corte diario. El del portero (§4) es sólo su vista del día: buscando, también ve
+días anteriores (D-146).
 
 Cuatro informes, exportables: accesos por periodo, visitantes frecuentes, uso de
 zonas y auditoría de sistema. **Cada informe dice lo que NO puede afirmar**: si
@@ -473,16 +474,24 @@ videoportero, use **Guardia virtual** (§5). «Última orden: …» dice lo que
 
 ### Su vista de «Eventos y alertas»
 
-Cada día empieza **vacía**: usted ve lo que pasó **hoy**, desde las 00:00 de
-Bogotá, y a medianoche se limpia sola. Si quiere empezar de cero a mitad de
-turno, pulse **«Limpiar»**: deja de ver lo anterior a ese instante. Junto al
-botón se lee: «Sólo limpia esta vista. El historial completo lo conserva la
-administración». Es literal: **ningún evento se borra** (RN-03); la
-administración lo sigue viendo todo. «Limpiar» se recuerda en ese navegador
-hasta el final del día; las **alertas abiertas no se limpian**: siguen ahí hasta
-que alguien las atiende. Los demás filtros del buscador (§3.5) los tiene
-todos menos las fechas, la vivienda y la persona: esos dos salen del padrón,
-que es de la administración.
+Cada día empieza **vacía**: al abrirla, sin filtros, usted ve lo que pasó
+**hoy**, desde las 00:00 de Bogotá, y a medianoche se limpia sola. Si quiere
+empezar de cero a mitad de turno, pulse **«Limpiar»**: deja de ver lo anterior
+a ese instante. Junto al botón se lee: «Limpia sólo la vista de hoy. Para ver
+días anteriores, use las fechas y los filtros».
+
+**Usted también puede consultar días anteriores** (D-146, decisión del cliente
+del 27/10). En cuanto cambia «Desde», «Hasta» o cualquier filtro, la pantalla
+busca como la de la administración: el rango que pidió, días anteriores
+incluidos; si sólo pone un filtro, como una placa, mira los últimos 7 días. Ni
+el corte del día ni «Limpiar» recortan una búsqueda. **«Borrar filtros»** lo
+devuelve a su vista de hoy, con su «Limpiar» si lo pulsó.
+
+**Ningún evento se borra** (RN-03): «Limpiar» sólo cambia lo que usted ve. Se
+recuerda en ese navegador hasta el final del día, y las **alertas abiertas no se
+limpian**: siguen ahí hasta que alguien las atiende. Tiene todos los filtros del
+buscador (§3.5) menos la vivienda y la persona, que salen del padrón, y el
+padrón es de la administración.
 
 En Portería **no hay audio**: hablar con el visitante por el videoportero se
 hace desde Guardia virtual.

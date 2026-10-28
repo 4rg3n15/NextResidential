@@ -127,13 +127,21 @@ export interface RangoDeLaVista {
   readonly hasta: Date;
   /** Con fechas incompletas o al revés se enseña lo de por omisión, y se dice. */
   readonly ajustado: boolean;
+  /**
+   * `true` en la vista POR OMISIÓN del portero (sin filtros tocados): su día,
+   * con el corte de medianoche y el de «Limpiar». Una búsqueda nunca lo es.
+   */
+  readonly delDia: boolean;
 }
 
 /**
  * El rango que se pide.
  *
- * · **Portero**: sólo HOY en Bogotá —el corte diario es automático— y, si
- *   pulsó «Limpiar» hoy, desde ese instante.
+ * · **Portero sin filtros**: su vista por omisión. Sólo HOY en Bogotá —el
+ *   corte diario es automático— y, si pulsó «Limpiar» hoy, desde ese instante.
+ * · **Portero que busca** (D-146, decisión del cliente del 27/10): en cuanto
+ *   toca las fechas o cualquier filtro, lo mismo que la administración. El
+ *   corte del día y el de «Limpiar» no recortan una búsqueda.
  * · **Resto** (administración, superadministración, central): lo que pidan,
  *   sin corte; por omisión los últimos 7 días.
  */
@@ -145,15 +153,16 @@ export const rangoDeLaVista = (
 ): RangoDeLaVista => {
   const finDeHoy = finDelDiaEnZona(ahora, zona);
   const inicioDeHoy = inicioDelDiaEnZona(ahora, zona);
-  if (vista.delPortero) {
+  if (vista.delPortero && !hayFiltros(f)) {
     const limpio = vista.limpiadoEn;
     const desde =
       limpio !== null && limpio > inicioDeHoy && limpio < finDeHoy ? limpio : inicioDeHoy;
-    return { desde, hasta: finDeHoy, ajustado: false };
+    return { desde, hasta: finDeHoy, ajustado: false, delDia: true };
   }
   const porOmision = {
     desde: inicioDelDiaEnZona(new Date(ahora.getTime() - 7 * 86_400_000), zona),
     hasta: finDeHoy,
+    delDia: false,
   };
   const desde = f.desde === '' ? porOmision.desde : instanteDeLocal(f.desde, zona);
   // `hasta` incluye el minuto escrito entero: el fin es exclusivo en el dominio.
@@ -161,7 +170,7 @@ export const rangoDeLaVista = (
   const hasta =
     f.hasta === '' ? porOmision.hasta : hastaEscrito && new Date(hastaEscrito.getTime() + 60_000);
   if (desde === null || hasta === null || desde >= hasta) return { ...porOmision, ajustado: true };
-  return { desde, hasta, ajustado: false };
+  return { desde, hasta, ajustado: false, delDia: false };
 };
 
 /** Los filtros de ACCESO, comunes a la línea de tiempo y a la exportación. */

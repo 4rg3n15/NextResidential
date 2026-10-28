@@ -19,7 +19,8 @@ const AHORA = new Date('2026-10-26T03:30:00.000Z');
 const INICIO_25 = '2026-10-25T05:00:00.000Z';
 const PERSONA = '30000000-0000-4000-8000-000000000001';
 const OPERADOR = '00000000-0000-4000-8000-000000000010';
-const AVISO = /Sólo limpia esta vista\. El historial completo lo conserva la administración/;
+const AVISO =
+  /Limpia sólo la vista de hoy\. Para ver días anteriores, use las fechas y los filtros/;
 
 const elemento = (extra: Partial<ElementoDeLineaDeTiempo>): ElementoDeLineaDeTiempo => ({
   origen: 'acceso',
@@ -133,8 +134,8 @@ describe('D-145 · el portero ve su día de Bogotá y puede limpiar la vista', (
     expect(ultimaLinea().searchParams.get('desde')).toBe(INICIO_25);
     expect(screen.getByText(AVISO)).toBeDefined();
     expect(screen.getByText(/Hoy, desde las 00:00/)).toBeDefined();
-    // Sin fechas que elegir: su vista es su día. El resto de filtros, sí.
-    expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
+    // D-146 · sin filtros ve su día, pero tiene las fechas para buscar otros.
+    expect(document.querySelectorAll('input[type="datetime-local"]')).toHaveLength(2);
     expect(screen.getByLabelText('Placa')).toBeDefined();
   });
 
