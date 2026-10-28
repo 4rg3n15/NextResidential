@@ -411,6 +411,22 @@ zonas y auditoría de sistema. **Cada informe dice lo que NO puede afirmar**: si
 un dato no se distingue, sale escrito junto al resultado en vez de dejar que
 alguien lo cite como si lo supiera.
 
+**Respaldos diarios** (D-147, al final de «Informes»; sólo superadministración y
+la administración de su copropiedad). Cada día a las **00:15 de Bogotá** se
+guarda el Excel de los eventos del día anterior —de 00:00 a 24:00 de Bogotá,
+con las columnas del buscador— en un almacén privado, y se envía por correo a
+los **superadministradores activos**, a la dirección de su cuenta. El asunto es
+«Eventos del AAAA-MM-DD · copropiedad» y el cuerpo trae el número de eventos,
+permitidos, negados y la **huella SHA-256** del fichero: con ella se comprueba
+que el adjunto y el descargado son el mismo. Si el fichero pasa de 10 MB, el
+correo trae un enlace que vale 24 horas en vez del adjunto. La lista muestra
+cada día con su estado de envío («Enviado», «Falló · se reintenta», «Correo sin
+configurar», «Pendiente») y un botón **Descargar** que pide un enlace de cinco
+minutos al pulsarlo. Un día ya guardado no se vuelve a generar; un envío fallido
+se reintenta en la siguiente ejecución; si el servidor estuvo apagado, se
+recuperan hasta 31 días, con un máximo de 7 correos por vez. **Es una copia**:
+el histórico entero sigue en «Eventos y alertas».
+
 ---
 
 ## 4 · Portero / Seguridad

@@ -75,6 +75,37 @@ else
   echo "base ${PGDATABASE} recreada vacía"
 fi
 
+# D-147 · el esquema `storage` de Supabase, en DOBLE. Lo trae la PLATAFORMA
+# —como `service_role` y `supabase_auth_admin`—, así que una migración no lo
+# crea: la 0061 crea el bucket privado y su política de lectura SÓLO donde
+# existe. Sin este doble, esa rama no se ejercería en ninguna parte antes de
+# llegar a Supabase. Es lo mínimo que la política necesita: `buckets` y
+# `objects` con RLS, dueño `supabase_storage_admin` (como en Supabase), y el
+# rol que aplica las migraciones como miembro, que es lo que le deja declarar
+# políticas sobre `storage.objects` ([SUPUESTO] S-147-03, comprobable en el
+# proyecto real con `SELECT pg_has_role('postgres','supabase_storage_admin','MEMBER')`).
+psql -d postgres -Atqc "DO \$\$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_storage_admin') THEN
+      CREATE ROLE supabase_storage_admin NOLOGIN NOINHERIT;
+    END IF;
+  END \$\$;" >/dev/null 2>&1 || true
+psql -d "$PGDATABASE" -v ON_ERROR_STOP=1 -Atq >/dev/null <<SQL
+CREATE SCHEMA IF NOT EXISTS storage AUTHORIZATION supabase_storage_admin;
+CREATE TABLE IF NOT EXISTS storage.buckets (
+  id text PRIMARY KEY, name text NOT NULL, public boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS storage.objects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text REFERENCES storage.buckets(id), name text NOT NULL, owner uuid NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), metadata jsonb NULL);
+ALTER TABLE storage.buckets OWNER TO supabase_storage_admin;
+ALTER TABLE storage.objects OWNER TO supabase_storage_admin;
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT supabase_storage_admin TO ${APLICADOR};
+SQL
+# Las concesiones a `anon` y `authenticated` van DESPUÉS de las migraciones:
+# esos roles los crea la 0001.
+
 for f in supabase/migrations/*.sql; do
   printf '  %-62s' "$(basename "$f")"
   psql -d "$PGDATABASE" -U "$APLICADOR" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null
@@ -102,6 +133,11 @@ done
 # aquí en la dirección contraria: no daba un verde falso, dejaba la suite sin
 # poder correr.
 psql -d postgres -Atqc "GRANT anon, authenticated, service_role, supabase_auth_admin TO ${APLICADOR} WITH SET TRUE;" >/dev/null 2>&1 || true
+# D-147 · como en Supabase, los roles de la API tienen privilegio sobre
+# `storage.objects` y es la RLS quien decide qué filas ven.
+psql -d "$PGDATABASE" -Atqc "GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects, storage.buckets TO authenticated, service_role;
+  GRANT SELECT ON storage.objects, storage.buckets TO anon;" >/dev/null
 
 if [[ "${1:-}" == "--con-semillas" || "${1:-}" == "--con-pruebas" ]]; then
   printf '  %-62s' "seed.sql"

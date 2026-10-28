@@ -2193,6 +2193,70 @@ try {
         : mal(`una acotación a ciegas NO se detecta (codigo ${r.codigo})`);
     }
 
+    // (d2) D-147 · una dependencia de npm acotada que vuelve a ser un rango.
+    {
+      const api = join(arbol13, 'npm-con-rango', 'apps', 'api');
+      mkdirSync(api, { recursive: true });
+      writeFileSync(
+        join(api, 'package.json'),
+        JSON.stringify({ dependencies: { nodemailer: '^10.1.0' } }),
+      );
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: join(arbol13, 'npm-con-rango'),
+      });
+      r.codigo !== 0 && /nodemailer.*\^10\.1\.0/.test(r.salida)
+        ? ok('dependencias-acotadas: una dependencia de npm acotada con RANGO se detecta')
+        : mal(`nodemailer con rango NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (d3) D-147 · la dependencia acotada en un manifiesto que no es el suyo.
+    {
+      const raizNpm = join(arbol13, 'npm-en-otro-manifiesto');
+      for (const app of ['api', 'web']) {
+        mkdirSync(join(raizNpm, 'apps', app), { recursive: true });
+        writeFileSync(
+          join(raizNpm, 'apps', app, 'package.json'),
+          JSON.stringify({ dependencies: { nodemailer: '10.1.0' } }),
+        );
+      }
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: raizNpm,
+      });
+      r.codigo !== 0 && /nodemailer.*apps\/web\/package\.json/.test(r.salida)
+        ? ok('dependencias-acotadas: la dependencia acotada en OTRO manifiesto se detecta')
+        : mal(`nodemailer en otro manifiesto NO se detecta (codigo ${r.codigo})`);
+    }
+
+    // (d4) Y el caso legítimo: versión exacta en su manifiesto, aunque esté en
+    // devDependencies y haya ficheros sueltos y paquetes sin manifiesto.
+    {
+      const raizNpm = join(arbol13, 'npm-legitimo');
+      mkdirSync(join(raizNpm, 'apps', 'api'), { recursive: true });
+      mkdirSync(join(raizNpm, 'packages', 'sin-manifiesto'), { recursive: true });
+      writeFileSync(join(raizNpm, 'apps', 'LEEME.md'), 'no es un paquete\n');
+      writeFileSync(join(raizNpm, 'package.json'), JSON.stringify({ name: 'raiz' }));
+      // Con la app móvil bien acotada, como el árbol real: el aviso de éxito es verdad.
+      mkdirSync(join(raizNpm, 'apps', 'mobile'), { recursive: true });
+      writeFileSync(
+        join(raizNpm, 'apps', 'mobile', 'pubspec.yaml'),
+        'name: ncr\ndependency_overrides:\n  path_provider_foundation: 2.5.1\n',
+      );
+      writeFileSync(join(raizNpm, 'apps', 'mobile', 'pubspec.lock'), 'packages:\n');
+      writeFileSync(
+        join(raizNpm, 'apps', 'api', 'package.json'),
+        JSON.stringify({
+          dependencies: { otra: '1.0.0' },
+          devDependencies: { nodemailer: '10.1.0' },
+        }),
+      );
+      const r = correr('node', [join(raiz, 'scripts/lib/dependencias-acotadas.mjs')], {
+        cwd: raizNpm,
+      });
+      r.codigo === 0 && /1 de npm a versión exacta con motivo \(nodemailer\)/.test(r.salida)
+        ? ok('dependencias-acotadas: la versión exacta en su manifiesto se ACEPTA')
+        : mal(`el caso legítimo de npm se rechaza (codigo ${r.codigo}): ${r.salida.slice(0, 200)}`);
+    }
+
     // (e) verificar-escritura · una ruta que NO se puede usar.
     {
       /**

@@ -1,4 +1,5 @@
 import { ESQUEMA_DE_AVISOS, problemaDeAvisos } from './esquema-de-avisos';
+import { ESQUEMA_DE_CORREO, problemaDeCorreo } from './esquema-de-correo';
 import { ESQUEMA_DE_DESPLIEGUE } from './esquema-de-despliegue';
 import { ESQUEMA_DE_ICE, problemaDeIce } from './esquema-de-ice';
 import { ESQUEMA_DE_ROSTRO } from './esquema-de-rostro';
@@ -16,6 +17,7 @@ import { ESQUEMA_DE_ROSTRO } from './esquema-de-rostro';
  *  · Avisos (15-R, B2): Web Push con VAPID; las tres llaves o ninguna.
  *  · Despliegue (15-R, D4): el secreto con que la consola firma la IP.
  *  · Rostro (15-X, D2): la retención del rostro del residente.
+ *  · Correo (D-147): el SMTP del respaldo diario; las cinco o ninguna.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export const ESQUEMAS_ADICIONALES = {
@@ -23,10 +25,13 @@ export const ESQUEMAS_ADICIONALES = {
   ...ESQUEMA_DE_AVISOS,
   ...ESQUEMA_DE_DESPLIEGUE,
   ...ESQUEMA_DE_ROSTRO,
+  ...ESQUEMA_DE_CORREO,
 };
 
-type Cruda = Parameters<typeof problemaDeIce>[0] & Parameters<typeof problemaDeAvisos>[0];
+type Cruda = Parameters<typeof problemaDeIce>[0] &
+  Parameters<typeof problemaDeAvisos>[0] &
+  Parameters<typeof problemaDeCorreo>[0];
 
 /** El primer problema de combinación entre variables, o `null`. */
 export const problemaAdicional = (c: Cruda): string | null =>
-  problemaDeIce(c) ?? problemaDeAvisos(c);
+  problemaDeIce(c) ?? problemaDeAvisos(c) ?? problemaDeCorreo(c);

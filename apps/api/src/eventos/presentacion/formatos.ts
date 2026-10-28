@@ -91,13 +91,16 @@ const escaparXml = (valor: string): string =>
  * emitir sin dependencias; el `.xlsx` moderno es un ZIP con varias partes y
  * exigiría una biblioteca para ganar formato que este informe no necesita.
  */
-export const aExcel = (filas: readonly EventoRegistrado[]): Buffer => {
+export const aExcelCon = <T>(
+  filas: readonly T[],
+  columnas: readonly (readonly [string, (f: T) => string])[],
+): Buffer => {
   const celda = (valor: string): string =>
     `<Cell><Data ss:Type="String">${escaparXml(valor)}</Data></Cell>`;
   const cuerpo = filas
-    .map((f) => `<Row>${COLUMNAS.map(([, leer]) => celda(leer(f))).join('')}</Row>`)
+    .map((f) => `<Row>${columnas.map(([, leer]) => celda(leer(f))).join('')}</Row>`)
     .join('');
-  const encabezado = `<Row>${COLUMNAS.map(([t]) => celda(t)).join('')}</Row>`;
+  const encabezado = `<Row>${columnas.map(([t]) => celda(t)).join('')}</Row>`;
 
   return Buffer.from(
     `<?xml version="1.0" encoding="UTF-8"?>` +
@@ -109,6 +112,9 @@ export const aExcel = (filas: readonly EventoRegistrado[]): Buffer => {
     'utf8',
   );
 };
+
+/** La exportación del histórico (HU-32), con sus columnas de siempre. */
+export const aExcel = (filas: readonly EventoRegistrado[]): Buffer => aExcelCon(filas, COLUMNAS);
 
 /** Diacríticos sueltos tras normalizar en NFD. */
 const DIACRITICOS = /[\u0300-\u036F]/g;

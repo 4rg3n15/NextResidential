@@ -13,6 +13,7 @@ export const UNIDAD_DE_TRABAJO = Symbol.for('ncr.puerto.UnidadDeTrabajo');
 export const BUS_DE_EVENTOS = Symbol.for('ncr.puerto.BusDeEventos');
 export const NOTIFICADOR = Symbol.for('ncr.puerto.Notificador');
 export const ALMACEN_EVIDENCIA = Symbol.for('ncr.puerto.AlmacenEvidencia');
+export const CORREO_SALIENTE = Symbol.for('ncr.puerto.CorreoSaliente');
 export const REGISTRO_IDEMPOTENCIA = Symbol.for('ncr.puerto.RegistroDeIdempotencia');
 
 export const VIVIENDA_REPO = Symbol.for('ncr.puerto.ViviendaRepo');

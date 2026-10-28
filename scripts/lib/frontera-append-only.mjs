@@ -47,6 +47,9 @@ const APPEND_ONLY = [
   'eventos_de_equipo',
   // ETAPA 15-P · el rastro de cada conversación de audio de la guardia.
   'conversaciones_de_guardia',
+  // D-147 · el respaldo diario de los eventos y cada intento de enviarlo.
+  'respaldos_de_eventos',
+  'envios_de_respaldo',
 ];
 
 /**

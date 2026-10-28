@@ -94,7 +94,8 @@ const SIN_DATOS_DE_ACCESO = {
   operador: null,
 } as const;
 
-const MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
+/** También los usa el respaldo diario (D-147): un solo texto por motivo. */
+export const MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   VIGENCIA_EXPIRADA: 'autorización fuera de vigencia',
   AFORO_SUPERADO: 'aforo de la zona completo',
   LISTA_NEGRA: 'persona o placa en lista negra',
@@ -107,7 +108,7 @@ const MOTIVO: Readonly<Record<MotivoAcceso, string>> = {
   FALLO_TECNICO: 'sin datos para decidir',
 };
 
-const METODO: Readonly<Record<string, string>> = {
+export const METODO: Readonly<Record<string, string>> = {
   placa: 'placa',
   facial: 'rostro',
   manual: 'a mano',

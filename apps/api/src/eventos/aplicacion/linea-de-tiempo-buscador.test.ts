@@ -47,6 +47,7 @@ const NOMBRES: NombresDeEventos = {
   personas: new Map([[PERSONA, { nombre: 'Laura Gómez', clase: 'residente' as const }]]),
   viviendas: new Map([[VIVIENDA, 'Casa 12']]),
   operadores: new Map([[OPERADOR, 'Pedro Portero']]),
+  dispositivos: new Map(),
 };
 
 const montar = async (filas: readonly EventoRegistrado[]) => {

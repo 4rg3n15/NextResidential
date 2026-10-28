@@ -233,11 +233,12 @@ export class PlanificadorPgBoss implements Planificador, ColaAPedido {
         }
       });
       await boss.schedule(trabajo.nombre, trabajo.cron, undefined, {
-        tz: this.opciones.zonaHoraria ?? ZONA_POR_OMISION,
+        tz: trabajo.zonaHoraria ?? this.opciones.zonaHoraria ?? ZONA_POR_OMISION,
       });
       this.opciones.bitacora.registrar('info', 'trabajo programado dado de alta', {
         trabajo: trabajo.nombre,
         cron: trabajo.cron,
+        zonaHoraria: trabajo.zonaHoraria ?? this.opciones.zonaHoraria ?? ZONA_POR_OMISION,
         descripcion: trabajo.descripcion,
       });
     }

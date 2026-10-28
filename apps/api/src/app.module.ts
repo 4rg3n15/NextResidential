@@ -17,7 +17,7 @@ import { MultiempresaModule } from './multiempresa/multiempresa.module';
 import { PoolModule } from './persistencia/pool.module';
 import { PadronModule } from './padron';
 import { AutorizacionesModule } from './autorizaciones';
-import { EventosModule } from './eventos';
+import { EventosModule, RespaldoDeEventosModule } from './eventos';
 import { ZonasModule } from './zonas';
 import { ProveedoresModule } from './proveedores';
 import { BiometriaModule } from './biometria';
@@ -165,6 +165,8 @@ export class AppModule {
         ZonasModule.registrar(),
         BiometriaModule.registrar(),
         EventosModule.registrar(),
+        // D-147 · el respaldo diario: lee `eventos` por el puerto que exporta EventosModule.
+        RespaldoDeEventosModule.registrar(),
         AutorizacionesModule.registrar(),
         // Después de eventos y autorizaciones: la guardia lee la cola del
         // repositorio de eventos y escala por el mismo camino que la ingesta.

@@ -8,8 +8,13 @@ export const PLANIFICADOR = Symbol.for('ncr.puerto.Planificador');
 export interface TrabajoProgramado {
   /** Nombre estable: es la CLAVE de la cola. Cambiarlo crea una cola nueva. */
   readonly nombre: string;
-  /** Expresión cron de cinco campos, en UTC. */
+  /** Expresión cron de cinco campos, en UTC salvo que el trabajo declare su zona. */
   readonly cron: string;
+  /**
+   * D-147 · la zona IANA en que se lee `cron`. El respaldo diario corre a las
+   * 00:15 de Bogotá, no de UTC; sin ella, la del planificador (UTC).
+   */
+  readonly zonaHoraria?: string;
   /** Qué hace y por qué necesita un planificador. Sale en el registro. */
   readonly descripcion: string;
   /**

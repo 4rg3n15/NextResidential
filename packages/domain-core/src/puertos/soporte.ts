@@ -34,6 +34,45 @@ export interface Notificador {
   notificar(destinatarioId: string, asunto: string, cuerpo: string): Promise<void>;
 }
 
+/**
+ * D-147 · CORREO SALIENTE CON ADJUNTOS. Puerto pequeño y aparte (§2.3 ISP):
+ * `Notificador` lleva un aviso a una persona del sistema y no admite adjuntos;
+ * esto manda un fichero a direcciones de correo. Mezclarlos obligaría a uno de
+ * los dos adaptadores a implementar lo que no hace.
+ *
+ * No lanza: el resultado es un dato (§2.4). `sin-configurar` no es un error —
+ * el despliegue puede no tener SMTP— y quien llama decide qué constancia deja.
+ */
+export interface AdjuntoDeCorreo {
+  readonly nombre: string;
+  readonly tipoMime: string;
+  readonly contenido: Uint8Array;
+}
+
+export interface CorreoAEnviar {
+  readonly destinatarios: readonly string[];
+  readonly asunto: string;
+  readonly cuerpo: string;
+  readonly adjuntos: readonly AdjuntoDeCorreo[];
+}
+
+export type ResultadoDeCorreo =
+  /**
+   * Aceptado por el servidor. `rechazados` son las direcciones que el servidor
+   * NO aceptó aunque el envío saliera para las demás: sin esto, un destinatario
+   * rechazado constaría como enviado y no se le reintentaría nunca.
+   */
+  | { readonly estado: 'enviado'; readonly rechazados: readonly string[] }
+  | { readonly estado: 'sin-configurar' }
+  /** El motivo, sin secretos ni contenido del correo. */
+  | { readonly estado: 'error'; readonly detalle: string };
+
+export interface CorreoSaliente {
+  /** `false` sin SMTP declarado: quien llama no prepara un correo que no saldrá. */
+  readonly configurado: boolean;
+  enviar(correo: CorreoAEnviar): Promise<ResultadoDeCorreo>;
+}
+
 export interface AlmacenEvidencia {
   guardar(clave: string, contenido: Uint8Array, tipoMime: string): Promise<string>;
   urlFirmada(clave: string, segundosDeVida: number): Promise<string>;

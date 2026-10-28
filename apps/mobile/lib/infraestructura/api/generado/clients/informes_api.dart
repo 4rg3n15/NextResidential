@@ -5,7 +5,10 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
+import '../models/descarga_de_respaldo_dto.dart';
 import '../models/informe_dto.dart';
+import '../models/parte_del_respaldo_dto.dart';
+import '../models/respaldo_diario_dto.dart';
 import '../models/tipo3.dart';
 
 part 'informes_api.g.dart';
@@ -23,5 +26,24 @@ abstract class InformesApi {
     @Query('tipo') Tipo3? tipo,
     @Query('viviendaId') String? viviendaId,
     @Query('dispositivoId') String? dispositivoId,
+  });
+
+  /// Respaldos diarios de los eventos, del más reciente al más antiguo
+  @GET('/copropiedades/{id}/respaldos')
+  Future<List<RespaldoDiarioDto>> respaldosControllerListar({
+    @Path('id') required String id,
+  });
+
+  /// Ejecuta el respaldo de esta copropiedad a mano (idempotente; superadministración)
+  @POST('/copropiedades/{id}/respaldos/ejecucion')
+  Future<ParteDelRespaldoDto> respaldosControllerEjecutar({
+    @Path('id') required String id,
+  });
+
+  /// URL firmada de vida corta para descargar el respaldo de un día
+  @GET('/copropiedades/{id}/respaldos/{fecha}/descarga')
+  Future<DescargaDeRespaldoDto> respaldosControllerDescargar({
+    @Path('id') required String id,
+    @Path('fecha') required String fecha,
   });
 }

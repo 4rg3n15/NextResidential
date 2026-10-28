@@ -13,6 +13,7 @@ import { CabeceraDeTarjeta, CuerpoDeTarjeta, Tarjeta } from '@/componentes/ui/ta
 import { EstadoCargando, EstadoVacio, estadoSegunCodigo } from '@/componentes/estados';
 import { ErrorDeApi } from '@/lib/api/cliente';
 import { useInforme } from '@/lib/api/consultas';
+import { RespaldosDiarios } from './respaldos-diarios';
 
 const TIPOS: readonly { readonly valor: TipoDeInforme; readonly etiqueta: string }[] = [
   { valor: 'accesos_por_periodo', etiqueta: 'Accesos por periodo' },
@@ -237,6 +238,9 @@ export const PantallaDeInformes = ({
           />
         </>
       ) : null}
+
+      {/* D-147 · la copia diaria de los eventos, con su descarga. */}
+      <RespaldosDiarios copropiedadId={copropiedadId} />
     </>
   );
 };

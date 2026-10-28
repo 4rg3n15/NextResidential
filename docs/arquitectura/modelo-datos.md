@@ -1206,6 +1206,32 @@ de X sigue sin ver a un usuario de otra copropiedad sin rol en X, ni a los actor
 sin copropiedad. Sólo lectura. Prueba: `99p_servicio_lee_operadores.sql`, que falla con la
 0060 revertida; `99k` se ajustó a la decisión. Reversión: `supabase/reversion/0060_revert.sql`.
 
+**D-147 · migración 0061 · el respaldo diario de los eventos.** Cada día a las 00:15 de
+Bogotá se guarda el Excel de los eventos del día anterior y se envía a los
+superadministradores. **`eventos` sólo se lee.** Lo nuevo:
+
+- `respaldos_de_eventos`: una fila por copropiedad y día (`UNIQUE (copropiedad_id, fecha)`)
+  con la ruta del fichero, sus cifras (eventos, permitidos, negados), su SHA-256 y su tamaño.
+  La ruta la fija un `CHECK`: `<copropiedad_id>/<AAAA>/<MM>/eventos-<AAAA-MM-DD>.xls`.
+- `envios_de_respaldo`: **una fila por intento y destinatario** (`enviado`, `error` o
+  `sin_configurar`). El estado de un día es el último intento de cada destinatario: reintentar
+  es insertar, nunca reescribir (C-68). La existencia del respaldo la comprueba un trigger
+  (`app.tg_envio_respaldo_existe`), no una clave ajena: ninguna clave ajena apunta a una tabla
+  append-only (`frontera-append-only.mjs`).
+- Las dos, **append-only como `eventos`** (ADR-005): `REVOKE UPDATE, DELETE, TRUNCATE` también
+  al dueño, triggers `tg_prohibir_update/delete` en `ENABLE ALWAYS`, RLS forzada y aserción de
+  despliegue que verifica `tgenabled`.
+- RLS: leen el superadministrador y la administración de esa copropiedad (y el servicio de
+  ella); sólo el servicio de la copropiedad inserta. El portero, el residente y otra
+  copropiedad no ven nada.
+- Bucket **privado** `respaldo-de-eventos` (si existe `storage.buckets`, es decir, en
+  Supabase): política de sólo lectura para el superadministrador y la administración de la
+  copropiedad del primer segmento de la ruta. La API escribe con la llave secreta y sirve la
+  descarga con URL firmada de 5 minutos (RN-21).
+
+Prueba: `99q_respaldo_diario.sql`. Reversión: `supabase/reversion/0061_revert.sql` (borra las
+dos tablas y la política; conserva el bucket y sus ficheros).
+
 #### `evidencias` — tenant ✔
 
 | Columna                   | Tipo                      | Restricción                                                          | Justificación                                      |

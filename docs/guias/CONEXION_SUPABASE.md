@@ -961,3 +961,57 @@ la API leen la credencial y acreditan la cámara con la nueva; repetir no cambia
 un byte; un sobre vigente de una tercera llave detiene la rotación sin tocar su
 copropiedad; el historial de una llave más antigua se cuenta y no se toca; y ni
 la constancia ni los errores contienen una llave o un secreto.
+
+---
+
+## 14. Respaldo diario de los eventos (D-147): bucket y correo
+
+**Qué hace.** A las 00:15 de Bogotá, la API guarda en el bucket privado
+`respaldo-de-eventos` el Excel de los eventos del día anterior de cada
+copropiedad (`<copropiedadId>/<AAAA>/<MM>/eventos-<AAAA-MM-DD>.xls`), deja
+constancia en `respaldos_de_eventos` (con su SHA-256) y lo envía a los
+superadministradores activos. Sólo LEE `eventos` (RN-03).
+
+### 14.1 Bucket
+
+- [ ] `supabase db push` aplica la **0061**: crea las dos tablas append-only y el
+      bucket `respaldo-de-eventos` **privado**, con su política de sólo lectura
+      (superadministración y la administración de la copropiedad). No hay que
+      crearlo a mano.
+- [ ] La API lo usa cuando `PERSISTENCIA_DE_EVENTOS=postgres` y `EVIDENCIA_BUCKET`
+      está declarada (S-147-04). Si no, el respaldo vive en memoria y el arranque
+      lo dice: `bucket privado del respaldo de eventos: SIN CONFIGURAR`.
+- [ ] Al arrancar, la API comprueba que el bucket existe y **no es público**.
+
+### 14.2 Correo (SMTP con TLS obligatorio)
+
+Cinco variables en el entorno de la API (Secret Manager en Cloud Run), **las
+cinco o ninguna**:
+
+| Variable              | Qué es                                                          |
+| --------------------- | --------------------------------------------------------------- |
+| `CORREO_SMTP_HOST`    | Nombre del servidor SMTP, sin esquema ni puerto                 |
+| `CORREO_SMTP_PUERTO`  | `465` = TLS implícito; cualquier otro exige **STARTTLS**        |
+| `CORREO_SMTP_USUARIO` | La cuenta de envío                                              |
+| `CORREO_SMTP_CLAVE`   | Su clave. **Secreta**: nunca en el repositorio ni en la consola |
+| `CORREO_REMITENTE`    | La dirección que firma el correo                                |
+
+- **Sin TLS no sale nada**: si el servidor no ofrece STARTTLS, la conexión se
+  corta antes de autenticarse. TLS 1.2 como mínimo y certificado verificado.
+- **Nada de esto va a los registros**, ni el contenido del correo.
+- **Sin las cinco, la API arranca igual**: el respaldo se guarda, el envío queda
+  «sin configurar» y el arranque lo declara SIN CONFIGURAR. Al configurarlas, la
+  siguiente ejecución envía lo pendiente (hasta 7 correos por copropiedad).
+- **Los destinatarios no se configuran**: son los superadministradores activos,
+  con el correo de su cuenta.
+
+### 14.3 Prueba en sitio
+
+1. Con las cinco `CORREO_*` declaradas, reinicie la API y compruebe en el
+   arranque: `correo del respaldo diario (SMTP con TLS): ok`.
+2. Como superadministrador, ejecute el respaldo a mano:
+   `POST /copropiedades/<id>/respaldos/ejecucion` (límite: 10 por minuto). Es
+   idempotente: no regenera ni reenvía lo ya hecho.
+3. Reciba el correo «Eventos del <ayer> · <copropiedad>» y anote la huella.
+4. En la consola, **Informes → Respaldos diarios → Descargar** el mismo día y
+   compruebe que su SHA-256 es la del correo (`shasum -a 256 eventos-<día>.xls`).
