@@ -22,7 +22,7 @@ describe('recursos del respaldo diario', () => {
   it('correo configurado que conecta: ok', async () => {
     const r = recursoCorreoDelRespaldo({
       configurado: true,
-      enviar: async () => ({ estado: 'enviado' }),
+      enviar: async () => ({ estado: 'enviado', rechazados: [] }),
       comprobar: async () => undefined,
     });
     expect((await r.comprobar()).estado).toBe('ok');
@@ -31,7 +31,7 @@ describe('recursos del respaldo diario', () => {
   it('correo configurado que no conecta: roto, con el código y sin la configuración', async () => {
     const r = recursoCorreoDelRespaldo({
       configurado: true,
-      enviar: async () => ({ estado: 'enviado' }),
+      enviar: async () => ({ estado: 'enviado', rechazados: [] }),
       comprobar: async () => {
         throw Object.assign(new Error('Invalid login: smtp.ejemplo.test usuario clave-secreta'), {
           code: 'EAUTH',

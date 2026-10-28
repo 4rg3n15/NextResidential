@@ -123,7 +123,7 @@ export const correoDePrueba = (
     enviados,
     enviar: async (correo) => {
       enviados.push(correo);
-      return respuestas.shift() ?? { estado: 'enviado' };
+      return respuestas.shift() ?? { estado: 'enviado', rechazados: [] };
     },
   };
 };

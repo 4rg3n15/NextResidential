@@ -28,7 +28,29 @@ export interface ParteDelRespaldo {
   readonly sinConfigurar: number;
 }
 
+const VACIO: ParteDelRespaldo = {
+  generados: 0,
+  fallidosAlGenerar: 0,
+  enviados: 0,
+  fallidosAlEnviar: 0,
+  sinConfigurar: 0,
+};
+
 export class RespaldarEventos {
+  /**
+   * Las ejecuciones en curso, por copropiedad. Si la programada y una a mano
+   * coinciden, o dos a mano, la segunda espera a la primera en vez de correr a
+   * la vez: las dos verían el mismo destinatario pendiente y enviarían dos
+   * veces antes de que ninguna anotara su intento. Al terminar la primera, la
+   * segunda ya no encuentra nada que hacer.
+   *
+   * Riesgo residual, declarado: el cerrojo es del proceso. Con dos instancias
+   * de la API a la vez, una ejecución a mano en una y la programada en otra en
+   * el mismo instante pueden duplicar un correo; nunca un respaldo, que lo
+   * impide la clave única de la base. El despliegue es de una instancia.
+   */
+  private readonly enCurso = new Map<string, Promise<ParteDelRespaldo>>();
+
   constructor(
     private readonly respaldos: RepositorioDeRespaldos,
     private readonly generar: GenerarRespaldo,
@@ -38,18 +60,21 @@ export class RespaldarEventos {
   ) {}
 
   async ejecutar(copropiedadId: string, actorId: string): Promise<ParteDelRespaldo> {
+    const anterior = this.enCurso.get(copropiedadId) ?? Promise.resolve(VACIO);
+    const esta = anterior.catch(() => VACIO).then(() => this.respaldar(copropiedadId, actorId));
+    this.enCurso.set(copropiedadId, esta);
+    try {
+      return await esta;
+    } finally {
+      if (this.enCurso.get(copropiedadId) === esta) this.enCurso.delete(copropiedadId);
+    }
+  }
+
+  private async respaldar(copropiedadId: string, actorId: string): Promise<ParteDelRespaldo> {
     const ahora = this.reloj.ahora();
     const ventana = diasAnteriores(ahora, DIAS_DE_RECUPERACION);
     const primero = ventana[0]?.fecha;
-    if (primero === undefined) {
-      return {
-        generados: 0,
-        fallidosAlGenerar: 0,
-        enviados: 0,
-        fallidosAlEnviar: 0,
-        sinConfigurar: 0,
-      };
-    }
+    if (primero === undefined) return VACIO;
 
     const yaEstaban = await this.respaldos.desde(copropiedadId, primero);
     let generados = 0;

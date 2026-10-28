@@ -86,6 +86,17 @@ export const cuerpoDelRespaldo = (
     'Es una copia: el histórico completo sigue en Next Control.',
   ].join('\n');
 
+/** Lo que sale de un envío para cada destinatario, sin el par respaldo-destinatario. */
+type Intento = Omit<IntentoNuevo, 'respaldoId' | 'destinatarioId'>;
+
+/** El servidor aceptó el correo para otros y rechazó esta dirección: se reintenta. */
+const RECHAZADO: Intento = {
+  resultado: 'error',
+  error: 'el servidor de correo rechazó la dirección',
+  enviadoEn: null,
+  conEnlace: false,
+};
+
 export class EnviarRespaldos {
   constructor(
     private readonly envios: EnviosDeRespaldo,
@@ -132,22 +143,41 @@ export class EnviarRespaldos {
     }
 
     const copropiedad = await this.destinatarios.nombreDeCopropiedad(copropiedadId);
+    // Lo que nunca falló va primero y los reintentos detrás, cada grupo del más
+    // antiguo al más reciente: un respaldo que falla siempre (su fichero ya no
+    // está) no puede ocupar los siete turnos de cada ejecución y dejar sin
+    // enviar los días siguientes durante un mes.
+    const yaFallo = (r: RespaldoGuardado): boolean =>
+      pendientesDe(r).some((d) => previos.get(`${r.id}|${d.id}`)?.resultado === 'error');
+    const enOrden = [...candidatos.filter((r) => !yaFallo(r)), ...candidatos.filter(yaFallo)];
+
     let enviados = 0;
     let fallidos = 0;
     let correos = 0;
-    for (const r of candidatos) {
+    for (const r of enOrden) {
       if (correos >= ENVIOS_POR_EJECUCION) break;
       const pendientes = pendientesDe(r);
       if (pendientes.length === 0) continue;
       correos += 1;
-      const intento = await this.enviarUno(r, copropiedad, pendientes);
+      const { intento, rechazados } = await this.enviarUno(r, copropiedad, pendientes);
+      const porDestinatario = pendientes.map((d) =>
+        rechazados.has(d.correo.toLowerCase())
+          ? { ...RECHAZADO, conEnlace: intento.conEnlace }
+          : intento,
+      );
       await this.envios.anotar(
         copropiedadId,
-        pendientes.map((d) => ({ ...intento, respaldoId: r.id, destinatarioId: d.id })),
+        porDestinatario.map((i, n) => ({
+          ...i,
+          respaldoId: r.id,
+          destinatarioId: pendientes[n]?.id ?? '',
+        })),
         actorId,
       );
-      if (intento.resultado === 'enviado') enviados += pendientes.length;
-      else fallidos += pendientes.length;
+      for (const i of porDestinatario) {
+        if (i.resultado === 'enviado') enviados += 1;
+        else fallidos += 1;
+      }
     }
     return { enviados, fallidos, sinConfigurar: 0 };
   }
@@ -156,7 +186,8 @@ export class EnviarRespaldos {
     r: RespaldoGuardado,
     copropiedad: string,
     pendientes: readonly Destinatario[],
-  ): Promise<Omit<IntentoNuevo, 'respaldoId' | 'destinatarioId'>> {
+  ): Promise<{ readonly intento: Intento; readonly rechazados: ReadonlySet<string> }> {
+    const sinRechazos = (intento: Intento) => ({ intento, rechazados: new Set<string>() });
     const fallo = (detalle: string, conEnlace = false) => ({
       resultado: 'error' as const,
       error: motivoSinDatos(detalle),
@@ -165,10 +196,14 @@ export class EnviarRespaldos {
     });
     try {
       const contenido = await this.almacen.leer(r.ruta);
-      if (contenido === null) return fallo('el fichero del respaldo no está en Storage');
+      if (contenido === null) {
+        return sinRechazos(fallo('el fichero del respaldo no está en Storage'));
+      }
       // Lo que se envía es lo que se guardó: si la huella no coincide, no sale.
       if (sha256(contenido) !== r.sha256) {
-        return fallo('la huella del fichero guardado no coincide con la de su constancia');
+        return sinRechazos(
+          fallo('la huella del fichero guardado no coincide con la de su constancia'),
+        );
       }
       const conEnlace = contenido.byteLength > LIMITE_DEL_ADJUNTO_BYTES;
       const enlace = conEnlace
@@ -183,14 +218,22 @@ export class EnviarRespaldos {
           : [{ nombre: `eventos-${r.fecha}.xls`, tipoMime: 'application/vnd.ms-excel', contenido }],
       });
       if (resultado.estado === 'enviado') {
-        return { resultado: 'enviado', error: null, enviadoEn: this.reloj.ahora(), conEnlace };
+        return {
+          intento: { resultado: 'enviado', error: null, enviadoEn: this.reloj.ahora(), conEnlace },
+          rechazados: new Set(resultado.rechazados.map((d) => d.toLowerCase())),
+        };
       }
       if (resultado.estado === 'sin-configurar') {
-        return { resultado: 'sin_configurar', error: null, enviadoEn: null, conEnlace };
+        return sinRechazos({
+          resultado: 'sin_configurar',
+          error: null,
+          enviadoEn: null,
+          conEnlace,
+        });
       }
-      return fallo(resultado.detalle, conEnlace);
+      return sinRechazos(fallo(resultado.detalle, conEnlace));
     } catch (error) {
-      return fallo(error instanceof Error ? error.message : String(error));
+      return sinRechazos(fallo(error instanceof Error ? error.message : String(error)));
     }
   }
 }

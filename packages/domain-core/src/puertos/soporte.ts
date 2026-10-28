@@ -57,7 +57,12 @@ export interface CorreoAEnviar {
 }
 
 export type ResultadoDeCorreo =
-  | { readonly estado: 'enviado' }
+  /**
+   * Aceptado por el servidor. `rechazados` son las direcciones que el servidor
+   * NO aceptó aunque el envío saliera para las demás: sin esto, un destinatario
+   * rechazado constaría como enviado y no se le reintentaría nunca.
+   */
+  | { readonly estado: 'enviado'; readonly rechazados: readonly string[] }
   | { readonly estado: 'sin-configurar' }
   /** El motivo, sin secretos ni contenido del correo. */
   | { readonly estado: 'error'; readonly detalle: string };

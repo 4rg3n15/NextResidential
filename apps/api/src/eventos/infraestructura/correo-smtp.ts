@@ -62,7 +62,7 @@ export class CorreoSmtp implements CorreoSaliente {
 
   async enviar(correo: CorreoAEnviar): Promise<ResultadoDeCorreo> {
     try {
-      await this.transporte.sendMail({
+      const info = await this.transporte.sendMail({
         from: this.config.remitente,
         // Cada superadministrador en copia oculta: ninguno ve la dirección de
         // los otros. El `to` es el propio remitente.
@@ -76,7 +76,9 @@ export class CorreoSmtp implements CorreoSaliente {
           content: Buffer.from(a.contenido),
         })),
       });
-      return { estado: 'enviado' };
+      // Un envío puede salir para unos y ser rechazado para otros: se devuelven
+      // los rechazados para que su intento conste como fallido y se reintente.
+      return { estado: 'enviado', rechazados: [...info.rejected] };
     } catch (error) {
       return { estado: 'error', detalle: detalleDelFallo(error, this.config) };
     }
