@@ -7,6 +7,7 @@ import {
   crearApp,
   crearFirmante,
   enumerarRutas,
+  RECORRIDO_DE_RUTAS,
   rutasConMetadato,
   tokenDe,
 } from './utilidades';
@@ -232,20 +233,9 @@ describe('cobertura de la suite', () => {
   });
 });
 
-/**
- * D-153 · EL PLAZO DE LOS RECORRIDOS. Cinco pruebas de este fichero piden, una tras
- * otra, TODAS las rutas de la API en un solo `it`, y crecen con cada endpoint nuevo.
- * A solas tardan ~1 s (0,7–1,0 s medido, igual con Node 22.22.0 y 22.23.4); en la
- * CI de macOS, con la suite entera en paralelo (paso 5 del verificador), dos pasaron
- * de los 5 000 ms por omisión de vitest y cayeron por «Test timed out» sin ninguna
- * fuga. Con 25 ms de carga simulada por petición, también otras dos. Lo que se
- * prueba es el aislamiento, no la latencia: el plazo cubre la carga, no esconde
- * nada, y una fuga sigue fallando por su aserción.
- */
-const RECORRIDO = { timeout: 60_000 } as const;
-
+// D-153 · los recorridos de rutas llevan plazo propio: ver `RECORRIDO_DE_RUTAS`.
 describe('camino 1 · sin token, toda ruta protegida responde 401', () => {
-  it('ninguna ruta protegida contesta sin autenticación', RECORRIDO, async () => {
+  it('ninguna ruta protegida contesta sin autenticación', RECORRIDO_DE_RUTAS, async () => {
     const fugas: string[] = [];
     for (const r of rutas) {
       if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
@@ -257,7 +247,7 @@ describe('camino 1 · sin token, toda ruta protegida responde 401', () => {
 });
 
 describe('camino 2 · JWT de usuario de OTRA copropiedad', () => {
-  it('ningún endpoint devuelve datos de una copropiedad ajena', RECORRIDO, async () => {
+  it('ningún endpoint devuelve datos de una copropiedad ajena', RECORRIDO_DE_RUTAS, async () => {
     // Identidad legítima de la copropiedad A pidiendo recursos de la B.
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
     const fugas: string[] = [];
@@ -431,7 +421,7 @@ describe('camino 5 · portero y residente — las cuentas de prueba del bloque 2
       .set('Authorization', `Bearer ${token}`);
   };
 
-  it('un portero de la A no alcanza NINGÚN recurso de la B', RECORRIDO, async () => {
+  it('un portero de la A no alcanza NINGÚN recurso de la B', RECORRIDO_DE_RUTAS, async () => {
     const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A, aal: 'aal1' });
     const fugas: string[] = [];
     for (const r of rutas) {
@@ -528,7 +518,7 @@ describe('camino 6 · el residente y la frontera de la VIVIENDA', () => {
 
   it(
     'si alguien abre el padrón al residente, esta prueba lo obliga a filtrar por vivienda',
-    RECORRIDO,
+    RECORRIDO_DE_RUTAS,
     async () => {
       /**
        * El control no es el 403 de arriba: es este. Comprueba que las rutas de
@@ -693,7 +683,7 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
 describe('la exención del segundo factor no crece sin que nadie lo vea', () => {
   it(
     'solo las rutas declaradas son alcanzables con aal1 por un rol administrativo',
-    RECORRIDO,
+    RECORRIDO_DE_RUTAS,
     async () => {
       const token = await tokenDe(firmante, {
         rol: 'administrador',
