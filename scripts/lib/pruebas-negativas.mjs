@@ -47,6 +47,7 @@ import { sondasDeEstabilidad } from './sondas/estabilidad.mjs';
 import { sondasDeFicherosCaidos } from './sondas/ficheros-caidos.mjs';
 import { sondaDeBaseCorta, sondaDeBaseRepuesta } from './sondas/base-corta.mjs';
 import { sondaDeInformeViejo } from './sondas/informe-viejo.mjs';
+import { sondaDeNodeDelBoletin } from './sondas/node-del-boletin.mjs';
 import { sondasDeLectorLentoPorClase } from './sondas/lector-lento-por-clase.mjs';
 
 /** 15-S5 · DT-15S2-11 · un representante por clase de guion con salida sin tope. */
@@ -567,6 +568,8 @@ try {
       ? ok('con el `engines` real, el mismo entorno pasa')
       : mal('el control rechaza un entorno que sí cumple');
   }
+  console.log('\n▸ 6 bis · D-149 · un Node anterior al boletín del 21/10/2026 no pasa');
+  sondaDeNodeDelBoletin({ raiz, clon, correr, ok, mal });
   console.log('\n▸ 7 · una suite intermitente NO pasa por estable');
   // 15-S5 · las sondas de este control viven en `sondas/`: este fichero no puede crecer.
   sondasDeEstabilidad({ raiz, banco, correr, ok, mal, control: 'scripts/lib/estabilidad.mjs' });
