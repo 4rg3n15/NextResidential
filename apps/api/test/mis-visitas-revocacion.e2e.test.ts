@@ -7,6 +7,7 @@ import { RepositorioDeEquiposPg } from '../src/equipos/infraestructura/repositor
 import { COP_A, COP_B } from './utilidades';
 import { bancoDelHogar } from './banco-del-hogar-pg';
 import type { Sesion } from './banco-del-hogar-pg';
+import { documentoDeLaCorrida } from './documento-de-la-corrida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -100,7 +101,8 @@ const jpeg = (): string =>
   ]).toString('base64');
 const visita = (n: number) => ({
   nombre: `Visitante ${CORRIDA} ${String(n)}`,
-  documento: `8${CORRIDA.replace(/\D/g, '5')}${String(n)}`.slice(0, 12),
+  // D-148 · único por corrida: la fórmula anterior repetía documento entre corridas.
+  documento: documentoDeLaCorrida('8', CORRIDA, n),
   inicio: new Date(Date.now() - 5 * 60_000).toISOString(),
   duracionMinutos: 120,
   foto: {
