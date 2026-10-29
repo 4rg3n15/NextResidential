@@ -86,6 +86,10 @@ async function arrancar(): Promise<void> {
     // Otros fallos (15-M) · al cerrar, las conexiones abiertas (SSE de la consola,
     // también las que reconectan durante el cierre) se cortan: no retienen el apagado.
     forceCloseConnections: true,
+    // D-150 · los parsers son SÓLO los de `montarTuberiaHttp`, que no descomprimen.
+    // Sin esto Nest añadiría los suyos —que sí descomprimen— si no reconociera
+    // los nuestros por su nombre; el banco de pruebas ya arrancaba así.
+    bodyParser: false,
   });
   const bitacora = app.get<Bitacora>(BITACORA);
 
