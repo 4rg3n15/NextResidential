@@ -533,6 +533,18 @@ export const direccionDe = (app: INestApplication): string => {
  * controlador. Al leer el enrutador, un endpoint nuevo sin cobertura hace
  * fallar la suite el día que se añade.
  */
+/**
+ * D-153 · EL PLAZO DE UN RECORRIDO DE RUTAS. Las pruebas que piden, una tras otra,
+ * TODAS las rutas (o todas las escrituras) de la API dentro de un solo `it` crecen
+ * con cada endpoint nuevo. A solas tardan ~1 s (0,7–1,0 s medido, igual con Node
+ * 22.22.0 y 22.23.4); en la CI de macOS, con la suite entera en paralelo, pasaron
+ * de los 5 000 ms por omisión de vitest y cayeron por «Test timed out» sin ninguna
+ * fuga (`aislamiento.e2e` en el paso 5 de #75, `escrituras-superadministrador.e2e`
+ * en el paso 14 de #77). Lo que prueban es el aislamiento y los permisos, no la
+ * latencia: el plazo cubre la carga y una fuga sigue fallando por su aserción.
+ */
+export const RECORRIDO_DE_RUTAS = { timeout: 60_000 } as const;
+
 export interface RutaExpuesta {
   metodo: string;
   ruta: string;

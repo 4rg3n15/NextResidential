@@ -1,7 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
-import { COP_A, COP_B, crearApp, crearFirmante, enumerarRutas, tokenDe } from './utilidades';
+import {
+  COP_A,
+  COP_B,
+  crearApp,
+  crearFirmante,
+  enumerarRutas,
+  RECORRIDO_DE_RUTAS,
+  tokenDe,
+} from './utilidades';
 import type { Firmante, RutaExpuesta } from './utilidades';
 
 /**
@@ -140,17 +148,21 @@ const invocar = (r: RutaExpuesta, token: string) => {
 };
 
 describe('D-71 · el superadministrador escribe en la copropiedad del selector', () => {
-  it('NINGUNA escritura le responde «la identidad no tiene copropiedad»', async () => {
-    // Con `copropiedadId: null`, que es como el gancho de claims lo emite.
-    const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: null });
-    const rotas: string[] = [];
-    for (const r of escrituras()) {
-      const res = await invocar(r, token);
-      const cuerpo = JSON.stringify(res.body);
-      if (SENAL_DE_D71.test(cuerpo)) rotas.push(`${r.metodo} ${r.ruta} → ${cuerpo.slice(0, 90)}`);
-    }
-    expect(rotas, `D-71 reaparecido en: ${rotas.join(' | ')}`).toEqual([]);
-  });
+  it(
+    'NINGUNA escritura le responde «la identidad no tiene copropiedad»',
+    RECORRIDO_DE_RUTAS,
+    async () => {
+      // Con `copropiedadId: null`, que es como el gancho de claims lo emite.
+      const token = await tokenDe(firmante, { rol: 'superadministrador', copropiedadId: null });
+      const rotas: string[] = [];
+      for (const r of escrituras()) {
+        const res = await invocar(r, token);
+        const cuerpo = JSON.stringify(res.body);
+        if (SENAL_DE_D71.test(cuerpo)) rotas.push(`${r.metodo} ${r.ruta} → ${cuerpo.slice(0, 90)}`);
+      }
+      expect(rotas, `D-71 reaparecido en: ${rotas.join(' | ')}`).toEqual([]);
+    },
+  );
 
   it('el alta de vivienda pasa el alcance y llega al repositorio', async () => {
     /**
@@ -191,7 +203,7 @@ describe('el aislamiento NO se afloja al arreglarlo', () => {
     expect(res.status).toBe(404);
   });
 
-  it('y tampoco por el resto de escrituras', async () => {
+  it('y tampoco por el resto de escrituras', RECORRIDO_DE_RUTAS, async () => {
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
     const fugas: string[] = [];
     for (const r of escrituras()) {
