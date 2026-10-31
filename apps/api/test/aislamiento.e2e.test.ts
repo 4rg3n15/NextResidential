@@ -7,6 +7,7 @@ import {
   crearApp,
   crearFirmante,
   enumerarRutas,
+  RECORRIDO_DE_RUTAS,
   rutasConMetadato,
   tokenDe,
 } from './utilidades';
@@ -232,8 +233,9 @@ describe('cobertura de la suite', () => {
   });
 });
 
+// D-153 · los recorridos de rutas llevan plazo propio: ver `RECORRIDO_DE_RUTAS`.
 describe('camino 1 · sin token, toda ruta protegida responde 401', () => {
-  it('ninguna ruta protegida contesta sin autenticación', async () => {
+  it('ninguna ruta protegida contesta sin autenticación', RECORRIDO_DE_RUTAS, async () => {
     const fugas: string[] = [];
     for (const r of rutas) {
       if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
@@ -245,7 +247,7 @@ describe('camino 1 · sin token, toda ruta protegida responde 401', () => {
 });
 
 describe('camino 2 · JWT de usuario de OTRA copropiedad', () => {
-  it('ningún endpoint devuelve datos de una copropiedad ajena', async () => {
+  it('ningún endpoint devuelve datos de una copropiedad ajena', RECORRIDO_DE_RUTAS, async () => {
     // Identidad legítima de la copropiedad A pidiendo recursos de la B.
     const token = await tokenDe(firmante, { rol: 'administrador', copropiedadId: COP_A });
     const fugas: string[] = [];
@@ -419,7 +421,7 @@ describe('camino 5 · portero y residente — las cuentas de prueba del bloque 2
       .set('Authorization', `Bearer ${token}`);
   };
 
-  it('un portero de la A no alcanza NINGÚN recurso de la B', async () => {
+  it('un portero de la A no alcanza NINGÚN recurso de la B', RECORRIDO_DE_RUTAS, async () => {
     const token = await tokenDe(firmante, { rol: 'portero', copropiedadId: COP_A, aal: 'aal1' });
     const fugas: string[] = [];
     for (const r of rutas) {
@@ -514,28 +516,36 @@ describe('camino 6 · el residente y la frontera de la VIVIENDA', () => {
     }
   });
 
-  it('si alguien abre el padrón al residente, esta prueba lo obliga a filtrar por vivienda', async () => {
-    /**
-     * El control no es el 403 de arriba: es este. Comprueba que las rutas de
-     * padrón siguen SIN admitir al residente. El día que se le abran —ETAPA
-     * 11— fallará, y quien la arregle tendrá que sustituirla por la prueba de
-     * que solo ve su vivienda, que es el trabajo real.
-     */
-    const token = await tokenDe(firmante, { rol: 'residente', copropiedadId: COP_A, aal: 'aal1' });
-    const abiertas: string[] = [];
-    for (const r of rutas) {
-      if (!r.ruta.includes('/padron')) continue;
-      if (r.metodo !== 'GET') continue;
-      const res = await invocar({ metodo: r.metodo, ruta: r.ruta.replace(':id', COP_A) }, token);
-      if (res.status !== 403) abiertas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
-    }
-    expect(
-      abiertas,
-      'Hay padrón alcanzable por un residente. Si es deliberado (ETAPA 11), ' +
-        'sustituye esta prueba por la de que solo ve SU vivienda: ' +
-        abiertas.join(' | '),
-    ).toEqual([]);
-  });
+  it(
+    'si alguien abre el padrón al residente, esta prueba lo obliga a filtrar por vivienda',
+    RECORRIDO_DE_RUTAS,
+    async () => {
+      /**
+       * El control no es el 403 de arriba: es este. Comprueba que las rutas de
+       * padrón siguen SIN admitir al residente. El día que se le abran —ETAPA
+       * 11— fallará, y quien la arregle tendrá que sustituirla por la prueba de
+       * que solo ve su vivienda, que es el trabajo real.
+       */
+      const token = await tokenDe(firmante, {
+        rol: 'residente',
+        copropiedadId: COP_A,
+        aal: 'aal1',
+      });
+      const abiertas: string[] = [];
+      for (const r of rutas) {
+        if (!r.ruta.includes('/padron')) continue;
+        if (r.metodo !== 'GET') continue;
+        const res = await invocar({ metodo: r.metodo, ruta: r.ruta.replace(':id', COP_A) }, token);
+        if (res.status !== 403) abiertas.push(`${r.metodo} ${r.ruta} → ${res.status}`);
+      }
+      expect(
+        abiertas,
+        'Hay padrón alcanzable por un residente. Si es deliberado (ETAPA 11), ' +
+          'sustituye esta prueba por la de que solo ve SU vivienda: ' +
+          abiertas.join(' | '),
+      ).toEqual([]);
+    },
+  );
 });
 
 describe('configuración de la copropiedad · editable, por quién, y con constancia', () => {
@@ -671,22 +681,26 @@ describe('CA-24 · todo acceso cruzado queda registrado', () => {
 });
 
 describe('la exención del segundo factor no crece sin que nadie lo vea', () => {
-  it('solo las rutas declaradas son alcanzables con aal1 por un rol administrativo', async () => {
-    const token = await tokenDe(firmante, {
-      rol: 'administrador',
-      copropiedadId: COP_A,
-      aal: 'aal1',
-    });
-    const alcanzables: string[] = [];
-    for (const r of rutas) {
-      if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
-      const res = await invocar(r, token);
-      // 401 es lo esperado para un administrativo con aal1. Cualquier otra cosa
-      // significa que la ruta lo dejó pasar el guard de autenticación.
-      if (res.status !== 401) alcanzables.push(r.ruta);
-    }
-    expect(new Set(alcanzables)).toEqual(SIN_SEGUNDO_FACTOR);
-  });
+  it(
+    'solo las rutas declaradas son alcanzables con aal1 por un rol administrativo',
+    RECORRIDO_DE_RUTAS,
+    async () => {
+      const token = await tokenDe(firmante, {
+        rol: 'administrador',
+        copropiedadId: COP_A,
+        aal: 'aal1',
+      });
+      const alcanzables: string[] = [];
+      for (const r of rutas) {
+        if (PUBLICAS.has(`${r.metodo} ${r.ruta}`)) continue;
+        const res = await invocar(r, token);
+        // 401 es lo esperado para un administrativo con aal1. Cualquier otra cosa
+        // significa que la ruta lo dejó pasar el guard de autenticación.
+        if (res.status !== 401) alcanzables.push(r.ruta);
+      }
+      expect(new Set(alcanzables)).toEqual(SIN_SEGUNDO_FACTOR);
+    },
+  );
 
   it('con aal1 un administrador NO alcanza ninguna ruta de copropiedad', async () => {
     const token = await tokenDe(firmante, {
