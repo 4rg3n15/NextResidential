@@ -11,7 +11,7 @@
 ## 0 · Antes de empezar
 
 ```bash
-node --version   # v22.22.2 (lo fija .nvmrc)
+node --version   # v22.23.4 (lo fija .nvmrc; engines rechaza cualquier 22 anterior)
 pnpm --version   # 9.x
 pnpm install --frozen-lockfile
 ```

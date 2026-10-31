@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import { configuracion } from '@/lib/configuracion';
 import { tokenVigente } from '@/lib/sesion/token';
 import { reenvioDeIp } from '@/lib/ip-de-la-peticion';
+import { leerCuerpoAcotado } from '@/lib/cuerpo-acotado';
 
 /**
  * Proxy de la consola hacia la API (patrón BFF).
@@ -76,8 +77,20 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
     cabeceras.set(clave, valor);
   }
 
-  const cuerpo =
-    peticion.method === 'GET' || peticion.method === 'HEAD' ? undefined : peticion.body;
+  // D-149 · el cuerpo se lee aquí, entero y con tope, y se reenvían los bytes:
+  // dárselo a `fetch` como flujo perdía a veces su primer trozo con Node 22.23.4
+  // (`lib/cuerpo-acotado.ts`).
+  const leido =
+    peticion.method === 'GET' || peticion.method === 'HEAD'
+      ? null
+      : await leerCuerpoAcotado(peticion.body, peticion.headers.get('content-length'));
+  if (leido?.tipo === 'excede') {
+    return NextResponse.json(
+      { estado: 413, correlacion: 'sin-correlacion', mensaje: 'Envío demasiado grande' },
+      { status: 413 },
+    );
+  }
+  const cuerpo = leido === null || leido.bytes.byteLength === 0 ? undefined : leido.bytes;
 
   let respuesta: Response;
   try {
@@ -85,8 +98,6 @@ const reenviar = async (peticion: NextRequest, segmentos: string[]): Promise<Res
       method: peticion.method,
       headers: cabeceras,
       body: cuerpo,
-      // Necesario en Node para enviar un cuerpo de flujo sin bufferizarlo.
-      ...(cuerpo === undefined ? {} : { duplex: 'half' }),
       cache: 'no-store',
       signal: peticion.signal,
       /**

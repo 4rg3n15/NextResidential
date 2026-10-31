@@ -320,7 +320,7 @@ NextResidential/
 
 ### Prerrequisitos
 
-- Node **22.22.2** (declarado en `.nvmrc`; el arranque falla fuera del rango)
+- Node **22.23.4** (declarado en `.nvmrc`; `engines` exige `>=22.23.4 <23` y el arranque falla fuera del rango: por debajo quedan las vulnerabilidades del boletín de Node del 21/10/2026, ver [`docs/seguridad/NODE_2026-10-21.md`](docs/seguridad/NODE_2026-10-21.md))
 - pnpm vía corepack
 - CLI de Supabase
 - Un proyecto Supabase con credenciales propias
