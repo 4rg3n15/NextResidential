@@ -54,7 +54,12 @@ const sinImagenEnLosAlmacenes = async (pagina) =>
 export const rostroDelTitular = async ({ pagina, base, titular, ok, afirmar }) => {
   await entrarAlInicio(pagina, base, titular.usuario, titular.contrasena);
   await pagina.goto(`${base}/mi/rostro`);
-  await pagina.getByRole('heading', { name: 'Mi rostro' }).waitFor({ timeout: 60_000 });
+  // D-152 · `exact`: sin él, «Mi rostro» casa también con el h2 «Registrar mi rostro»
+  // (Playwright compara por subcadena y sin mayúsculas), y si ese h2 ya está
+  // pintado el localizador falla en modo estricto: «resolved to 2 elements».
+  await pagina
+    .getByRole('heading', { name: 'Mi rostro', exact: true })
+    .waitFor({ timeout: 60_000 });
   await pagina
     .getByText('No ha registrado su rostro. Es opcional: puede entrar sin él.')
     .waitFor({ timeout: 60_000 });
