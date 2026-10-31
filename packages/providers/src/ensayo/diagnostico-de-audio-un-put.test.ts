@@ -29,6 +29,23 @@ afterEach(async () => {
   equipo = null;
 });
 
+/**
+ * D-151 · LOS MÁRGENES, CONTRA EL RELOJ REAL. El equipo simulado cierra la
+ * subida que pasa `subidaOciosaMs` sin datos, y el tono manda una trama cada
+ * 20 ms. Con 300 ms bastaba que el proceso se parase ~280 ms —un runner de
+ * macOS cargado lo hizo en la CI de #73— para que la subida se cerrase a mitad
+ * del tono, la reapertura recibiese 400 y el veredicto dejase de ser
+ * «sessionId: usado». Reproducido: una pausa de 400 ms entre dos tramas da ese
+ * mismo mensaje; una de 250 ms, no.
+ *
+ * Lo que la prueba distingue es que el `PUT` del tono NO espere ocioso durante
+ * la escucha: eso exige escuchar MÁS tiempo que el umbral de ocio. Se mantiene
+ * la proporción (escucha = 2 × ocio) con más holgura: ahora tolera una pausa
+ * de 900 ms y sigue fallando si el `PUT` espera ocioso lo que dura la escucha.
+ */
+const ESCUCHA_MS = 2000;
+const OCIO_MS = 1000;
+
 const diagnosticar = async (guion: { putsPorSesion: number; subidaOciosaMs?: number }) => {
   equipo = await videoporteroDeAudioEnRed({ ...CREDENCIAL, ...guion });
   const audio = new IntercomIsapiPersistente({
@@ -45,7 +62,7 @@ const diagnosticar = async (guion: { putsPorSesion: number; subidaOciosaMs?: num
     audio,
     canal: G711U,
     nombre: 'el equipo',
-    escucharMs: 600,
+    escucharMs: ESCUCHA_MS,
     interlocutor: {
       indicar: async () => {
         indicadoEn.push(Date.now());
@@ -58,7 +75,10 @@ const diagnosticar = async (guion: { putsPorSesion: number; subidaOciosaMs?: num
 
 describe('diagnosticarAudio · un solo PUT por sesión y la subida ociosa (DT-15S4-01)', () => {
   it('el PUT del tono no queda ocioso: el tono va en una sesión abierta tras el Enter, con su PUT recién abierto', async () => {
-    const { d, texto, indicadoEn } = await diagnosticar({ putsPorSesion: 1, subidaOciosaMs: 300 });
+    const { d, texto, indicadoEn } = await diagnosticar({
+      putsPorSesion: 1,
+      subidaOciosaMs: OCIO_MS,
+    });
     expect(texto).toMatch(/sessionId: usado/);
     expect(texto).not.toMatch(/rechazad/);
     expect(d.fallo).toBe(false);
