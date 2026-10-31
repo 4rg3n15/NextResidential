@@ -12,6 +12,7 @@ import { CanalEnProceso } from '../src/eventos/infraestructura/canal-en-proceso'
 import { COP_A, COP_B, crearApp, crearFirmante, tokenDe } from './utilidades';
 import { URL_BASE, exigirBase } from './base-exigida';
 import { MEDIDAS_BUENAS, TerminalesSimuladas, hogarPropio, jpeg } from './dobles/visitas-con-foto';
+import { documentoDeLaCorrida, documentosYaRegistrados } from './documento-de-la-corrida';
 
 /**
  * ═════════════════════════════════════════════════════════════════════════════
@@ -100,6 +101,19 @@ beforeAll(async () => {
   pool = new Pool({ connectionString: URL_BASE, max: 4 });
   try {
     await pool.query('SELECT consentimiento_declarado_por FROM public.autorizaciones LIMIT 1');
+  } catch (e) {
+    console.warn('visitas-pg: base no preparada, se omite:', e);
+    return;
+  }
+  // D-148 · un documento de esta corrida que ya tiene persona apuntaría las
+  // visitas a ella, con SU nombre: se dice aquí, no con una lista vacía después.
+  const ocupados = await documentosYaRegistrados(pool, COP_A, '9', CORRIDA);
+  if (ocupados.length > 0) {
+    throw new Error(
+      `visitas-pg: los documentos ${ocupados.join(', ')} de la corrida ${CORRIDA} ya tienen persona en COP_A`,
+    );
+  }
+  try {
     equipos = new RepositorioDeEquiposPg(pool, LLAVE_EQUIPOS, 'env:EQUIPOS_LLAVE');
     terminalBuena = await alta(`Terminal visitas ${CORRIDA}`);
     terminalQueRechaza = await alta(`Videoportero visitas ${CORRIDA}`);
@@ -167,7 +181,8 @@ const fila = async <T extends Record<string, unknown>>(
   parametros: readonly unknown[],
 ): Promise<T | undefined> => (await (pool as Pool).query<T>(sql, [...parametros])).rows[0];
 
-const documento = (n: number): string => `9${CORRIDA.replace(/\D/g, '7')}${String(n)}`.slice(0, 12);
+/** D-148 · único por corrida: ver `documento-de-la-corrida.ts`. */
+const documento = (n: number): string => documentoDeLaCorrida('9', CORRIDA, n);
 
 const visita = (n: number, extra: object = {}) => ({
   nombre: `Visitante ${CORRIDA} ${String(n)}`,
