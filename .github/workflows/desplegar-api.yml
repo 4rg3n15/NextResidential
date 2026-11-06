@@ -84,7 +84,7 @@ jobs:
             if [ -z "$(printenv "$v")" ]; then faltan="$faltan $v"; fi
           done
           if [ -n "$faltan" ]; then
-            echo "Faltan variables del repositorio:$faltan (DESPLIEGUE_CLOUD_RUN.md §7)" >&2
+            echo "Faltan variables del repositorio:$faltan (DESPLIEGUE_CLOUD_RUN.md §8)" >&2
             exit 1
           fi
           case "$REGION" in

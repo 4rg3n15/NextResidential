@@ -281,6 +281,10 @@ VEREDICTO_PENDIENTE
 - **DT-154-01**: `BIOMETRIA_LLAVE` no tiene herramienta de recifrado.
 - **DT-154-02**: cinco guías más aún dicen `supabase db push` sin `--remote`
   (lista en `ESTADO_ETAPAS.md`).
+- **Un rol más que el encargo** para la cuenta de despliegue:
+  `roles/serviceusage.serviceUsageConsumer`, porque `gcloud run deploy` consulta
+  Service Usage (visto con el analizador local). [Probable]: lo confirma el
+  primer despliegue.
 - **Sin verificar en la nube** (PR 3):
   - la forma real de `X-Forwarded-For` en `*.run.app`, con la primera petición
     (S-15R-06);

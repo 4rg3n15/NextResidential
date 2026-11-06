@@ -198,12 +198,21 @@ gcloud projects add-iam-policy-binding "$PROYECTO" \
 # …publicar SÓLO en este repositorio de imágenes…
 gcloud artifacts repositories add-iam-policy-binding "$REPOSITORIO" --location="$REGION" \
   --member="serviceAccount:$CUENTA_DESPLIEGUE" --role=roles/artifactregistry.writer
-# …y actuar SÓLO como la cuenta de ejecución.
+# …actuar SÓLO como la cuenta de ejecución…
 gcloud iam service-accounts add-iam-policy-binding "$CUENTA_EJECUCION" \
   --member="serviceAccount:$CUENTA_DESPLIEGUE" --role=roles/iam.serviceAccountUser
+# …y consultar qué APIs están habilitadas, que `gcloud run deploy` comprueba antes de desplegar.
+gcloud projects add-iam-policy-binding "$PROYECTO" \
+  --member="serviceAccount:$CUENTA_DESPLIEGUE" --role=roles/serviceusage.serviceUsageConsumer
 ```
 
-**Debe ver:** dos `Created service account` y tres `Updated IAM policy`. El rol
+**Debe ver:** dos `Created service account` y cuatro `Updated IAM policy`.
+
+[Probable] El cuarto rol no estaba en la lista del encargo. Se añade porque
+`gcloud run deploy`, antes de desplegar, consulta Service Usage (comprobado con
+el analizador local de `gcloud`: la llamada llega a `serviceusage.googleapis.com`).
+Sin el rol, el despliegue puede detenerse ahí. `serviceUsageConsumer` sólo deja
+ver y usar las APIs ya habilitadas, no habilitar otras. El rol
 de lectura de secretos de la de ejecución se da **por secreto** en el §6, no
 sobre el proyecto.
 
