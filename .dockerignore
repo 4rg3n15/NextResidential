@@ -1,0 +1,44 @@
+# =============================================================================
+# Contexto de la imagen de la API (apps/api/Dockerfile) · D-154
+#
+# LISTA BLANCA: se excluye TODO y se deja pasar sólo lo que la imagen usa.
+# Una lista negra deja entrar por omisión lo que nadie pensó en excluir —el
+# `.env` de un portátil, un volcado, una llave de prueba—, y lo que entra en el
+# contexto puede acabar en una capa de la imagen publicada.
+# =============================================================================
+*
+
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.nvmrc
+!tsconfig.base.json
+
+# Manifiestos de TODOS los miembros del espacio de trabajo: `pnpm install
+# --frozen-lockfile` contrasta el lockfile con cada uno.
+!apps/api/package.json
+!apps/web/package.json
+!apps/edge/package.json
+!packages/config/package.json
+!packages/contracts/package.json
+
+# Lo que se compila: la API y los dos paquetes internos de los que depende.
+!apps/api/tsconfig.json
+!apps/api/src
+!packages/domain-core/package.json
+!packages/domain-core/tsconfig.json
+!packages/domain-core/src
+!packages/providers/package.json
+!packages/providers/tsconfig.json
+!packages/providers/src
+
+# ── Y, aunque estén DENTRO de lo permitido, nunca (§2.5, §2.7.1) ────────────
+**/.env*
+**/*.pem
+**/*.key
+**/service-account*.json
+**/coverage
+**/.git
+**/node_modules
+**/dist
+**/*.test.ts

@@ -15,9 +15,15 @@ import type { Bitacora } from '@ncr/domain-core';
  *  2. si en `plazoMs` no terminó, se sale igual y se dice;
  *  3. una segunda señal sale en el acto (código 130, el de Ctrl+C).
  *
- * [SUPUESTO] S-159 · 10 s de plazo: cabe el barrido en curso del planificador
- * (6 s, `PLAZO_DE_PARADA_MS`) y queda por debajo de los 30 s con que un
- * orquestador suele pasar de SIGTERM a SIGKILL.
+ * [SUPUESTO] S-159 · cabe el barrido en curso del planificador (6 s,
+ * `PLAZO_DE_PARADA_MS`) y queda por debajo de lo que el orquestador espera
+ * entre SIGTERM y SIGKILL.
+ *
+ * D-154 · 8 s y no 10. Cloud Run manda SIGTERM y, «10 segundos» después,
+ * SIGKILL (contrato de contenedor de Cloud Run). Con 10 s el vigilante y el
+ * SIGKILL llegaban a la vez, y la línea «el cierre no terminó a tiempo» —la
+ * única que explica un cierre colgado— podía no escribirse nunca. Con 8 quedan
+ * 2 s para escribirla y salir, y el barrido de 6 s sigue cabiendo.
  * ═════════════════════════════════════════════════════════════════════════════
  */
 export interface CerrablePorSenal {
@@ -25,7 +31,7 @@ export interface CerrablePorSenal {
   getHttpServer(): { closeAllConnections?: () => void };
 }
 
-export const PLAZO_DE_CIERRE_MS = 10_000;
+export const PLAZO_DE_CIERRE_MS = 8_000;
 
 export const instalarCierreOrdenado = (
   app: CerrablePorSenal,

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Bitacora } from '@ncr/domain-core';
 import { PLAZO_DE_CIERRE_MS, instalarCierreOrdenado } from './cierre-ordenado';
+import { PLAZO_DE_PARADA_MS } from '../planificacion';
 import type { CerrablePorSenal } from './cierre-ordenado';
 
 /**
@@ -30,10 +31,16 @@ afterEach(() => {
 });
 
 describe('instalarCierreOrdenado', () => {
-  it('escucha SIGINT y SIGTERM; el plazo por omisión son 10 s', () => {
+  it('escucha SIGINT y SIGTERM; el plazo por omisión son 8 s', () => {
     const { oyentes } = montar(async () => undefined);
     expect([...oyentes.keys()].sort()).toEqual(['SIGINT', 'SIGTERM']);
-    expect(PLAZO_DE_CIERRE_MS).toBe(10_000);
+    expect(PLAZO_DE_CIERRE_MS).toBe(8_000);
+  });
+
+  it('D-154 · el plazo cabe entre el SIGTERM y el SIGKILL de Cloud Run (10 s), y en él cabe la parada de pg-boss', () => {
+    const SIGKILL_DE_CLOUD_RUN_MS = 10_000;
+    expect(PLAZO_DE_CIERRE_MS).toBeLessThan(SIGKILL_DE_CLOUD_RUN_MS);
+    expect(PLAZO_DE_CIERRE_MS).toBeGreaterThan(PLAZO_DE_PARADA_MS);
   });
 
   it('primera señal: corta las conexiones abiertas ANTES de cerrar y sale con 0', async () => {

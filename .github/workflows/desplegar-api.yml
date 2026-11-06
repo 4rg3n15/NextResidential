@@ -1,0 +1,181 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# DESPLEGAR LA API EN CLOUD RUN · D-154 a D-157 (ADR-040)
+#
+# SOLO A MANO (`workflow_dispatch`), nunca por un push ni por un pull_request:
+# un PR de un tercero no puede pedir credenciales de la nube. Y aun a mano:
+#
+#   · el environment «nube» exige la APROBACIÓN de un revisor y sólo admite
+#     las ramas develop y main (se configura en GitHub, DESPLIEGUE_CLOUD_RUN.md
+#     §7); la condición `if:` del trabajo lo repite aquí;
+#   · la credencial es de Workload Identity Federation: GitHub firma un token
+#     OIDC de ESTA ejecución y Google lo cambia por un acceso de minutos a la
+#     cuenta de despliegue. No hay llave JSON —la organización bloquea crearlas
+#     (iam.disableServiceAccountKeyCreation) y así se queda—, y el proveedor
+#     de WIF sólo acepta tokens de este repositorio (por repository_id), de
+#     esas dos ramas y de este environment.
+#
+# Dos modos (D-157), elegidos al lanzarlo:
+#
+#   prelanzamiento  facturación POR SOLICITUD (--cpu-throttling) y mínimo 0:
+#                   sin tráfico, la instancia se apaga y no cuesta. pg-boss y
+#                   los temporizadores se congelan entre peticiones.
+#   produccion      facturación POR INSTANCIA (--no-cpu-throttling) y mínimo 1:
+#                   los túneles de los Edge y pg-boss corren siempre.
+#
+# Proyecto, región, repositorio y cuentas: variables del repositorio (`vars`),
+# nunca escritas aquí. Los secretos: Secret Manager, por nombre
+# (`apps/api/cloud-run/secretos.txt`).
+# ═════════════════════════════════════════════════════════════════════════════
+name: desplegar-api
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'prelanzamiento (por solicitud, mínimo 0) o produccion (por instancia, mínimo 1)'
+        required: true
+        type: choice
+        options:
+          - prelanzamiento
+          - produccion
+
+# Nada por omisión: el trabajo pide sólo lo que usa.
+permissions: {}
+
+# Un despliegue a la vez, y el siguiente ESPERA: cancelar uno a medias podría
+# dejar una imagen publicada sin revisión que la use.
+concurrency:
+  group: desplegar-api
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: desplegar (${{ inputs.modo }})
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: nube
+    permissions:
+      contents: read
+      id-token: write # el token OIDC que WIF cambia por el acceso a Google
+    env:
+      PROYECTO: ${{ vars.NCR_GCP_PROYECTO }}
+      REGION: ${{ vars.NCR_GCP_REGION }}
+      REPOSITORIO: ${{ vars.NCR_GCP_REPOSITORIO }}
+      SERVICIO: ${{ vars.NCR_GCP_SERVICIO }}
+      CUENTA_EJECUCION: ${{ vars.NCR_GCP_CUENTA_EJECUCION }}
+      MODO: ${{ inputs.modo }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Antes de pedir credenciales: si falta una variable o los ficheros de
+      # Cloud Run no cuadran, el despliegue no empieza.
+      - name: Las variables del repositorio están cargadas
+        env:
+          NCR_GCP_WIF_PROVEEDOR: ${{ vars.NCR_GCP_WIF_PROVEEDOR }}
+          NCR_GCP_CUENTA_DESPLIEGUE: ${{ vars.NCR_GCP_CUENTA_DESPLIEGUE }}
+        run: |
+          faltan=""
+          for v in PROYECTO REGION REPOSITORIO SERVICIO CUENTA_EJECUCION NCR_GCP_WIF_PROVEEDOR NCR_GCP_CUENTA_DESPLIEGUE; do
+            if [ -z "$(printenv "$v")" ]; then faltan="$faltan $v"; fi
+          done
+          if [ -n "$faltan" ]; then
+            echo "Faltan variables del repositorio:$faltan (DESPLIEGUE_CLOUD_RUN.md §8)" >&2
+            exit 1
+          fi
+          case "$REGION" in
+            southamerica-*) echo "Región $REGION: Tier 2. D-154 exige Tier 1." >&2; exit 1 ;;
+          esac
+          node scripts/lib/despliegue-cloud-run.mjs comprobar
+
+      - name: Variables de la API para Cloud Run
+        env:
+          NCR_SUPABASE_URL: ${{ vars.NCR_SUPABASE_URL }}
+          NCR_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NCR_SUPABASE_PUBLISHABLE_KEY }}
+          NCR_CORS_ALLOWED_ORIGINS: ${{ vars.NCR_CORS_ALLOWED_ORIGINS }}
+          NCR_SUPABASE_POOLER_MAX_CLIENTES: ${{ vars.NCR_SUPABASE_POOLER_MAX_CLIENTES }}
+        run: node scripts/lib/despliegue-cloud-run.mjs variables "$RUNNER_TEMP/variables.yaml"
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.NCR_GCP_WIF_PROVEEDOR }}
+          service_account: ${{ vars.NCR_GCP_CUENTA_DESPLIEGUE }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Construcción de la imagen (Node de .nvmrc)
+        run: |
+          IMAGEN="$REGION-docker.pkg.dev/$PROYECTO/$REPOSITORIO/api:$GITHUB_SHA"
+          echo "IMAGEN=$IMAGEN" >>"$GITHUB_ENV"
+          docker buildx build --load --provenance=false --sbom=false \
+            -f apps/api/Dockerfile \
+            --build-arg NODE_VERSION="$(cat .nvmrc)" \
+            -t "$IMAGEN" .
+
+      # Lo mismo que comprueba la verificación en cada PR, ahora sobre la imagen
+      # que se va a publicar.
+      - name: Node de .nvmrc, sin root, sin secretos y por debajo de 250 MB
+        run: node scripts/lib/imagen-de-la-api.mjs "$IMAGEN"
+
+      - name: Publicación en Artifact Registry
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker push "$IMAGEN"
+
+      # Las banderas, verificadas contra la documentación de Cloud Run y la
+      # ayuda de `gcloud run deploy` (DESPLIEGUE_CLOUD_RUN.md §3):
+      #   --no-invoker-iam-check  servicio público SIN dar run.invoker a
+      #                           allUsers, que la restricción de dominios
+      #                           (iam.allowedPolicyMemberDomains) prohíbe;
+      #   --max-instances=1       los túneles de los Edge viven en UNA instancia
+      #                           (DESPLIEGUE.md §4.4);
+      #   --concurrency=1000      el máximo: cada túnel, SSE o audio abierto es
+      #                           una petición viva. Tope: 1000 a la vez; a la
+      #                           base nunca más de PG_POOL_MAX + PGBOSS_POOL_MAX;
+      #   --timeout=3600          el máximo: un WebSocket vive lo que la petición;
+      #   --startup-probe         el tráfico entra cuando /ready responde 200.
+      - name: Despliegue en Cloud Run (${{ inputs.modo }})
+        run: |
+          set -- \
+            --project="$PROYECTO" \
+            --region="$REGION" \
+            --image="$IMAGEN" \
+            --service-account="$CUENTA_EJECUCION" \
+            --port=8080 \
+            --cpu=1 \
+            --memory=512Mi \
+            --max-instances=1 \
+            --concurrency=1000 \
+            --timeout=3600 \
+            --ingress=all \
+            --no-invoker-iam-check \
+            --startup-probe="httpGet.path=/ready,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=2,timeoutSeconds=2,failureThreshold=30" \
+            --env-vars-file="$RUNNER_TEMP/variables.yaml" \
+            --set-secrets="$(node scripts/lib/despliegue-cloud-run.mjs secretos)" \
+            --labels="modo=$MODO" \
+            --quiet
+          if [ "$MODO" = "produccion" ]; then
+            set -- "$@" --no-cpu-throttling --min-instances=1 \
+              --liveness-probe="httpGet.path=/health,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3"
+          else
+            set -- "$@" --cpu-throttling --min-instances=0
+            # Sin sonda de vivacidad: Cloud Run factura la CPU de cada sonda, y
+            # una periódica tendría la instancia facturando sin tráfico. Si el
+            # servicio ya existe (venía de producción), se QUITA la que tuviera.
+            if gcloud run services describe "$SERVICIO" --project="$PROYECTO" --region="$REGION" >/dev/null 2>&1; then
+              set -- "$@" --liveness-probe=""
+            fi
+          fi
+          gcloud run deploy "$SERVICIO" "$@"
+
+      - name: La API responde /health
+        run: |
+          URL="$(gcloud run services describe "$SERVICIO" --project="$PROYECTO" --region="$REGION" --format='value(status.url)')"
+          codigo="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 60 "$URL/health")"
+          echo "/health → $codigo · modo $MODO · imagen $GITHUB_SHA"
+          [ "$codigo" = "200" ]

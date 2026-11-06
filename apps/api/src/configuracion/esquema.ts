@@ -73,6 +73,9 @@ const secreto = (nombre: string, minimo: number) =>
       message: `${nombre} contiene espacios o caracteres de control: el valor está partido o pegado a otro`,
     });
 
+/** D-154 · `API_PROXIES_DE_CONFIANZA` como número de saltos (Cloud Run: 1). */
+export const SALTOS_DE_PROXY = /^[1-3]$/;
+
 export const esquemaConfiguracion = z.object({
   ...ESQUEMAS_ADICIONALES,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -125,12 +128,21 @@ export const esquemaConfiguracion = z.object({
    */
   MODO_PRUEBAS_FACTOR_DE_LIMITE: z.coerce.number().int().min(2).max(100).default(10),
 
+  /**
+   * D-154 · o bien un NÚMERO DE SALTOS (1 a 3), sin lista: cuántos proxies
+   * delante de la API escriben la `X-Forwarded-For`. Es el valor de Cloud Run
+   * (`1`): su frontal AÑADE la IP del cliente al final de la cabecera, y nadie
+   * puede escribir a la derecha de lo que añade el último salto. Cloud Run no
+   * documenta desde qué dirección llega su frontal al contenedor, así que una
+   * lista de IP o CIDR no se puede escribir sin suponerla.
+   */
   API_PROXIES_DE_CONFIANZA: z
     .string()
     .trim()
     .default('loopback')
     .refine(
       (v) =>
+        SALTOS_DE_PROXY.test(v) ||
         v
           .split(',')
           .map((x) => x.trim())
@@ -140,7 +152,7 @@ export const esquemaConfiguracion = z.object({
             if (isIP(ip ?? '') === 0) return false;
             return prefijo === undefined || /^\d{1,3}$/.test(prefijo);
           }),
-      'API_PROXIES_DE_CONFIANZA: «loopback» o direcciones/CIDR separados por coma',
+      'API_PROXIES_DE_CONFIANZA: un número de saltos (1 a 3), o «loopback» o direcciones/CIDR separados por coma',
     ),
 
   /**

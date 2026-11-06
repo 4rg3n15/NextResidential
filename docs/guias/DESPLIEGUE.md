@@ -16,6 +16,11 @@
 >
 > **En la ETAPA 15-I no se hizo trabajo de despliegue.** Esta guía separa lo
 > que no depende del proveedor —casi todo— de lo que sí.
+>
+> **D-154 (2026-11-06, ADR-040): el proveedor está elegido.** La API va en
+> **Cloud Run**, en una instancia y con dos modos (prelanzamiento y
+> producción). Lo que dependía del proveedor —§13.1 a §13.3— está en
+> [`DESPLIEGUE_CLOUD_RUN.md`](DESPLIEGUE_CLOUD_RUN.md).
 
 ---
 
@@ -33,7 +38,7 @@
 10. [Observabilidad: qué mirar y dónde](#10--observabilidad-qué-mirar-y-dónde)
 11. [Verificación posterior al despliegue](#11--verificación-posterior-al-despliegue)
 12. [Reversión](#12--reversión)
-13. [Lo que falta cuando se elija el servidor de la API](#13--lo-que-falta-cuando-se-elija-el-servidor-de-la-api)
+13. [El servidor de la API: Cloud Run](#13--el-servidor-de-la-api-cloud-run)
 
 ---
 
@@ -93,8 +98,8 @@ despliegue:
 
 ```bash
 # 1 · Migraciones, en orden y de forma idempotente
-supabase link --project-ref <ref-del-proyecto>
-supabase db push
+npx supabase link --project-ref <ref-del-proyecto>
+npx supabase db push --remote   # sin --remote, la CLI 3.0 apunta a la base LOCAL
 
 # 2 · Comprobación de que RLS quedó ACTIVA y FORZADA en todas las tablas
 ./supabase/verificar.sh --modo-supabase
@@ -182,9 +187,16 @@ la A, y falla con «el Edge del conjunto no está conectado» aunque lo esté.
 
 **Por eso: UNA instancia.** En Cloud Run, `--min-instances=1 --max-instances=1`
 y sin cortar la CPU fuera de las peticiones (`--no-cpu-throttling`): el túnel
-y su latido corren entre peticiones. El tiempo de espera de la petición debe
-cubrir un WebSocket de larga duración (`--timeout=3600`); el Edge vuelve a
-conectar solo, con retroceso y dispersión, cuando la plataforma lo corta.
+y su latido corren entre peticiones.
+
+> **D-157 · esto es el modo PRODUCCIÓN, y sigue siendo obligatorio en cuanto
+> haya un conjunto.** Mientras no lo haya, el modo **prelanzamiento** usa
+> mínimo 0 y CPU sólo durante las peticiones, a sabiendas de que pg-boss y los
+> temporizadores se congelan entre ellas ([CONTRADICCIÓN] C-69, resuelta por
+> D-157; medido en `DESPLIEGUE_CLOUD_RUN.md` §15). `--max-instances=1` vale en
+> los dos modos. El tiempo de espera de la petición debe
+> cubrir un WebSocket de larga duración (`--timeout=3600`); el Edge vuelve a
+> conectar solo, con retroceso y dispersión, cuando la plataforma lo corta.
 
 Lo que antes eran avisos para varias instancias sigue siendo cierto, y ya no
 hace falta resolverlo mientras sea una:
@@ -511,29 +523,29 @@ cualquier fuga. Si esa suite está verde en la SHA desplegada, está comprobado.
 
 ---
 
-## 13 · Lo que falta cuando se elija el servidor de la API
+## 13 · El servidor de la API: Cloud Run
 
 D8 fijó el reparto (consola en Netlify, API en un servidor con procesos
-permanentes). Cuando Grupo Control elija el **proveedor del servidor de la
-API**, esta guía necesita **exactamente** estas cuatro secciones, y ni una más. Se dejan enumeradas para que la decisión llegue
-con su lista de deberes:
+permanentes). **D-154 eligió el proveedor: Cloud Run** ([ADR-040](../decisiones/ADR-040-la-api-en-cloud-run-con-dos-modos.md)).
+De las cuatro secciones que esta guía dejó enumeradas, tres están escritas en
+[`DESPLIEGUE_CLOUD_RUN.md`](DESPLIEGUE_CLOUD_RUN.md), y la cuarta no aplica
+mientras no haya dominio propio:
 
-| §        | Sección que habrá que escribir | Qué tiene que contener                                                                                           |
-| -------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| **13.1** | Aprovisionamiento              | Cuenta **corporativa** de Grupo Control —nunca personal, PDF del reto §8—, región, plan y tope de conexiones     |
-| **13.2** | Despliegue continuo desde CI   | Qué dispara el despliegue, con qué credencial, y cómo se guarda esa credencial fuera del repositorio             |
-| **13.3** | Secretos en la plataforma      | Dónde se cargan las variables de `.env.example`, quién puede leerlas, y el procedimiento de rotación de cada una |
-| **13.4** | Dominio, TLS y proxy inverso   | Dominio de API y consola, emisión y renovación del certificado, y las cabeceras que el proxy debe propagar       |
+| §        | Sección                      | Dónde                                                                                                                                                                                                    |
+| -------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **13.1** | Aprovisionamiento            | `DESPLIEGUE_CLOUD_RUN.md` §0 a §5: proyecto **corporativo** dentro de la organización, región Tier 1, APIs, Artifact Registry, cuentas de servicio. Tope de conexiones: §4.4 aquí y `--concurrency=1000` |
+| **13.2** | Despliegue continuo desde CI | `DESPLIEGUE_CLOUD_RUN.md` §7, §8 y §10: `desplegar-api.yml`, sólo a mano, con aprobación, credencial de Workload Identity Federation y ninguna llave guardada                                            |
+| **13.3** | Secretos en la plataforma    | `DESPLIEGUE_CLOUD_RUN.md` §6 y §13: Secret Manager, quién los lee (sólo la cuenta de ejecución, secreto a secreto) y la rotación con destrucción de la versión anterior                                  |
+| **13.4** | Dominio, TLS y proxy inverso | **No aplica por ahora (D-156):** `*.run.app` con el TLS de Google, sin proxy inverso propio. La IP real del cliente: `API_PROXIES_DE_CONFIANZA=1` (ADR-040)                                              |
 
 **Lo que la decisión NO cambia:** nada de las secciones 3 a 12. El sistema es un
 proceso Node con variables de entorno y una base PostgreSQL gestionada; eso es
-cierto en un contenedor y en una máquina, siempre que el proceso sea permanente.
+cierto en un contenedor y en una máquina.
 
-**Dos requisitos que valen sea cual sea la elección**, y conviene comprobarlos
-al decidir:
+**Los dos requisitos de siempre:**
 
-- La cuenta y el dominio van bajo **cuentas corporativas de Grupo Control**
+- La cuenta y el proyecto van bajo **cuentas corporativas de Grupo Control**
   (PDF del reto §8, y §1 del contrato). Nunca personales.
-- La plataforma tiene que admitir **un proceso de larga vida**, no solo
-  funciones efímeras: el planificador de pg-boss y el canal de tiempo real
-  necesitan que el proceso siga en pie entre peticiones.
+- La plataforma tiene que admitir **un proceso de larga vida**. Cloud Run lo
+  admite en producción (`--no-cpu-throttling --min-instances=1`). El
+  prelanzamiento lo suspende a sabiendas, sin conjuntos conectados (D-157).
