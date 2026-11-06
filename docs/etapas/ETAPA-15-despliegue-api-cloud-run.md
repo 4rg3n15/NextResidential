@@ -248,7 +248,18 @@ el trabajo `imagen-de-la-api` de la CI.
 
 **Veredicto de §2.8.0** (`./scripts/verificar-etapa.sh --con-base`, Linux, Node 22.23.4):
 
-VEREDICTO_PENDIENTE
+```text
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
+```
+
+- 32 de 32 pasos ejecutados; el declarado es el de siempre: las 5 pruebas de
+  arranque en frío del paso 12b, que ese paso ejecuta.
+- **Suite:** `@ncr/api` 2796 (2763 en `develop`: +33), `@ncr/providers` 1333,
+  `@ncr/web` 992, `@ncr/domain-core` 490, `@ncr/edge` 331, `@ncr/config` 144.
+- **Ficheros:** 632 recogidos y 632 ejecutados.
+- **Estabilidad:** tres corridas idénticas.
+- **Cobertura por capa:** dominio 96,38 %, aplicación 97,87 %, global 88,67 %.
+- **App móvil:** dominio 98,66 % y aplicación 96,99 %.
 
 ## 7 · Verificación de seguridad (§2.7)
 

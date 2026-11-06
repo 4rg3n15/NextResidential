@@ -911,7 +911,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | 8 · Medido          | Arranque a `/ready` en 2,0–2,4 s; pg-boss congelado 11 min retoma sin errores ni duplicados y no recupera disparos perdidos (RN-11 → P-44)                                                       |
 | Registro            | C-69 (resuelta), E-11, P-43 a P-46, S-154-01 a S-154-04, S-159 actualizado, DT-154-01 y DT-154-02 (nuevas)                                                                                       |
 
-**Verificación:** VEREDICTO_PENDIENTE
+**Verificación:** `VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe` (2026-11-06, Linux, Node 22.23.4, base del puerto 55432, 6086 pruebas, 632 ficheros; cobertura dominio 96,38 %, aplicación 97,87 %, global 88,67 %)
 
 ---
 
