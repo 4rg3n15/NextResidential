@@ -391,3 +391,41 @@ jobs:
             apps/web/src-tauri/target/release/bundle/deb/*.deb
             apps/mobile/build/web/index.html
             apps/web/public/manifest.webmanifest
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LA IMAGEN DE LA API · D-154 (ADR-040)
+  #
+  # El flujo de despliegue (`desplegar-api.yml`) sólo corre a mano y con
+  # aprobación: si el Dockerfile se rompiera, nadie lo sabría hasta el día de
+  # desplegar. Aquí se CONSTRUYE en cada PR —sin publicarla en ningún sitio— y
+  # se comprueba lo mismo que el despliegue comprueba antes del `push`: Node de
+  # `.nvmrc`, sin root, sin secretos dentro y por debajo de 250 MB.
+  # ═══════════════════════════════════════════════════════════════════════════
+  imagen-de-la-api:
+    name: imagen de la API (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Variables y secretos de Cloud Run cuadran con .env.example
+        run: node scripts/lib/despliegue-cloud-run.mjs comprobar
+
+      # `--provenance=false --sbom=false`: lo mismo que se publica. Cada
+      # atestación es un artefacto más en Artifact Registry, y la limpieza
+      # conserva «las 2 últimas versiones».
+      - name: Construcción (sin publicar)
+        run: |
+          docker buildx build --load --provenance=false --sbom=false \
+            -f apps/api/Dockerfile \
+            --build-arg NODE_VERSION="$(cat .nvmrc)" \
+            -t ncr-api:verificacion .
+
+      - name: Node de .nvmrc, sin root, sin secretos y por debajo de 250 MB
+        run: node scripts/lib/imagen-de-la-api.mjs ncr-api:verificacion

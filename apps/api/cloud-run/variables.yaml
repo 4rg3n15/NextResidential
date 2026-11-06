@@ -1,0 +1,40 @@
+# =============================================================================
+# Variables NO secretas de la API en Cloud Run · D-154 (ADR-040)
+#
+# Se versiona SIN VALORES REALES. Lo que depende del proyecto (la URL de
+# Supabase, la llave publicable, el origen de la consola) va como `${NCR_…}`
+# y lo sustituye el flujo de despliegue con las VARIABLES del repositorio en
+# GitHub (`desplegar-api.yml`). `scripts/lib/despliegue-cloud-run.mjs` falla si
+# falta alguna, si una no empieza por NCR_, o si aquí aparece una variable que
+# `apps/api/.env.example` no declara o que es secreta (ésas van en
+# `secretos.txt`, desde Secret Manager).
+#
+# Cloud Run REEMPLAZA todas las variables con este fichero en cada despliegue
+# (`--env-vars-file`): lo que no está aquí no existe en la revisión. Lo que
+# falta toma el valor por omisión del esquema (`configuracion/esquema.ts`).
+# =============================================================================
+NODE_ENV: 'production'
+
+# El frontal de Google es UN salto: la IP real es la última de X-Forwarded-For.
+API_PROXIES_DE_CONFIANZA: '1'
+
+SUPABASE_URL: '${NCR_SUPABASE_URL}'
+# Publicable (sb_publishable_…): sujeta a RLS y pública por definición, pero
+# identifica el proyecto, así que tampoco se versiona.
+SUPABASE_PUBLISHABLE_KEY: '${NCR_SUPABASE_PUBLISHABLE_KEY}'
+SUPABASE_JWKS_URL: '${NCR_SUPABASE_URL}/auth/v1/.well-known/jwks.json'
+
+# El origen de la consola (Netlify, PR 2). Nunca `*` (§2.7.2).
+CORS_ALLOWED_ORIGINS: '${NCR_CORS_ALLOWED_ORIGINS}'
+
+# pg-boss va por DATABASE_URL, que en Cloud Run es el pooler en modo SESIÓN
+# (:5432): la conexión directa de Supabase sólo resuelve por IPv6.
+PLANIFICADOR_HABILITADO: 'true'
+# 15-O · PG_POOL_MAX (10) + PGBOSS_POOL_MAX (2) deben caber aquí.
+SUPABASE_POOLER_MAX_CLIENTES: '${NCR_SUPABASE_POOLER_MAX_CLIENTES}'
+
+# Sin conjuntos conectados no hay equipos que mover: el simulado es el valor
+# seguro hasta el primer conjunto (PENDIENTE DE DEFINICIÓN P-43).
+PROVEEDOR_DE_EQUIPOS: 'simulado'
+
+LOG_LEVEL: 'info'

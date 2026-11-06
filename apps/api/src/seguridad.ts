@@ -3,6 +3,7 @@ import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-option
 import { ValidationPipe } from '@nestjs/common';
 import { rechazoDeForma } from './comun/validacion-en-espanol';
 import helmet from 'helmet';
+import { SALTOS_DE_PROXY } from './configuracion/esquema';
 import type { Configuracion } from './configuracion/esquema';
 import { SaneamientoMiddleware, conservarCuerpoCrudo } from './comun/saneamiento';
 import { RUTA_DE_AUDIO_DE_INTERCOM } from './comun/ruta-de-audio';
@@ -34,9 +35,13 @@ export const aplicarSeguridad = (app: INestApplication, config: Configuracion): 
   const express = app.getHttpAdapter().getInstance() as { set(c: string, v: unknown): void };
   // 15-U · Express 5 pasó el parser de consulta a `simple`; se conserva `qs` (H-13-13).
   express.set('query parser', 'extended');
+  // D-154 · con un número, Express cree exactamente esos saltos desde el socket
+  // (Cloud Run: `1`, su frontal); con una lista, sólo las direcciones listadas.
   express.set(
     'trust proxy',
-    config.API_PROXIES_DE_CONFIANZA.split(',').map((x) => x.trim()),
+    SALTOS_DE_PROXY.test(config.API_PROXIES_DE_CONFIANZA)
+      ? Number(config.API_PROXIES_DE_CONFIANZA)
+      : config.API_PROXIES_DE_CONFIANZA.split(',').map((x) => x.trim()),
   );
   // 15-R · D4 · la consola en Netlify manda la IP del navegador FIRMADA.
   app.use(ipFirmada(config.API_IP_FIRMA_SECRETO));

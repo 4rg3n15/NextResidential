@@ -291,15 +291,15 @@ declarada: la lista blanca de porteros deniega por omisión.
 
 ### 7.3 · Variables
 
-| Dónde             | Variable                           | Valor                                                                                                                                                                                     |
-| ----------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Consola (Netlify) | `API_URL`                          | URL de la API en Cloud Run (la usa el proxy)                                                                                                                                              |
-| Consola           | `API_ORIGEN_PUBLICO`               | El **origen** público de la API (`https://api.su-dominio`), sin ruta. Es lo único de la API que entra en la CSP (`connect-src` https + wss)                                               |
-| Consola           | `CONSOLA_CABECERA_IP_DE_CONFIANZA` | `x-nf-client-connection-ip`. La consola **no arranca** con `X-Forwarded-For`, `Forwarded` o `X-Real-IP`                                                                                   |
-| Consola           | `CONSOLA_IP_FIRMA_SECRETO`         | Secreto compartido, ≥ 32 caracteres. Exige la cabecera anterior                                                                                                                           |
-| API (Cloud Run)   | `API_IP_FIRMA_SECRETO`             | **El mismo** secreto                                                                                                                                                                      |
-| API               | `CORS_ALLOWED_ORIGINS`             | El origen de la consola (`https://consola.su-dominio`). Nunca `*`                                                                                                                         |
-| API               | `API_PROXIES_DE_CONFIANZA`         | El proxy de Cloud Run delante de la API, para que el navegador que abre el flujo directo se vea con su IP real. `[SUPUESTO]` S-15R-06: verifíquelo con el registro de la primera petición |
+| Dónde             | Variable                           | Valor                                                                                                                                                                                          |
+| ----------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Consola (Netlify) | `API_URL`                          | URL de la API en Cloud Run (la usa el proxy)                                                                                                                                                   |
+| Consola           | `API_ORIGEN_PUBLICO`               | El **origen** público de la API (`https://api.su-dominio`), sin ruta. Es lo único de la API que entra en la CSP (`connect-src` https + wss)                                                    |
+| Consola           | `CONSOLA_CABECERA_IP_DE_CONFIANZA` | `x-nf-client-connection-ip`. La consola **no arranca** con `X-Forwarded-For`, `Forwarded` o `X-Real-IP`                                                                                        |
+| Consola           | `CONSOLA_IP_FIRMA_SECRETO`         | Secreto compartido, ≥ 32 caracteres. Exige la cabecera anterior                                                                                                                                |
+| API (Cloud Run)   | `API_IP_FIRMA_SECRETO`             | **El mismo** secreto                                                                                                                                                                           |
+| API               | `CORS_ALLOWED_ORIGINS`             | El origen de la consola (`https://consola.su-dominio`). Nunca `*`                                                                                                                              |
+| API               | `API_PROXIES_DE_CONFIANZA`         | **`1`** (D-154, ADR-040): un salto, el frontal de Google, que añade la IP real al final de `X-Forwarded-For`. `[SUPUESTO]` S-15R-06: verifíquelo con el registro de la primera petición (PR 3) |
 
 Generar el secreto compartido (una vez; guárdelo en Netlify y en Secret
 Manager, **nunca** en el repositorio):
@@ -309,6 +309,12 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'
 ```
 
 ### 7.4 · Cloud Run: lo que no puede faltar
+
+> **D-157 (2026-11-06).** Lo de abajo es el modo **producción**, obligatorio
+> desde el primer conjunto conectado. En **prelanzamiento** el mínimo es 0 y la
+> CPU sólo corre durante las peticiones ([CONTRADICCIÓN] C-69). Las banderas
+> exactas de los dos modos están en `desplegar-api.yml` y en
+> [`DESPLIEGUE_CLOUD_RUN.md`](DESPLIEGUE_CLOUD_RUN.md).
 
 - **`--max-instances=1 --min-instances=1`** (P-30). Los billetes, el canal en
   vivo y los bloqueos de audio viven en la memoria de esa instancia; con dos,

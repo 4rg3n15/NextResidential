@@ -195,34 +195,48 @@ git status --porcelain | grep -E '\.env$|\.env\.local$'   # no debe devolver nad
 
 ## 4. CLI de Supabase
 
-### Instalación
+### Instalación: ninguna, se usa con `npx`
 
 ```bash
-npm install -g supabase        # o: brew install supabase/tap/supabase
-supabase --version
+npx supabase --version
 ```
+
+**Por qué `npx` y no `npm install -g supabase`** (D-154, 2026-11-06). La
+instalación global deja una versión fija en cada máquina, distinta en cada una,
+y desde la CLI 3.0 la diferencia cambia el destino de los comandos (ver abajo).
+Con `npx` la versión la decide el comando del día y es la misma en el portátil,
+en el servidor de pruebas y en Cloud Shell.
 
 ### Enlazar el proyecto
 
 ```bash
-supabase login
-supabase link --project-ref <ref-del-proyecto>   # el ref esta en la URL del panel
+npx supabase login
+npx supabase link --project-ref <ref-del-proyecto>   # el ref esta en la URL del panel
 ```
 
-### Aplicar las migraciones
+### Aplicar las migraciones: siempre con `--remote`
 
 ```bash
-supabase db push
+npx supabase migration list --remote   # qué hay en el proyecto y qué falta
+npx supabase db push --remote          # aplica las que faltan
 ```
+
+> **Desde la CLI 3.0, sin `--remote` el destino es la base LOCAL.** La ayuda de
+> `db push` y de `migration list` lo dice así: «Local by default. Pass --remote
+> for the linked project» (comprobado con `npx supabase@latest`, versión 3.0.0,
+> el 2026-11-06). Un `db push` sin la bandera no toca el proyecto enlazado: o
+> falla por no haber base local, o migra la local, y en los dos casos el
+> proyecto sigue sin las migraciones que usted creía haber aplicado. Así se
+> aplicaron la 0059 a la 0061 en el servidor de pruebas.
 
 Aplica en orden los archivos de `supabase/migrations/` (16 en la ETAPA 01; 56
 tras la ronda 15-W). Son **idempotentes**: volver a ejecutarlos sobre una base
 ya migrada no produce error ni cambio. Está verificado con tres pasadas
 consecutivas.
 
-**Las migraciones las aplicas tú contra tu proyecto**, con `supabase db push`.
-El agente no ejecuta `supabase db push`: entrega las migraciones y dice cuáles
-faltan.
+**Las migraciones las aplicas tú contra tu proyecto**, con
+`npx supabase db push --remote`. El agente no ejecuta `db push`: entrega las
+migraciones y dice cuáles faltan.
 
 **Ronda 15-W · `0055` y `0056`.** La `0055` añade el origen de cada cuenta
 (`usuarios.origen_de_alta`), los tipos nuevos de la bitácora de residentes y la
@@ -686,8 +700,9 @@ Marca cada casilla antes de dar la conexión por buena.
 
 **Esquema**
 
-- [ ] `supabase link` enlaza el proyecto correcto
-- [ ] `supabase db push` corre limpio sobre la base
+- [ ] `npx supabase link` enlaza el proyecto correcto
+- [ ] `npx supabase migration list --remote` lista el proyecto, no la base local
+- [ ] `npx supabase db push --remote` corre limpio sobre la base
 - [ ] Volver a ejecutarlo no produce error (idempotencia)
 - [ ] Existen las 31 tablas y las 10 particiones de `eventos`
 - [ ] Semillas aplicadas, con las **dos** copropiedades
@@ -974,7 +989,7 @@ superadministradores activos. Sólo LEE `eventos` (RN-03).
 
 ### 14.1 Bucket
 
-- [ ] `supabase db push` aplica la **0061**: crea las dos tablas append-only y el
+- [ ] `npx supabase db push --remote` aplica la **0061**: crea las dos tablas append-only y el
       bucket `respaldo-de-eventos` **privado**, con su política de sólo lectura
       (superadministración y la administración de la copropiedad). No hay que
       crearlo a mano.

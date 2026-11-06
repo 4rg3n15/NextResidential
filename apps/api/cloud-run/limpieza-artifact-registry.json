@@ -1,0 +1,12 @@
+[
+  {
+    "name": "borrar-lo-que-no-se-conserva",
+    "action": { "type": "Delete" },
+    "condition": { "tagState": "any", "olderThan": "1d" }
+  },
+  {
+    "name": "conservar-las-2-ultimas",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": { "keepCount": 2 }
+  }
+]
