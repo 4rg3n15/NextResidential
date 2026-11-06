@@ -118,6 +118,11 @@ describe('D-154 · lo que el guion rechaza', () => {
 
   it('forma estricta: YAML anidado, valor sin comillas, secreto con nombre inválido, duplicados', () => {
     expect(() => leerVariables('A: 1')).toThrow('variables.yaml:1');
+    expect(() => leerVariables(`A: "a'b"`)).toThrow('variables.yaml:1');
+    expect([...leerVariables(`A: 'x'\nB: "y"`)]).toEqual([
+      ['A', 'x'],
+      ['B', 'y'],
+    ]);
     expect(() => leerVariables('A: "1"\nA: "2"')).toThrow('A está dos veces');
     expect(() => leerSecretos('A=Mayusculas')).toThrow('secretos.txt:1');
     expect(() => leerSecretos('A=ncr-a\nA=ncr-b')).toThrow('A está dos veces');

@@ -81,10 +81,12 @@ export const leerVariables = (plantilla) => {
   for (const [i, linea] of plantilla.split('\n').entries()) {
     const t = linea.trim();
     if (t === '' || t.startsWith('#')) continue;
-    const m = /^([A-Z][A-Z0-9_]*):\s*"([^"\\]*)"$/.exec(t);
+    // Comillas dobles o simples (Prettier escribe las simples), sin escapes ni
+    // comillas dentro: un valor que las necesite no es un valor de este fichero.
+    const m = /^([A-Z][A-Z0-9_]*):\s*(?:"([^"'\\]*)"|'([^"'\\]*)')$/.exec(t);
     if (m === null) throw new Error(`variables.yaml:${String(i + 1)}: se espera CLAVE: "valor"`);
     if (variables.has(m[1])) throw new Error(`variables.yaml: ${m[1]} está dos veces`);
-    variables.set(m[1], m[2]);
+    variables.set(m[1], m[2] ?? m[3] ?? '');
   }
   return variables;
 };
