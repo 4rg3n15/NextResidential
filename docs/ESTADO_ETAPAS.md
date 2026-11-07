@@ -901,7 +901,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 
 | Qué                 | Cómo queda                                                                                                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 · El sitio        | `apps/web/netlify.toml`: base en la raíz del monorepo, `pnpm --filter @ncr/web build`, adaptador OpenNext sin fijar; ninguna variable en el fichero                              |
+| 1 · El sitio        | `apps/web/netlify.toml`: base en la raíz del monorepo, `pnpm turbo run build --filter=@ncr/web` (con sus paquetes), adaptador OpenNext sin fijar; ninguna variable en el fichero |
 | 2 · El despliegue   | `desplegar-consola.yml`: sólo `workflow_dispatch`, environment «nube», `develop`/`main`; comprueba NOMBRES de variables, publica y lee la CSP real                               |
 | 3 · La comprobación | `scripts/lib/variables-de-netlify.mjs`: rechaza `NEXT_PUBLIC_*`, la llave secreta de Supabase y la cabecera de IP equivocada; juzga cabeceras y empaquetado                      |
 | 4 · En cada PR      | Trabajo nuevo `consola-en-netlify`: `netlify build --offline` sin cuenta; la función de Next en `nodejs22.x` y el middleware de borde con su emparejador                         |

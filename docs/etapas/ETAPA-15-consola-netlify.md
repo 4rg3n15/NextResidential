@@ -88,7 +88,9 @@ sigue al runtime de la plataforma. Fijarlo se desfasaría en silencio.
 lee al construir, y la consola lee sus variables en tiempo de ejecución, en la
 función y en el middleware. Ninguna es `NEXT_PUBLIC_*`, y el comprobador lo
 exige. El fichero dice sólo cómo se construye: base en la raíz del monorepo,
-`pnpm --filter @ncr/web build`, `publish = "apps/web/.next"`.
+`pnpm turbo run build --filter=@ncr/web`, `publish = "apps/web/.next"`.
+Turbo, y no `pnpm --filter @ncr/web build`, porque `next build` no compila
+los paquetes del monorepo y `@ncr/contracts` se resuelve a su `dist/`.
 
 **Un guion puro para lo que se juzga.** `scripts/lib/variables-de-netlify.mjs`
 reúne las tres comprobaciones —variables, cabeceras y empaquetado— como
@@ -182,6 +184,24 @@ borde, con su emparejador».
 Para construir aquí hicieron falta ajustes que la CI no necesita: el proxy y su
 CA para Node (`NODE_USE_ENV_PROXY`, `NODE_EXTRA_CA_CERTS`) y Deno desde npm.
 
+**La CI encontró lo que el ensayo local no podía.** La primera corrida del
+trabajo `consola-en-netlify` falló:
+
+```text
+./src/lib/biometria/medidas.ts
+Module not found: Can't resolve '@ncr/contracts'
+```
+
+El comando original, `pnpm --filter @ncr/web build`, sólo construye la consola,
+y en un checkout limpio `packages/contracts/dist/` no existe. Aquí había pasado
+porque quedaba un `dist/` de corridas anteriores. **El despliegue real habría
+fallado igual.**
+
+Se reprodujo borrando los `dist/` y se corrigió con
+`pnpm turbo run build --filter=@ncr/web`, que construye antes las dependencias.
+Los dos pasos del trabajo de la CI pasan desde un árbol limpio: turbo con 3 de
+3 tareas, y el juicio de empaquetado.
+
 **No ejecutado aquí:** `netlify serve`, por el proxy del contenedor. Tampoco el
 despliegue real. Ambos quedan para la PR 3.
 
@@ -274,4 +294,5 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 
 Rama `etapa-15-consola-netlify` desde `develop` (`488cd3f`); PR hacia
 `develop`, sin fusionar. Commits: el de la construcción, la corrección de
-`.netlify/` en los controles y el de cierre (este informe, con el veredicto).
+`.netlify/` en los controles, el de cierre (este informe, con el veredicto) y
+la corrección del comando de construcción que encontró la CI.
