@@ -260,6 +260,9 @@ parte del arreglo — el mensaje anterior mandaba a reintentar en bucle.
 > el audio de la guardia van **directos del navegador a la API** con un billete
 > de un solo uso; todo lo demás sigue pasando por el proxy de la consola.
 > Sin estas variables, la consola funciona exactamente como en sitio (D3).
+>
+> **D-160 (PR 2):** cómo se crea el sitio, dónde se cargan estas variables y
+> cómo se publica está en [`DESPLIEGUE_NETLIFY.md`](DESPLIEGUE_NETLIFY.md).
 
 ### 7.1 · Por qué directo, y qué protege el billete
 

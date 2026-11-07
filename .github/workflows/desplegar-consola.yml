@@ -1,0 +1,101 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# DESPLEGAR LA CONSOLA EN NETLIFY · D-160 (ADR-041, PR 2 de 3)
+#
+# Igual que la API: SOLO a mano (`workflow_dispatch`), en el environment «nube»
+# (aprobación de un revisor, ramas develop y main) y con la construcción en
+# GitHub, no en Netlify. Así un despliegue de producción —15 créditos de los
+# 300 del plan gratuito— sólo ocurre cuando alguien lo aprueba, y ningún PR
+# construye con las variables del sitio.
+#
+# La construcción la hace la CLI de Netlify (`netlify deploy`, que construye): corre
+# `apps/web/netlify.toml` y el adaptador OpenNext, y publica funciones,
+# middleware y estáticos. Las variables del sitio (API_URL, la firma de la
+# IP…) viven en Netlify (DESPLIEGUE_NETLIFY.md §4): este flujo sólo comprueba
+# que estén, por su NOMBRE.
+#
+# Netlify no ofrece federación de identidad: la credencial es un token
+# personal de acceso, guardado como SECRETO DEL ENVIRONMENT «nube», que sólo
+# llega a un trabajo ya aprobado. Riesgo y rotación en ADR-041.
+# ═════════════════════════════════════════════════════════════════════════════
+name: desplegar-consola
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: desplegar-consola
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: desplegar la consola
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: nube
+    permissions:
+      contents: read
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NCR_NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ vars.NCR_NETLIFY_SITIO }}
+      # La versión EXACTA de la CLI: la documentación de Netlify pide fijarla en
+      # CI. Se usa con npx y no en el lockfile (ADR-041).
+      NETLIFY_CLI: netlify-cli@27.14.2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      # La versión de `.nvmrc` construye, y con ella elige Netlify el runtime de
+      # las funciones (documentación de Netlify: «Node.js version for runtime»).
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: El token y el sitio están cargados
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "Faltan NCR_NETLIFY_AUTH_TOKEN (secreto de «nube») o NCR_NETLIFY_SITIO (variable) · DESPLIEGUE_NETLIFY.md §5" >&2
+            exit 1
+          fi
+
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      # Por NOMBRE: `env:list --json` trae valores, y aquí sólo se miran las
+      # claves. El único valor que sale es API_ORIGEN_PUBLICO, a un fichero del
+      # runner: no es secreto, va en la CSP de cada respuesta de la consola.
+      - name: Las variables del sitio en Netlify están declaradas
+        run: |
+          npx -y "$NETLIFY_CLI" env:list --json --context production --scope functions --filter @ncr/web \
+            | node scripts/lib/variables-de-netlify.mjs comprobar "$RUNNER_TEMP/origen-api.txt"
+
+      # ANTES de publicar: el origen configurado es nuestra API y está viva. Un
+      # origen https equivocado haría pasar la CSP por buena —la consola la
+      # construye con ese mismo valor— y gastaría 15 créditos en una consola
+      # sin flujo en vivo ni audio. Con la API en prelanzamiento (mínimo 0), la
+      # primera petición espera su arranque en frío.
+      - name: La API pública configurada responde
+        run: |
+          ORIGEN="$(cat "$RUNNER_TEMP/origen-api.txt")"
+          CODIGO="$(curl -sS -o "$RUNNER_TEMP/salud.json" -w '%{http_code}' --max-time 60 "$ORIGEN/health" || true)"
+          node scripts/lib/variables-de-netlify.mjs salud "$RUNNER_TEMP/salud.json" "${CODIGO:-0}"
+
+      # `deploy` construye por omisión (`--no-build` lo evitaría).
+      - name: Construcción y publicación en producción
+        run: |
+          npx -y "$NETLIFY_CLI" deploy --prod --filter @ncr/web \
+            --message "desplegar-consola · $GITHUB_SHA" --json >"$RUNNER_TEMP/despliegue.json"
+          node -e "const d=require(process.argv[1]);console.log('publicado:', d.deploy_id, d.url)" "$RUNNER_TEMP/despliegue.json"
+
+      # La consola contesta y su CSP deja abrir el flujo en vivo y el audio con
+      # EXACTAMENTE la API comprobada arriba (15-R, D2).
+      - name: La consola responde con su CSP
+        run: |
+          URL="$(node -e "console.log(require(process.argv[1]).url)" "$RUNNER_TEMP/despliegue.json")"
+          curl -sS -D "$RUNNER_TEMP/cabeceras.txt" -o /dev/null --max-time 60 "$URL/acceso"
+          node scripts/lib/variables-de-netlify.mjs cabeceras "$RUNNER_TEMP/cabeceras.txt" \
+            "$(cat "$RUNNER_TEMP/origen-api.txt")"

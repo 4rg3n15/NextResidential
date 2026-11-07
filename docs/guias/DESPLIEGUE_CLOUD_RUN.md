@@ -220,8 +220,11 @@ sobre el proyecto.
 
 ## 6 · Los secretos
 
-Los nombres están en `apps/api/cloud-run/secretos.txt`. Son **seis**, los que la
-API exige para arrancar, y seis es también lo que Secret Manager da gratis.
+Los nombres están en `apps/api/cloud-run/secretos.txt`. Son **siete**: los seis
+que la API exige para arrancar —seis es lo que Secret Manager da gratis— y,
+desde la PR 2 (D-160), el que comparte con la consola en Netlify para firmar la
+IP del navegador. El séptimo es la primera versión fuera de la capa gratuita:
+**USD 0,06 al mes**.
 
 | Variable de la API      | Secreto                        | De dónde sale el valor                                                                                                                                    |
 | ----------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -231,6 +234,7 @@ API exige para arrancar, y seis es también lo que Secret Manager da gratis.
 | `INGESTA_FIRMA_SECRETO` | `ncr-ingesta-firma-secreto`    | Se genera (abajo)                                                                                                                                         |
 | `BIOMETRIA_LLAVE`       | `ncr-biometria-llave`          | Se genera, **salvo** lo que dice el aviso de abajo                                                                                                        |
 | `EQUIPOS_LLAVE`         | `ncr-equipos-llave`            | Ídem                                                                                                                                                      |
+| `API_IP_FIRMA_SECRETO`  | `ncr-api-ip-firma-secreto`     | Se genera **una vez** y el MISMO valor va en Netlify como `CONSOLA_IP_FIRMA_SECRETO` (`DESPLIEGUE_NETLIFY.md` §3)                                         |
 
 > **Aviso · las dos llaves y los datos que ya existen.** `BIOMETRIA_LLAVE` y
 > `EQUIPOS_LLAVE` cifran lo que la API guarda en la base. Si este proyecto de
@@ -267,20 +271,27 @@ crear_secreto_generado() {   # $1 = nombre del secreto
 crear_secreto_generado ncr-ingesta-firma-secreto
 crear_secreto_generado ncr-biometria-llave     # o crear_secreto_leido, ver el aviso
 crear_secreto_generado ncr-equipos-llave       # ídem
+crear_secreto_generado ncr-api-ip-firma-secreto
 ```
 
-Y la cuenta de ejecución lee **sólo esos seis**:
+El de la firma de la IP es el único que tiene que existir **en dos sitios**:
+aquí y en Netlify. Se genera aquí, porque la API no despliega sin sus siete
+secretos, y `DESPLIEGUE_NETLIFY.md` §3 lo copia después a Netlify desde Secret
+Manager sin que se vea.
+
+Y la cuenta de ejecución lee **sólo esos siete**:
 
 ```bash
 for s in ncr-supabase-secret-key ncr-database-url-sesion ncr-database-url-transaccion \
-         ncr-ingesta-firma-secreto ncr-biometria-llave ncr-equipos-llave; do
+         ncr-ingesta-firma-secreto ncr-biometria-llave ncr-equipos-llave \
+         ncr-api-ip-firma-secreto; do
   gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:$CUENTA_EJECUCION" --role=roles/secretmanager.secretAccessor
 done
 ```
 
-**Debe ver:** seis `Created version [1] of the secret [...]` y seis
-`Updated IAM policy for secret`. `gcloud secrets list` muestra los seis nombres;
+**Debe ver:** siete `Created version [1] of the secret [...]` y siete
+`Updated IAM policy for secret`. `gcloud secrets list` muestra los siete nombres;
 ningún comando de esta guía muestra un valor.
 
 **Replicación automática a propósito:** Secret Manager la factura como **una**
@@ -357,19 +368,19 @@ GitHub → el repositorio → **Settings → Environments → New environment** 
 variable.** Son **variables**, no secretos: ninguna es secreta, y ningún secreto
 pasa por GitHub (viven en Secret Manager).
 
-| Variable                           | Valor                                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `NCR_GCP_PROYECTO`                 | `$PROYECTO`                                                                                                               |
-| `NCR_GCP_REGION`                   | `$REGION`                                                                                                                 |
-| `NCR_GCP_REPOSITORIO`              | `$REPOSITORIO`                                                                                                            |
-| `NCR_GCP_SERVICIO`                 | `$SERVICIO`                                                                                                               |
-| `NCR_GCP_CUENTA_EJECUCION`         | `$CUENTA_EJECUCION`                                                                                                       |
-| `NCR_GCP_CUENTA_DESPLIEGUE`        | `$CUENTA_DESPLIEGUE`                                                                                                      |
-| `NCR_GCP_WIF_PROVEEDOR`            | la ruta que imprimió el último comando del §7                                                                             |
-| `NCR_SUPABASE_URL`                 | la Project URL de Supabase, sin `/` final                                                                                 |
-| `NCR_SUPABASE_PUBLISHABLE_KEY`     | la llave **publicable** (`sb_publishable_…`), nunca la secreta                                                            |
-| `NCR_CORS_ALLOWED_ORIGINS`         | el origen de la consola. Hasta el PR 2 no hay consola: ponga `https://consola.invalid`, que no es de nadie y no abre nada |
-| `NCR_SUPABASE_POOLER_MAX_CLIENTES` | el «Pool Size» del pooler (Database → Settings): 15 en el plan gratuito [SUPUESTO S-170]                                  |
+| Variable                           | Valor                                                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NCR_GCP_PROYECTO`                 | `$PROYECTO`                                                                                                                                                                                            |
+| `NCR_GCP_REGION`                   | `$REGION`                                                                                                                                                                                              |
+| `NCR_GCP_REPOSITORIO`              | `$REPOSITORIO`                                                                                                                                                                                         |
+| `NCR_GCP_SERVICIO`                 | `$SERVICIO`                                                                                                                                                                                            |
+| `NCR_GCP_CUENTA_EJECUCION`         | `$CUENTA_EJECUCION`                                                                                                                                                                                    |
+| `NCR_GCP_CUENTA_DESPLIEGUE`        | `$CUENTA_DESPLIEGUE`                                                                                                                                                                                   |
+| `NCR_GCP_WIF_PROVEEDOR`            | la ruta que imprimió el último comando del §7                                                                                                                                                          |
+| `NCR_SUPABASE_URL`                 | la Project URL de Supabase, sin `/` final                                                                                                                                                              |
+| `NCR_SUPABASE_PUBLISHABLE_KEY`     | la llave **publicable** (`sb_publishable_…`), nunca la secreta                                                                                                                                         |
+| `NCR_CORS_ALLOWED_ORIGINS`         | el origen de la consola en Netlify, `https://<sitio>.netlify.app`, sin `/` final (`DESPLIEGUE_NETLIFY.md` §2). Si aún no existe el sitio, `https://consola.invalid`, que no es de nadie y no abre nada |
+| `NCR_SUPABASE_POOLER_MAX_CLIENTES` | el «Pool Size» del pooler (Database → Settings): 15 en el plan gratuito [SUPUESTO S-170]                                                                                                               |
 
 Con `gh` desde Cloud Shell, si lo prefiere: `gh variable set NOMBRE --repo "$GITHUB_REPO" --body "valor"`.
 
@@ -495,7 +506,8 @@ revierten en caliente.
 
 **Cada versión activa cuenta**, y una deshabilitada también: Secret Manager
 cobra las versiones «habilitadas y deshabilitadas»; sólo la **destruida** es
-gratis. Con seis secretos, una versión de más ya sale de la capa gratuita.
+gratis. Con siete secretos ya hay una versión fuera de la capa gratuita; cada
+rotación que no destruya la anterior suma otra.
 
 1. Versión nueva (por la entrada estándar, como en el §6):
 
@@ -521,6 +533,11 @@ gratis. Con seis secretos, una versión de más ya sale de la capa gratuita.
 credenciales cifradas con ella dejan de abrirse. **`BIOMETRIA_LLAVE`** es igual
 de delicada y **no tiene** herramienta de recifrado: no la rote mientras haya
 plantillas cifradas con ella (deuda DT-154-01).
+
+**`API_IP_FIRMA_SECRETO`** vive también en Netlify: tras el paso 1, cópielo con
+`DESPLIEGUE_NETLIFY.md` §3 y despliegue **también la consola** antes del paso 4.
+Mientras sólo una de las dos tenga el valor nuevo, la lista blanca de porteros
+niega a todos.
 
 [SUPUESTO] S-154-02 · `:latest` y no una versión fijada, que es lo que la
 documentación de Cloud Run recomienda. Con versiones fijas, cada rotación
@@ -585,9 +602,9 @@ sin descuentos por compromiso de uso.
 
 - **Artifact Registry:** 0,5 GB gratis. Dos imágenes de 74 MB comprimidas
   (medidas, §15) caben de sobra.
-- **Secret Manager:** 6 versiones activas y 10 000 accesos al mes gratis. Seis
-  secretos con una versión cada uno: **USD 0**. Los accesos ocurren al arrancar
-  cada instancia: seis por arranque.
+- **Secret Manager:** 6 versiones activas y 10 000 accesos al mes gratis. Siete
+  secretos con una versión cada uno: **USD 0,06 al mes**. Los accesos ocurren al
+  arrancar cada instancia: siete por arranque.
 - **Peticiones:** 2 millones al mes gratis.
 
 ---

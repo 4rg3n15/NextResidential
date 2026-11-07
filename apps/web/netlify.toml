@@ -1,0 +1,22 @@
+# =============================================================================
+# La consola en Netlify · D-160 (PR 2 de 3, ADR-041)
+#
+# La base es la RAÍZ del monorepo: ahí están el lockfile, `.nvmrc` y los
+# paquetes de los que depende la consola. Rutas absolutas desde esa base
+# (documentación de Netlify, «file-based configuration»).
+#
+# Se construye con turbo y no con `pnpm --filter @ncr/web build`: `next build`
+# no compila los paquetes del monorepo, y `@ncr/contracts` se resuelve a su
+# `dist/`, que en un checkout limpio no existe. Turbo construye antes las
+# dependencias (`^build` en turbo.json), como `pnpm build` en la CI.
+#
+# El Next.js lo despliega el adaptador OpenNext de Netlify, que se instala solo
+# y no se fija aquí: la documentación de Netlify recomienda no fijarlo.
+#
+# Las variables NO van aquí: `netlify.toml` sólo se lee al construir, y las
+# funciones y el middleware las leen al ejecutar. Se cargan en el panel de
+# Netlify (DESPLIEGUE_NETLIFY.md §4), nunca en el repositorio.
+# =============================================================================
+[build]
+  command = "pnpm turbo run build --filter=@ncr/web"
+  publish = "apps/web/.next"

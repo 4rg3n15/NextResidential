@@ -66,6 +66,7 @@ const NO_SE_RECORRE = new Set([
   'coverage',
   'build',
   '.next',
+  '.netlify',
   '.turbo',
   '.dart_tool',
   'ios',

@@ -35,8 +35,22 @@ const RAICES = ['apps', 'packages', 'supabase', 'scripts'];
  * iconos, sin que ninguna IP de dispositivo se hubiera acercado al repositorio.
  * Un falso positivo así es tan dañino como un falso negativo: enseña a
  * desactivar el control.
+ *
+ * `.netlify` se añadió en D-160 por el mismo motivo: es lo que deja
+ * `netlify build` (ignorado por git), con la biblioteca estándar de Deno
+ * vendida dentro —sus comentarios citan RFC por sección, `4.1.2.3`— y los
+ * trazos de iconos de `.next` copiados a `static/`.
  */
-const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git', 'build', '.next']);
+const IGNORADOS = new Set([
+  'node_modules',
+  'dist',
+  'coverage',
+  '.turbo',
+  '.git',
+  'build',
+  '.next',
+  '.netlify',
+]);
 const EXTENSIONES = /\.(ts|tsx|js|mjs|cjs|dart|sql|sh|yml|yaml)$/;
 
 /**

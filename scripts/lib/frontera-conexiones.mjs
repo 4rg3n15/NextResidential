@@ -39,7 +39,13 @@ const BANCOS = new Set(['pruebas-negativas.mjs']);
 const ficheros = [];
 const recorrer = (dir) => {
   for (const nombre of readdirSync(dir)) {
-    if (nombre === 'node_modules' || nombre === 'dist' || nombre === '.next') continue;
+    if (
+      nombre === 'node_modules' ||
+      nombre === 'dist' ||
+      nombre === '.next' ||
+      nombre === '.netlify'
+    )
+      continue;
     const ruta = join(dir, nombre);
     if (statSync(ruta).isDirectory()) recorrer(ruta);
     else if (
