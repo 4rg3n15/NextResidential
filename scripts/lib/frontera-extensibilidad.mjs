@@ -45,7 +45,16 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const raiz = (process.argv[2] ?? process.cwd()).replace(/\/$/, '');
-const IGNORADOS = new Set(['node_modules', 'dist', 'coverage', '.turbo', '.git', 'build', '.next']);
+const IGNORADOS = new Set([
+  'node_modules',
+  'dist',
+  'coverage',
+  '.turbo',
+  '.git',
+  'build',
+  '.next',
+  '.netlify',
+]);
 const EXENCION = /kpi-11-exento|extensibilidad-exenta/i;
 
 function* ficheros(dir, extension = /\.(ts|tsx|mjs|js)$/) {

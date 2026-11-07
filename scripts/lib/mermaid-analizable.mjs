@@ -43,7 +43,16 @@ import { createRequire } from 'node:module';
 const raiz = resolve(process.argv[2] ?? process.cwd());
 
 /** Nada de esto es documentación del proyecto. */
-const EXCLUIDOS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.turbo', '.next']);
+const EXCLUIDOS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'coverage',
+  '.turbo',
+  '.next',
+  '.netlify',
+]);
 
 const marcados = [];
 const recorrer = (dir) => {
