@@ -114,22 +114,23 @@ publicada. No se simula.
 
 ## 3 · Árbol de archivos
 
-| Archivo                                                           | Propósito                                                                              |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `apps/web/netlify.toml` (nuevo)                                   | Cómo construye Netlify la consola en el monorepo; sin variables                        |
-| `.github/workflows/desplegar-consola.yml` (nuevo)                 | Publica la consola a mano, en el environment «nube», y comprueba variables y cabeceras |
-| `.github/workflows/verificacion.yml`                              | Trabajo nuevo `consola-en-netlify`: empaqueta sin cuenta y juzga el resultado          |
-| `scripts/lib/variables-de-netlify.mjs` + `.d.mts` (nuevos)        | Juicios puros de variables, cabeceras y empaquetado, y su CLI de tres modos            |
-| `apps/web/src/lib/variables-de-netlify.test.ts` (nuevo)           | 9 pruebas de los juicios, con la CSP real de la consola                                |
-| `apps/api/cloud-run/secretos.txt`                                 | `API_IP_FIRMA_SECRETO` activo como séptimo secreto                                     |
-| `apps/api/test/despliegue-cloud-run.test.ts`                      | Siete secretos, y la configuración resultante sigue arrancando la API                  |
-| `.gitignore`                                                      | `.netlify/`, lo que deja la CLI al construir                                           |
-| `docs/guias/DESPLIEGUE_NETLIFY.md` (nuevo)                        | La guía, con «Debe ver», del sitio al rollback                                         |
-| `docs/guias/DESPLIEGUE_CLOUD_RUN.md`                              | §6 con siete secretos, §8.2 el origen de la consola, §13 y §14 el costo                |
-| `docs/guias/DESPLIEGUE.md` · `CONSOLA_EN_RED_Y_DESPLIEGUE.md`     | Apuntan a la guía nueva                                                                |
-| `docs/decisiones/ADR-041-…` (nuevo) · `docs/decisiones/README.md` | La decisión y su fila                                                                  |
-| `docs/auditoria/contradicciones-y-supuestos.md`                   | E-12 y S-160-01 a S-160-03                                                             |
-| `docs/ESTADO_ETAPAS.md` · este informe                            | Estado y cierre                                                                        |
+| Archivo                                                                            | Propósito                                                                              |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `apps/web/netlify.toml` (nuevo)                                                    | Cómo construye Netlify la consola en el monorepo; sin variables                        |
+| `.github/workflows/desplegar-consola.yml` (nuevo)                                  | Publica la consola a mano, en el environment «nube», y comprueba variables y cabeceras |
+| `.github/workflows/verificacion.yml`                                               | Trabajo nuevo `consola-en-netlify`: empaqueta sin cuenta y juzga el resultado          |
+| `scripts/lib/variables-de-netlify.mjs` + `.d.mts` (nuevos)                         | Juicios puros de variables, cabeceras y empaquetado, y su CLI de tres modos            |
+| `apps/web/src/lib/variables-de-netlify.test.ts` (nuevo)                            | 9 pruebas de los juicios, con la CSP real de la consola                                |
+| `apps/api/cloud-run/secretos.txt`                                                  | `API_IP_FIRMA_SECRETO` activo como séptimo secreto                                     |
+| `apps/api/test/despliegue-cloud-run.test.ts`                                       | Siete secretos, y la configuración resultante sigue arrancando la API                  |
+| `.gitignore`                                                                       | `.netlify/`, lo que deja la CLI al construir                                           |
+| `scripts/lib/frontera-*.mjs` · `mermaid-analizable.mjs` · `omisiones-sin-base.mjs` | Ignoran `.netlify/` como ya ignoraban `.next/`: artefacto generado, no fuente          |
+| `docs/guias/DESPLIEGUE_NETLIFY.md` (nuevo)                                         | La guía, con «Debe ver», del sitio al rollback                                         |
+| `docs/guias/DESPLIEGUE_CLOUD_RUN.md`                                               | §6 con siete secretos, §8.2 el origen de la consola, §13 y §14 el costo                |
+| `docs/guias/DESPLIEGUE.md` · `CONSOLA_EN_RED_Y_DESPLIEGUE.md`                      | Apuntan a la guía nueva                                                                |
+| `docs/decisiones/ADR-041-…` (nuevo) · `docs/decisiones/README.md`                  | La decisión y su fila                                                                  |
+| `docs/auditoria/contradicciones-y-supuestos.md`                                    | E-12 y S-160-01 a S-160-03                                                             |
+| `docs/ESTADO_ETAPAS.md` · este informe                                             | Estado y cierre                                                                        |
 
 ## 4 · Tabla SOLID (archivos nuevos)
 
@@ -184,11 +185,38 @@ CA para Node (`NODE_USE_ENV_PROXY`, `NODE_EXTRA_CA_CERTS`) y Deno desde npm.
 **No ejecutado aquí:** `netlify serve`, por el proxy del contenedor. Tampoco el
 despliegue real. Ambos quedan para la PR 3.
 
+**La primera corrida del verificador falló, y con razón de forma.** El control
+KPI-11 (`frontera-hardware.mjs`) recorre el disco, no el índice de git. Encontró
+«IPs» en `apps/web/.netlify/`, lo que dejó el `netlify build` local:
+
+- secciones de RFC en los comentarios de la biblioteca estándar de Deno
+  (`4.1.2.3`);
+- los trazos de iconos de `lucide-react` copiados a `static/` (`4.5.8.8`).
+
+Es el mismo falso positivo que en la ETAPA 09-B obligó a ignorar `.next/`, y se
+resuelve igual. `.netlify/` se ignora en los cinco controles que ya ignoraban
+`.next/`, con su motivo escrito en `frontera-hardware.mjs`.
+
+La segunda corrida se hizo **con `.netlify/` todavía en el disco**: es la
+prueba de que la corrección cubre el caso que falló.
+
 **Veredicto de §2.8.0** (`./scripts/verificar-etapa.sh --con-base`, Linux, Node 22.23.4):
 
 ```text
-VEREDICTO_PENDIENTE
+VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe
 ```
+
+- 32 de 32 pasos ejecutados. El declarado es el de siempre: las 5 pruebas de
+  arranque en frío del paso 12b, que ese paso ejecuta.
+- **Suite:** `@ncr/web` 1001 (992 en `develop`: +9), `@ncr/api` 2796 (sin
+  cambio en número: la prueba de despliegue cambia sus expectativas),
+  `@ncr/providers` 1333, `@ncr/domain-core` 490, `@ncr/edge` 331,
+  `@ncr/config` 144. En total, 6095.
+- **Ficheros:** 633 recogidos y 633 ejecutados.
+- **Estabilidad:** tres corridas idénticas.
+- **Cobertura por capa:** dominio 96,38 %, aplicación 97,87 %, global 88,67 %.
+- **App móvil:** dominio 98,66 % y aplicación 96,99 %.
+- **Base de pruebas:** PostgreSQL local, puerto 55432.
 
 ## 7 · Verificación de seguridad (§2.7)
 
@@ -245,5 +273,5 @@ VEREDICTO_PENDIENTE
 ## 10 · Rama y commits
 
 Rama `etapa-15-consola-netlify` desde `develop` (`488cd3f`); PR hacia
-`develop`, sin fusionar. Commits: el de la construcción y el de cierre (este
-informe, con el veredicto).
+`develop`, sin fusionar. Commits: el de la construcción, la corrección de
+`.netlify/` en los controles y el de cierre (este informe, con el veredicto).

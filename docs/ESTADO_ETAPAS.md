@@ -909,7 +909,7 @@ sustitución por la referencia exacta queda como deuda mecánica.
 | 6 · La guía         | [`guias/DESPLIEGUE_NETLIFY.md`](guias/DESPLIEGUE_NETLIFY.md) con «Debe ver»; `DESPLIEGUE.md` §6, `DESPLIEGUE_CLOUD_RUN.md` §6/§8.2/§13/§14 y `CONSOLA_EN_RED_Y_DESPLIEGUE.md` §7 |
 | Registro            | E-12, S-160-01 a S-160-03, ADR-041                                                                                                                                               |
 
-**Verificación:** VEREDICTO_PENDIENTE
+**Verificación:** `VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) — se puede escribir el informe` (2026-11-07, Linux, Node 22.23.4, base del puerto 55432, 6095 pruebas, 633 ficheros; cobertura dominio 96,38 %, aplicación 97,87 %, global 88,67 %). La primera corrida falló en KPI-11 por `apps/web/.netlify/`, artefacto local: corregido en los controles
 
 ---
 
