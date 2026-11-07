@@ -37,9 +37,12 @@ patrón que la API.
 Antes de publicar, el flujo comprueba los **nombres** de las variables del
 sitio, nunca sus valores. Falla si falta alguna obligatoria, si hay una
 `NEXT_PUBLIC_*`, si está la llave secreta de Supabase o si la cabecera de IP de
-confianza no es la de Netlify. Después de publicar, pide `/acceso` a la consola
-desplegada y juzga sus cabeceras reales: CSP con nonce, sin `unsafe-*`,
-`connect-src` hacia la API, `frame-ancestors 'none'` y HSTS.
+confianza no es la de Netlify. Antes de publicar, pide `/health` a
+`API_ORIGEN_PUBLICO` y exige la respuesta de nuestra API: un origen equivocado
+no gasta créditos. Después de publicar, pide `/acceso` a la consola desplegada
+y juzga sus cabeceras reales: CSP con nonce, sin `unsafe-*`, `connect-src` con
+**exactamente** ese origen por https y por wss, `frame-ancestors 'none'` y
+HSTS.
 
 En cada PR, un trabajo nuevo de la CI, `consola-en-netlify`, empaqueta la
 consola con `netlify build --offline`, sin cuenta ni token, y comprueba lo que
@@ -122,7 +125,7 @@ publicada. No se simula.
 | `.github/workflows/desplegar-consola.yml` (nuevo)                                  | Publica la consola a mano, en el environment «nube», y comprueba variables y cabeceras |
 | `.github/workflows/verificacion.yml`                                               | Trabajo nuevo `consola-en-netlify`: empaqueta sin cuenta y juzga el resultado          |
 | `scripts/lib/variables-de-netlify.mjs` + `.d.mts` (nuevos)                         | Juicios puros de variables, cabeceras y empaquetado, y su CLI de tres modos            |
-| `apps/web/src/lib/variables-de-netlify.test.ts` (nuevo)                            | 9 pruebas de los juicios, con la CSP real de la consola                                |
+| `apps/web/src/lib/variables-de-netlify.test.ts` (nuevo)                            | 14 pruebas de los juicios, con la CSP real de la consola                               |
 | `apps/api/cloud-run/secretos.txt`                                                  | `API_IP_FIRMA_SECRETO` activo como séptimo secreto                                     |
 | `apps/api/test/despliegue-cloud-run.test.ts`                                       | Siete secretos, y la configuración resultante sigue arrancando la API                  |
 | `.gitignore`                                                                       | `.netlify/`, lo que deja la CLI al construir                                           |
@@ -161,11 +164,16 @@ en `secretos.txt` y la cuenta de secretos en su prueba.
 
 **Nuevas o cambiadas** (todas pasan):
 
-- `apps/web/src/lib/variables-de-netlify.test.ts` (9):
+- `apps/web/src/lib/variables-de-netlify.test.ts` (14):
   - las variables buenas pasan;
   - falta una, viene vacía, la cabecera de IP es otra, hay una `NEXT_PUBLIC_*`
     o la llave secreta de Supabase, y cada caso se nombra;
   - un secreto enmascarado no falla;
+  - `API_ORIGEN_PUBLICO` con ruta, sin https o que no es URL se rechaza;
+  - `/health`: el de nuestra API pasa, y otro servicio con 200, una página
+    HTML, un 404 o ninguna respuesta no;
+  - una CSP con **otra** API https no pasa por buena, ni con Supabase como
+    origen (hallazgo de Codex en el PR);
   - las cabeceras de la `construirCsp` real pasan, y sin nonce, con
     `unsafe-inline`, sin HSTS o con otro estado no;
   - el empaquetado con otra versión de Node o sin el emparejador del
@@ -228,7 +236,8 @@ VERIFICACIÓN DE ETAPA: correcta CON 1 CONTROL(ES) DECLARADO(S) NO EJERCIDO(S) �
 
 - 32 de 32 pasos ejecutados. El declarado es el de siempre: las 5 pruebas de
   arranque en frío del paso 12b, que ese paso ejecuta.
-- **Suite:** `@ncr/web` 1001 (992 en `develop`: +9), `@ncr/api` 2796 (sin
+- **Suite:** `@ncr/web` 1001 en la corrida del verificador (992 en `develop`:
+  +9; luego +5 por el hallazgo de Codex, 14 en el fichero), `@ncr/api` 2796 (sin
   cambio en número: la prueba de despliegue cambia sus expectativas),
   `@ncr/providers` 1333, `@ncr/domain-core` 490, `@ncr/edge` 331,
   `@ncr/config` 144. En total, 6095.

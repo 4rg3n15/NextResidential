@@ -3,6 +3,7 @@ import {
   CABECERA_DE_NETLIFY,
   juzgarCabeceras,
   juzgarEmpaquetado,
+  juzgarSalud,
   juzgarVariables,
   leerCabeceras,
 } from '../../../../scripts/lib/variables-de-netlify.mjs';
@@ -76,26 +77,88 @@ describe('D-160 · las variables del sitio en Netlify', () => {
     ]);
     expect(motivos.join(' ')).not.toContain('v'.repeat(24));
   });
+
+  it('API_ORIGEN_PUBLICO con ruta, sin https o que no es URL: rechazado', () => {
+    for (const malo of ['https://api.ejemplo.invalid/v1', 'http://api.ejemplo.invalid', 'api']) {
+      expect(juzgarVariables({ ...COMPLETAS, API_ORIGEN_PUBLICO: malo })).toEqual([
+        'API_ORIGEN_PUBLICO no es un origen https sin ruta (https://host)',
+      ]);
+    }
+    expect(
+      juzgarVariables({ ...COMPLETAS, API_ORIGEN_PUBLICO: 'https://api.ejemplo.invalid/' }),
+    ).toEqual([]);
+  });
+});
+
+describe('D-160 · el /health de la API pública, antes de publicar', () => {
+  it('el de nuestra API pasa', () => {
+    expect(juzgarSalud({ codigo: 200, cuerpo: '{"estado":"vivo","momento":"x"}' })).toEqual([]);
+  });
+
+  it('otro servicio que responde 200, una página HTML, un 404 o sin respuesta: no', () => {
+    expect(juzgarSalud({ codigo: 200, cuerpo: '{"status":"ok"}' })).toEqual([
+      '/health no es el de la API de Next Control: API_ORIGEN_PUBLICO apunta a otro servicio',
+    ]);
+    expect(juzgarSalud({ codigo: 200, cuerpo: '<html></html>' })).toEqual([
+      '/health de la API pública no es JSON: API_ORIGEN_PUBLICO apunta a otro servicio',
+    ]);
+    expect(juzgarSalud({ codigo: 404, cuerpo: '' })).toEqual([
+      'la API pública respondió 404 en /health, no 200',
+    ]);
+    expect(juzgarSalud({ codigo: 0, cuerpo: '' })).toEqual([
+      'la API pública respondió 0 en /health, no 200',
+    ]);
+  });
 });
 
 describe('D-160 · la respuesta de la consola publicada', () => {
   it('la CSP real con la API pública pasa, tras una redirección', () => {
-    expect(juzgarCabeceras(respuesta(cspDeProduccion('https://api.ejemplo.invalid')))).toEqual([]);
+    expect(
+      juzgarCabeceras(
+        respuesta(cspDeProduccion('https://api.ejemplo.invalid')),
+        'https://api.ejemplo.invalid',
+      ),
+    ).toEqual([]);
   });
 
   it('la CSP real SIN la API pública: el flujo directo y el audio no abrirían, y se dice', () => {
-    expect(juzgarCabeceras(respuesta(cspDeProduccion()))).toEqual([
-      'connect-src sin la API pública (https): falta API_ORIGEN_PUBLICO en Netlify',
-      'connect-src sin la API pública por wss: el audio de la guardia no abriría',
+    expect(juzgarCabeceras(respuesta(cspDeProduccion()), 'https://api.ejemplo.invalid')).toEqual([
+      'connect-src no tiene la API configurada (API_ORIGEN_PUBLICO) por https',
+      'connect-src no tiene la API configurada por wss: el audio no abriría',
     ]);
   });
 
+  it('OTRA API https en la CSP no pasa por buena (Supabase tampoco cuenta como la API)', () => {
+    expect(
+      juzgarCabeceras(
+        respuesta(cspDeProduccion('https://otra.ejemplo.invalid')),
+        'https://api.ejemplo.invalid',
+      ),
+    ).toEqual([
+      'connect-src no tiene la API configurada (API_ORIGEN_PUBLICO) por https',
+      'connect-src no tiene la API configurada por wss: el audio no abriría',
+    ]);
+    expect(juzgarCabeceras(respuesta(cspDeProduccion()), 'https://ref.supabase.co')).toEqual([
+      'connect-src no tiene la API configurada (API_ORIGEN_PUBLICO) por https',
+      'connect-src no tiene la API configurada por wss: el audio no abriría',
+    ]);
+  });
+
+  it('sin origen con que comparar, no hay veredicto bueno', () => {
+    expect(
+      juzgarCabeceras(respuesta(cspDeProduccion('https://api.ejemplo.invalid')), undefined),
+    ).toEqual(['sin el origen configurado de la API con que comparar']);
+  });
+
   it('sin CSP, con unsafe-inline o con otro código', () => {
-    expect(juzgarCabeceras({ codigo: 200, cabeceras: {} })).toEqual([
+    expect(juzgarCabeceras({ codigo: 200, cabeceras: {} }, 'https://api.ejemplo.invalid')).toEqual([
       'sin Content-Security-Policy',
     ]);
     expect(
-      juzgarCabeceras(respuesta("script-src 'self' 'unsafe-inline'; frame-ancestors 'none'", 502)),
+      juzgarCabeceras(
+        respuesta("script-src 'self' 'unsafe-inline'; frame-ancestors 'none'", 502),
+        'https://api.ejemplo.invalid',
+      ),
     ).toEqual(
       expect.arrayContaining([
         'la consola respondió 502, no 200',

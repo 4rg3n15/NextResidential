@@ -217,16 +217,23 @@ URL_ y _Redirect URLs_ con la URL de Netlify (`CONSOLA_EN_RED_Y_DESPLIEGUE.md`
    - el token y el sitio están cargados;
    - la instalación;
    - «las variables del sitio en Netlify están declaradas» (por nombre);
+   - «la API pública configurada responde»: el `/health` de
+     `API_ORIGEN_PUBLICO`, **antes** de publicar;
    - la construcción y publicación;
    - «la consola responde con su CSP».
 
+**Debe ver** en el paso de la API:
+`la API pública configurada responde /health: es la nuestra`. Si dice «apunta
+a otro servicio» o «respondió 0», `API_ORIGEN_PUBLICO` no es la URL de Cloud
+Run (`DESPLIEGUE_CLOUD_RUN.md` §10) o la API no está desplegada.
+
 **Debe ver** en el último paso:
-`la consola responde 200, con su CSP de nonce y la API pública en connect-src`.
-Si en cambio dice «connect-src sin la API pública», falta o está mal
-`API_ORIGEN_PUBLICO`.
+`la consola responde 200, con su CSP de nonce y la API configurada en connect-src`.
+Si dice «connect-src no tiene la API configurada», la consola publicada no está
+usando ese origen: compruebe que la variable está en el contexto de producción.
 
 **Cada ejecución en verde gasta 15 créditos.** Si falla antes de publicar, no
-gasta nada.
+gasta nada: por eso la API se comprueba antes.
 
 ---
 

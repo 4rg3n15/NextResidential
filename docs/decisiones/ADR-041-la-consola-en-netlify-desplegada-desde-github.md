@@ -35,8 +35,9 @@ Faltaba **cómo** se construye y se publica. Lo que pesa en la decisión:
    OpenNext no se fija**, como recomienda Netlify.
 3. **Las variables del sitio viven en Netlify.** El flujo comprueba sus
    NOMBRES, nunca imprime sus valores, y rechaza `NEXT_PUBLIC_*` y la llave
-   secreta de Supabase. Tras publicar, comprueba la CSP real de la consola
-   desplegada.
+   secreta de Supabase. Antes de publicar, comprueba que `API_ORIGEN_PUBLICO`
+   responde el `/health` de nuestra API. Tras publicar, comprueba que la CSP
+   real lleva exactamente ese origen, por https y por wss.
 4. **El token se guarda como secreto del environment «nube»**, no del
    repositorio, con caducidad.
 5. **En cada PR, la CI empaqueta la consola para Netlify** sin cuenta ni token

@@ -3,8 +3,9 @@
  * ═════════════════════════════════════════════════════════════════════════════
  * LA CONSOLA EN NETLIFY, COMPROBADA SIN VER UN SOLO VALOR · D-160 (ADR-041)
  *
- *   netlify env:list --json … | node scripts/lib/variables-de-netlify.mjs comprobar
- *   node scripts/lib/variables-de-netlify.mjs cabeceras <cabeceras.txt>
+ *   netlify env:list --json … | node scripts/lib/variables-de-netlify.mjs comprobar [<origen.txt>]
+ *   node scripts/lib/variables-de-netlify.mjs salud <cuerpo.json> <código>
+ *   node scripts/lib/variables-de-netlify.mjs cabeceras <cabeceras.txt> <origen-de-la-api>
  *   node scripts/lib/variables-de-netlify.mjs empaquetado apps/web/.netlify
  *
  * `comprobar` lee de la entrada estándar el JSON de `env:list` —que trae
@@ -13,19 +14,26 @@
  *   · faltan las que la consola en Netlify necesita;
  *   · la cabecera de la IP es la de Netlify y no otra;
  *   · ninguna variable del sitio es la llave SECRETA de Supabase ni lleva el
- *     prefijo NEXT_PUBLIC_ (todo eso llegaría al navegador o a sus funciones).
+ *     prefijo NEXT_PUBLIC_ (todo eso llegaría al navegador o a sus funciones);
+ *   · `API_ORIGEN_PUBLICO` es un origen https sin ruta.
+ * Con un fichero, escribe en él ese origen —el único valor que sale, y no es
+ * secreto: está en la CSP de cada respuesta de la consola—.
+ *
+ * `salud` juzga el `/health` de ESE origen antes de publicar: que el origen
+ * configurado sea de verdad nuestra API, y no un host https cualquiera. Así un
+ * origen equivocado no gasta los 15 créditos de un despliegue.
  *
  * `cabeceras` lee las de una respuesta de la consola publicada (`curl -D`) y
  * comprueba la CSP que exige §2.7.7 y la que hace posible el flujo directo
- * (15-R): nonce, sin `unsafe-inline` ni `unsafe-eval`, y la API pública en
- * `connect-src` por https y wss.
+ * (15-R): nonce, sin `unsafe-inline` ni `unsafe-eval`, y EXACTAMENTE el origen
+ * configurado de la API en `connect-src`, por https y por wss.
  *
  * `empaquetado` lee lo que deja `netlify build`: la función que sirve Next,
  * con el Node de la MISMA versión mayor que `.nvmrc`, y el middleware como
  * función de borde, con el emparejador de la consola (los estáticos fuera).
  * ═════════════════════════════════════════════════════════════════════════════
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,7 +78,36 @@ export const juzgarVariables = (variables) => {
     if (typeof valor === 'string' && valor.startsWith('sb_secret_'))
       motivos.push(`${nombre} contiene una llave SECRETA de Supabase`);
   }
+  const publico = variables.API_ORIGEN_PUBLICO;
+  if (typeof publico === 'string' && publico.trim() !== '' && origenHttps(publico) === undefined)
+    motivos.push('API_ORIGEN_PUBLICO no es un origen https sin ruta (https://host)');
   return motivos;
+};
+
+/** `https://host[:puerto]` tal cual, o `undefined` si trae otro esquema, ruta o consulta. */
+export const origenHttps = (texto) => {
+  let url;
+  try {
+    url = new URL(texto.trim());
+  } catch {
+    return undefined;
+  }
+  const limpio = url.pathname === '/' && url.search === '' && url.hash === '';
+  return url.protocol === 'https:' && limpio && url.username === '' ? url.origin : undefined;
+};
+
+/** Juicio puro sobre el `/health` de la API pública: el de NUESTRA API, no un 200 cualquiera. */
+export const juzgarSalud = ({ codigo, cuerpo }) => {
+  if (codigo !== 200) return [`la API pública respondió ${String(codigo)} en /health, no 200`];
+  let datos;
+  try {
+    datos = JSON.parse(cuerpo);
+  } catch {
+    return ['/health de la API pública no es JSON: API_ORIGEN_PUBLICO apunta a otro servicio'];
+  }
+  return datos?.estado === 'vivo'
+    ? []
+    : ['/health no es el de la API de Next Control: API_ORIGEN_PUBLICO apunta a otro servicio'];
 };
 
 /** `curl -D` → mapa de cabeceras en minúscula, de la ÚLTIMA respuesta (tras redirecciones). */
@@ -93,8 +130,8 @@ const directiva = (csp, nombre) =>
     .find((partes) => partes[0] === nombre)
     ?.slice(1) ?? [];
 
-/** Juicio puro sobre la respuesta de la consola publicada. */
-export const juzgarCabeceras = ({ codigo, cabeceras }) => {
+/** Juicio puro sobre la respuesta de la consola publicada, con el origen configurado de la API. */
+export const juzgarCabeceras = ({ codigo, cabeceras }, origenApi) => {
   const motivos = [];
   if (codigo !== 200) motivos.push(`la consola respondió ${String(codigo)}, no 200`);
   const csp = cabeceras['content-security-policy'] ?? '';
@@ -105,11 +142,17 @@ export const juzgarCabeceras = ({ codigo, cabeceras }) => {
   for (const prohibido of ["'unsafe-inline'", "'unsafe-eval'"]) {
     if (script.includes(prohibido)) motivos.push(`script-src con ${prohibido}`);
   }
-  const conectar = directiva(csp, 'connect-src');
-  if (!conectar.some((s) => s.startsWith('https://')))
-    motivos.push('connect-src sin la API pública (https): falta API_ORIGEN_PUBLICO en Netlify');
-  if (!conectar.some((s) => s.startsWith('wss://')))
-    motivos.push('connect-src sin la API pública por wss: el audio de la guardia no abriría');
+  // El origen EXACTO, no un https cualquiera: Supabase también está en
+  // connect-src, y una API equivocada pero https pasaría por buena.
+  const origen = origenHttps(origenApi ?? '');
+  const conectar = directiva(csp, 'connect-src').map((s) => s.replace(/\/$/, ''));
+  if (origen === undefined) motivos.push('sin el origen configurado de la API con que comparar');
+  else {
+    if (!conectar.includes(origen))
+      motivos.push('connect-src no tiene la API configurada (API_ORIGEN_PUBLICO) por https');
+    if (!conectar.includes(origen.replace(/^https/, 'wss')))
+      motivos.push('connect-src no tiene la API configurada por wss: el audio no abriría');
+  }
   if (!directiva(csp, 'frame-ancestors').includes("'none'"))
     motivos.push("frame-ancestors no es 'none'");
   if (!(cabeceras['strict-transport-security'] ?? '').includes('max-age='))
@@ -138,7 +181,7 @@ export const juzgarEmpaquetado = ({ funciones, rutasDeBorde, nodeMayor }) => {
 const esPrincipal =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (esPrincipal) {
-  const [orden, fichero] = process.argv.slice(2);
+  const [orden, fichero, extra] = process.argv.slice(2);
   let motivos;
   if (orden === 'comprobar') {
     let variables;
@@ -151,14 +194,24 @@ if (esPrincipal) {
       process.exit(1);
     }
     motivos = juzgarVariables(variables);
-    if (motivos.length === 0)
+    if (motivos.length === 0) {
+      if (fichero !== undefined) writeFileSync(fichero, origenHttps(variables.API_ORIGEN_PUBLICO));
       console.log(
         `variables del sitio: las ${String(OBLIGATORIAS.length)} declaradas, y ninguna prohibida`,
       );
-  } else if (orden === 'cabeceras' && fichero !== undefined) {
-    motivos = juzgarCabeceras(leerCabeceras(readFileSync(fichero, 'utf8')));
+    }
+  } else if (orden === 'salud' && fichero !== undefined && extra !== undefined) {
+    // Sin conexión, curl no crea el fichero: el código (000) ya lo dice todo.
+    const cuerpo = existsSync(fichero) ? readFileSync(fichero, 'utf8') : '';
+    motivos = juzgarSalud({ codigo: Number(extra), cuerpo });
     if (motivos.length === 0)
-      console.log('la consola responde 200, con su CSP de nonce y la API pública en connect-src');
+      console.log('la API pública configurada responde /health: es la nuestra');
+  } else if (orden === 'cabeceras' && fichero !== undefined && extra !== undefined) {
+    motivos = juzgarCabeceras(leerCabeceras(readFileSync(fichero, 'utf8')), extra);
+    if (motivos.length === 0)
+      console.log(
+        'la consola responde 200, con su CSP de nonce y la API configurada en connect-src',
+      );
   } else if (orden === 'empaquetado' && fichero !== undefined) {
     const leer = (r) => JSON.parse(readFileSync(join(fichero, r), 'utf8'));
     const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -173,7 +226,7 @@ if (esPrincipal) {
       );
   } else {
     console.error(
-      'uso: variables-de-netlify.mjs comprobar < env.json | cabeceras <fichero> | empaquetado <dir>',
+      'uso: variables-de-netlify.mjs comprobar [<origen.txt>] < env.json | salud <cuerpo> <código> | cabeceras <fichero> <origen> | empaquetado <dir>',
     );
     process.exit(2);
   }

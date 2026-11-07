@@ -66,11 +66,23 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Por NOMBRE: `env:list --json` trae valores, y aquí sólo se miran las
-      # claves. Ningún valor sale de este paso.
+      # claves. El único valor que sale es API_ORIGEN_PUBLICO, a un fichero del
+      # runner: no es secreto, va en la CSP de cada respuesta de la consola.
       - name: Las variables del sitio en Netlify están declaradas
         run: |
           npx -y "$NETLIFY_CLI" env:list --json --context production --scope functions --filter @ncr/web \
-            | node scripts/lib/variables-de-netlify.mjs comprobar
+            | node scripts/lib/variables-de-netlify.mjs comprobar "$RUNNER_TEMP/origen-api.txt"
+
+      # ANTES de publicar: el origen configurado es nuestra API y está viva. Un
+      # origen https equivocado haría pasar la CSP por buena —la consola la
+      # construye con ese mismo valor— y gastaría 15 créditos en una consola
+      # sin flujo en vivo ni audio. Con la API en prelanzamiento (mínimo 0), la
+      # primera petición espera su arranque en frío.
+      - name: La API pública configurada responde
+        run: |
+          ORIGEN="$(cat "$RUNNER_TEMP/origen-api.txt")"
+          CODIGO="$(curl -sS -o "$RUNNER_TEMP/salud.json" -w '%{http_code}' --max-time 60 "$ORIGEN/health" || true)"
+          node scripts/lib/variables-de-netlify.mjs salud "$RUNNER_TEMP/salud.json" "${CODIGO:-0}"
 
       # `deploy` construye por omisión (`--no-build` lo evitaría).
       - name: Construcción y publicación en producción
@@ -80,9 +92,10 @@ jobs:
           node -e "const d=require(process.argv[1]);console.log('publicado:', d.deploy_id, d.url)" "$RUNNER_TEMP/despliegue.json"
 
       # La consola contesta y su CSP deja abrir el flujo en vivo y el audio con
-      # la API pública, que es lo que exige la consola en Netlify (15-R, D2).
+      # EXACTAMENTE la API comprobada arriba (15-R, D2).
       - name: La consola responde con su CSP
         run: |
           URL="$(node -e "console.log(require(process.argv[1]).url)" "$RUNNER_TEMP/despliegue.json")"
           curl -sS -D "$RUNNER_TEMP/cabeceras.txt" -o /dev/null --max-time 60 "$URL/acceso"
-          node scripts/lib/variables-de-netlify.mjs cabeceras "$RUNNER_TEMP/cabeceras.txt"
+          node scripts/lib/variables-de-netlify.mjs cabeceras "$RUNNER_TEMP/cabeceras.txt" \
+            "$(cat "$RUNNER_TEMP/origen-api.txt")"

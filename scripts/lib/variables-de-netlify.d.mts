@@ -5,10 +5,18 @@ export function leerCabeceras(texto: string): {
   readonly codigo: number;
   readonly cabeceras: Readonly<Record<string, string>>;
 };
-export function juzgarCabeceras(respuesta: {
+export function origenHttps(texto: string): string | undefined;
+export function juzgarSalud(respuesta: {
   readonly codigo: number;
-  readonly cabeceras: Readonly<Record<string, string>>;
+  readonly cuerpo: string;
 }): string[];
+export function juzgarCabeceras(
+  respuesta: {
+    readonly codigo: number;
+    readonly cabeceras: Readonly<Record<string, string>>;
+  },
+  origenApi: string | undefined,
+): string[];
 export function juzgarEmpaquetado(entrada: {
   readonly funciones: readonly { readonly name: string; readonly runtimeVersion?: string }[];
   readonly rutasDeBorde: readonly { readonly function: string; readonly pattern: string }[];
