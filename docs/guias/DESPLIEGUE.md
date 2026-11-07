@@ -253,18 +253,22 @@ pnpm --filter @ncr/web start      # servidor Node en el puerto 3100
 La consola es **renderizada en servidor** (`force-dynamic` en las páginas que
 leen sesión): no hay exportación estática y no se puede servir desde un bucket.
 
-### En Netlify (D8)
+### En Netlify (D8 · D-160)
 
-- El renderizado en servidor, el proxy `/api/ncr/…` y el `middleware` de la CSP
-  con nonce corren como funciones de Netlify. `API_URL` apunta al dominio
-  público de la API y **nunca** es un `NEXT_PUBLIC_*`.
+**El procedimiento completo está en [`DESPLIEGUE_NETLIFY.md`](DESPLIEGUE_NETLIFY.md)**
+(D-160, [ADR-041](../decisiones/ADR-041-la-consola-en-netlify-desplegada-desde-github.md)):
+el sitio no se conecta a Git y lo publica el flujo `desplegar-consola.yml`, a
+mano y con aprobación.
+
+- El renderizado en servidor y el proxy `/api/ncr/…` corren como funciones de
+  Netlify, y el `middleware` de la CSP con nonce como función de borde.
+  `API_URL` apunta al dominio público de la API y **nunca** es un
+  `NEXT_PUBLIC_*`.
 - `CORS_ALLOWED_ORIGINS` de la API incluye el dominio de la consola.
-- **C-37 · P-20 (sin resolver):** el canal SSE (`…/eventos/flujo`) y el audio de
-  la guardia virtual pasan por el proxy como flujo. Con el límite de ejecución
-  de una función, el SSE reconecta con huecos y el audio se corta. Hasta que se
-  decida P-20, las consolas **operativas** (portería y guardia virtual) deben
-  correr donde el proxy no tenga ese límite: el servidor Node de la consola
-  (`pnpm --filter @ncr/web start`) o la app de escritorio. Así se hace en sitio.
+- **C-37 · resuelta en la 15-R (P-20).** El SSE y el audio de la guardia ya no
+  pasan por el proxy: van directos del navegador a la API con un billete de un
+  solo uso (`CONSOLA_EN_RED_Y_DESPLIEGUE.md` §7). Por el proxy sólo van
+  peticiones cortas, dentro de los 60 s de una función de Netlify.
 
 ### La PWA no se despliega aparte
 

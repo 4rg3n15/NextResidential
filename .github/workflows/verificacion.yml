@@ -429,3 +429,39 @@ jobs:
 
       - name: Node de .nvmrc, sin root, sin secretos y por debajo de 250 MB
         run: node scripts/lib/imagen-de-la-api.mjs ncr-api:verificacion
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LA CONSOLA EMPAQUETADA PARA NETLIFY · D-160 (ADR-041)
+  #
+  # `pnpm build` (en `entregables`) compila Next, pero no lo que Netlify
+  # despliega: las funciones y el middleware que genera el adaptador OpenNext.
+  # El middleware de la consola es de Node (`runtime: 'nodejs'`), y Netlify lo
+  # convierte en una función de borde con sus limitaciones (sin sistema de
+  # ficheros ni módulos nativos). Aquí se empaqueta en cada PR, SIN cuenta, SIN
+  # token y SIN publicar (`--offline`): si una dependencia nueva lo rompe, se
+  # sabe aquí y no el día de desplegar.
+  # ═══════════════════════════════════════════════════════════════════════════
+  consola-en-netlify:
+    name: consola empaquetada para Netlify (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalación reproducible
+        run: pnpm install --frozen-lockfile
+
+      - name: Construcción de Netlify, sin cuenta ni publicación
+        run: npx -y netlify-cli@27.14.2 build --offline --filter @ncr/web
+
+      - name: Funciones y middleware empaquetados
+        run: node scripts/lib/variables-de-netlify.mjs empaquetado apps/web/.netlify

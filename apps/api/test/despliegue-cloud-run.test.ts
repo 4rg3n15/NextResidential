@@ -36,13 +36,14 @@ const DE_SECRET_MANAGER: Record<string, string> = {
   INGESTA_FIRMA_SECRETO: 'secreto-de-ingesta-de-treinta-y-dos-o-mas',
   BIOMETRIA_LLAVE: 'llave-de-biometria-de-treinta-y-dos-o-mas',
   EQUIPOS_LLAVE: 'llave-de-equipos-de-treinta-y-dos-o-mas++',
+  API_IP_FIRMA_SECRETO: 'secreto-compartido-con-la-consola-32+++',
 };
 
 describe('D-154 · los ficheros versionados de Cloud Run', () => {
   it('cuadran con .env.example: nada inventado, nada secreto como variable, nada obligatorio fuera', () => {
     const { variables, secretos } = cargar(RAIZ);
     expect(variables.size).toBeGreaterThan(0);
-    expect(secretos.size).toBe(6);
+    expect(secretos.size).toBe(7);
     for (const nombre of variables.keys()) expect(SECRETAS).not.toContain(nombre);
   });
 
@@ -64,7 +65,7 @@ describe('D-154 · los ficheros versionados de Cloud Run', () => {
   it('el valor de --set-secrets es VARIABLE=secreto:latest, sin valores', () => {
     const { secretos } = cargar(RAIZ);
     const bandera = banderaDeSecretos(secretos);
-    expect(bandera.split(',')).toHaveLength(6);
+    expect(bandera.split(',')).toHaveLength(7);
     for (const parte of bandera.split(','))
       expect(parte).toMatch(/^[A-Z][A-Z0-9_]*=[a-z0-9-]+:latest$/);
   });
